@@ -63,6 +63,7 @@ import {
   createProviderProvenanceSchedulerNarrativeTemplate,
   createProviderProvenanceScheduledReport,
   approveProviderProvenanceExportJob,
+  deleteProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   deleteProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   deleteProviderProvenanceSchedulerNarrativeRegistryEntry,
   deleteProviderProvenanceSchedulerNarrativeTemplate,
@@ -82,7 +83,9 @@ import {
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
   listProviderProvenanceAnalyticsPresets,
   listProviderProvenanceDashboardViews,
+  listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits,
   listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogs,
+  listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions,
   listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAudits,
   listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates,
   listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisions,
@@ -103,13 +106,16 @@ import {
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
+  restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevision,
   restoreProviderProvenanceSchedulerNarrativeRegistryRevision,
   restoreProviderProvenanceSchedulerNarrativeTemplateRevision,
   revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   runProviderProvenanceSchedulerNarrativeGovernancePlanBatchAction,
+  runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance,
   runDueProviderProvenanceScheduledReports,
   runProviderProvenanceScheduledReport,
+  updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   updateProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   updateProviderProvenanceSchedulerNarrativeRegistryEntry,
   updateProviderProvenanceSchedulerNarrativeTemplate,
@@ -318,7 +324,10 @@ import type {
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry,
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionEntry,
@@ -678,6 +687,21 @@ const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft:
     default_policy_template_id: "",
   };
 
+type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  default_policy_template_id: string;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    default_policy_template_id: "",
+  };
+
 type ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
   queue_state: typeof ALL_FILTER_VALUE | "pending_approval" | "ready_to_apply" | "completed";
   item_type: typeof ALL_FILTER_VALUE | "template" | "registry";
@@ -705,6 +729,21 @@ type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterStat
 const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilter:
   ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState = {
     policy_template_id: "",
+    action: ALL_FILTER_VALUE,
+    actor_tab_id: "",
+    search: "",
+  };
+
+type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilterState = {
+  catalog_id: string;
+  action: string;
+  actor_tab_id: string;
+  search: string;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilterState = {
+    catalog_id: "",
     action: ALL_FILTER_VALUE,
     actor_tab_id: "",
     search: "",
@@ -3271,13 +3310,23 @@ export default function App() {
     useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraftState>(
       defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft,
     );
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraftState>(
+      defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft,
+    );
   const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogs] =
     useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog[]>([]);
   const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogsLoading, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogsLoading] =
     useState(false);
   const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogsError, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogsError] =
     useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds, setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds] =
+    useState<string[]>([]);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction] =
+    useState<"delete" | "restore" | "update" | null>(null);
   const [editingProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId, setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId] =
+    useState<string | null>(null);
+  const [editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId, setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId, setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId] =
     useState<string | null>(null);
@@ -3286,6 +3335,14 @@ export default function App() {
   const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplateHistoryLoading, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateHistoryLoading] =
     useState(false);
   const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplateHistoryError, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateHistoryError] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId, setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory, setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionListPayload | null>(null);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryLoading, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilter, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilter] =
     useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState>(
@@ -3296,6 +3353,16 @@ export default function App() {
   const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsLoading, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsLoading] =
     useState(false);
   const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsError, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilterState>(
+      defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter,
+    );
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord[]>([]);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId, setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId] =
     useState("");
@@ -3552,6 +3619,10 @@ export default function App() {
     () => new Set(selectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds),
     [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds],
   );
+  const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIdSet = useMemo(
+    () => new Set(selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds),
+    [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds],
+  );
   const selectedProviderProvenanceSchedulerNarrativeGovernancePlanIdSet = useMemo(
     () => new Set(selectedProviderProvenanceSchedulerNarrativeGovernancePlanIds),
     [selectedProviderProvenanceSchedulerNarrativeGovernancePlanIds],
@@ -3584,6 +3655,16 @@ export default function App() {
     [
       selectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIdSet,
       providerProvenanceSchedulerNarrativeGovernancePolicyTemplates,
+    ],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries = useMemo(
+    () =>
+      providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.filter((entry) =>
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIdSet.has(entry.catalog_id),
+      ),
+    [
+      selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIdSet,
+      providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs,
     ],
   );
   const selectedProviderProvenanceSchedulerNarrativeGovernancePlan = useMemo(
@@ -6147,6 +6228,7 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesLoading(true);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogsLoading(true);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsLoading(true);
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading(true);
     setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(true);
     setProviderProvenanceScheduledReportsLoading(true);
     setProviderProvenanceAnalyticsPresetsError(null);
@@ -6156,6 +6238,7 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesError(null);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogsError(null);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsError(null);
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError(null);
     setProviderProvenanceSchedulerNarrativeGovernancePlansError(null);
     setProviderProvenanceScheduledReportsError(null);
     try {
@@ -6167,6 +6250,7 @@ export default function App() {
         governancePolicyTemplatePayload,
         governancePolicyCatalogPayload,
         governancePolicyTemplateAuditPayload,
+        governancePolicyCatalogAuditPayload,
         governancePlanPayload,
         reportPayload,
       ] = await Promise.all([
@@ -6192,6 +6276,22 @@ export default function App() {
               || undefined,
           limit: 24,
         }),
+        listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits({
+          catalogId:
+            providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.catalog_id.trim()
+              || undefined,
+          action:
+            providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.action !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.action
+              : undefined,
+          actorTabId:
+            providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.actor_tab_id.trim()
+              || undefined,
+          search:
+            providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.search.trim()
+              || undefined,
+          limit: 24,
+        }),
         listProviderProvenanceSchedulerNarrativeGovernancePlans({ limit: 24 }),
         listProviderProvenanceScheduledReports({ limit: 24 }),
       ]);
@@ -6203,6 +6303,9 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogs(governancePolicyCatalogPayload.items);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAudits(
         governancePolicyTemplateAuditPayload.items,
+      );
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits(
+        governancePolicyCatalogAuditPayload.items,
       );
       setProviderProvenanceSchedulerNarrativeGovernancePlans(governancePlanPayload.items);
       setProviderProvenanceScheduledReports(reportPayload.items);
@@ -6216,7 +6319,22 @@ export default function App() {
           governancePlanPayload.items.some((entry) => entry.plan_id === planId),
         ),
       );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds((current) =>
+        current.filter((catalogId) =>
+          governancePolicyCatalogPayload.items.some((entry) => entry.catalog_id === catalogId),
+        ),
+      );
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft((current) => ({
+        ...current,
+        default_policy_template_id:
+          current.default_policy_template_id
+          && !governancePolicyTemplatePayload.items.some(
+            (entry) => entry.policy_template_id === current.default_policy_template_id,
+          )
+            ? ""
+            : current.default_policy_template_id,
+      }));
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft((current) => ({
         ...current,
         default_policy_template_id:
           current.default_policy_template_id
@@ -6235,6 +6353,16 @@ export default function App() {
         setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId(null);
         setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateHistory(null);
         setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateHistoryError(null);
+      }
+      if (
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId
+        && !governancePolicyCatalogPayload.items.some(
+          (entry) => entry.catalog_id === selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId,
+        )
+      ) {
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(null);
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(null);
+        setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
       }
       if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlanId && governancePlanPayload.items.length) {
         setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(governancePlanPayload.items[0].plan_id);
@@ -6299,11 +6427,13 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates([]);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogs([]);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAudits([]);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits([]);
       setProviderProvenanceSchedulerNarrativeGovernancePlans([]);
       setProviderProvenanceScheduledReports([]);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds([]);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateId(null);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
@@ -6311,6 +6441,8 @@ export default function App() {
       setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateHistory(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(null);
       setProviderProvenanceAnalyticsPresetsError(message);
       setProviderProvenanceDashboardViewsError(message);
@@ -6319,6 +6451,7 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsError(message);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePlansError(message);
       setProviderProvenanceScheduledReportsError(message);
     } finally {
@@ -6329,6 +6462,7 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogsLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsLoading(false);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(false);
       setProviderProvenanceScheduledReportsLoading(false);
     }
@@ -6585,6 +6719,7 @@ export default function App() {
   }
 
   function resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft() {
+    setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(null);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft(
       defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft,
     );
@@ -6638,6 +6773,22 @@ export default function App() {
     );
   }
 
+  function toggleProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogSelection(catalogId: string) {
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds((current) =>
+      current.includes(catalogId)
+        ? current.filter((candidate) => candidate !== catalogId)
+        : [...current, catalogId],
+    );
+  }
+
+  function toggleAllProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogSelections() {
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds((current) =>
+      current.length === providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.length
+        ? []
+        : providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.map((entry) => entry.catalog_id),
+    );
+  }
+
   function toggleProviderProvenanceSchedulerNarrativeGovernancePlanSelection(planId: string) {
     setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanIds((current) =>
       current.includes(planId)
@@ -6663,7 +6814,12 @@ export default function App() {
   function formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(
     result: ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ) {
-    const label = result.item_type === "registry" ? "registry entries" : "templates";
+    const label =
+      result.item_type === "registry"
+        ? "registry entries"
+        : result.item_type === "policy_catalog"
+          ? "policy catalogs"
+          : "templates";
     const parts = [
       `${result.applied_count} applied`,
       `${result.skipped_count} skipped`,
@@ -7178,21 +7334,46 @@ export default function App() {
       return;
     }
     try {
-      const catalog = await createProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog({
-        name: providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.name.trim(),
-        description: providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.description.trim(),
-        policyTemplateIds: selectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateEntries.map(
-          (entry) => entry.policy_template_id,
-        ),
-        defaultPolicyTemplateId:
-          providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.default_policy_template_id.trim() || undefined,
-        createdByTabId: comparisonHistoryTabIdentity.tabId,
-        createdByTabLabel: comparisonHistoryTabIdentity.label,
-      });
+      const catalog = editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId
+        ? await updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog({
+            catalogId: editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId,
+            name: providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.name.trim(),
+            description: providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.description.trim(),
+            policyTemplateIds: selectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateEntries.map(
+              (entry) => entry.policy_template_id,
+            ),
+            defaultPolicyTemplateId:
+              providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.default_policy_template_id.trim()
+              || null,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+            reason: "scheduler_narrative_governance_policy_catalog_manual_edit",
+          })
+        : await createProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog({
+            name: providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.name.trim(),
+            description: providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.description.trim(),
+            policyTemplateIds: selectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateEntries.map(
+              (entry) => entry.policy_template_id,
+            ),
+            defaultPolicyTemplateId:
+              providerProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft.default_policy_template_id.trim()
+              || undefined,
+            createdByTabId: comparisonHistoryTabIdentity.tabId,
+            createdByTabLabel: comparisonHistoryTabIdentity.label,
+          });
       resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft();
       await loadProviderProvenanceWorkspaceRegistry();
+      if (
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId === catalog.catalog_id
+      ) {
+        const history = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
+          catalog.catalog_id,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(history);
+        setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+      }
       setProviderProvenanceWorkspaceFeedback(
-        `Saved governance policy catalog ${catalog.name} with ${catalog.policy_template_ids.length} linked template(s).`,
+        `${editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId ? "Updated" : "Saved"} governance policy catalog ${catalog.name} with ${catalog.policy_template_ids.length} linked template(s).`,
       );
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
@@ -7230,6 +7411,163 @@ export default function App() {
     setProviderProvenanceWorkspaceFeedback(
       `Applied governance policy catalog ${catalog.name} to the approval queue and governance defaults.`,
     );
+  }
+
+  function editProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog(
+    catalog: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  ) {
+    if (catalog.status !== "active") {
+      setProviderProvenanceWorkspaceFeedback("Restore a governance policy catalog revision before editing a deleted catalog.");
+      return;
+    }
+    setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(catalog.catalog_id);
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft({
+      name: catalog.name,
+      description: catalog.description,
+      default_policy_template_id: catalog.default_policy_template_id ?? "",
+    });
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds(catalog.policy_template_ids);
+    setProviderProvenanceWorkspaceFeedback(`Editing governance policy catalog ${catalog.name}.`);
+  }
+
+  async function toggleProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(
+    catalogId: string,
+  ) {
+    if (
+      selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId === catalogId
+      && selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory
+    ) {
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(null);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+      return;
+    }
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(catalogId);
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(null);
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryLoading(true);
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+    try {
+      const payload = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
+        catalogId,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(payload);
+    } catch (error) {
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(
+        (error as Error).message,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryLoading(false);
+    }
+  }
+
+  async function restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryRevision(
+    entry: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry,
+  ) {
+    try {
+      const restored = await restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevision({
+        catalogId: entry.catalog_id,
+        revisionId: entry.revision_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_policy_catalog_revision_restore_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const history = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
+        entry.catalog_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(entry.catalog_id);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(history);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+      setProviderProvenanceWorkspaceFeedback(
+        `Restored governance policy catalog ${restored.name} from revision ${entry.revision_id}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Governance policy catalog restore failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function removeProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog(
+    catalog: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  ) {
+    if (catalog.status === "deleted") {
+      setProviderProvenanceWorkspaceFeedback(`Governance policy catalog ${catalog.name} is already deleted.`);
+      return;
+    }
+    if (typeof window !== "undefined" && !window.confirm(`Delete governance policy catalog ${catalog.name}?`)) {
+      return;
+    }
+    try {
+      await deleteProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog({
+        catalogId: catalog.catalog_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_policy_catalog_deleted_from_control_room",
+      });
+      if (editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId === catalog.catalog_id) {
+        resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft();
+      }
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId === catalog.catalog_id) {
+        const history = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
+          catalog.catalog_id,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(history);
+      }
+      setProviderProvenanceWorkspaceFeedback(`Deleted governance policy catalog ${catalog.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Governance policy catalog delete failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction(
+    action: "delete" | "restore" | "update",
+  ) {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more governance policy catalogs first.");
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction(action);
+    try {
+      const result = await runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance({
+        action,
+        catalogIds: selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: `scheduler_narrative_governance_policy_catalog_bulk_${action}_from_control_room`,
+        namePrefix:
+          action === "update" ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.name_prefix : undefined,
+        nameSuffix:
+          action === "update" ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.name_suffix : undefined,
+        descriptionAppend:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.description_append
+            : undefined,
+        defaultPolicyTemplateId:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.default_policy_template_id.trim()
+            ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.default_policy_template_id.trim()
+            : undefined,
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (action === "update") {
+        setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft(
+          defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft,
+        );
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Governance policy catalog bulk ${action} failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction(null);
+    }
   }
 
   function editProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate(
@@ -10081,15 +10419,27 @@ export default function App() {
                                               }}
                                               type="button"
                                             >
-                                              Save catalog
+                                              {editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId
+                                                ? "Update catalog"
+                                                : "Save catalog"}
                                             </button>
-                                            <button
-                                              className="ghost-button"
-                                              onClick={resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft}
-                                              type="button"
-                                            >
-                                              Reset
-                                            </button>
+                                            {editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId ? (
+                                              <button
+                                                className="ghost-button"
+                                                onClick={resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft}
+                                                type="button"
+                                              >
+                                                Cancel edit
+                                              </button>
+                                            ) : (
+                                              <button
+                                                className="ghost-button"
+                                                onClick={resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft}
+                                                type="button"
+                                              >
+                                                Reset
+                                              </button>
+                                            )}
                                           </div>
                                         </label>
                                       </div>
@@ -10466,8 +10816,132 @@ export default function App() {
                                   <div className="market-data-provenance-shared-history">
                                     <div className="market-data-provenance-history-head">
                                       <strong>Governance policy catalogs</strong>
-                                      <p>Reuse named policy bundles to set queue filters and default policy selections without reselecting each template.</p>
+                                      <p>Reuse named policy bundles, review catalog revisions, and bulk-govern shared queue defaults without editing each catalog one by one.</p>
                                     </div>
+                                    {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.length ? (
+                                      <div className="filter-bar">
+                                        <label>
+                                          <span>Selection</span>
+                                          <button
+                                            className="ghost-button"
+                                            onClick={toggleAllProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogSelections}
+                                            type="button"
+                                          >
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds.length
+                                              === providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.length
+                                              ? "Clear all"
+                                              : "Select all"}
+                                          </button>
+                                          <p className="run-lineage-symbol-copy">
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries.length} catalog(s) selected
+                                          </p>
+                                        </label>
+                                        <label>
+                                          <span>Name prefix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft((current) => ({
+                                                ...current,
+                                                name_prefix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="Shift "
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.name_prefix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Name suffix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft((current) => ({
+                                                ...current,
+                                                name_suffix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder=" / archived"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.name_suffix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Description append</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft((current) => ({
+                                                ...current,
+                                                description_append: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="requires desk review"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.description_append}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Default template</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft((current) => ({
+                                                ...current,
+                                                default_policy_template_id: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft.default_policy_template_id}
+                                          >
+                                            <option value="">Keep current default</option>
+                                            {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
+                                              .filter((entry) => entry.status === "active")
+                                              .map((entry) => (
+                                                <option key={entry.policy_template_id} value={entry.policy_template_id}>
+                                                  {entry.name}
+                                                </option>
+                                              ))}
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <div className="market-data-provenance-history-actions">
+                                            <button
+                                              className="ghost-button"
+                                              disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries.length}
+                                              onClick={() => {
+                                                void runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction("delete");
+                                              }}
+                                              type="button"
+                                            >
+                                              {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction === "delete"
+                                                ? "Deleting…"
+                                                : "Delete selected"}
+                                            </button>
+                                            <button
+                                              className="ghost-button"
+                                              disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries.length}
+                                              onClick={() => {
+                                                void runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction("restore");
+                                              }}
+                                              type="button"
+                                            >
+                                              {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction === "restore"
+                                                ? "Restoring…"
+                                                : "Restore selected"}
+                                            </button>
+                                            <button
+                                              className="ghost-button"
+                                              disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries.length}
+                                              onClick={() => {
+                                                void runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction("update");
+                                              }}
+                                              type="button"
+                                            >
+                                              {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction === "update"
+                                                ? "Updating…"
+                                                : "Apply bulk edit"}
+                                            </button>
+                                          </div>
+                                        </label>
+                                      </div>
+                                    ) : null}
                                     {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogsLoading ? (
                                       <p className="empty-state">Loading governance policy catalogs…</p>
                                     ) : null}
@@ -10480,6 +10954,7 @@ export default function App() {
                                       <table className="data-table">
                                         <thead>
                                           <tr>
+                                            <th aria-label="Select catalog">Sel</th>
                                             <th>Catalog</th>
                                             <th>Defaults</th>
                                             <th>Action</th>
@@ -10489,12 +10964,24 @@ export default function App() {
                                           {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.map((catalog) => (
                                             <tr key={catalog.catalog_id}>
                                               <td>
+                                                <input
+                                                  checked={selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIdSet.has(catalog.catalog_id)}
+                                                  onChange={() => {
+                                                    toggleProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogSelection(catalog.catalog_id);
+                                                  }}
+                                                  type="checkbox"
+                                                />
+                                              </td>
+                                              <td>
                                                 <strong>{catalog.name}</strong>
                                                 <p className="run-lineage-symbol-copy">
                                                   {catalog.description || "No description."}
                                                 </p>
                                                 <p className="run-lineage-symbol-copy">
                                                   {catalog.policy_template_names.join(", ") || "No linked templates."}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(catalog.status)} · {catalog.revision_count} revision(s) · updated {formatTimestamp(catalog.updated_at)}
                                                 </p>
                                               </td>
                                               <td>
@@ -10505,17 +10992,53 @@ export default function App() {
                                                 <p className="run-lineage-symbol-copy">
                                                   {formatWorkflowToken(catalog.approval_lane)} · {formatWorkflowToken(catalog.approval_priority)}
                                                 </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {catalog.created_by_tab_label ?? catalog.created_by_tab_id ?? "unknown tab"}
+                                                </p>
                                               </td>
                                               <td>
                                                 <div className="market-data-provenance-history-actions">
                                                   <button
                                                     className="ghost-button"
+                                                    disabled={catalog.status !== "active"}
                                                     onClick={() => {
                                                       applyProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog(catalog);
                                                     }}
                                                     type="button"
                                                   >
                                                     Apply catalog
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      editProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog(catalog);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Edit
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void removeProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog(catalog);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Delete
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void toggleProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(
+                                                        catalog.catalog_id,
+                                                      );
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId === catalog.catalog_id
+                                                      && selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory
+                                                      ? "Hide versions"
+                                                      : "Versions"}
                                                   </button>
                                                 </div>
                                               </td>
@@ -10526,6 +11049,233 @@ export default function App() {
                                     ) : (
                                       <p className="empty-state">No governance policy catalogs saved yet.</p>
                                     )}
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Catalog revision history</strong>
+                                        <p>Stage a previous linked-template snapshot or restore it as the active policy catalog.</p>
+                                      </div>
+                                      {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryLoading ? (
+                                        <p className="empty-state">Loading policy catalog revisions…</p>
+                                      ) : null}
+                                      {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError ? (
+                                        <p className="market-data-workflow-feedback">
+                                          Policy catalog revision history failed: {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError}
+                                        </p>
+                                      ) : null}
+                                      {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Revision</th>
+                                              <th>Defaults</th>
+                                              <th>Action</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory.history.map((entry) => (
+                                              <tr key={entry.revision_id}>
+                                                <td>
+                                                  <strong>{entry.revision_id}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.name}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.reason}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{entry.default_policy_template_name ?? "No default template"}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.policy_template_names.join(", ") || "No linked templates."}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatWorkflowToken(entry.status)} · {formatWorkflowToken(entry.approval_lane)} / {formatWorkflowToken(entry.approval_priority)}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <div className="market-data-provenance-history-actions">
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() => {
+                                                        setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(
+                                                          entry.catalog_id,
+                                                        );
+                                                        setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft({
+                                                          name: entry.name,
+                                                          description: entry.description,
+                                                          default_policy_template_id: entry.default_policy_template_id ?? "",
+                                                        });
+                                                        setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds(
+                                                          entry.policy_template_ids,
+                                                        );
+                                                        setProviderProvenanceWorkspaceFeedback(
+                                                          `Policy catalog revision ${entry.revision_id} staged in the editor.`,
+                                                        );
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Stage draft
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() => {
+                                                        void restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryRevision(
+                                                          entry,
+                                                        );
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Restore revision
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : (
+                                        <p className="empty-state">Select a policy catalog row and open Versions to inspect revisions.</p>
+                                      )}
+                                    </div>
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Policy catalog team audit</strong>
+                                        <p>Filter shared audit events by catalog, action, or actor to review catalog lifecycle and linked-template changes.</p>
+                                      </div>
+                                      <div className="filter-bar">
+                                        <label>
+                                          <span>Catalog</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter((current) => ({
+                                                ...current,
+                                                catalog_id: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.catalog_id}
+                                          >
+                                            <option value="">All catalogs</option>
+                                            {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.map((entry) => (
+                                              <option key={entry.catalog_id} value={entry.catalog_id}>
+                                                {entry.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter((current) => ({
+                                                ...current,
+                                                action: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.action}
+                                          >
+                                            <option value={ALL_FILTER_VALUE}>All actions</option>
+                                            <option value="created">Created</option>
+                                            <option value="updated">Updated</option>
+                                            <option value="deleted">Deleted</option>
+                                            <option value="restored">Restored</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Actor</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter((current) => ({
+                                                ...current,
+                                                actor_tab_id: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="tab_ops"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.actor_tab_id}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Search</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter((current) => ({
+                                                ...current,
+                                                search: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="batch, restore, default"
+                                            type="search"
+                                            value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter.search}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => {
+                                              void loadProviderProvenanceWorkspaceRegistry();
+                                            }}
+                                            type="button"
+                                          >
+                                            Refresh audit
+                                          </button>
+                                        </label>
+                                      </div>
+                                      {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading ? (
+                                        <p className="empty-state">Loading policy catalog audit trail…</p>
+                                      ) : null}
+                                      {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError ? (
+                                        <p className="market-data-workflow-feedback">
+                                          Policy catalog audit load failed: {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError}
+                                        </p>
+                                      ) : null}
+                                      {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits.length ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Audit</th>
+                                              <th>Catalog</th>
+                                              <th>Actor</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits.map((entry) => (
+                                              <tr key={entry.audit_id}>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(entry.action)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.detail}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatTimestamp(entry.recorded_at)}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{entry.name}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatWorkflowToken(entry.status)} · {entry.policy_template_names.join(", ") || "No linked templates."}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    revision {entry.revision_id ?? "n/a"}{entry.source_revision_id ? ` · from ${shortenIdentifier(entry.source_revision_id, 10)}` : ""}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{entry.actor_tab_label ?? entry.actor_tab_id ?? "system"}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatWorkflowToken(entry.approval_lane)} · {formatWorkflowToken(entry.approval_priority)}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.reason}
+                                                  </p>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : (
+                                        <p className="empty-state">No policy catalog audit records match the current filter.</p>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="provider-provenance-workspace-card">

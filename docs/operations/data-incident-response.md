@@ -95,6 +95,9 @@ unclear dataset lineage.
 - the same approval queue now also supports batch approve/apply, and named governance policy
   catalogs can reapply linked template bundles plus queue defaults when a handoff or follow-the-sun
   review cycle needs to rehydrate the same discipline quickly
+- those policy catalogs now also expose revision history, team audit, and bulk lifecycle controls,
+  so handoff presets can be edited, deleted, restored, and batch-retired without leaving the
+  operator workspace
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

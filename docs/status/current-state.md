@@ -199,6 +199,9 @@ It is not yet a finished live trading product:
 - that approval queue now also supports multi-plan batch approve/apply, and governance policy
   catalogs can bundle linked policy templates into reusable queue/default-policy presets for shift
   handoff workflows
+- those governance policy catalogs now also support edit/delete/revision restore, shared audit, and
+  bulk governance updates in the control room, so catalog lifecycle is durable instead of being a
+  create/list-only preset layer
 
 ### Operator discipline baseline
 

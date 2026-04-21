@@ -1737,14 +1737,77 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog = {
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
   guidance?: string | null;
+  status: "active" | "deleted" | string;
   created_at: string;
   updated_at: string;
+  current_revision_id?: string | null;
+  revision_count: number;
   created_by_tab_id?: string | null;
   created_by_tab_label?: string | null;
+  deleted_at?: string | null;
+  deleted_by_tab_id?: string | null;
+  deleted_by_tab_label?: string | null;
 };
 
 export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogListPayload = {
   items: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog[];
+  total: number;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry = {
+  revision_id: string;
+  catalog_id: string;
+  action: string;
+  reason: string;
+  source_revision_id?: string | null;
+  name: string;
+  description: string;
+  policy_template_ids: string[];
+  policy_template_names: string[];
+  default_policy_template_id?: string | null;
+  default_policy_template_name?: string | null;
+  item_type_scope: "any" | "template" | "registry" | string;
+  action_scope: "any" | "delete" | "restore" | "update" | string;
+  approval_lane: string;
+  approval_priority: "low" | "normal" | "high" | "critical" | string;
+  guidance?: string | null;
+  status: "active" | "deleted" | string;
+  recorded_at: string;
+  recorded_by_tab_id?: string | null;
+  recorded_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionListPayload = {
+  current: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog;
+  history: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry[];
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord = {
+  audit_id: string;
+  catalog_id: string;
+  action: string;
+  recorded_at: string;
+  reason: string;
+  detail: string;
+  revision_id?: string | null;
+  source_revision_id?: string | null;
+  name: string;
+  status: "active" | "deleted" | string;
+  default_policy_template_id?: string | null;
+  default_policy_template_name?: string | null;
+  policy_template_ids: string[];
+  policy_template_names: string[];
+  item_type_scope: "any" | "template" | "registry" | string;
+  action_scope: "any" | "delete" | "restore" | "update" | string;
+  approval_lane: string;
+  approval_priority: "low" | "normal" | "high" | "critical" | string;
+  guidance?: string | null;
+  actor_tab_id?: string | null;
+  actor_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditListPayload = {
+  items: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord[];
   total: number;
 };
 

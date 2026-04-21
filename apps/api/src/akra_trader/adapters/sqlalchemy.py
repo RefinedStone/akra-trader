@@ -34,7 +34,9 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord
@@ -285,6 +287,25 @@ provider_provenance_scheduler_narrative_governance_policy_catalogs = Table(
   Column("created_by_tab_id", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_narrative_governance_policy_catalog_revisions = Table(
+  "provider_provenance_scheduler_narrative_governance_policy_catalog_revisions",
+  metadata,
+  Column("revision_id", String, primary_key=True),
+  Column("catalog_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records = Table(
+  "provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records",
+  metadata,
+  Column("audit_id", String, primary_key=True),
+  Column("catalog_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("actor_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 provider_provenance_scheduler_narrative_governance_plans = Table(
   "provider_provenance_scheduler_narrative_governance_plans",
   metadata,
@@ -377,6 +398,12 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   )
   _provider_provenance_scheduler_narrative_governance_policy_catalog_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
+  )
+  _provider_provenance_scheduler_narrative_governance_policy_catalog_revision_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord
+  )
+  _provider_provenance_scheduler_narrative_governance_policy_catalog_audit_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord
   )
   _provider_provenance_scheduler_narrative_governance_plan_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
@@ -1715,6 +1742,136 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       return None
     return self._provider_provenance_scheduler_narrative_governance_policy_catalog_adapter.validate_python(
       row["payload"]
+    )
+
+  def save_provider_provenance_scheduler_narrative_governance_policy_catalog_revision(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord:
+    payload = self._provider_provenance_scheduler_narrative_governance_policy_catalog_revision_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "revision_id": record.revision_id,
+      "catalog_id": record.catalog_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.c.revision_id).where(
+          provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.c.revision_id
+          == record.revision_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(provider_provenance_scheduler_narrative_governance_policy_catalog_revisions).values(**row)
+        )
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_narrative_governance_policy_catalog_revisions)
+          .where(
+            provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.c.revision_id
+            == record.revision_id
+          )
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_policy_catalog_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord, ...]:
+    statement = select(
+      provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.c.payload
+    ).order_by(
+      provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.c.recorded_at.desc(),
+      provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.c.revision_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_narrative_governance_policy_catalog_revision_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_narrative_governance_policy_catalog_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.c.payload).where(
+          provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.c.revision_id
+          == revision_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_narrative_governance_policy_catalog_revision_adapter.validate_python(
+      row["payload"]
+    )
+
+  def save_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord:
+    payload = self._provider_provenance_scheduler_narrative_governance_policy_catalog_audit_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "audit_id": record.audit_id,
+      "catalog_id": record.catalog_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "actor_tab_id": record.actor_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.c.audit_id).where(
+          provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.c.audit_id
+          == record.audit_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records).values(
+            **row
+          )
+        )
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records)
+          .where(
+            provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.c.audit_id
+            == record.audit_id
+          )
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord, ...]:
+    statement = select(
+      provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.c.payload
+    ).order_by(
+      provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.c.recorded_at.desc(),
+      provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.c.audit_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_narrative_governance_policy_catalog_audit_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
     )
 
   def save_provider_provenance_scheduler_narrative_governance_plan(

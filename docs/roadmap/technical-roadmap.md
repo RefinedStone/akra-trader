@@ -144,6 +144,9 @@ creation.
 - the next layer is now in place too: queue operators can batch approve/apply multiple plans, and
   higher-level governance policy catalogs can bundle linked templates into reusable queue/default
   presets instead of rebuilding the same selection set by hand
+- those policy catalogs now also have lifecycle, audit, and bulk-governance surfaces, but catalog
+  governance still does not yet include stitched multi-occurrence narrative artifacts or deeper
+  server-side narrative search
 
 ### Remaining work
 

@@ -15165,6 +15165,12 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_update",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_delete",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_bulk_governance",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_list",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_restore",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_approve",
@@ -15358,6 +15364,20 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list"].filter_param_specs[0].key == (
     "search"
   )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_update"].methods == ("PATCH",)
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_delete"].path_param_keys == (
+    "catalog_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_bulk_governance"].methods == ("POST",)
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_list"
+  ].route_path.endswith("/scheduler-narrative-governance/policy-catalogs/{catalog_id}/revisions")
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_restore"
+  ].path_param_keys == ("catalog_id", "revision_id")
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_list"
+  ].filter_param_specs[0].key == "catalog_id"
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[0].key == (
     "item_type"
@@ -16920,6 +16940,94 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert governance_policy_catalog_list_payload["total"] == 1
   assert governance_policy_catalog_list_payload["items"][0]["catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+
+  updated_governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_update"],
+    app=app,
+    path_params={"catalog_id": governance_policy_catalog_payload["catalog_id"]},
+    request_payload={
+      "name": "Shift lead batch catalog / reviewed",
+      "description": "Reusable queue defaults for reviewed shift-lead policies.",
+      "policy_template_ids": [governance_policy_template_payload["policy_template_id"]],
+      "default_policy_template_id": governance_policy_template_payload["policy_template_id"],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_catalog_update",
+    },
+  )
+  assert updated_governance_policy_catalog_payload["name"].endswith("/ reviewed")
+  assert updated_governance_policy_catalog_payload["revision_count"] == 2
+
+  deleted_governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_delete"],
+    app=app,
+    path_params={"catalog_id": governance_policy_catalog_payload["catalog_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_catalog_delete",
+    },
+  )
+  assert deleted_governance_policy_catalog_payload["status"] == "deleted"
+
+  governance_policy_catalog_revision_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_list"],
+    app=app,
+    path_params={"catalog_id": governance_policy_catalog_payload["catalog_id"]},
+  )
+  assert governance_policy_catalog_revision_payload["current"]["status"] == "deleted"
+  assert governance_policy_catalog_revision_payload["history"][0]["action"] == "deleted"
+
+  restored_governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_restore"],
+    app=app,
+    path_params={
+      "catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "revision_id": governance_policy_catalog_revision_payload["history"][-1]["revision_id"],
+    },
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_catalog_restore",
+    },
+  )
+  assert restored_governance_policy_catalog_payload["status"] == "active"
+  assert restored_governance_policy_catalog_payload["revision_count"] == 4
+
+  governance_policy_catalog_audit_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_list"],
+    app=app,
+    filters={
+      "catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "limit": 10,
+    },
+  )
+  assert [item["action"] for item in governance_policy_catalog_audit_payload["items"][:4]] == [
+    "restored",
+    "deleted",
+    "updated",
+    "created",
+  ]
+
+  bulk_governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_bulk_governance"],
+    app=app,
+    request_payload={
+      "action": "update",
+      "catalog_ids": [governance_policy_catalog_payload["catalog_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_catalog_bulk_update",
+      "name_suffix": " / bulk",
+    },
+  )
+  assert bulk_governance_policy_catalog_payload["applied_count"] == 1
+  refreshed_governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list"],
+    app=app,
+    filters={"search": "/ bulk", "limit": 10},
+  )
+  assert refreshed_governance_policy_catalog_payload["items"][0]["name"].endswith("/ bulk")
 
   template_governance_plan_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],

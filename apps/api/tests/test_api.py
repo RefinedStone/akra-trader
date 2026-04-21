@@ -1871,6 +1871,84 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert governance_policy_catalog_list_payload["total"] == 1
   assert governance_policy_catalog_list_payload["items"][0]["catalog_id"] == governance_policy_catalog_payload["catalog_id"]
 
+  updated_governance_policy_catalog_response = client.patch(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}",
+    json={
+      "name": "Shift lead batch catalog / reviewed",
+      "description": "Reusable queue defaults for reviewed shift-lead policies.",
+      "policy_template_ids": [governance_policy_template_payload["policy_template_id"]],
+      "default_policy_template_id": governance_policy_template_payload["policy_template_id"],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_catalog_update",
+    },
+  )
+  assert updated_governance_policy_catalog_response.status_code == 200
+  updated_governance_policy_catalog_payload = updated_governance_policy_catalog_response.json()
+  assert updated_governance_policy_catalog_payload["name"].endswith("/ reviewed")
+  assert updated_governance_policy_catalog_payload["revision_count"] == 2
+
+  deleted_governance_policy_catalog_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/delete",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_catalog_delete",
+    },
+  )
+  assert deleted_governance_policy_catalog_response.status_code == 200
+  deleted_governance_policy_catalog_payload = deleted_governance_policy_catalog_response.json()
+  assert deleted_governance_policy_catalog_payload["status"] == "deleted"
+
+  governance_policy_catalog_revision_response = client.get(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/revisions",
+  )
+  assert governance_policy_catalog_revision_response.status_code == 200
+  governance_policy_catalog_revision_payload = governance_policy_catalog_revision_response.json()
+  assert governance_policy_catalog_revision_payload["current"]["status"] == "deleted"
+  assert governance_policy_catalog_revision_payload["history"][0]["action"] == "deleted"
+
+  restored_governance_policy_catalog_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/revisions/{governance_policy_catalog_revision_payload['history'][-1]['revision_id']}/restore",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_catalog_restore",
+    },
+  )
+  assert restored_governance_policy_catalog_response.status_code == 200
+  restored_governance_policy_catalog_payload = restored_governance_policy_catalog_response.json()
+  assert restored_governance_policy_catalog_payload["status"] == "active"
+  assert restored_governance_policy_catalog_payload["revision_count"] == 4
+
+  governance_policy_catalog_audit_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/audits",
+    params={"catalog_id": governance_policy_catalog_payload["catalog_id"], "limit": 10},
+  )
+  assert governance_policy_catalog_audit_response.status_code == 200
+  governance_policy_catalog_audit_payload = governance_policy_catalog_audit_response.json()
+  assert [item["action"] for item in governance_policy_catalog_audit_payload["items"][:4]] == [
+    "restored",
+    "deleted",
+    "updated",
+    "created",
+  ]
+
+  bulk_governance_policy_catalog_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/bulk-governance",
+    json={
+      "action": "update",
+      "catalog_ids": [governance_policy_catalog_payload["catalog_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_catalog_bulk_update",
+      "name_suffix": " / bulk",
+    },
+  )
+  assert bulk_governance_policy_catalog_response.status_code == 200
+  bulk_governance_policy_catalog_payload = bulk_governance_policy_catalog_response.json()
+  assert bulk_governance_policy_catalog_payload["applied_count"] == 1
+
   template_governance_plan_response = client.post(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
     json={
