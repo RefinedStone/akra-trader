@@ -14507,6 +14507,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_export_analytics",
     "operator_provider_provenance_export_job_download",
     "operator_provider_provenance_export_job_history",
+    "operator_provider_provenance_export_job_policy",
+    "operator_provider_provenance_export_job_approval",
     "operator_provider_provenance_export_job_escalate",
     "operator_provider_provenance_analytics_preset_create",
     "operator_provider_provenance_analytics_preset_list",
@@ -14617,6 +14619,14 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_export_job_download"].filter_param_specs[0].key == "source_tab_id"
   assert bindings_by_key["operator_provider_provenance_export_job_history"].route_path == (
     "/operator/provider-provenance-exports/{job_id}/history"
+  )
+  assert bindings_by_key["operator_provider_provenance_export_job_policy"].methods == ("POST",)
+  assert bindings_by_key["operator_provider_provenance_export_job_policy"].request_payload_kind == (
+    "operator_provider_provenance_export_job_policy"
+  )
+  assert bindings_by_key["operator_provider_provenance_export_job_approval"].methods == ("POST",)
+  assert bindings_by_key["operator_provider_provenance_export_job_approval"].request_payload_kind == (
+    "operator_provider_provenance_export_job_approval"
   )
   assert bindings_by_key["operator_provider_provenance_export_job_escalate"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_export_job_escalate"].request_payload_kind == (
@@ -15813,6 +15823,13 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert shared_scheduler_export_payload["export_scope"] == "provider_provenance_scheduler_health"
   assert shared_scheduler_export_payload["focus_key"] == "provider-provenance-scheduler-health"
   assert shared_scheduler_export_payload["result_count"] == 1
+  assert shared_scheduler_export_payload["routing_policy_id"] == "chatops_only"
+  assert shared_scheduler_export_payload["routing_targets"] == ["slack_webhook"]
+  assert shared_scheduler_export_payload["approval_state"] == "not_required"
+  assert shared_scheduler_export_payload["available_delivery_targets"] == [
+    "slack_webhook",
+    "pagerduty_events",
+  ]
 
   listed_scheduler_exports_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_export_job_list"],
@@ -15821,6 +15838,54 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert listed_scheduler_exports_payload["total"] == 1
   assert listed_scheduler_exports_payload["items"][0]["job_id"] == shared_scheduler_export_payload["job_id"]
+
+  updated_scheduler_policy_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_policy"],
+    app=app,
+    path_params={"job_id": shared_scheduler_export_payload["job_id"]},
+    request_payload={
+      "actor": "operator",
+      "routing_policy_id": "all_targets",
+      "approval_policy_id": "manual_required",
+      "source_tab_id": "tab_scheduler",
+      "source_tab_label": "Scheduler panel",
+    },
+  )
+  assert updated_scheduler_policy_payload["export_job"]["routing_policy_id"] == "all_targets"
+  assert updated_scheduler_policy_payload["export_job"]["routing_targets"] == [
+    "slack_webhook",
+    "pagerduty_events",
+  ]
+  assert updated_scheduler_policy_payload["export_job"]["approval_state"] == "pending"
+  assert updated_scheduler_policy_payload["audit_record"]["action"] == "policy_updated"
+
+  with pytest.raises(ValueError, match="requires approval"):
+    execute_standalone_surface_binding(
+      binding=bindings_by_key["operator_provider_provenance_export_job_escalate"],
+      app=app,
+      path_params={"job_id": shared_scheduler_export_payload["job_id"]},
+      request_payload={
+        "actor": "operator",
+        "reason": "scheduler_health_export_review",
+        "source_tab_id": "tab_scheduler",
+        "source_tab_label": "Scheduler panel",
+      },
+    )
+
+  approved_scheduler_export_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_approval"],
+    app=app,
+    path_params={"job_id": shared_scheduler_export_payload["job_id"]},
+    request_payload={
+      "actor": "operator",
+      "note": "manager_review_complete",
+      "source_tab_id": "tab_scheduler",
+      "source_tab_label": "Scheduler panel",
+    },
+  )
+  assert approved_scheduler_export_payload["export_job"]["approval_state"] == "approved"
+  assert approved_scheduler_export_payload["export_job"]["approved_by"] == "operator"
+  assert approved_scheduler_export_payload["audit_record"]["action"] == "approved"
 
   escalated_scheduler_export_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_export_job_escalate"],
@@ -15836,6 +15901,8 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert escalated_scheduler_export_payload["export_job"]["escalation_count"] == 1
   assert escalated_scheduler_export_payload["export_job"]["last_delivery_status"] == "delivered"
   assert escalated_scheduler_export_payload["audit_record"]["action"] == "escalated"
+  assert escalated_scheduler_export_payload["audit_record"]["routing_policy_id"] == "all_targets"
+  assert escalated_scheduler_export_payload["audit_record"]["approval_state"] == "approved"
   assert escalated_scheduler_export_payload["audit_record"]["delivery_targets"] == [
     "slack_webhook",
     "pagerduty_events",
@@ -15857,6 +15924,8 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert [record["action"] for record in shared_scheduler_export_history_payload["history"]] == [
     "escalated",
+    "approved",
+    "policy_updated",
     "created",
   ]
 

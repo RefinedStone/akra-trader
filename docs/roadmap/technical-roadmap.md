@@ -104,6 +104,8 @@ creation.
 - scheduler-health export now also plugs into the shared export registry with audit trail and
   delivery-backed escalation workflow, so provenance automation review can promote directly into an
   operator handoff artifact
+- per-export routing and approval policy now sits on top of that scheduler export workflow, so
+  escalation targets and approval gates can be chosen and audited at the export artifact level
 
 ### Remaining work
 

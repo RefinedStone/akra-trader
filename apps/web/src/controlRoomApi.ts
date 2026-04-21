@@ -12,6 +12,7 @@ import type {
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobHistoryPayload,
   ProviderProvenanceExportJobListPayload,
+  ProviderProvenanceExportJobPolicyResult,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
@@ -201,6 +202,52 @@ export async function escalateProviderProvenanceExportJob(params: {
         ...(params.sourceTabId?.trim() ? { source_tab_id: params.sourceTabId.trim() } : {}),
         ...(params.sourceTabLabel?.trim() ? { source_tab_label: params.sourceTabLabel.trim() } : {}),
         ...(params.deliveryTargets?.length ? { delivery_targets: params.deliveryTargets } : {}),
+      }),
+    },
+  );
+}
+
+export async function updateProviderProvenanceExportJobPolicy(params: {
+  jobId: string;
+  actor?: string;
+  routingPolicyId?: string;
+  approvalPolicyId?: string;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+  deliveryTargets?: string[];
+}) {
+  return fetchJson<ProviderProvenanceExportJobPolicyResult>(
+    `/operator/provider-provenance-exports/${encodeURIComponent(params.jobId)}/policy`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actor?.trim() ? { actor: params.actor.trim() } : {}),
+        ...(params.routingPolicyId?.trim() ? { routing_policy_id: params.routingPolicyId.trim() } : {}),
+        ...(params.approvalPolicyId?.trim() ? { approval_policy_id: params.approvalPolicyId.trim() } : {}),
+        ...(params.sourceTabId?.trim() ? { source_tab_id: params.sourceTabId.trim() } : {}),
+        ...(params.sourceTabLabel?.trim() ? { source_tab_label: params.sourceTabLabel.trim() } : {}),
+        ...(params.deliveryTargets?.length ? { delivery_targets: params.deliveryTargets } : {}),
+      }),
+    },
+  );
+}
+
+export async function approveProviderProvenanceExportJob(params: {
+  jobId: string;
+  actor?: string;
+  note?: string;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceExportJobPolicyResult>(
+    `/operator/provider-provenance-exports/${encodeURIComponent(params.jobId)}/approval`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actor?.trim() ? { actor: params.actor.trim() } : {}),
+        ...(params.note?.trim() ? { note: params.note.trim() } : {}),
+        ...(params.sourceTabId?.trim() ? { source_tab_id: params.sourceTabId.trim() } : {}),
+        ...(params.sourceTabLabel?.trim() ? { source_tab_label: params.sourceTabLabel.trim() } : {}),
       }),
     },
   );

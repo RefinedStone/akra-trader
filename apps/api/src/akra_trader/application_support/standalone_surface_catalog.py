@@ -1288,6 +1288,28 @@ def build_standalone_surface_runtime_bindings(
     binding_kind="operator_provider_provenance_export_job_history",
     path_param_keys=("job_id",),
   )
+  operator_provider_provenance_export_job_policy_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_export_job_policy",
+    route_path="/operator/provider-provenance-exports/{job_id}/policy",
+    route_name="update_operator_provider_provenance_export_job_policy",
+    response_title="Update provider provenance export job routing policy",
+    scope="app",
+    binding_kind="operator_provider_provenance_export_job_policy",
+    methods=("POST",),
+    path_param_keys=("job_id",),
+    request_payload_kind="operator_provider_provenance_export_job_policy",
+  )
+  operator_provider_provenance_export_job_approval_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_export_job_approval",
+    route_path="/operator/provider-provenance-exports/{job_id}/approval",
+    route_name="approve_operator_provider_provenance_export_job",
+    response_title="Approve provider provenance export job escalation",
+    scope="app",
+    binding_kind="operator_provider_provenance_export_job_approval",
+    methods=("POST",),
+    path_param_keys=("job_id",),
+    request_payload_kind="operator_provider_provenance_export_job_approval",
+  )
   operator_provider_provenance_export_job_escalate_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_export_job_escalate",
     route_path="/operator/provider-provenance-exports/{job_id}/escalate",
@@ -3049,6 +3071,8 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_export_analytics_binding,
     operator_provider_provenance_export_job_download_binding,
     operator_provider_provenance_export_job_history_binding,
+    operator_provider_provenance_export_job_policy_binding,
+    operator_provider_provenance_export_job_approval_binding,
     operator_provider_provenance_export_job_escalate_binding,
     operator_provider_provenance_analytics_preset_create_binding,
     operator_provider_provenance_analytics_preset_list_binding,

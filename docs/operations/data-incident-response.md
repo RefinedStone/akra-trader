@@ -54,6 +54,9 @@ unclear dataset lineage.
 - scheduler health export can now be shared into the team registry, leaves delivery/download /
   escalation audit records, and can be escalated directly to configured operator delivery targets
   when automation drift needs a cross-shift handoff
+- each shared scheduler export now also carries its own routing and approval policy, so operators
+  can hold a snapshot in chatops review, switch it to paging delivery, and require explicit
+  approval before sending higher-noise escalation routes
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

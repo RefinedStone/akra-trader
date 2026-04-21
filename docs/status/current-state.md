@@ -156,6 +156,9 @@ It is not yet a finished live trading product:
 - scheduler-health exports can now also be shared into the same server-side registry with delivery
   and download audit trail plus direct escalation workflow, so automation snapshots can move from
   review into operator handoff without leaving the control room
+- those shared scheduler exports now also persist per-export routing and approval policy, so
+  chatops-only review, paging routes, and manual approval gates are all visible and enforceable
+  before escalation is sent
 
 ### Operator discipline baseline
 

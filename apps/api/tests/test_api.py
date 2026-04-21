@@ -526,6 +526,16 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "limit",
     "app",
   )
+  assert tuple(inspect.signature(routes["update_operator_provider_provenance_export_job_policy"].endpoint).parameters) == (
+    "job_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["approve_operator_provider_provenance_export_job"].endpoint).parameters) == (
+    "job_id",
+    "request",
+    "app",
+  )
   assert tuple(inspect.signature(routes["escalate_operator_provider_provenance_export_job"].endpoint).parameters) == (
     "job_id",
     "request",
@@ -3403,6 +3413,34 @@ def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trend
       "/api/operator/provider-provenance-exports",
       params={"export_scope": "provider_provenance_scheduler_health", "limit": 10},
     )
+    shared_export_policy_response = client.post(
+      f"/api/operator/provider-provenance-exports/{shared_export_create_response.json()['job_id']}/policy",
+      json={
+        "actor": "operator",
+        "routing_policy_id": "paging_only",
+        "approval_policy_id": "manual_required",
+        "source_tab_id": "tab_scheduler",
+        "source_tab_label": "Scheduler panel",
+      },
+    )
+    shared_export_unapproved_escalate_response = client.post(
+      f"/api/operator/provider-provenance-exports/{shared_export_create_response.json()['job_id']}/escalate",
+      json={
+        "actor": "operator",
+        "reason": "scheduler_health_export_review",
+        "source_tab_id": "tab_scheduler",
+        "source_tab_label": "Scheduler panel",
+      },
+    )
+    shared_export_approval_response = client.post(
+      f"/api/operator/provider-provenance-exports/{shared_export_create_response.json()['job_id']}/approval",
+      json={
+        "actor": "operator",
+        "note": "manager_review_complete",
+        "source_tab_id": "tab_scheduler",
+        "source_tab_label": "Scheduler panel",
+      },
+    )
     shared_export_escalate_response = client.post(
       f"/api/operator/provider-provenance-exports/{shared_export_create_response.json()['job_id']}/escalate",
       json={
@@ -3456,28 +3494,48 @@ def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trend
   assert shared_export_payload["export_scope"] == "provider_provenance_scheduler_health"
   assert shared_export_payload["focus_key"] == "provider-provenance-scheduler-health"
   assert shared_export_payload["result_count"] == 3
+  assert shared_export_payload["routing_policy_id"] == "default_critical"
+  assert shared_export_payload["approval_state"] == "approved"
+  assert shared_export_payload["routing_targets"] == ["slack_webhook", "pagerduty_events"]
 
   assert shared_export_list_response.status_code == 200
   shared_export_list_payload = shared_export_list_response.json()
   assert shared_export_list_payload["total"] == 1
   assert shared_export_list_payload["items"][0]["job_id"] == shared_export_payload["job_id"]
 
+  assert shared_export_policy_response.status_code == 200
+  shared_export_policy_payload = shared_export_policy_response.json()
+  assert shared_export_policy_payload["export_job"]["routing_policy_id"] == "paging_only"
+  assert shared_export_policy_payload["export_job"]["routing_targets"] == ["pagerduty_events"]
+  assert shared_export_policy_payload["export_job"]["approval_state"] == "pending"
+  assert shared_export_policy_payload["audit_record"]["action"] == "policy_updated"
+
+  assert shared_export_unapproved_escalate_response.status_code == 400
+  assert "requires approval" in shared_export_unapproved_escalate_response.json()["detail"]
+
+  assert shared_export_approval_response.status_code == 200
+  shared_export_approval_payload = shared_export_approval_response.json()
+  assert shared_export_approval_payload["export_job"]["approval_state"] == "approved"
+  assert shared_export_approval_payload["export_job"]["approved_by"] == "operator"
+  assert shared_export_approval_payload["audit_record"]["action"] == "approved"
+
   assert shared_export_escalate_response.status_code == 200
   shared_export_escalation_payload = shared_export_escalate_response.json()
   assert shared_export_escalation_payload["export_job"]["escalation_count"] == 1
   assert shared_export_escalation_payload["export_job"]["last_delivery_status"] == "delivered"
   assert shared_export_escalation_payload["audit_record"]["action"] == "escalated"
-  assert shared_export_escalation_payload["audit_record"]["delivery_targets"] == [
-    "slack_webhook",
-    "pagerduty_events",
-  ]
-  assert len(shared_export_escalation_payload["delivery_history"]) == 2
+  assert shared_export_escalation_payload["audit_record"]["routing_policy_id"] == "paging_only"
+  assert shared_export_escalation_payload["audit_record"]["approval_state"] == "approved"
+  assert shared_export_escalation_payload["audit_record"]["delivery_targets"] == ["pagerduty_events"]
+  assert len(shared_export_escalation_payload["delivery_history"]) == 1
   assert delivery.deliveries[0][2] == "scheduler_export_escalation"
 
   assert shared_export_history_response.status_code == 200
   shared_export_history_payload = shared_export_history_response.json()
   assert [record["action"] for record in shared_export_history_payload["history"]] == [
     "escalated",
+    "approved",
+    "policy_updated",
     "created",
   ]
 

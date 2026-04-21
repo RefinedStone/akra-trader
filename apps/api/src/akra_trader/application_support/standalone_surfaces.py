@@ -97,6 +97,10 @@ def serialize_provider_provenance_export_job_escalation_result(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_export_job_escalation_result')(*args, **kwargs)
 
 
+def serialize_provider_provenance_export_job_policy_result(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_export_job_policy_result')(*args, **kwargs)
+
+
 def serialize_provider_provenance_analytics_preset_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_analytics_preset_record')(*args, **kwargs)
 
@@ -506,6 +510,32 @@ def execute_standalone_surface_binding(
     return serialize_provider_provenance_export_job_history(
       export_job,
       app.list_provider_provenance_export_job_history(resolved_path_params["job_id"]),
+    )
+  if binding.binding_kind == "operator_provider_provenance_export_job_policy":
+    policy_result = app.update_provider_provenance_export_job_routing_policy(
+      resolved_path_params["job_id"],
+      actor=resolved_payload.get("actor", "operator"),
+      routing_policy_id=resolved_payload.get("routing_policy_id", "default"),
+      approval_policy_id=resolved_payload.get("approval_policy_id", "auto"),
+      source_tab_id=resolved_payload.get("source_tab_id"),
+      source_tab_label=resolved_payload.get("source_tab_label"),
+      delivery_targets=resolved_payload.get("delivery_targets"),
+    )
+    return serialize_provider_provenance_export_job_policy_result(
+      policy_result["export_job"],
+      policy_result["audit_record"],
+    )
+  if binding.binding_kind == "operator_provider_provenance_export_job_approval":
+    approval_result = app.approve_provider_provenance_export_job(
+      resolved_path_params["job_id"],
+      actor=resolved_payload.get("actor", "operator"),
+      note=resolved_payload.get("note"),
+      source_tab_id=resolved_payload.get("source_tab_id"),
+      source_tab_label=resolved_payload.get("source_tab_label"),
+    )
+    return serialize_provider_provenance_export_job_policy_result(
+      approval_result["export_job"],
+      approval_result["audit_record"],
     )
   if binding.binding_kind == "operator_provider_provenance_export_job_escalate":
     escalation_result = app.escalate_provider_provenance_export_job(

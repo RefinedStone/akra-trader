@@ -820,6 +820,17 @@ class ProviderProvenanceExportJobRecord:
   filters: dict[str, Any] = field(default_factory=dict)
   requested_by_tab_id: str | None = None
   requested_by_tab_label: str | None = None
+  available_delivery_targets: tuple[str, ...] = ()
+  routing_policy_id: str | None = None
+  routing_policy_summary: str | None = None
+  routing_targets: tuple[str, ...] = ()
+  approval_policy_id: str | None = None
+  approval_required: bool = False
+  approval_state: str = "not_required"
+  approval_summary: str | None = None
+  approved_at: datetime | None = None
+  approved_by: str | None = None
+  approval_note: str | None = None
   escalation_count: int = 0
   last_escalated_at: datetime | None = None
   last_escalated_by: str | None = None
@@ -862,6 +873,13 @@ class ProviderProvenanceExportJobAuditRecord:
   requested_by_tab_label: str | None = None
   source_tab_id: str | None = None
   source_tab_label: str | None = None
+  routing_policy_id: str | None = None
+  routing_targets: tuple[str, ...] = ()
+  approval_policy_id: str | None = None
+  approval_required: bool = False
+  approval_state: str | None = None
+  approval_summary: str | None = None
+  approved_by: str | None = None
   delivery_targets: tuple[str, ...] = ()
   delivery_status: str | None = None
   delivery_summary: str | None = None

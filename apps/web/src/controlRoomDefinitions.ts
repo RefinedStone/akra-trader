@@ -1042,6 +1042,17 @@ export type ProviderProvenanceExportJobEntry = {
   filters: Record<string, unknown>;
   requested_by_tab_id?: string | null;
   requested_by_tab_label?: string | null;
+  available_delivery_targets: string[];
+  routing_policy_id?: string | null;
+  routing_policy_summary?: string | null;
+  routing_targets: string[];
+  approval_policy_id?: string | null;
+  approval_required: boolean;
+  approval_state: string;
+  approval_summary?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  approval_note?: string | null;
   escalation_count: number;
   last_escalated_at?: string | null;
   last_escalated_by?: string | null;
@@ -1071,6 +1082,13 @@ export type ProviderProvenanceExportJobAuditRecord = {
   requested_by_tab_label?: string | null;
   source_tab_id?: string | null;
   source_tab_label?: string | null;
+  routing_policy_id?: string | null;
+  routing_targets: string[];
+  approval_policy_id?: string | null;
+  approval_required: boolean;
+  approval_state?: string | null;
+  approval_summary?: string | null;
+  approved_by?: string | null;
   delivery_targets: string[];
   delivery_status?: string | null;
   delivery_summary?: string | null;
@@ -1107,6 +1125,11 @@ export type ProviderProvenanceExportJobEscalationResult = {
     external_reference?: string | null;
     source: string;
   }[];
+};
+
+export type ProviderProvenanceExportJobPolicyResult = {
+  export_job: ProviderProvenanceExportJobEntry;
+  audit_record: ProviderProvenanceExportJobAuditRecord;
 };
 
 export type ProviderProvenanceExportAnalyticsRollupEntry = {

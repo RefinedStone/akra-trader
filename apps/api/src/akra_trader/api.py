@@ -206,6 +206,22 @@ class OperatorProviderProvenanceExportJobEscalateRequest(BaseModel):
   delivery_targets: list[str] = Field(default_factory=list)
 
 
+class OperatorProviderProvenanceExportJobPolicyRequest(BaseModel):
+  actor: str = "operator"
+  routing_policy_id: str = "default"
+  approval_policy_id: str = "auto"
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+  delivery_targets: list[str] = Field(default_factory=list)
+
+
+class OperatorProviderProvenanceExportJobApprovalRequest(BaseModel):
+  actor: str = "operator"
+  note: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -256,6 +272,8 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_audit_export_job_create": (ReplayLinkAliasAuditExportJobCreateRequest, {}),
   "replay_link_audit_export_job_prune": (ReplayLinkAliasAuditExportJobPruneRequest, {}),
   "operator_provider_provenance_export_job_create": (OperatorProviderProvenanceExportJobCreateRequest, {}),
+  "operator_provider_provenance_export_job_policy": (OperatorProviderProvenanceExportJobPolicyRequest, {}),
+  "operator_provider_provenance_export_job_approval": (OperatorProviderProvenanceExportJobApprovalRequest, {}),
   "operator_provider_provenance_export_job_escalate": (OperatorProviderProvenanceExportJobEscalateRequest, {}),
   "operator_provider_provenance_analytics_preset_create": (OperatorProviderProvenanceAnalyticsPresetCreateRequest, {}),
   "operator_provider_provenance_dashboard_view_create": (OperatorProviderProvenanceDashboardViewCreateRequest, {}),

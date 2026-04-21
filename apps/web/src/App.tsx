@@ -55,6 +55,7 @@ import {
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
   createProviderProvenanceScheduledReport,
+  approveProviderProvenanceExportJob,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   downloadProviderProvenanceExportJob,
@@ -83,6 +84,7 @@ import {
   revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   runDueProviderProvenanceScheduledReports,
   runProviderProvenanceScheduledReport,
+  updateProviderProvenanceExportJobPolicy,
 } from "./controlRoomApi";
 
 
@@ -279,6 +281,7 @@ import type {
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobEscalationResult,
   ProviderProvenanceExportJobHistoryPayload,
+  ProviderProvenanceExportJobPolicyResult,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
@@ -375,6 +378,14 @@ type ProviderProvenanceAnalyticsQueryState = {
   window_days: number;
 };
 
+type ProviderProvenanceSchedulerExportPolicyDraft = {
+  job_id: string | null;
+  routing_policy_id: string;
+  approval_policy_id: string;
+  delivery_targets: string[];
+  approval_note: string;
+};
+
 const defaultProviderProvenanceAnalyticsQueryState: ProviderProvenanceAnalyticsQueryState = {
   scope: "current_focus",
   provider_label: ALL_FILTER_VALUE,
@@ -384,6 +395,36 @@ const defaultProviderProvenanceAnalyticsQueryState: ProviderProvenanceAnalyticsQ
   search_query: "",
   window_days: 14,
 };
+
+function normalizeProviderProvenanceSchedulerRoutingPolicyDraftValue(policyId?: string | null) {
+  if (
+    policyId === "all_targets"
+    || policyId === "chatops_only"
+    || policyId === "paging_only"
+    || policyId === "custom"
+  ) {
+    return policyId;
+  }
+  return "default";
+}
+
+function normalizeProviderProvenanceSchedulerApprovalPolicyDraftValue(policyId?: string | null) {
+  return policyId === "manual_required" ? "manual_required" : "auto";
+}
+
+function buildProviderProvenanceSchedulerExportPolicyDraft(
+  entry: ProviderProvenanceExportJobEntry | null,
+): ProviderProvenanceSchedulerExportPolicyDraft {
+  return {
+    job_id: entry?.job_id ?? null,
+    routing_policy_id: normalizeProviderProvenanceSchedulerRoutingPolicyDraftValue(entry?.routing_policy_id),
+    approval_policy_id: normalizeProviderProvenanceSchedulerApprovalPolicyDraftValue(entry?.approval_policy_id),
+    delivery_targets: entry?.routing_targets?.length
+      ? [...entry.routing_targets]
+      : [...(entry?.available_delivery_targets ?? [])],
+    approval_note: entry?.approval_note?.trim() ?? "",
+  };
+}
 
 const defaultProviderProvenanceDashboardLayout: ProviderProvenanceDashboardLayout = {
   highlight_panel: "overview",
@@ -2883,6 +2924,10 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerExportHistoryError, setProviderProvenanceSchedulerExportHistoryError] =
     useState<string | null>(null);
+  const [providerProvenanceSchedulerExportPolicyDraft, setProviderProvenanceSchedulerExportPolicyDraft] =
+    useState<ProviderProvenanceSchedulerExportPolicyDraft>(
+      buildProviderProvenanceSchedulerExportPolicyDraft(null),
+    );
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -3039,6 +3084,19 @@ export default function App() {
   const providerProvenanceSchedulerAnalyticsRequestIdRef = useRef(0);
   const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
+  const selectedProviderProvenanceSchedulerExportEntry = useMemo(
+    () =>
+      selectedProviderProvenanceSchedulerExportHistory?.job
+      ?? providerProvenanceSchedulerExports.find(
+        (entry) => entry.job_id === selectedProviderProvenanceSchedulerExportJobId,
+      )
+      ?? null,
+    [
+      providerProvenanceSchedulerExports,
+      selectedProviderProvenanceSchedulerExportHistory,
+      selectedProviderProvenanceSchedulerExportJobId,
+    ],
+  );
   const comparisonSelection = useMemo(
     () =>
       normalizeControlRoomComparisonSelection({
@@ -4296,6 +4354,12 @@ export default function App() {
   }, [providerProvenanceAnalyticsQuery.window_days, providerProvenanceSchedulerHistoryOffset, providerProvenanceSchedulerDrilldownBucketKey]);
 
   useEffect(() => {
+    setProviderProvenanceSchedulerExportPolicyDraft(
+      buildProviderProvenanceSchedulerExportPolicyDraft(selectedProviderProvenanceSchedulerExportEntry),
+    );
+  }, [selectedProviderProvenanceSchedulerExportEntry]);
+
+  useEffect(() => {
     void loadProviderProvenanceWorkspaceRegistry();
   }, []);
 
@@ -5158,6 +5222,12 @@ export default function App() {
     }
   }
 
+  async function refreshSelectedProviderProvenanceSchedulerExportHistory(jobId: string) {
+    const historyPayload = await getProviderProvenanceExportJobHistory(jobId);
+    setSelectedProviderProvenanceSchedulerExportHistory(historyPayload);
+    setProviderProvenanceSchedulerExportHistoryError(null);
+  }
+
   async function copySharedProviderProvenanceSchedulerExport(
     entry: ProviderProvenanceExportJobEntry,
   ) {
@@ -5176,13 +5246,71 @@ export default function App() {
         `Copied shared scheduler export ${shortenIdentifier(entry.job_id, 10)}.`,
       );
       if (selectedProviderProvenanceSchedulerExportJobId === entry.job_id) {
-        const historyPayload = await getProviderProvenanceExportJobHistory(entry.job_id);
-        setSelectedProviderProvenanceSchedulerExportHistory(historyPayload);
-        setProviderProvenanceSchedulerExportHistoryError(null);
+        await refreshSelectedProviderProvenanceSchedulerExportHistory(entry.job_id);
       }
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
         `Shared scheduler export copy failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function updateSharedProviderProvenanceSchedulerExportPolicy(
+    entry: ProviderProvenanceExportJobEntry,
+  ) {
+    const selectedTargets =
+      providerProvenanceSchedulerExportPolicyDraft.routing_policy_id === "custom"
+        ? providerProvenanceSchedulerExportPolicyDraft.delivery_targets
+        : [];
+    try {
+      const result: ProviderProvenanceExportJobPolicyResult = await updateProviderProvenanceExportJobPolicy({
+        jobId: entry.job_id,
+        actor: "operator",
+        routingPolicyId: providerProvenanceSchedulerExportPolicyDraft.routing_policy_id,
+        approvalPolicyId: providerProvenanceSchedulerExportPolicyDraft.approval_policy_id,
+        sourceTabId: comparisonHistoryTabIdentity.tabId,
+        sourceTabLabel: comparisonHistoryTabIdentity.label,
+        deliveryTargets: selectedTargets,
+      });
+      setProviderProvenanceSchedulerExports((current) => current.map((candidate) => (
+        candidate.job_id === result.export_job.job_id ? result.export_job : candidate
+      )));
+      if (selectedProviderProvenanceSchedulerExportJobId === entry.job_id) {
+        await refreshSelectedProviderProvenanceSchedulerExportHistory(entry.job_id);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        result.audit_record.detail || `Updated scheduler export routing policy for ${shortenIdentifier(entry.job_id, 10)}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler export routing update failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function approveSharedProviderProvenanceSchedulerExport(
+    entry: ProviderProvenanceExportJobEntry,
+  ) {
+    try {
+      const result: ProviderProvenanceExportJobPolicyResult = await approveProviderProvenanceExportJob({
+        jobId: entry.job_id,
+        actor: "operator",
+        note: providerProvenanceSchedulerExportPolicyDraft.approval_note,
+        sourceTabId: comparisonHistoryTabIdentity.tabId,
+        sourceTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceSchedulerExports((current) => current.map((candidate) => (
+        candidate.job_id === result.export_job.job_id ? result.export_job : candidate
+      )));
+      if (selectedProviderProvenanceSchedulerExportJobId === entry.job_id) {
+        await refreshSelectedProviderProvenanceSchedulerExportHistory(entry.job_id);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        result.audit_record.detail || `Approved scheduler export routing for ${shortenIdentifier(entry.job_id, 10)}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler export approval failed: ${(error as Error).message}`,
       );
     }
   }
@@ -5202,9 +5330,7 @@ export default function App() {
         candidate.job_id === result.export_job.job_id ? result.export_job : candidate
       )));
       if (selectedProviderProvenanceSchedulerExportJobId === entry.job_id) {
-        const historyPayload = await getProviderProvenanceExportJobHistory(entry.job_id);
-        setSelectedProviderProvenanceSchedulerExportHistory(historyPayload);
-        setProviderProvenanceSchedulerExportHistoryError(null);
+        await refreshSelectedProviderProvenanceSchedulerExportHistory(entry.job_id);
       }
       setProviderProvenanceWorkspaceFeedback(
         result.audit_record.delivery_summary
@@ -8636,6 +8762,11 @@ export default function App() {
                                                 Scope {formatWorkflowToken(entry.export_scope)}
                                               </p>
                                               <p className="run-lineage-symbol-copy">
+                                                Route {formatWorkflowToken(entry.routing_policy_id ?? "default")} · {entry.routing_targets.length
+                                                  ? entry.routing_targets.join(", ")
+                                                  : "no targets"}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
                                                 Escalations {entry.escalation_count}
                                               </p>
                                             </td>
@@ -8643,6 +8774,9 @@ export default function App() {
                                               <strong>{formatWorkflowToken(entry.last_delivery_status ?? "not_escalated")}</strong>
                                               <p className="run-lineage-symbol-copy">
                                                 {entry.last_delivery_summary ?? "Not escalated yet."}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                Approval {formatWorkflowToken(entry.approval_state)} · {entry.approval_summary ?? "No approval summary recorded."}
                                               </p>
                                               <p className="run-lineage-symbol-copy">
                                                 {entry.last_escalated_at
@@ -8675,6 +8809,7 @@ export default function App() {
                                                   onClick={() => {
                                                     void escalateSharedProviderProvenanceSchedulerExport(entry);
                                                   }}
+                                                  disabled={entry.approval_required && entry.approval_state !== "approved"}
                                                   type="button"
                                                 >
                                                   Escalate
@@ -8692,6 +8827,162 @@ export default function App() {
                                         <strong>Scheduler export audit trail</strong>
                                         <p>{shortenIdentifier(selectedProviderProvenanceSchedulerExportJobId, 10)}</p>
                                       </div>
+                                      {selectedProviderProvenanceSchedulerExportEntry ? (
+                                        <div className="provider-provenance-workspace-card">
+                                          <div className="market-data-provenance-history-head">
+                                            <strong>Escalation policy</strong>
+                                            <p>
+                                              Save a per-export routing policy, require approval when needed, and then
+                                              escalate the selected scheduler snapshot.
+                                            </p>
+                                          </div>
+                                          <div className="filter-bar">
+                                            <label>
+                                              <span>Route</span>
+                                              <select
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerExportPolicyDraft((current) => ({
+                                                    ...current,
+                                                    routing_policy_id: event.target.value,
+                                                    delivery_targets:
+                                                      event.target.value === "custom"
+                                                        ? (
+                                                          current.delivery_targets.length
+                                                            ? current.delivery_targets
+                                                            : [...selectedProviderProvenanceSchedulerExportEntry.available_delivery_targets]
+                                                        )
+                                                        : current.delivery_targets,
+                                                  }))
+                                                }
+                                                value={providerProvenanceSchedulerExportPolicyDraft.routing_policy_id}
+                                              >
+                                                <option value="default">Default recommendation</option>
+                                                <option value="chatops_only">Chatops only</option>
+                                                <option value="all_targets">All targets</option>
+                                                <option value="paging_only">Paging only</option>
+                                                <option value="custom">Custom targets</option>
+                                              </select>
+                                            </label>
+                                            <label>
+                                              <span>Approval</span>
+                                              <select
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerExportPolicyDraft((current) => ({
+                                                    ...current,
+                                                    approval_policy_id: event.target.value === "manual_required"
+                                                      ? "manual_required"
+                                                      : "auto",
+                                                  }))
+                                                }
+                                                value={providerProvenanceSchedulerExportPolicyDraft.approval_policy_id}
+                                              >
+                                                <option value="auto">Auto</option>
+                                                <option value="manual_required">Manual approval required</option>
+                                              </select>
+                                            </label>
+                                            <label>
+                                              <span>Approval note</span>
+                                              <input
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerExportPolicyDraft((current) => ({
+                                                    ...current,
+                                                    approval_note: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder="manager_review_complete"
+                                                type="text"
+                                                value={providerProvenanceSchedulerExportPolicyDraft.approval_note}
+                                              />
+                                            </label>
+                                          </div>
+                                          {providerProvenanceSchedulerExportPolicyDraft.routing_policy_id === "custom" ? (
+                                            <div className="filter-bar">
+                                              {selectedProviderProvenanceSchedulerExportEntry.available_delivery_targets.map((target) => (
+                                                <label className="provider-provenance-checkbox" key={`provider-scheduler-target-${target}`}>
+                                                  <input
+                                                    checked={providerProvenanceSchedulerExportPolicyDraft.delivery_targets.includes(target)}
+                                                    onChange={(event) =>
+                                                      setProviderProvenanceSchedulerExportPolicyDraft((current) => ({
+                                                        ...current,
+                                                        delivery_targets: event.target.checked
+                                                          ? Array.from(new Set([...current.delivery_targets, target]))
+                                                          : current.delivery_targets.filter((candidate) => candidate !== target),
+                                                      }))
+                                                    }
+                                                    type="checkbox"
+                                                  />
+                                                  <span>{target}</span>
+                                                </label>
+                                              ))}
+                                            </div>
+                                          ) : null}
+                                          <div className="run-filter-summary-chip-row">
+                                            <span className="run-filter-summary-chip">
+                                              Current route {formatWorkflowToken(selectedProviderProvenanceSchedulerExportEntry.routing_policy_id ?? "default")}
+                                            </span>
+                                            <span className="run-filter-summary-chip">
+                                              Targets {selectedProviderProvenanceSchedulerExportEntry.routing_targets.length
+                                                ? selectedProviderProvenanceSchedulerExportEntry.routing_targets.join(", ")
+                                                : "none"}
+                                            </span>
+                                            <span className="run-filter-summary-chip">
+                                              Approval {formatWorkflowToken(selectedProviderProvenanceSchedulerExportEntry.approval_state)}
+                                            </span>
+                                            {selectedProviderProvenanceSchedulerExportEntry.approved_at ? (
+                                              <span className="run-filter-summary-chip">
+                                                Approved {formatTimestamp(selectedProviderProvenanceSchedulerExportEntry.approved_at)} by {selectedProviderProvenanceSchedulerExportEntry.approved_by ?? "unknown"}
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                          <p className="market-data-workflow-export-copy">
+                                            {selectedProviderProvenanceSchedulerExportEntry.routing_policy_summary ?? "No routing summary recorded."}{" "}
+                                            {selectedProviderProvenanceSchedulerExportEntry.approval_summary ?? "No approval summary recorded."}
+                                          </p>
+                                          <div className="market-data-provenance-history-actions">
+                                            <button
+                                              className="ghost-button"
+                                              onClick={() => {
+                                                void updateSharedProviderProvenanceSchedulerExportPolicy(
+                                                  selectedProviderProvenanceSchedulerExportEntry,
+                                                );
+                                              }}
+                                              type="button"
+                                            >
+                                              Save policy
+                                            </button>
+                                            <button
+                                              className="ghost-button"
+                                              disabled={
+                                                !selectedProviderProvenanceSchedulerExportEntry.approval_required
+                                                || selectedProviderProvenanceSchedulerExportEntry.approval_state === "approved"
+                                              }
+                                              onClick={() => {
+                                                void approveSharedProviderProvenanceSchedulerExport(
+                                                  selectedProviderProvenanceSchedulerExportEntry,
+                                                );
+                                              }}
+                                              type="button"
+                                            >
+                                              Approve route
+                                            </button>
+                                            <button
+                                              className="ghost-button"
+                                              disabled={
+                                                selectedProviderProvenanceSchedulerExportEntry.approval_required
+                                                && selectedProviderProvenanceSchedulerExportEntry.approval_state !== "approved"
+                                              }
+                                              onClick={() => {
+                                                void escalateSharedProviderProvenanceSchedulerExport(
+                                                  selectedProviderProvenanceSchedulerExportEntry,
+                                                );
+                                              }}
+                                              type="button"
+                                            >
+                                              Escalate now
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : null}
                                       {providerProvenanceSchedulerExportHistoryLoading ? (
                                         <p className="empty-state">Loading scheduler export audit trail…</p>
                                       ) : null}
@@ -8730,6 +9021,16 @@ export default function App() {
                                                 </td>
                                                 <td>
                                                   <strong>{record.detail}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Route {formatWorkflowToken(record.routing_policy_id ?? "default")} · {record.routing_targets.length
+                                                      ? record.routing_targets.join(", ")
+                                                      : "no routing targets recorded"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Approval {record.approval_state
+                                                      ? formatWorkflowToken(record.approval_state)
+                                                      : "not recorded"} · {record.approval_summary ?? "No approval summary recorded."}
+                                                  </p>
                                                   <p className="run-lineage-symbol-copy">
                                                     {record.delivery_targets.length
                                                       ? `Targets: ${record.delivery_targets.join(", ")}`
