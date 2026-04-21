@@ -1106,6 +1106,26 @@ class ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
+  catalog_id: str
+  name: str
+  description: str = ""
+  policy_template_ids: tuple[str, ...] = ()
+  policy_template_names: tuple[str, ...] = ()
+  default_policy_template_id: str | None = None
+  default_policy_template_name: str | None = None
+  item_type_scope: str = "any"
+  action_scope: str = "any"
+  approval_lane: str = "general"
+  approval_priority: str = "normal"
+  guidance: str | None = None
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
   plan_id: str
   item_type: str
@@ -1143,6 +1163,27 @@ class ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
   rolled_back_by_tab_label: str | None = None
   rollback_note: str | None = None
   rollback_result: ProviderProvenanceSchedulerNarrativeBulkGovernanceResult | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult:
+  plan_id: str
+  action: str
+  outcome: str
+  status: str | None = None
+  queue_state: str | None = None
+  message: str | None = None
+  plan: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult:
+  action: str
+  requested_count: int = 0
+  succeeded_count: int = 0
+  skipped_count: int = 0
+  failed_count: int = 0
+  results: tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult, ...] = ()
 
 
 @dataclass(frozen=True)

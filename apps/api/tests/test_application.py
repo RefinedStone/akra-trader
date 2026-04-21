@@ -15163,10 +15163,13 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list",
     "operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore",
     "operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_approve",
     "operator_provider_provenance_scheduler_narrative_governance_plan_apply",
+    "operator_provider_provenance_scheduler_narrative_governance_plan_batch_action",
     "operator_provider_provenance_scheduler_narrative_governance_plan_rollback",
     "operator_provider_provenance_scheduled_report_create",
     "operator_provider_provenance_scheduled_report_list",
@@ -15351,6 +15354,10 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list"
   ].filter_param_specs[0].key == "policy_template_id"
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create"].methods == ("POST",)
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list"].filter_param_specs[0].key == (
+    "search"
+  )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[0].key == (
     "item_type"
@@ -15361,6 +15368,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_apply"].path_param_keys == (
     "plan_id",
   )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_batch_action"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_rollback"].path_param_keys == (
     "plan_id",
   )
@@ -16888,6 +16896,31 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     "created",
   ]
 
+  governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create"],
+    app=app,
+    request_payload={
+      "name": "Shift lead batch catalog",
+      "description": "Reusable queue defaults for staged shift-lead reviews.",
+      "policy_template_ids": [governance_policy_template_payload["policy_template_id"]],
+      "default_policy_template_id": governance_policy_template_payload["policy_template_id"],
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert governance_policy_catalog_payload["default_policy_template_id"] == (
+    governance_policy_template_payload["policy_template_id"]
+  )
+  assert governance_policy_catalog_payload["approval_priority"] == "critical"
+
+  governance_policy_catalog_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list"],
+    app=app,
+    filters={"search": "shift lead batch", "limit": 10},
+  )
+  assert governance_policy_catalog_list_payload["total"] == 1
+  assert governance_policy_catalog_list_payload["items"][0]["catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+
   template_governance_plan_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
     app=app,
@@ -17045,6 +17078,69 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     },
   )
   assert reverted_registry_list_payload["total"] == 2
+
+  batch_template_governance_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
+    app=app,
+    request_payload={
+      "item_type": "template",
+      "item_ids": [template_payload["template_id"]],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "batch_template_governance_plan",
+      "name_suffix": " / batch",
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
+    },
+  )
+  batch_registry_governance_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
+    app=app,
+    request_payload={
+      "item_type": "registry",
+      "item_ids": [registry_payload["registry_id"]],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "batch_registry_governance_plan",
+      "layout_patch": {
+        "show_rollups": False,
+      },
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
+    },
+  )
+  batch_approve_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_batch_action"],
+    app=app,
+    request_payload={
+      "action": "approve",
+      "plan_ids": [
+        batch_template_governance_plan_payload["plan_id"],
+        batch_registry_governance_plan_payload["plan_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "batch approval",
+    },
+  )
+  assert batch_approve_payload["succeeded_count"] == 2
+  assert all(item["status"] == "approved" for item in batch_approve_payload["results"] if item["plan"])
+
+  batch_apply_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_batch_action"],
+    app=app,
+    request_payload={
+      "action": "apply",
+      "plan_ids": [
+        batch_template_governance_plan_payload["plan_id"],
+        batch_registry_governance_plan_payload["plan_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert batch_apply_payload["succeeded_count"] == 2
+  assert all(item["status"] == "applied" for item in batch_apply_payload["results"] if item["plan"])
 
   report_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduled_report_create"],

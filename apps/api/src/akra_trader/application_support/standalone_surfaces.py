@@ -169,6 +169,18 @@ def serialize_provider_provenance_scheduler_narrative_governance_policy_template
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_policy_template_audit_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_list')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_plan_batch_result(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_plan_batch_result')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduled_report_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduled_report_record')(*args, **kwargs)
 
@@ -889,6 +901,24 @@ def execute_standalone_surface_binding(
         limit=resolved_filters.get("limit", 50),
       )
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create":
+    return serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
+      app.create_provider_provenance_scheduler_narrative_governance_policy_catalog(
+        name=resolved_payload.get("name", ""),
+        description=resolved_payload.get("description", ""),
+        policy_template_ids=resolved_payload.get("policy_template_ids", ()),
+        default_policy_template_id=resolved_payload.get("default_policy_template_id"),
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list":
+    return serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_list(
+      app.list_provider_provenance_scheduler_narrative_governance_policy_catalogs(
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 20),
+      )
+    )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_create":
     return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
       app.create_provider_provenance_scheduler_narrative_governance_plan(
@@ -933,6 +963,16 @@ def execute_standalone_surface_binding(
         resolved_path_params["plan_id"],
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_batch_action":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_batch_result(
+      app.run_provider_provenance_scheduler_narrative_governance_plan_batch_action(
+        action=resolved_payload.get("action", ""),
+        plan_ids=resolved_payload.get("plan_ids", ()),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        note=resolved_payload.get("note"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_rollback":

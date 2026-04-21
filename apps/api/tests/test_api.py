@@ -1844,6 +1844,33 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
     "created",
   ]
 
+  governance_policy_catalog_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs",
+    json={
+      "name": "Shift lead batch catalog",
+      "description": "Reusable queue defaults for staged shift-lead reviews.",
+      "policy_template_ids": [governance_policy_template_payload["policy_template_id"]],
+      "default_policy_template_id": governance_policy_template_payload["policy_template_id"],
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert governance_policy_catalog_response.status_code == 200
+  governance_policy_catalog_payload = governance_policy_catalog_response.json()
+  assert governance_policy_catalog_payload["default_policy_template_id"] == (
+    governance_policy_template_payload["policy_template_id"]
+  )
+  assert governance_policy_catalog_payload["approval_priority"] == "critical"
+
+  governance_policy_catalog_list_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs",
+    params={"search": "shift lead batch", "limit": 10},
+  )
+  assert governance_policy_catalog_list_response.status_code == 200
+  governance_policy_catalog_list_payload = governance_policy_catalog_list_response.json()
+  assert governance_policy_catalog_list_payload["total"] == 1
+  assert governance_policy_catalog_list_payload["items"][0]["catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+
   template_governance_plan_response = client.post(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
     json={
@@ -2003,6 +2030,75 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   )
   assert reverted_registry_response.status_code == 200
   assert reverted_registry_response.json()["total"] == 2
+
+  batch_template_governance_plan_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    json={
+      "item_type": "template",
+      "item_ids": [template_payload["template_id"]],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "batch_template_governance_plan",
+      "name_suffix": " / batch",
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
+    },
+  )
+  assert batch_template_governance_plan_response.status_code == 200
+  batch_template_governance_plan_payload = batch_template_governance_plan_response.json()
+
+  batch_registry_governance_plan_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    json={
+      "item_type": "registry",
+      "item_ids": [registry_payload["registry_id"]],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "batch_registry_governance_plan",
+      "layout_patch": {
+        "show_rollups": False,
+      },
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
+    },
+  )
+  assert batch_registry_governance_plan_response.status_code == 200
+  batch_registry_governance_plan_payload = batch_registry_governance_plan_response.json()
+
+  batch_approve_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/batch",
+    json={
+      "action": "approve",
+      "plan_ids": [
+        batch_template_governance_plan_payload["plan_id"],
+        batch_registry_governance_plan_payload["plan_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "batch approval",
+    },
+  )
+  assert batch_approve_response.status_code == 200
+  batch_approve_payload = batch_approve_response.json()
+  assert batch_approve_payload["succeeded_count"] == 2
+  assert all(item["status"] == "approved" for item in batch_approve_payload["results"] if item["plan"])
+
+  batch_apply_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/batch",
+    json={
+      "action": "apply",
+      "plan_ids": [
+        batch_template_governance_plan_payload["plan_id"],
+        batch_registry_governance_plan_payload["plan_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert batch_apply_response.status_code == 200
+  batch_apply_payload = batch_apply_response.json()
+  assert batch_apply_payload["succeeded_count"] == 2
+  assert all(item["status"] == "applied" for item in batch_apply_payload["results"] if item["plan"])
 
   report_response = client.post(
     "/api/operator/provider-provenance-analytics/reports",

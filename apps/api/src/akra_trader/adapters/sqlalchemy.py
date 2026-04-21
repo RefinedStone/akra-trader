@@ -34,6 +34,7 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord
@@ -270,6 +271,20 @@ provider_provenance_scheduler_narrative_governance_policy_template_audit_records
   Column("actor_tab_id", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_narrative_governance_policy_catalogs = Table(
+  "provider_provenance_scheduler_narrative_governance_policy_catalogs",
+  metadata,
+  Column("catalog_id", String, primary_key=True),
+  Column("name", String, nullable=False, index=True),
+  Column("default_policy_template_id", String, nullable=True, index=True),
+  Column("item_type_scope", String, nullable=False, index=True),
+  Column("action_scope", String, nullable=False, index=True),
+  Column("approval_lane", String, nullable=False, index=True),
+  Column("approval_priority", String, nullable=False, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 provider_provenance_scheduler_narrative_governance_plans = Table(
   "provider_provenance_scheduler_narrative_governance_plans",
   metadata,
@@ -359,6 +374,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   )
   _provider_provenance_scheduler_narrative_governance_policy_template_audit_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord
+  )
+  _provider_provenance_scheduler_narrative_governance_policy_catalog_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
   )
   _provider_provenance_scheduler_narrative_governance_plan_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
@@ -1629,6 +1647,74 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         row["payload"]
       )
       for row in rows
+    )
+
+  def save_provider_provenance_scheduler_narrative_governance_policy_catalog(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
+    payload = self._provider_provenance_scheduler_narrative_governance_policy_catalog_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "catalog_id": record.catalog_id,
+      "name": record.name,
+      "default_policy_template_id": record.default_policy_template_id,
+      "item_type_scope": record.item_type_scope,
+      "action_scope": record.action_scope,
+      "approval_lane": record.approval_lane,
+      "approval_priority": record.approval_priority,
+      "updated_at": record.updated_at.isoformat(),
+      "created_by_tab_id": record.created_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_narrative_governance_policy_catalogs.c.catalog_id).where(
+          provider_provenance_scheduler_narrative_governance_policy_catalogs.c.catalog_id == record.catalog_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_narrative_governance_policy_catalogs).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_narrative_governance_policy_catalogs)
+          .where(provider_provenance_scheduler_narrative_governance_policy_catalogs.c.catalog_id == record.catalog_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_policy_catalogs(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord, ...]:
+    statement = select(provider_provenance_scheduler_narrative_governance_policy_catalogs.c.payload).order_by(
+      provider_provenance_scheduler_narrative_governance_policy_catalogs.c.updated_at.desc(),
+      provider_provenance_scheduler_narrative_governance_policy_catalogs.c.catalog_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_narrative_governance_policy_catalog_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_narrative_governance_policy_catalog(
+    self,
+    catalog_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_narrative_governance_policy_catalogs.c.payload).where(
+          provider_provenance_scheduler_narrative_governance_policy_catalogs.c.catalog_id == catalog_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_narrative_governance_policy_catalog_adapter.validate_python(
+      row["payload"]
     )
 
   def save_provider_provenance_scheduler_narrative_governance_plan(

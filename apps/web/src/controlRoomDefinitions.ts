@@ -1724,6 +1724,30 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditLis
   total: number;
 };
 
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog = {
+  catalog_id: string;
+  name: string;
+  description: string;
+  policy_template_ids: string[];
+  policy_template_names: string[];
+  default_policy_template_id?: string | null;
+  default_policy_template_name?: string | null;
+  item_type_scope: "any" | "template" | "registry" | string;
+  action_scope: "any" | "delete" | "restore" | "update" | string;
+  approval_lane: string;
+  approval_priority: "low" | "normal" | "high" | "critical" | string;
+  guidance?: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogListPayload = {
+  items: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog[];
+  total: number;
+};
+
 export type ProviderProvenanceSchedulerNarrativeGovernancePlan = {
   plan_id: string;
   item_type: "template" | "registry" | string;
@@ -1770,6 +1794,25 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePlanListPayload = {
   pending_approval_count: number;
   ready_to_apply_count: number;
   completed_count: number;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult = {
+  plan_id: string;
+  action: string;
+  outcome: "succeeded" | "skipped" | "failed" | string;
+  status?: string | null;
+  queue_state?: string | null;
+  message?: string | null;
+  plan?: ProviderProvenanceSchedulerNarrativeGovernancePlan | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult = {
+  action: string;
+  requested_count: number;
+  succeeded_count: number;
+  skipped_count: number;
+  failed_count: number;
+  results: ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult[];
 };
 
 export type ProviderProvenanceSchedulerNarrativeRegistryEntry = {

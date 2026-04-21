@@ -92,6 +92,9 @@ unclear dataset lineage.
   pending vs ready-to-apply narrative plans without scanning a flat plan registry
 - those policy templates now also have revision history and a shared team audit trail, so review
   defaults can be edited, deleted, restored, and traced without leaving the control room
+- the same approval queue now also supports batch approve/apply, and named governance policy
+  catalogs can reapply linked template bundles plus queue defaults when a handoff or follow-the-sun
+  review cycle needs to rehydrate the same discipline quickly
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

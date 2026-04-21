@@ -141,6 +141,9 @@ creation.
   reviewed as a queue instead of only an undifferentiated plan table
 - those governance policy templates now also carry revision history and a shared audit surface, so
   template edits and restores are durable and team-visible instead of being create/list only
+- the next layer is now in place too: queue operators can batch approve/apply multiple plans, and
+  higher-level governance policy catalogs can bundle linked templates into reusable queue/default
+  presets instead of rebuilding the same selection set by hand
 
 ### Remaining work
 

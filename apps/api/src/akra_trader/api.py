@@ -370,6 +370,15 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisi
   reason: str = "scheduler_narrative_governance_policy_template_revision_restored"
 
 
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogCreateRequest(BaseModel):
+  name: str
+  description: str = ""
+  policy_template_ids: list[str] = Field(default_factory=list)
+  default_policy_template_id: str | None = None
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
 class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest(BaseModel):
   item_type: str
   item_ids: list[str] = Field(default_factory=list)
@@ -398,6 +407,14 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanApprovalRequest(
 class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanApplyRequest(BaseModel):
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanBatchActionRequest(BaseModel):
+  action: str
+  plan_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  note: str | None = None
 
 
 class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanRollbackRequest(BaseModel):
@@ -501,6 +518,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
     OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRestoreRequest,
     {},
   ),
+  "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogCreateRequest,
+    {},
+  ),
   "operator_provider_provenance_scheduler_narrative_governance_plan_create": (
     OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest,
     {"exclude_unset": True},
@@ -511,6 +532,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_governance_plan_apply": (
     OperatorProviderProvenanceSchedulerNarrativeGovernancePlanApplyRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_plan_batch_action": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePlanBatchActionRequest,
     {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_governance_plan_rollback": (

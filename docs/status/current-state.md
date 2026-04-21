@@ -196,6 +196,9 @@ It is not yet a finished live trading product:
   queue instead of a flat unprioritized plan list
 - those governance policy templates now also support edit/delete/version workflow plus a shared
   audit trail, so lane/priority defaults are no longer opaque create-once records
+- that approval queue now also supports multi-plan batch approve/apply, and governance policy
+  catalogs can bundle linked policy templates into reusable queue/default-policy presets for shift
+  handoff workflows
 
 ### Operator discipline baseline
 

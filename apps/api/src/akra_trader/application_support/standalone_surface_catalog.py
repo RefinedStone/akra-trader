@@ -1957,6 +1957,49 @@ def build_standalone_surface_runtime_bindings(
       ),
     ),
   )
+  operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs",
+    route_name="create_operator_provider_provenance_scheduler_narrative_governance_policy_catalog",
+    response_title="Create provider provenance scheduler narrative governance policy catalog",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs",
+    route_name="list_operator_provider_provenance_scheduler_narrative_governance_policy_catalogs",
+    response_title="List provider provenance scheduler narrative governance policy catalogs",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list",
+    filter_keys=("search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search scheduler governance policy catalogs by name, linked templates, lane, or guidance.",
+          examples=("shift lead",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=20,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=100),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler governance policy catalogs to return.",
+          examples=(20,),
+        ),
+      ),
+    ),
+  )
   operator_provider_provenance_scheduler_narrative_governance_plan_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_create",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
@@ -2032,6 +2075,16 @@ def build_standalone_surface_runtime_bindings(
     methods=("POST",),
     path_param_keys=("plan_id",),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_plan_apply",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_plan_batch_action_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_batch_action",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/batch",
+    route_name="run_operator_provider_provenance_scheduler_narrative_governance_plan_batch_action",
+    response_title="Run provider provenance scheduler narrative governance plan batch action",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_plan_batch_action",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_plan_batch_action",
   )
   operator_provider_provenance_scheduler_narrative_governance_plan_rollback_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_rollback",
@@ -3736,10 +3789,13 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_catalog_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_create_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_approve_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_apply_binding,
+    operator_provider_provenance_scheduler_narrative_governance_plan_batch_action_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_rollback_binding,
     operator_provider_provenance_scheduled_report_create_binding,
     operator_provider_provenance_scheduled_report_list_binding,

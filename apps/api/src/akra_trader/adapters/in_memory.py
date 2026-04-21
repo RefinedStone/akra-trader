@@ -33,6 +33,7 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord
@@ -316,6 +317,10 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_scheduler_narrative_governance_policy_template_audit_records: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_narrative_governance_policy_catalogs: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
     ] = OrderedDict()
     self._provider_provenance_scheduler_narrative_governance_plans: OrderedDict[
       str,
@@ -912,6 +917,30 @@ class InMemoryRunRepository(RunRepositoryPort):
         reverse=True,
       )
     )
+
+  def save_provider_provenance_scheduler_narrative_governance_policy_catalog(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
+    self._provider_provenance_scheduler_narrative_governance_policy_catalogs[record.catalog_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_policy_catalogs(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_governance_policy_catalogs.values(),
+        key=lambda record: (record.updated_at, record.catalog_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_narrative_governance_policy_catalog(
+    self,
+    catalog_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord | None:
+    return self._provider_provenance_scheduler_narrative_governance_policy_catalogs.get(catalog_id)
 
   def save_provider_provenance_scheduler_narrative_governance_plan(
     self,

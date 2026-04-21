@@ -39,7 +39,10 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceResult
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord
@@ -465,6 +468,10 @@ class TradingApplication:
     self._provider_provenance_scheduler_narrative_governance_policy_template_audit_records: dict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
+    ] = {}
+    self._provider_provenance_scheduler_narrative_governance_policy_catalogs: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
     ] = {}
     self._provider_provenance_scheduler_narrative_governance_plans: dict[
       str,
@@ -1959,6 +1966,51 @@ class TradingApplication:
       sorted(
         self._provider_provenance_scheduler_narrative_governance_policy_template_audit_records.values(),
         key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
+    save_record = getattr(
+      self._runs,
+      "save_provider_provenance_scheduler_narrative_governance_policy_catalog",
+      None,
+    )
+    if callable(save_record):
+      return save_record(record)
+    self._provider_provenance_scheduler_narrative_governance_policy_catalogs[record.catalog_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
+    self,
+    catalog_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord | None:
+    get_record = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_narrative_governance_policy_catalog",
+      None,
+    )
+    if callable(get_record):
+      return get_record(catalog_id)
+    return self._provider_provenance_scheduler_narrative_governance_policy_catalogs.get(catalog_id)
+
+  def _list_provider_provenance_scheduler_narrative_governance_policy_catalog_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord, ...]:
+    list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_narrative_governance_policy_catalogs",
+      None,
+    )
+    if callable(list_records):
+      return tuple(list_records())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_governance_policy_catalogs.values(),
+        key=lambda record: (record.updated_at, record.catalog_id),
         reverse=True,
       )
     )
@@ -6597,6 +6649,123 @@ class TradingApplication:
       )
     return tuple(filtered[:normalized_limit])
 
+  def create_provider_provenance_scheduler_narrative_governance_policy_catalog(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    policy_template_ids: Iterable[str],
+    default_policy_template_id: str | None = None,
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
+    normalized_name = self._normalize_provider_provenance_workspace_name(
+      name,
+      field_name="scheduler narrative governance policy catalog name",
+    )
+    normalized_description = description.strip() if isinstance(description, str) else ""
+    normalized_policy_template_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(
+      policy_template_ids
+    )
+    if not normalized_policy_template_ids:
+      raise ValueError("Select at least one governance policy template for the catalog.")
+    resolved_templates = tuple(
+      self.get_provider_provenance_scheduler_narrative_governance_policy_template(template_id)
+      for template_id in normalized_policy_template_ids
+    )
+    if any(template.status != "active" for template in resolved_templates):
+      raise ValueError("Governance policy catalog entries must reference active policy templates.")
+    resolved_default_policy_template_id = (
+      default_policy_template_id.strip()
+      if isinstance(default_policy_template_id, str) and default_policy_template_id.strip()
+      else resolved_templates[0].policy_template_id
+    )
+    default_template = next(
+      (
+        template
+        for template in resolved_templates
+        if template.policy_template_id == resolved_default_policy_template_id
+      ),
+      None,
+    )
+    if default_template is None:
+      raise ValueError("Default governance policy template must be one of the linked templates.")
+    now = self._clock()
+    return self._save_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord(
+        catalog_id=uuid4().hex[:12],
+        name=normalized_name,
+        description=normalized_description,
+        policy_template_ids=tuple(template.policy_template_id for template in resolved_templates),
+        policy_template_names=tuple(template.name for template in resolved_templates),
+        default_policy_template_id=default_template.policy_template_id,
+        default_policy_template_name=default_template.name,
+        item_type_scope=default_template.item_type_scope,
+        action_scope=default_template.action_scope,
+        approval_lane=default_template.approval_lane,
+        approval_priority=default_template.approval_priority,
+        guidance=default_template.guidance,
+        created_at=now,
+        updated_at=now,
+        created_by_tab_id=(
+          created_by_tab_id.strip()
+          if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+          else None
+        ),
+        created_by_tab_label=(
+          created_by_tab_label.strip()
+          if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+          else None
+        ),
+      )
+    )
+
+  def list_provider_provenance_scheduler_narrative_governance_policy_catalogs(
+    self,
+    *,
+    search: str | None = None,
+    limit: int = 20,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord, ...]:
+    normalized_limit = max(1, min(limit, 100))
+    filtered: list[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord] = []
+    for record in self._list_provider_provenance_scheduler_narrative_governance_policy_catalog_records():
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.catalog_id,
+          record.name,
+          record.description,
+          record.default_policy_template_id,
+          record.default_policy_template_name,
+          record.item_type_scope,
+          record.action_scope,
+          record.approval_lane,
+          record.approval_priority,
+          record.guidance,
+          record.created_by_tab_id,
+          record.created_by_tab_label,
+          *record.policy_template_ids,
+          *record.policy_template_names,
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(record)
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_scheduler_narrative_governance_policy_catalog(
+    self,
+    catalog_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
+    normalized_catalog_id = catalog_id.strip()
+    if not normalized_catalog_id:
+      raise LookupError("Provider provenance scheduler narrative governance policy catalog not found.")
+    record = self._load_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
+      normalized_catalog_id
+    )
+    if record is None:
+      raise LookupError("Provider provenance scheduler narrative governance policy catalog not found.")
+    return record
+
   def _find_latest_active_provider_provenance_scheduler_narrative_governance_policy_template_revision(
     self,
     policy_template_id: str,
@@ -7094,6 +7263,111 @@ class TradingApplication:
         ),
         applied_result=applied_result,
       )
+    )
+
+  def run_provider_provenance_scheduler_narrative_governance_plan_batch_action(
+    self,
+    *,
+    action: str,
+    plan_ids: Iterable[str],
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    note: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult:
+    normalized_action = action.strip().lower()
+    if normalized_action not in {"approve", "apply"}:
+      raise ValueError("Unsupported scheduler narrative governance batch action.")
+    normalized_plan_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(plan_ids)
+    if not normalized_plan_ids:
+      raise ValueError("Select at least one scheduler narrative governance plan.")
+    results: list[ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult] = []
+    succeeded_count = 0
+    skipped_count = 0
+    failed_count = 0
+    for plan_id in normalized_plan_ids:
+      try:
+        current = self.get_provider_provenance_scheduler_narrative_governance_plan(plan_id)
+        if normalized_action == "approve" and current.status == "approved":
+          skipped_count += 1
+          results.append(
+            ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult(
+              plan_id=current.plan_id,
+              action=normalized_action,
+              outcome="skipped",
+              status=current.status,
+              queue_state=self._build_provider_provenance_scheduler_narrative_governance_queue_state(
+                current.status
+              ),
+              message="Plan is already approved.",
+              plan=current,
+            )
+          )
+          continue
+        if normalized_action == "apply" and current.status == "applied":
+          skipped_count += 1
+          results.append(
+            ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult(
+              plan_id=current.plan_id,
+              action=normalized_action,
+              outcome="skipped",
+              status=current.status,
+              queue_state=self._build_provider_provenance_scheduler_narrative_governance_queue_state(
+                current.status
+              ),
+              message="Plan is already applied.",
+              plan=current,
+            )
+          )
+          continue
+        updated = (
+          self.approve_provider_provenance_scheduler_narrative_governance_plan(
+            current.plan_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            note=note,
+          )
+          if normalized_action == "approve"
+          else self.apply_provider_provenance_scheduler_narrative_governance_plan(
+            current.plan_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+          )
+        )
+        succeeded_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult(
+            plan_id=updated.plan_id,
+            action=normalized_action,
+            outcome="succeeded",
+            status=updated.status,
+            queue_state=self._build_provider_provenance_scheduler_narrative_governance_queue_state(
+              updated.status
+            ),
+            message=(
+              "Plan approved for apply."
+              if normalized_action == "approve"
+              else "Approved governance plan applied."
+            ),
+            plan=updated,
+          )
+        )
+      except (LookupError, RuntimeError, ValueError) as exc:
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult(
+            plan_id=plan_id,
+            action=normalized_action,
+            outcome="failed",
+            message=str(exc),
+          )
+        )
+    return ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult(
+      action=normalized_action,
+      requested_count=len(normalized_plan_ids),
+      succeeded_count=succeeded_count,
+      skipped_count=skipped_count,
+      failed_count=failed_count,
+      results=tuple(results),
     )
 
   def rollback_provider_provenance_scheduler_narrative_governance_plan(
@@ -32969,6 +33243,41 @@ def serialize_provider_provenance_scheduler_narrative_governance_policy_template
   }
 
 
+def serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
+  record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
+) -> dict[str, Any]:
+  return {
+    "catalog_id": record.catalog_id,
+    "name": record.name,
+    "description": record.description,
+    "policy_template_ids": list(record.policy_template_ids),
+    "policy_template_names": list(record.policy_template_names),
+    "default_policy_template_id": record.default_policy_template_id,
+    "default_policy_template_name": record.default_policy_template_name,
+    "item_type_scope": record.item_type_scope,
+    "action_scope": record.action_scope,
+    "approval_lane": record.approval_lane,
+    "approval_priority": record.approval_priority,
+    "guidance": record.guidance,
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_list(
+  records: tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
 def serialize_provider_provenance_scheduler_narrative_governance_plan_record(
   record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
 ) -> dict[str, Any]:
@@ -33041,6 +33350,34 @@ def serialize_provider_provenance_scheduler_narrative_governance_plan_list(
     "pending_approval_count": pending_approval_count,
     "ready_to_apply_count": ready_to_apply_count,
     "completed_count": completed_count,
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_plan_batch_result(
+  record: ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
+) -> dict[str, Any]:
+  return {
+    "action": record.action,
+    "requested_count": record.requested_count,
+    "succeeded_count": record.succeeded_count,
+    "skipped_count": record.skipped_count,
+    "failed_count": record.failed_count,
+    "results": [
+      {
+        "plan_id": result.plan_id,
+        "action": result.action,
+        "outcome": result.outcome,
+        "status": result.status,
+        "queue_state": result.queue_state,
+        "message": result.message,
+        "plan": (
+          serialize_provider_provenance_scheduler_narrative_governance_plan_record(result.plan)
+          if result.plan is not None
+          else None
+        ),
+      }
+      for result in record.results
+    ],
   }
 
 
