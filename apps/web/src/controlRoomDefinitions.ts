@@ -934,6 +934,54 @@ export type MarketDataStatus = {
   }[];
 };
 
+export type MarketDataLineageHistoryRecord = {
+  history_id: string;
+  source_job_id?: string | null;
+  provider: string;
+  venue: string;
+  symbol: string;
+  timeframe: string;
+  recorded_at: string;
+  sync_status: string;
+  validation_claim: string;
+  reproducibility_state: string;
+  boundary_id?: string | null;
+  checkpoint_id?: string | null;
+  dataset_boundary?: DatasetBoundaryContract | null;
+  first_timestamp?: string | null;
+  last_timestamp?: string | null;
+  candle_count: number;
+  lag_seconds?: number | null;
+  last_sync_at?: string | null;
+  failure_count_24h: number;
+  contiguous_missing_candles?: number | null;
+  gap_window_count: number;
+  last_error?: string | null;
+  issues: string[];
+};
+
+export type MarketDataIngestionJobRecord = {
+  job_id: string;
+  provider: string;
+  venue: string;
+  symbol: string;
+  timeframe: string;
+  operation: string;
+  status: string;
+  started_at: string;
+  finished_at: string;
+  duration_ms: number;
+  fetched_candle_count: number;
+  validation_claim?: string | null;
+  boundary_id?: string | null;
+  checkpoint_id?: string | null;
+  lineage_history_id?: string | null;
+  requested_start_at?: string | null;
+  requested_end_at?: string | null;
+  requested_limit?: number | null;
+  last_error?: string | null;
+};
+
 export type OperatorVisibility = {
   generated_at: string;
   alerts: {

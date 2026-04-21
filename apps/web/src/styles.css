@@ -2297,6 +2297,64 @@ select {
   font-size: 0.8rem;
 }
 
+.market-data-instrument-row.is-active td {
+  background: rgba(19, 117, 236, 0.05);
+}
+
+.market-data-instrument-button {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.market-data-instrument-button strong {
+  font-size: 0.82rem;
+}
+
+.market-data-instrument-button span {
+  font-size: 0.7rem;
+  font-family: "IBM Plex Mono", monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.market-data-instrument-button.is-active span {
+  color: var(--blue);
+}
+
+.market-data-workflow-toolbar {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.market-data-workflow-focus-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.market-data-workflow-focus-copy strong {
+  font-size: 0.92rem;
+}
+
+.market-data-workflow-focus-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.market-data-workflow-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .progress-stack {
   display: grid;
   gap: 4px;

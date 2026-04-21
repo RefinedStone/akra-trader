@@ -118,6 +118,8 @@ It is not yet a finished live trading product:
 - separate histories for backtest, sandbox, paper, and live modes
 - guarded-live panels for candidacy blockers, venue snapshots, recovery state, and audit history
 - operator surfaces for replay-link alias governance and audit export administration
+- runtime control-room workflows now consume focused market-data lineage and ingestion-job history
+  for selected instruments during incident triage
 
 ### Operator discipline baseline
 
@@ -132,8 +134,9 @@ It is not yet a finished live trading product:
 - custom strategy registration exists, but registration metadata is still process-local rather than a
   durable strategy registry
 - dataset-boundary contracts, rerun validation categories, operator-visible lineage summaries, and
-  normalized lineage or ingestion history surfaces now exist, but operator-first workflow and alert
-  correlation on top of those surfaces are still thin
+  normalized lineage or ingestion history surfaces now exist, and the control room now consumes
+  focused history for incident triage, but alert correlation and operator action guidance on top of
+  those surfaces are still thin
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to

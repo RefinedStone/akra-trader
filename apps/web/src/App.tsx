@@ -57,6 +57,8 @@ import {
   exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   fetchJson,
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
+  listMarketDataIngestionJobs,
+  listMarketDataLineageHistory,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
@@ -232,6 +234,8 @@ import type {
   ExperimentPresetRevision,
   GapWindowDragSelectionState,
   GuardedLiveStatus,
+  MarketDataIngestionJobRecord,
+  MarketDataLineageHistoryRecord,
   MarketDataStatus,
   OperatorVisibility,
   PendingTouchGapWindowSweepState,
@@ -1685,6 +1689,55 @@ function normalizeRunFormPreset(
   };
 }
 
+function resolveMarketDataSymbol(instrumentId: string) {
+  const separatorIndex = instrumentId.indexOf(":");
+  return separatorIndex >= 0 ? instrumentId.slice(separatorIndex + 1) : instrumentId;
+}
+
+function buildMarketDataInstrumentFocusKey(
+  instrument: MarketDataStatus["instruments"][number],
+) {
+  return `${instrument.instrument_id}|${instrument.timeframe}`;
+}
+
+function isMarketDataInstrumentAtRisk(
+  instrument: MarketDataStatus["instruments"][number],
+) {
+  return (
+    instrument.sync_status !== "synced"
+    || instrument.failure_count_24h > 0
+    || (instrument.lag_seconds ?? 0) > 0
+    || instrument.backfill_gap_windows.length > 0
+    || instrument.issues.length > 0
+  );
+}
+
+function resolvePreferredMarketDataInstrument(
+  marketStatus: MarketDataStatus,
+  preferredKey: string | null,
+) {
+  if (preferredKey) {
+    const preferredInstrument = marketStatus.instruments.find(
+      (instrument) => buildMarketDataInstrumentFocusKey(instrument) === preferredKey,
+    );
+    if (preferredInstrument) {
+      return preferredInstrument;
+    }
+  }
+  return (
+    marketStatus.instruments.find((instrument) => isMarketDataInstrumentAtRisk(instrument))
+    ?? marketStatus.instruments[0]
+    ?? null
+  );
+}
+
+function formatWorkflowToken(value?: string | null) {
+  if (!value) {
+    return "n/a";
+  }
+  return value.replaceAll("_", " ");
+}
+
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [references, setReferences] = useState<ReferenceSource[]>([]);
@@ -1695,6 +1748,11 @@ export default function App() {
   const [paperRuns, setPaperRuns] = useState<Run[]>([]);
   const [liveRuns, setLiveRuns] = useState<Run[]>([]);
   const [marketStatus, setMarketStatus] = useState<MarketDataStatus | null>(null);
+  const [marketDataLineageHistory, setMarketDataLineageHistory] = useState<MarketDataLineageHistoryRecord[]>([]);
+  const [marketDataIngestionJobs, setMarketDataIngestionJobs] = useState<MarketDataIngestionJobRecord[]>([]);
+  const [activeMarketInstrumentKey, setActiveMarketInstrumentKey] = useState<string | null>(null);
+  const [marketDataWorkflowLoading, setMarketDataWorkflowLoading] = useState(false);
+  const [marketDataWorkflowError, setMarketDataWorkflowError] = useState<string | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -1846,6 +1904,7 @@ export default function App() {
   const comparisonHistoryWriteModeRef = useRef<ComparisonHistoryWriteMode>("replace");
   const comparisonHistoryUrlRef = useRef<string | null>(null);
   const skipNextControlRoomUiPersistRef = useRef(false);
+  const marketDataWorkflowRequestIdRef = useRef(0);
   const comparisonSelection = useMemo(
     () =>
       normalizeControlRoomComparisonSelection({
@@ -1982,8 +2041,18 @@ export default function App() {
       setPaperRuns(paperResponse);
       setLiveRuns(liveResponse);
       setMarketStatus(marketResponse);
+      const preferredMarketInstrument = resolvePreferredMarketDataInstrument(
+        marketResponse,
+        activeMarketInstrumentKey,
+      );
+      setActiveMarketInstrumentKey(
+        preferredMarketInstrument
+          ? buildMarketDataInstrumentFocusKey(preferredMarketInstrument)
+          : null,
+      );
       setOperatorVisibility(operatorResponse);
       setGuardedLive(guardedLiveResponse);
+      await loadMarketDataWorkflow(preferredMarketInstrument);
       setStatusText("Control room synchronized.");
     } catch (error) {
       setStatusText(`Load failed: ${(error as Error).message}`);
@@ -2891,6 +2960,43 @@ export default function App() {
     };
   }, [marketStatus]);
 
+  const incidentFocusedInstruments = useMemo(
+    () => marketStatus?.instruments.filter((instrument) => isMarketDataInstrumentAtRisk(instrument)) ?? [],
+    [marketStatus],
+  );
+
+  const activeMarketInstrument = useMemo(() => {
+    if (!marketStatus) {
+      return null;
+    }
+    return resolvePreferredMarketDataInstrument(marketStatus, activeMarketInstrumentKey);
+  }, [activeMarketInstrumentKey, marketStatus]);
+
+  const focusedMarketWorkflowSummary = useMemo(() => {
+    if (!activeMarketInstrument) {
+      return null;
+    }
+    const latestLineage = marketDataLineageHistory[0] ?? null;
+    const latestJob = marketDataIngestionJobs[0] ?? null;
+    const failedJobCount = marketDataIngestionJobs.filter((job) => job.status !== "succeeded").length;
+    const reviewSnapshotCount = marketDataLineageHistory.filter(
+      (record) =>
+        record.sync_status !== "synced"
+        || record.failure_count_24h > 0
+        || record.gap_window_count > 0
+        || record.issues.length > 0,
+    ).length;
+    return {
+      focusLabel: `${activeMarketInstrument.instrument_id} / ${activeMarketInstrument.timeframe}`,
+      lineageCount: marketDataLineageHistory.length,
+      ingestionJobCount: marketDataIngestionJobs.length,
+      failedJobCount,
+      reviewSnapshotCount,
+      latestLineage,
+      latestJob,
+    };
+  }, [activeMarketInstrument, marketDataIngestionJobs, marketDataLineageHistory]);
+
   const operatorSummary = useMemo(() => {
     if (!operatorVisibility) {
       return null;
@@ -3014,6 +3120,60 @@ export default function App() {
   function resolveGuardedLiveReason(fallback: string) {
     const trimmed = guardedLiveReason.trim();
     return trimmed.length ? trimmed : fallback;
+  }
+
+  async function loadMarketDataWorkflow(
+    instrument: MarketDataStatus["instruments"][number] | null,
+  ) {
+    const requestId = marketDataWorkflowRequestIdRef.current + 1;
+    marketDataWorkflowRequestIdRef.current = requestId;
+    if (!instrument) {
+      setMarketDataLineageHistory([]);
+      setMarketDataIngestionJobs([]);
+      setMarketDataWorkflowError(null);
+      setMarketDataWorkflowLoading(false);
+      return;
+    }
+    setMarketDataWorkflowLoading(true);
+    setMarketDataWorkflowError(null);
+    try {
+      const symbol = resolveMarketDataSymbol(instrument.instrument_id);
+      const [lineageResponse, ingestionResponse] = await Promise.all([
+        listMarketDataLineageHistory({
+          symbol,
+          timeframe: instrument.timeframe,
+          sort: "recorded_at:desc",
+        }),
+        listMarketDataIngestionJobs({
+          symbol,
+          timeframe: instrument.timeframe,
+          sort: "started_at:desc",
+        }),
+      ]);
+      if (marketDataWorkflowRequestIdRef.current !== requestId) {
+        return;
+      }
+      setMarketDataLineageHistory(lineageResponse);
+      setMarketDataIngestionJobs(ingestionResponse);
+    } catch (error) {
+      if (marketDataWorkflowRequestIdRef.current !== requestId) {
+        return;
+      }
+      setMarketDataLineageHistory([]);
+      setMarketDataIngestionJobs([]);
+      setMarketDataWorkflowError((error as Error).message);
+    } finally {
+      if (marketDataWorkflowRequestIdRef.current === requestId) {
+        setMarketDataWorkflowLoading(false);
+      }
+    }
+  }
+
+  async function handleMarketInstrumentFocus(
+    instrument: MarketDataStatus["instruments"][number],
+  ) {
+    setActiveMarketInstrumentKey(buildMarketDataInstrumentFocusKey(instrument));
+    await loadMarketDataWorkflow(instrument);
   }
 
   async function handlePresetSubmit(event: FormEvent) {
@@ -3853,9 +4013,31 @@ export default function App() {
                   </div>
                 </>
               ) : null}
+              {activeMarketInstrument && focusedMarketWorkflowSummary ? (
+                <>
+                  <div className="metric-tile">
+                    <span>Triage focus</span>
+                    <strong>{focusedMarketWorkflowSummary.focusLabel}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Focused sync</span>
+                    <strong>{activeMarketInstrument.sync_status}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Lineage claim</span>
+                    <strong>{formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage?.validation_claim)}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Latest ingestion</span>
+                    <strong>{formatWorkflowToken(focusedMarketWorkflowSummary.latestJob?.status)}</strong>
+                  </div>
+                </>
+              ) : null}
               <PanelDisclosure
                 defaultOpen={false}
-                summary={`${marketStatus.instruments.length} instruments across ${marketStatus.provider} / ${marketStatus.venue}.`}
+                summary={`${
+                  marketStatus.instruments.length
+                } instruments across ${marketStatus.provider} / ${marketStatus.venue}.${activeMarketInstrument ? ` Focused triage: ${activeMarketInstrument.instrument_id} ${activeMarketInstrument.timeframe}.` : ""}`}
                 title="Instrument sync ledger"
               >
                 <table className="data-table">
@@ -3876,9 +4058,26 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {marketStatus.instruments.map((instrument) => (
-                      <tr key={instrument.instrument_id}>
-                        <td>{instrument.instrument_id}</td>
+                    {marketStatus.instruments.map((instrument) => {
+                      const isFocusedInstrument =
+                        buildMarketDataInstrumentFocusKey(instrument) === activeMarketInstrumentKey;
+                      return (
+                      <tr
+                        className={isFocusedInstrument ? "market-data-instrument-row is-active" : "market-data-instrument-row"}
+                        key={instrument.instrument_id}
+                      >
+                        <td>
+                          <button
+                            className={`market-data-instrument-button ${isFocusedInstrument ? "is-active" : ""}`.trim()}
+                            onClick={() => {
+                              void handleMarketInstrumentFocus(instrument);
+                            }}
+                            type="button"
+                          >
+                            <strong>{instrument.instrument_id}</strong>
+                            <span>{isMarketDataInstrumentAtRisk(instrument) ? "review" : "clear"}</span>
+                          </button>
+                        </td>
                         <td>{instrument.timeframe}</td>
                         <td>{instrument.sync_status}</td>
                         <td>{instrument.candle_count}</td>
@@ -3977,7 +4176,7 @@ export default function App() {
                         </td>
                         <td>{instrument.issues.length ? instrument.issues.join(", ") : "ok"}</td>
                       </tr>
-                    ))}
+                    );})}
                   </tbody>
                 </table>
               </PanelDisclosure>
@@ -4025,6 +4224,181 @@ export default function App() {
                   </div>
                 </>
               ) : null}
+              <PanelDisclosure
+                defaultOpen={true}
+                summary={
+                  activeMarketInstrument && focusedMarketWorkflowSummary
+                    ? `${focusedMarketWorkflowSummary.lineageCount} lineage snapshots · ${focusedMarketWorkflowSummary.ingestionJobCount} ingestion jobs for ${focusedMarketWorkflowSummary.focusLabel}.`
+                    : "Select a market-data instrument to inspect lineage and ingestion workflow history."
+                }
+                title="Data incident triage"
+              >
+                {marketStatus ? (
+                  <>
+                    <div className="market-data-workflow-toolbar">
+                      <div className="market-data-workflow-focus-copy">
+                        <strong>
+                          {focusedMarketWorkflowSummary?.focusLabel ?? "No triage focus selected"}
+                        </strong>
+                        <p>
+                          {marketDataWorkflowLoading
+                            ? "Refreshing lineage and ingestion workflow history..."
+                            : marketDataWorkflowError
+                              ? `History load failed: ${marketDataWorkflowError}`
+                              : focusedMarketWorkflowSummary?.latestLineage
+                                ? `Latest lineage snapshot recorded ${formatTimestamp(focusedMarketWorkflowSummary.latestLineage.recorded_at)} with ${formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage.validation_claim)} claim.`
+                                : "No lineage or ingestion history recorded for the current focus."}
+                        </p>
+                      </div>
+                      {incidentFocusedInstruments.length ? (
+                        <div className="market-data-workflow-chip-row">
+                          {incidentFocusedInstruments.map((instrument) => {
+                            const focusKey = buildMarketDataInstrumentFocusKey(instrument);
+                            const active = focusKey === activeMarketInstrumentKey;
+                            return (
+                              <button
+                                className={`ghost-button ${active ? "is-active" : ""}`.trim()}
+                                key={focusKey}
+                                onClick={() => {
+                                  void handleMarketInstrumentFocus(instrument);
+                                }}
+                                type="button"
+                              >
+                                {resolveMarketDataSymbol(instrument.instrument_id)} · {instrument.timeframe}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                    {activeMarketInstrument && focusedMarketWorkflowSummary ? (
+                      <>
+                        <div className="status-grid">
+                          <div className="metric-tile">
+                            <span>Focused sync</span>
+                            <strong>{activeMarketInstrument.sync_status}</strong>
+                          </div>
+                          <div className="metric-tile">
+                            <span>Lineage snapshots</span>
+                            <strong>{focusedMarketWorkflowSummary.lineageCount}</strong>
+                          </div>
+                          <div className="metric-tile">
+                            <span>Review snapshots</span>
+                            <strong>{focusedMarketWorkflowSummary.reviewSnapshotCount}</strong>
+                          </div>
+                          <div className="metric-tile">
+                            <span>Failed jobs</span>
+                            <strong>{focusedMarketWorkflowSummary.failedJobCount}</strong>
+                          </div>
+                          <div className="metric-tile">
+                            <span>Latest claim</span>
+                            <strong>{formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage?.validation_claim)}</strong>
+                          </div>
+                          <div className="metric-tile">
+                            <span>Latest job</span>
+                            <strong>
+                              {focusedMarketWorkflowSummary.latestJob
+                                ? `${formatWorkflowToken(focusedMarketWorkflowSummary.latestJob.status)} / ${formatWorkflowToken(focusedMarketWorkflowSummary.latestJob.operation)}`
+                                : "n/a"}
+                            </strong>
+                          </div>
+                        </div>
+                        <div className="status-grid-two-column">
+                          <div>
+                            <h3>Lineage history</h3>
+                            {marketDataLineageHistory.length ? (
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Recorded</th>
+                                    <th>Sync</th>
+                                    <th>Claim</th>
+                                    <th>Boundary</th>
+                                    <th>Signal</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {marketDataLineageHistory.slice(0, 6).map((record) => (
+                                    <tr key={record.history_id}>
+                                      <td>{formatTimestamp(record.recorded_at)}</td>
+                                      <td>{record.sync_status}</td>
+                                      <td>{formatWorkflowToken(record.validation_claim)}</td>
+                                      <td title={record.boundary_id ?? undefined}>
+                                        {record.boundary_id ? shortenIdentifier(record.boundary_id, 22) : "n/a"}
+                                      </td>
+                                      <td>
+                                        <strong>
+                                          {record.failure_count_24h} failures / 24h
+                                          {record.gap_window_count ? ` · ${record.gap_window_count} gaps` : ""}
+                                        </strong>
+                                        <p className="run-lineage-symbol-copy">
+                                          {record.issues.length ? record.issues.join(", ") : "No lineage issues recorded."}
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          Window: {formatRange(record.first_timestamp, record.last_timestamp)}
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          Checkpoint: {record.checkpoint_id ? shortenIdentifier(record.checkpoint_id, 22) : "n/a"}
+                                        </p>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <p className="empty-state">No lineage history recorded for this focus.</p>
+                            )}
+                          </div>
+                          <div>
+                            <h3>Ingestion jobs</h3>
+                            {marketDataIngestionJobs.length ? (
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Finished</th>
+                                    <th>Status</th>
+                                    <th>Operation</th>
+                                    <th>Fetched</th>
+                                    <th>Detail</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {marketDataIngestionJobs.slice(0, 6).map((job) => (
+                                    <tr key={job.job_id}>
+                                      <td>{formatTimestamp(job.finished_at)}</td>
+                                      <td>{job.status}</td>
+                                      <td>{job.operation}</td>
+                                      <td>{job.fetched_candle_count}</td>
+                                      <td>
+                                        <strong>{job.duration_ms} ms</strong>
+                                        <p className="run-lineage-symbol-copy">
+                                          Claim: {formatWorkflowToken(job.validation_claim)}
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          Requested: {formatRange(job.requested_start_at, job.requested_end_at)}
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          {job.last_error ? truncateLabel(job.last_error, 84) : "No job error recorded."}
+                                        </p>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <p className="empty-state">No ingestion jobs recorded for this focus.</p>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="empty-state">No market-data instrument is currently selected for triage.</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="empty-state">Load market-data status before reviewing lineage workflow history.</p>
+                )}
+              </PanelDisclosure>
               <PanelDisclosure
                 defaultOpen={true}
                 summary={`${operatorVisibility.alerts.length} active alerts · ${operatorVisibility.audit_events.length} recent audit events.`}
