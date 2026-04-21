@@ -6,52 +6,70 @@
       "direction_id": "data-trust-and-lineage",
       "title": "Define canonical dataset-boundary contract and rerun validation categories",
       "description": "Establish the single canonical dataset-boundary contract for rerun validation and classify the validation result categories needed to defend deterministic rerun claims.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 100,
       "dynamic_priority_delta": 15,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:00:00+09:00",
+      "updated_at": "2026-04-21T20:51:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "Batch 1 first slice from the execution board and explicitly called out as the immediate next step in the latest main-session reply.",
-      "priority_reason": "This is the clearest next executable gate because later lineage and experiment tasks rely on a stable rerun-boundary contract."
+      "direction_relation_note": "Batch 1 first slice is now implemented on main in commit c21c51c, including dataset_boundary.v1 claims and rerun validation categories across lineage and API payloads.",
+      "priority_reason": "Completed and validated with targeted pytest coverage plus compileall, so downstream lineage and experiment tasks can now assume the canonical boundary contract exists."
     },
     {
       "id": "task-b1-lineage-mismatch-taxonomy",
       "direction_id": "data-trust-and-lineage",
-      "title": "Classify lineage mismatches and define operator-visible summary surface",
-      "description": "Replace generic drift handling with a lineage mismatch taxonomy and the normalized summary surface needed to expose mismatch meaning to operators.",
-      "status": "proposed",
+      "title": "Ship operator-visible lineage mismatch summary from rerun taxonomy",
+      "description": "Use the new rerun validation categories to expose operator-visible lineage mismatch summaries so exact_match, checkpoint_match, window_match, delegated_match, mode_translation, and dataset_changed are understandable without reading raw payload internals.",
+      "status": "ready",
       "base_priority": 92,
-      "dynamic_priority_delta": 8,
+      "dynamic_priority_delta": 17,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:00:00+09:00",
+      "updated_at": "2026-04-21T20:51:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-dataset-boundary-contract"
       ],
-      "direction_relation_note": "Directly follows the first Batch 1 slice in the execution board and closes the second immediate gap in the data-trust direction.",
-      "priority_reason": "Should start right after the canonical boundary contract because mismatch classes depend on what counts as the authoritative boundary."
+      "direction_relation_note": "The latest main-session reply names the missing operator-visible lineage mismatch summary as the immediate next step after commit c21c51c established the backend taxonomy.",
+      "priority_reason": "This is now the clearest executable follow-up because the taxonomy exists in backend state but operators still cannot consume its meaning directly."
     },
     {
       "id": "task-b1-lineage-query-surfaces",
       "direction_id": "data-trust-and-lineage",
-      "title": "Add ingestion-job history and normalized lineage query surfaces",
-      "description": "Plan the follow-up slice that makes ingestion-job history and normalized lineage queries first-class so operators can inspect provenance without payload-heavy or shell-based workflows.",
+      "title": "Add ingestion-job history and normalized lineage/history query surfaces",
+      "description": "Make ingestion-job history plus normalized lineage/history queries first-class so operators can inspect provenance, sync checkpoints, and rerun context without payload-heavy or shell-based workflows.",
       "status": "proposed",
       "base_priority": 84,
-      "dynamic_priority_delta": 4,
+      "dynamic_priority_delta": 7,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:00:00+09:00",
+      "updated_at": "2026-04-21T20:51:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-dataset-boundary-contract",
         "task-b1-lineage-mismatch-taxonomy"
       ],
-      "direction_relation_note": "Completes the remaining immediate gap named in the data-trust direction detail doc and Batch 1 execution board.",
-      "priority_reason": "This is still Batch 1 work, but it should follow the contract and taxonomy so the normalized query surface reflects the final lineage model."
+      "direction_relation_note": "The latest main-session reply explicitly keeps normalized lineage/history surfaces and ingestion-job history open after the boundary contract landed.",
+      "priority_reason": "This remains the next backend slice after the operator-visible mismatch summary because the normalized query surface should reflect the final mismatch semantics."
+    },
+    {
+      "id": "task-b1-lineage-category-ui",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Interpret rerun lineage categories in operator-facing UI",
+      "description": "Update operator-facing frontend views to actively interpret rerun lineage categories and dataset-boundary claims instead of showing opaque matched or drifted states.",
+      "status": "proposed",
+      "base_priority": 78,
+      "dynamic_priority_delta": 6,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T20:51:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-lineage-mismatch-taxonomy"
+      ],
+      "direction_relation_note": "The latest main-session reply calls out the missing frontend interpretation of the new rerun categories as a remaining follow-up after the backend taxonomy landed.",
+      "priority_reason": "This is executable work, but it should stay behind the operator-visible summary slice so the UI builds on a settled backend surface rather than raw category strings."
     },
     {
       "id": "task-b1-durable-strategy-registry",
