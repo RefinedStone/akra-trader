@@ -222,6 +222,15 @@ class OperatorProviderProvenanceExportJobApprovalRequest(BaseModel):
   source_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerHistoricalExportRequest(BaseModel):
+  alert_category: str
+  detected_at: datetime
+  resolved_at: datetime | None = None
+  format: str = "json"
+  history_limit: int = 25
+  drilldown_history_limit: int = 24
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -1317,6 +1326,32 @@ def create_router(container: Container) -> APIRouter:
       summary=binding.response_title,
       openapi_extra=_build_route_openapi_extra(binding),
     )
+
+  def reconstruct_operator_provider_provenance_scheduler_health_export(
+    request: OperatorProviderProvenanceSchedulerHistoricalExportRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.reconstruct_provider_provenance_scheduler_health_export(
+        alert_category=request.alert_category,
+        detected_at=request.detected_at,
+        resolved_at=request.resolved_at,
+        export_format=request.format,
+        history_limit=request.history_limit,
+        drilldown_history_limit=request.drilldown_history_limit,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (ValueError, RuntimeError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-health/reconstruct-export",
+    reconstruct_operator_provider_provenance_scheduler_health_export,
+    methods=["POST"],
+    name="reconstruct_operator_provider_provenance_scheduler_health_export",
+    summary="Reconstruct provider provenance scheduler health export for a historical alert row",
+  )
 
   return router
 

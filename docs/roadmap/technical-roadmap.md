@@ -110,6 +110,9 @@ creation.
   lag/failure conditions, so automation faults open one shared handoff artifact automatically and
   can escalate it immediately when policy allows, tightening the loop between automation detection
   and operator
+- resolved scheduler alert history can now reconstruct historical scheduler exports from persisted
+  scheduler-health records, so post-incident review is no longer forced to export only the current
+  automation snapshot after the alert has cleared
   handoff
 
 ### Remaining work

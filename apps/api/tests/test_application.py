@@ -1437,6 +1437,76 @@ def test_provider_provenance_scheduler_failure_auto_runs_export_workflow(
   assert len(delivery.deliveries) == 1
 
 
+def test_resolved_scheduler_alert_row_reconstructs_historical_export(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 12, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+
+  overdue_at = clock.current - timedelta(minutes=10)
+  for name in ("Drift watch A", "Drift watch B"):
+    report = app.create_provider_provenance_scheduled_report(name=name)
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report, next_run_at=overdue_at)
+    )
+
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  clock.advance(timedelta(minutes=1))
+  for record in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(record, next_run_at=clock.current + timedelta(days=7))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  resolved_visibility = app.get_operator_visibility()
+  resolved_alert = next(
+    alert
+    for alert in resolved_visibility.alert_history
+    if alert.category == "scheduler_lag" and alert.status == "resolved"
+  )
+
+  export_payload = app.reconstruct_provider_provenance_scheduler_health_export(
+    alert_category=resolved_alert.category,
+    detected_at=resolved_alert.detected_at,
+    resolved_at=resolved_alert.resolved_at,
+    export_format="json",
+    history_limit=8,
+    drilldown_history_limit=12,
+  )
+  reconstructed = json.loads(export_payload["content"])
+  shared_export = app.create_provider_provenance_export_job(
+    content=export_payload["content"],
+    requested_by_tab_id="tab_scheduler_history",
+    requested_by_tab_label="Scheduler history row",
+  )
+
+  assert export_payload["format"] == "json"
+  assert reconstructed["reconstruction"]["mode"] == "resolved_alert_row"
+  assert reconstructed["reconstruction"]["alert_category"] == "scheduler_lag"
+  assert reconstructed["current"]["status"] == "lagging"
+  assert reconstructed["history_page"]["total"] >= 1
+  assert reconstructed["analytics"]["query"]["reconstruction_mode"] == "resolved_alert_row"
+  assert reconstructed["analytics"]["query"]["alert_resolved_at"] == resolved_alert.resolved_at.isoformat()
+  assert shared_export.export_scope == "provider_provenance_scheduler_health"
+  assert "resolved alert reconstruction" in (shared_export.filter_summary or "")
+
+
 def test_provider_provenance_scheduler_history_and_analytics_persist(
   monkeypatch,
   tmp_path: Path,

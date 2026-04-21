@@ -2154,6 +2154,16 @@ class TradingApplication:
         filter_tokens.append(f"{window_days}d window")
       if isinstance(query_payload.get("drilldown_bucket_key"), str) and query_payload.get("drilldown_bucket_key").strip():
         filter_tokens.append(f"hour drill-down {query_payload['drilldown_bucket_key'].strip()}")
+      if (
+        isinstance(query_payload.get("reconstruction_mode"), str)
+        and query_payload.get("reconstruction_mode").strip() == "resolved_alert_row"
+      ):
+        filter_tokens.append("resolved alert reconstruction")
+      if (
+        isinstance(query_payload.get("alert_category"), str)
+        and query_payload.get("alert_category").strip()
+      ):
+        filter_tokens.append(query_payload["alert_category"].strip())
       filter_summary = " / ".join(filter_tokens)
       if not export_filters:
         export_filters = {
@@ -5266,10 +5276,20 @@ class TradingApplication:
     )
     alerts.sort(key=lambda alert: alert.detected_at, reverse=True)
     audit_events.sort(key=lambda event: event.timestamp, reverse=True)
+    scheduler_alert_history = self._build_provider_provenance_scheduler_alert_history(
+      current_time=current_time,
+    )
+    merged_alert_history = tuple(
+      sorted(
+        (*guarded_live_state.alert_history, *scheduler_alert_history),
+        key=lambda alert: (alert.resolved_at or alert.detected_at, alert.detected_at),
+        reverse=True,
+      )
+    )
     return OperatorVisibility(
       generated_at=current_time,
       alerts=tuple(alerts),
-      alert_history=guarded_live_state.alert_history,
+      alert_history=merged_alert_history,
       incident_events=incident_events,
       delivery_history=delivery_history,
       audit_events=tuple(audit_events),
@@ -27140,6 +27160,288 @@ class TradingApplication:
       ],
     }
 
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_alert_category(
+    category: str,
+  ) -> str:
+    normalized_category = category.strip().lower() if isinstance(category, str) else ""
+    if normalized_category not in {"scheduler_lag", "scheduler_failure"}:
+      raise ValueError("Unsupported scheduler alert category for historical export reconstruction.")
+    return normalized_category
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_export_datetime(
+    value: datetime,
+    *,
+    field_name: str,
+  ) -> datetime:
+    if not isinstance(value, datetime):
+      raise ValueError(f"{field_name} is required for scheduler export reconstruction.")
+    return value.astimezone(UTC) if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+  @staticmethod
+  def _provider_provenance_scheduler_health_snapshot_from_record(
+    record: ProviderProvenanceSchedulerHealthRecord,
+  ) -> ProviderProvenanceSchedulerHealth:
+    return ProviderProvenanceSchedulerHealth(
+      generated_at=record.recorded_at,
+      enabled=record.enabled,
+      status=record.status,
+      summary=record.summary,
+      interval_seconds=record.interval_seconds,
+      batch_limit=record.batch_limit,
+      last_cycle_started_at=record.last_cycle_started_at,
+      last_cycle_finished_at=record.last_cycle_finished_at,
+      last_success_at=record.last_success_at,
+      last_failure_at=record.last_failure_at,
+      last_error=record.last_error,
+      cycle_count=record.cycle_count,
+      success_count=record.success_count,
+      failure_count=record.failure_count,
+      consecutive_failure_count=record.consecutive_failure_count,
+      last_executed_count=record.last_executed_count,
+      total_executed_count=record.total_executed_count,
+      due_report_count=record.due_report_count,
+      oldest_due_at=record.oldest_due_at,
+      max_due_lag_seconds=record.max_due_lag_seconds,
+      active_alert_key=record.active_alert_key,
+      alert_workflow_job_id=record.alert_workflow_job_id,
+      alert_workflow_triggered_at=record.alert_workflow_triggered_at,
+      alert_workflow_state=record.alert_workflow_state,
+      alert_workflow_summary=record.alert_workflow_summary,
+      issues=record.issues,
+    )
+
+  def reconstruct_provider_provenance_scheduler_health_export(
+    self,
+    *,
+    alert_category: str,
+    detected_at: datetime,
+    resolved_at: datetime | None = None,
+    export_format: str = "json",
+    history_limit: int = 25,
+    drilldown_history_limit: int = 24,
+  ) -> dict[str, Any]:
+    normalized_format = export_format.strip().lower() if isinstance(export_format, str) else "json"
+    if normalized_format not in {"json", "csv"}:
+      raise ValueError("Unsupported provider provenance scheduler health export format.")
+    normalized_category = self._normalize_provider_provenance_scheduler_alert_category(alert_category)
+    target_status = "failed" if normalized_category == "scheduler_failure" else "lagging"
+    detected_at_utc = self._normalize_provider_provenance_scheduler_export_datetime(
+      detected_at,
+      field_name="detected_at",
+    )
+    resolved_at_utc = (
+      self._normalize_provider_provenance_scheduler_export_datetime(
+        resolved_at,
+        field_name="resolved_at",
+      )
+      if resolved_at is not None
+      else None
+    )
+    if resolved_at_utc is not None and resolved_at_utc < detected_at_utc:
+      raise ValueError("resolved_at must be on or after detected_at for scheduler export reconstruction.")
+    self._prune_provider_provenance_scheduler_health_records()
+    all_records = tuple(self._list_provider_provenance_scheduler_health_records())
+    window_end = resolved_at_utc or max(
+      (record.recorded_at for record in all_records),
+      default=detected_at_utc,
+    )
+    window_records = tuple(
+      record
+      for record in all_records
+      if detected_at_utc <= record.recorded_at <= window_end
+    )
+    matching_records = tuple(
+      record
+      for record in window_records
+      if record.status == target_status
+    )
+    if not matching_records:
+      raise LookupError("No scheduler health history could be reconstructed for the selected alert row.")
+    latest_matching_record = max(
+      matching_records,
+      key=lambda record: (record.recorded_at, record.record_id),
+    )
+    current_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(
+      latest_matching_record,
+    )
+    normalized_history_limit = max(1, min(history_limit, 200))
+    normalized_drilldown_history_limit = max(1, min(drilldown_history_limit, 100))
+    window_days = max(
+      3,
+      min(
+        int((window_end.date() - detected_at_utc.date()).days) + 1,
+        90,
+      ),
+    )
+    drilldown_bucket_key = latest_matching_record.recorded_at.date().isoformat()
+    recent_matching_records = tuple(
+      sorted(
+        matching_records,
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+    recent_window_records = tuple(
+      sorted(
+        window_records,
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+    time_series = self._build_provider_provenance_scheduler_health_time_series(
+      records=matching_records,
+      window_days=window_days,
+      now=window_end,
+    )
+    drill_down = self._build_provider_provenance_scheduler_health_hourly_drill_down(
+      records=matching_records,
+      bucket_key=drilldown_bucket_key,
+      history_limit=normalized_drilldown_history_limit,
+    )
+    all_statuses = tuple(sorted({record.status for record in window_records if record.status}))
+    exported_at = self._clock().isoformat()
+    history_payload = {
+      "query": {
+        "status": target_status,
+        "limit": normalized_history_limit,
+        "offset": 0,
+      },
+      "items": recent_matching_records[:normalized_history_limit],
+      "total": len(matching_records),
+      "returned": min(len(matching_records), normalized_history_limit),
+      "has_more": len(matching_records) > normalized_history_limit,
+      "next_offset": normalized_history_limit if len(matching_records) > normalized_history_limit else None,
+      "previous_offset": None,
+    }
+    analytics_payload = {
+      "generated_at": exported_at,
+      "query": {
+        "status": target_status,
+        "window_days": time_series["window_days"],
+        "history_limit": min(normalized_history_limit, 50),
+        "drilldown_bucket_key": (
+          drill_down["bucket_key"]
+          if isinstance(drill_down, dict)
+          else None
+        ),
+        "drilldown_history_limit": normalized_drilldown_history_limit,
+        "reconstruction_mode": "resolved_alert_row",
+        "alert_category": normalized_category,
+        "alert_detected_at": detected_at_utc.isoformat(),
+        "alert_resolved_at": window_end.isoformat(),
+      },
+      "current": serialize_provider_provenance_scheduler_health(current_snapshot),
+      "totals": {
+        "record_count": len(matching_records),
+        "healthy_count": sum(1 for record in matching_records if record.status == "healthy"),
+        "lagging_count": sum(1 for record in matching_records if record.status == "lagging"),
+        "failed_count": sum(1 for record in matching_records if record.status == "failed"),
+        "disabled_count": sum(1 for record in matching_records if record.status == "disabled"),
+        "starting_count": sum(1 for record in matching_records if record.status == "starting"),
+        "executed_report_count": sum(record.last_executed_count for record in matching_records),
+        "peak_lag_seconds": max((record.max_due_lag_seconds for record in matching_records), default=0),
+        "peak_due_report_count": max((record.due_report_count for record in matching_records), default=0),
+      },
+      "available_filters": {
+        "statuses": list(all_statuses),
+      },
+      "time_series": time_series,
+      "drill_down": drill_down,
+      "recent_history": [
+        serialize_provider_provenance_scheduler_health_record(record)
+        for record in recent_matching_records[:min(normalized_history_limit, 50)]
+      ],
+    }
+    reconstruction_payload = {
+      "mode": "resolved_alert_row",
+      "alert_category": normalized_category,
+      "alert_status": target_status,
+      "alert_detected_at": detected_at_utc.isoformat(),
+      "alert_resolved_at": window_end.isoformat(),
+      "matched_record_count": len(matching_records),
+      "window_record_count": len(window_records),
+      "current_record_id": latest_matching_record.record_id,
+      "latest_window_status": (
+        recent_window_records[0].status
+        if recent_window_records
+        else target_status
+      ),
+    }
+    if normalized_format == "json":
+      content = json.dumps(
+        {
+          "export_scope": "provider_provenance_scheduler_health",
+          "exported_at": exported_at,
+          "query": analytics_payload["query"],
+          "reconstruction": reconstruction_payload,
+          "current": analytics_payload["current"],
+          "history_page": serialize_provider_provenance_scheduler_health_history(
+            current_snapshot,
+            history_payload,
+          ),
+          "analytics": analytics_payload,
+        },
+        indent=2,
+        sort_keys=True,
+      )
+      return {
+        "content": content,
+        "content_type": "application/json; charset=utf-8",
+        "exported_at": exported_at,
+        "filename": f"provider-provenance-scheduler-history-{normalized_category}.json",
+        "format": "json",
+        "record_count": history_payload["returned"],
+        "total_count": history_payload["total"],
+      }
+    buffer = io.StringIO()
+    fieldnames = (
+      "record_id",
+      "recorded_at",
+      "status",
+      "summary",
+      "cycle_count",
+      "last_executed_count",
+      "total_executed_count",
+      "due_report_count",
+      "max_due_lag_seconds",
+      "last_error",
+      "source_tab_id",
+      "source_tab_label",
+      "issues",
+    )
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for item in history_payload["items"]:
+      serialized = serialize_provider_provenance_scheduler_health_record(item)
+      writer.writerow(
+        {
+          "record_id": serialized["record_id"],
+          "recorded_at": serialized["recorded_at"],
+          "status": serialized["status"],
+          "summary": serialized["summary"],
+          "cycle_count": serialized["cycle_count"],
+          "last_executed_count": serialized["last_executed_count"],
+          "total_executed_count": serialized["total_executed_count"],
+          "due_report_count": serialized["due_report_count"],
+          "max_due_lag_seconds": serialized["max_due_lag_seconds"],
+          "last_error": serialized["last_error"],
+          "source_tab_id": serialized["source_tab_id"],
+          "source_tab_label": serialized["source_tab_label"],
+          "issues": " | ".join(serialized["issues"]),
+        }
+      )
+    return {
+      "content": buffer.getvalue(),
+      "content_type": "text/csv; charset=utf-8",
+      "exported_at": exported_at,
+      "filename": f"provider-provenance-scheduler-history-{normalized_category}.csv",
+      "format": "csv",
+      "record_count": history_payload["returned"],
+      "total_count": history_payload["total"],
+    }
+
   def export_provider_provenance_scheduler_health(
     self,
     *,
@@ -27249,6 +27551,131 @@ class TradingApplication:
       "total_count": history_payload["total"],
     }
 
+  def _build_provider_provenance_scheduler_operator_alert(
+    self,
+    *,
+    health: ProviderProvenanceSchedulerHealth,
+    current_time: datetime,
+  ) -> OperatorAlert | None:
+    if health.status == "lagging":
+      severity = (
+        "critical"
+        if health.max_due_lag_seconds >= self._provider_provenance_scheduler_critical_lag_seconds()
+        else "warning"
+      )
+      return OperatorAlert(
+        alert_id="provider-provenance:scheduler-lag",
+        severity=severity,
+        category="scheduler_lag",
+        summary="Provider provenance report scheduler is lagging.",
+        detail=(
+          f"{health.due_report_count} due report(s) remain. "
+          f"Oldest due at {health.oldest_due_at.isoformat() if health.oldest_due_at is not None else 'n/a'} "
+          f"with {health.max_due_lag_seconds}s lag. "
+          f"Last successful cycle: {health.last_success_at.isoformat() if health.last_success_at is not None else 'n/a'}."
+        ),
+        detected_at=health.oldest_due_at or health.generated_at,
+        source="runtime",
+      )
+    if health.status == "failed":
+      detected_at = (
+        health.last_failure_at
+        or health.last_cycle_finished_at
+        or health.last_cycle_started_at
+        or current_time
+      )
+      return OperatorAlert(
+        alert_id="provider-provenance:scheduler-failure",
+        severity="critical",
+        category="scheduler_failure",
+        summary="Provider provenance report scheduler is failing.",
+        detail=(
+          f"{health.summary} Last success: "
+          f"{health.last_success_at.isoformat() if health.last_success_at is not None else 'n/a'}. "
+          f"Last error: {health.last_error or 'n/a'}."
+        ),
+        detected_at=detected_at,
+        source="runtime",
+      )
+    return None
+
+  def _build_provider_provenance_scheduler_alert_history(
+    self,
+    *,
+    current_time: datetime,
+  ) -> tuple[OperatorAlert, ...]:
+    self._prune_provider_provenance_scheduler_health_records()
+    records = tuple(
+      sorted(
+        self._list_provider_provenance_scheduler_health_records(),
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+    )
+    if not records:
+      return ()
+    current_health = self.get_provider_provenance_scheduler_health()
+    history_rows: list[OperatorAlert] = []
+    for target_status in ("lagging", "failed"):
+      latest_index = next(
+        (index for index in range(len(records) - 1, -1, -1) if records[index].status == target_status),
+        None,
+      )
+      if latest_index is None:
+        continue
+      start_index = latest_index
+      while start_index > 0 and records[start_index - 1].status == target_status:
+        start_index -= 1
+      latest_record = records[latest_index]
+      latest_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(latest_record)
+      alert = self._build_provider_provenance_scheduler_operator_alert(
+        health=latest_snapshot,
+        current_time=current_time,
+      )
+      if alert is None:
+        continue
+      first_record = records[start_index]
+      first_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(first_record)
+      detected_at = (
+        first_snapshot.oldest_due_at or first_snapshot.generated_at
+        if target_status == "lagging"
+        else (
+          first_snapshot.last_failure_at
+          or first_snapshot.last_cycle_finished_at
+          or first_snapshot.last_cycle_started_at
+          or first_snapshot.generated_at
+        )
+      )
+      if current_health.status == target_status:
+        history_rows.append(
+          replace(
+            alert,
+            detected_at=detected_at,
+            status="active",
+            resolved_at=None,
+          )
+        )
+        continue
+      resolved_at = (
+        records[latest_index + 1].recorded_at
+        if latest_index + 1 < len(records)
+        else current_time
+      )
+      history_rows.append(
+        replace(
+          alert,
+          detected_at=detected_at,
+          status="resolved",
+          resolved_at=resolved_at,
+        )
+      )
+    return tuple(
+      sorted(
+        history_rows,
+        key=lambda alert: (alert.resolved_at or alert.detected_at, alert.detected_at),
+        reverse=True,
+      )
+    )
+
   def _collect_provider_provenance_scheduler_operator_visibility(
     self,
     *,
@@ -27257,29 +27684,13 @@ class TradingApplication:
     health = self.get_provider_provenance_scheduler_health()
     alerts: list[OperatorAlert] = []
     audit_events: list[OperatorAuditEvent] = []
+    active_alert = self._build_provider_provenance_scheduler_operator_alert(
+      health=health,
+      current_time=current_time,
+    )
 
-    if health.status == "lagging":
-      severity = (
-        "critical"
-        if health.max_due_lag_seconds >= self._provider_provenance_scheduler_critical_lag_seconds()
-        else "warning"
-      )
-      alerts.append(
-        OperatorAlert(
-          alert_id="provider-provenance:scheduler-lag",
-          severity=severity,
-          category="scheduler_lag",
-          summary="Provider provenance report scheduler is lagging.",
-          detail=(
-            f"{health.due_report_count} due report(s) remain. "
-            f"Oldest due at {health.oldest_due_at.isoformat() if health.oldest_due_at is not None else 'n/a'} "
-            f"with {health.max_due_lag_seconds}s lag. "
-            f"Last successful cycle: {health.last_success_at.isoformat() if health.last_success_at is not None else 'n/a'}."
-          ),
-          detected_at=health.oldest_due_at or health.generated_at,
-          source="runtime",
-        )
-      )
+    if active_alert is not None and health.status == "lagging":
+      alerts.append(active_alert)
       audit_events.append(
         OperatorAuditEvent(
           event_id=f"audit:provider_provenance_scheduler_lagging:{health.generated_at.isoformat()}",
@@ -27291,28 +27702,9 @@ class TradingApplication:
           source="runtime",
         )
       )
-    elif health.status == "failed":
-      detected_at = (
-        health.last_failure_at
-        or health.last_cycle_finished_at
-        or health.last_cycle_started_at
-        or current_time
-      )
-      alerts.append(
-        OperatorAlert(
-          alert_id="provider-provenance:scheduler-failure",
-          severity="critical",
-          category="scheduler_failure",
-          summary="Provider provenance report scheduler is failing.",
-          detail=(
-            f"{health.summary} Last success: "
-            f"{health.last_success_at.isoformat() if health.last_success_at is not None else 'n/a'}. "
-            f"Last error: {health.last_error or 'n/a'}."
-          ),
-          detected_at=detected_at,
-          source="runtime",
-        )
-      )
+    elif active_alert is not None and health.status == "failed":
+      detected_at = active_alert.detected_at
+      alerts.append(active_alert)
       audit_events.append(
         OperatorAuditEvent(
           event_id=f"audit:provider_provenance_scheduler_failed:{detected_at.isoformat()}",

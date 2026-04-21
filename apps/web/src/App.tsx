@@ -62,6 +62,7 @@ import {
   downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   escalateProviderProvenanceExportJob,
   exportProviderProvenanceSchedulerHealth,
+  reconstructProviderProvenanceSchedulerHealthExport,
   exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   fetchJson,
   getProviderProvenanceExportAnalytics,
@@ -437,10 +438,12 @@ function isProviderProvenanceSchedulerAlertCategory(category?: string | null) {
 function buildProviderProvenanceSchedulerAlertWorkflowReason(
   alert: OperatorVisibilityAlertEntry,
   mode: "workflow" | "escalation",
+  source: "current" | "historical" = "current",
 ) {
   const category = alert.category === "scheduler_failure" ? "scheduler_failure" : "scheduler_lag";
+  const suffix = source === "historical" ? "historical_alert_row" : "alert_triggered";
   return mode === "escalation"
-    ? `${category}_alert_triggered`
+    ? `${category}_${suffix}`
     : `${category}_alert_workflow`;
 }
 
@@ -5186,16 +5189,18 @@ export default function App() {
     options?: {
       sourceLabel?: string;
       selectCreatedJob?: boolean;
+      exportPayload?: ProviderProvenanceSchedulerHealthExportPayload;
     },
   ) {
     const sourceLabel = options?.sourceLabel ?? "scheduler automation";
-    const exportPayload = await exportProviderProvenanceSchedulerHealth({
-      format: "json",
-      windowDays: providerProvenanceAnalyticsQuery.window_days,
-      historyLimit: 8,
-      offset: 0,
-      limit: 8,
-    });
+    const exportPayload = options?.exportPayload
+      ?? await exportProviderProvenanceSchedulerHealth({
+        format: "json",
+        windowDays: providerProvenanceAnalyticsQuery.window_days,
+        historyLimit: 8,
+        offset: 0,
+        limit: 8,
+      });
     const sharedEntry = await createProviderProvenanceExportJob({
       content: exportPayload.content,
       requestedByTabId: comparisonHistoryTabIdentity.tabId,
@@ -5387,27 +5392,49 @@ export default function App() {
     },
   ) {
     const sourceLabel = options?.sourceLabel ?? alert.summary;
+    const useHistoricalAlertRow = alert.status === "resolved" && Boolean(alert.resolved_at);
     try {
+      const exportPayload = useHistoricalAlertRow
+        ? await reconstructProviderProvenanceSchedulerHealthExport({
+          alertCategory: alert.category,
+          detectedAt: alert.detected_at,
+          resolvedAt: alert.resolved_at ?? null,
+          format: "json",
+          historyLimit: 8,
+          drilldownHistoryLimit: 12,
+        })
+        : await exportProviderProvenanceSchedulerHealth({
+          format: "json",
+          windowDays: providerProvenanceAnalyticsQuery.window_days,
+          historyLimit: 8,
+          offset: 0,
+          limit: 8,
+        });
       const sharedEntry = await createSharedProviderProvenanceSchedulerExportSnapshot({
         sourceLabel,
         selectCreatedJob: true,
+        exportPayload,
       });
       if (!options?.escalate) {
         setProviderProvenanceWorkspaceFeedback(
-          `Started scheduler export workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
+          `${useHistoricalAlertRow ? "Reconstructed" : "Started"} scheduler export workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
         );
         return;
       }
       if (sharedEntry.approval_required && sharedEntry.approval_state !== "approved") {
         setProviderProvenanceWorkspaceFeedback(
-          `Started scheduler export workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}, but the saved route still requires approval before escalation.`,
+          `${useHistoricalAlertRow ? "Reconstructed" : "Started"} scheduler export workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}, but the saved route still requires approval before escalation.`,
         );
         return;
       }
       const result: ProviderProvenanceExportJobEscalationResult = await escalateProviderProvenanceExportJob({
         jobId: sharedEntry.job_id,
         actor: "operator",
-        reason: buildProviderProvenanceSchedulerAlertWorkflowReason(alert, "escalation"),
+        reason: buildProviderProvenanceSchedulerAlertWorkflowReason(
+          alert,
+          "escalation",
+          useHistoricalAlertRow ? "historical" : "current",
+        ),
         sourceTabId: comparisonHistoryTabIdentity.tabId,
         sourceTabLabel: comparisonHistoryTabIdentity.label,
       });
@@ -5417,7 +5444,7 @@ export default function App() {
       await refreshSelectedProviderProvenanceSchedulerExportHistory(sharedEntry.job_id);
       setProviderProvenanceWorkspaceFeedback(
         result.audit_record.delivery_summary
-          ?? `Escalated scheduler export ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
+          ?? `${useHistoricalAlertRow ? "Escalated reconstructed" : "Escalated"} scheduler export ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
       );
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
@@ -9957,7 +9984,7 @@ export default function App() {
                                     }}
                                     type="button"
                                   >
-                                    Start current workflow
+                                    {alert.status === "resolved" ? "Reconstruct export" : "Start current workflow"}
                                   </button>
                                   <button
                                     className="ghost-button"
@@ -9969,7 +9996,7 @@ export default function App() {
                                     }}
                                     type="button"
                                   >
-                                    Escalate current snapshot
+                                    {alert.status === "resolved" ? "Escalate reconstructed export" : "Escalate current snapshot"}
                                   </button>
                                 </div>
                               ) : null}

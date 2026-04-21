@@ -61,6 +61,9 @@ unclear dataset lineage.
   alert condition in backend automation, and that workflow auto-escalates when its saved routing
   and approval policy already permit delivery; the alert surface still exposes direct controls to
   inspect, approve, or re-escalate that same handoff artifact without leaving alert review
+- when that scheduler alert has already resolved, the alert-history row can now reconstruct a
+  historical scheduler export from the persisted health-cycle records for the same detected /
+  resolved window instead of exporting the current scheduler snapshot
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

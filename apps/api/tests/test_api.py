@@ -659,6 +659,10 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "format",
     "app",
   )
+  assert tuple(inspect.signature(routes["reconstruct_operator_provider_provenance_scheduler_health_export"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_preset"].endpoint).parameters) == ("request", "app")
   assert tuple(inspect.signature(routes["update_preset"].endpoint).parameters) == ("preset_id", "request", "app")
   assert tuple(inspect.signature(routes["restore_preset_revision"].endpoint).parameters) == (
@@ -3347,6 +3351,84 @@ def test_operator_visibility_endpoint_reports_provider_provenance_scheduler_lag(
     payload["provider_provenance_scheduler"]["alert_workflow_job_id"]
   )
   assert shared_exports_payload["items"][0]["last_escalation_reason"] == "scheduler_lag_auto_export"
+
+
+def test_operator_visibility_endpoint_reconstructs_historical_scheduler_export_for_resolved_alert(
+  tmp_path: Path,
+) -> None:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    provider_provenance_report_scheduler_enabled=False,
+  ) as client:
+    app = client.app.state.container.app
+    fixed_time = datetime(2026, 4, 22, 10, 0, tzinfo=UTC)
+    app._clock = lambda: fixed_time
+    app._provider_provenance_report_scheduler_interval_seconds = 60
+    app._provider_provenance_report_scheduler_batch_limit = 1
+    app._provider_provenance_scheduler_health_records = {}
+    app._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
+      generated_at=fixed_time,
+      enabled=True,
+      status="starting",
+      summary="Background scheduler has not completed a provider provenance automation cycle yet.",
+      interval_seconds=60,
+      batch_limit=1,
+    )
+
+    report_a = app.create_provider_provenance_scheduled_report(name="Drift watch A")
+    report_b = app.create_provider_provenance_scheduled_report(name="Drift watch B")
+    overdue_at = fixed_time - timedelta(minutes=10)
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report_a, next_run_at=overdue_at)
+    )
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report_b, next_run_at=overdue_at)
+    )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    active_visibility_response = client.get("/api/operator/visibility")
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time + timedelta(days=7))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+
+    visibility_response = client.get("/api/operator/visibility")
+    resolved_alert = next(
+      alert
+      for alert in visibility_response.json()["alert_history"]
+      if alert["category"] == "scheduler_lag" and alert["status"] == "resolved"
+    )
+    reconstruct_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-health/reconstruct-export",
+      json={
+        "alert_category": resolved_alert["category"],
+        "detected_at": resolved_alert["detected_at"],
+        "resolved_at": resolved_alert["resolved_at"],
+        "format": "json",
+        "history_limit": 8,
+        "drilldown_history_limit": 12,
+      },
+    )
+
+  assert active_visibility_response.status_code == 200
+  assert visibility_response.status_code == 200
+  assert reconstruct_response.status_code == 200
+  payload = reconstruct_response.json()
+  assert payload["format"] == "json"
+  reconstructed = json.loads(payload["content"])
+  assert reconstructed["reconstruction"]["mode"] == "resolved_alert_row"
+  assert reconstructed["reconstruction"]["alert_category"] == "scheduler_lag"
+  assert reconstructed["current"]["status"] == "lagging"
+  assert reconstructed["history_page"]["total"] >= 1
+  assert reconstructed["analytics"]["query"]["reconstruction_mode"] == "resolved_alert_row"
 
 
 def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trends(

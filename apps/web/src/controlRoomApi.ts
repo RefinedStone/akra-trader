@@ -398,6 +398,36 @@ export async function exportProviderProvenanceSchedulerHealth(params: {
   );
 }
 
+export async function reconstructProviderProvenanceSchedulerHealthExport(params: {
+  alertCategory: string;
+  detectedAt: string;
+  resolvedAt?: string | null;
+  format?: "json" | "csv";
+  historyLimit?: number;
+  drilldownHistoryLimit?: number;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerHealthExportPayload>(
+    "/operator/provider-provenance-analytics/scheduler-health/reconstruct-export",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        alert_category: params.alertCategory,
+        detected_at: params.detectedAt,
+        resolved_at: params.resolvedAt ?? null,
+        format: params.format ?? "json",
+        history_limit:
+          typeof params.historyLimit === "number" && Number.isFinite(params.historyLimit)
+            ? Math.max(1, Math.min(Math.round(params.historyLimit), 200))
+            : 25,
+        drilldown_history_limit:
+          typeof params.drilldownHistoryLimit === "number" && Number.isFinite(params.drilldownHistoryLimit)
+            ? Math.max(1, Math.min(Math.round(params.drilldownHistoryLimit), 100))
+            : 24,
+      }),
+    },
+  );
+}
+
 export async function downloadProviderProvenanceExportJob(params: {
   jobId: string;
   sourceTabId?: string;

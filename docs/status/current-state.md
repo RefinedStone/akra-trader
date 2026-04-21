@@ -163,6 +163,9 @@ It is not yet a finished live trading product:
   automation, creating one shared snapshot per active alert condition and auto-escalating it when
   the saved routing and approval policy already allow delivery; the alert surface can still jump
   into that same workflow for review or follow-up approval
+- resolved scheduler alert history rows can now reconstruct historical scheduler-health exports
+  from the matching persisted health records instead of always snapshotting the current scheduler
+  state, so post-incident handoff can follow the actual alert window that already closed
 
 ### Operator discipline baseline
 
