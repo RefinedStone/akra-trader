@@ -1072,6 +1072,9 @@ def test_operator_visibility_flags_stale_sandbox_worker_runtime(tmp_path: Path) 
   assert visibility.alerts[0].category == "stale_runtime"
   assert visibility.alerts[0].severity == "warning"
   assert visibility.alerts[0].run_id == run.config.run_id
+  assert visibility.alerts[0].symbol == "ETH/USDT"
+  assert visibility.alerts[0].symbols == ("ETH/USDT",)
+  assert visibility.alerts[0].timeframe == "5m"
   assert len(visibility.audit_events) >= 2
   assert visibility.audit_events[0].kind == "sandbox_worker_stale"
   assert visibility.audit_events[0].run_id == run.config.run_id
@@ -1113,6 +1116,9 @@ def test_operator_visibility_surfaces_worker_failure_and_operator_stop_audit(
   assert failed_visibility.alerts[0].category == "worker_failure"
   assert failed_visibility.alerts[0].severity == "critical"
   assert failed_visibility.alerts[0].run_id == run.config.run_id
+  assert failed_visibility.alerts[0].symbol == "ETH/USDT"
+  assert failed_visibility.alerts[0].symbols == ("ETH/USDT",)
+  assert failed_visibility.alerts[0].timeframe == "5m"
   assert any(event.kind == "sandbox_worker_failed" for event in failed_visibility.audit_events)
 
   stopped = app.stop_sandbox_run(run.config.run_id)
@@ -1294,6 +1300,9 @@ def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_h
     if alert.category == "worker_failure" and alert.run_id == run.config.run_id
   )
   assert failure_alert.source == "guarded_live"
+  assert failure_alert.symbol == "ETH/USDT"
+  assert failure_alert.symbols == ("ETH/USDT",)
+  assert failure_alert.timeframe == "5m"
   assert "operator_visibility" in failure_alert.delivery_targets
   assert any(event.kind == "guarded_live_worker_failed" for event in visibility.audit_events)
   assert any(alert.alert_id == failure_alert.alert_id for alert in guarded_live_status.active_alerts)
@@ -1307,6 +1316,14 @@ def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_h
     event.kind == "incident_opened" and event.alert_id == failure_alert.alert_id
     for event in guarded_live_status.incident_events
   )
+  failure_incident = next(
+    event
+    for event in guarded_live_status.incident_events
+    if event.kind == "incident_opened" and event.alert_id == failure_alert.alert_id
+  )
+  assert failure_incident.symbol == "ETH/USDT"
+  assert failure_incident.symbols == ("ETH/USDT",)
+  assert failure_incident.timeframe == "5m"
   assert any(
     record.target == "operator_console" and record.alert_id == failure_alert.alert_id
     for record in guarded_live_status.delivery_history
@@ -1523,6 +1540,9 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
     if alert.category == "market_data_freshness"
   )
   assert "ETH/USDT lagged 1200s." in market_data_alert.detail
+  assert market_data_alert.symbol == "ETH/USDT"
+  assert market_data_alert.symbols == ("ETH/USDT",)
+  assert market_data_alert.timeframe == "5m"
   market_data_quality_alert = next(
     alert for alert in visibility.alerts
     if alert.category == "market_data_quality"
@@ -1546,6 +1566,17 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
   )
   assert "total return -24.00%" in risk_alert.detail
   assert "gross open risk reached" in risk_alert.detail
+  assert risk_alert.symbol == "ETH/USDT"
+  assert risk_alert.symbols == ("ETH/USDT",)
+  assert risk_alert.timeframe == "5m"
+  market_data_incident = next(
+    event
+    for event in guarded_live_status.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+  assert market_data_incident.symbol == "ETH/USDT"
+  assert market_data_incident.symbols == ("ETH/USDT",)
+  assert market_data_incident.timeframe == "5m"
   assert any(
     event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
     for event in guarded_live_status.incident_events

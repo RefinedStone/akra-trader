@@ -2804,6 +2804,9 @@ def test_operator_visibility_endpoint_reports_stale_runtime_alerts(tmp_path: Pat
   payload = response.json()
   assert payload["alerts"][0]["category"] == "stale_runtime"
   assert payload["alerts"][0]["severity"] == "warning"
+  assert payload["alerts"][0]["symbol"] == "ETH/USDT"
+  assert payload["alerts"][0]["symbols"] == ["ETH/USDT"]
+  assert payload["alerts"][0]["timeframe"] == "5m"
   assert payload["audit_events"][0]["kind"] == "sandbox_worker_stale"
 
 
@@ -2833,6 +2836,9 @@ def test_operator_visibility_endpoint_reports_worker_failures(tmp_path: Path) ->
   payload = response.json()
   assert payload["alerts"][0]["category"] == "worker_failure"
   assert payload["alerts"][0]["severity"] == "critical"
+  assert payload["alerts"][0]["symbol"] == "ETH/USDT"
+  assert payload["alerts"][0]["symbols"] == ["ETH/USDT"]
+  assert payload["alerts"][0]["timeframe"] == "5m"
   assert any(event["kind"] == "sandbox_worker_failed" for event in payload["audit_events"])
 
 
@@ -3696,6 +3702,9 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
     } <= categories
     market_data_alert = next(alert for alert in alerts if alert["category"] == "market_data_freshness")
     assert "ETH/USDT lagged 1200s." in market_data_alert["detail"]
+    assert market_data_alert["symbol"] == "ETH/USDT"
+    assert market_data_alert["symbols"] == ["ETH/USDT"]
+    assert market_data_alert["timeframe"] == "5m"
     market_data_quality_alert = next(alert for alert in alerts if alert["category"] == "market_data_quality")
     assert "backfill target covers 72.00%" in market_data_quality_alert["detail"]
     market_data_continuity_alert = next(alert for alert in alerts if alert["category"] == "market_data_candle_continuity")
@@ -3710,10 +3719,20 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
     )
     assert "total return -24.00%" in risk_alert["detail"]
     assert "gross open risk reached" in risk_alert["detail"]
+    assert risk_alert["symbol"] == "ETH/USDT"
+    assert risk_alert["symbols"] == ["ETH/USDT"]
+    assert risk_alert["timeframe"] == "5m"
 
     guarded_live_response = client.get("/api/guarded-live")
     assert guarded_live_response.status_code == 200
     incident_events = guarded_live_response.json()["incident_events"]
+    market_data_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:market-data:5m"
+    )
+    assert market_data_incident["symbol"] == "ETH/USDT"
+    assert market_data_incident["symbols"] == ["ETH/USDT"]
+    assert market_data_incident["timeframe"] == "5m"
     assert any(event["alert_id"] == "guarded-live:market-data:5m" for event in incident_events)
     assert any(event["alert_id"] == "guarded-live:market-data-quality:binance:5m" for event in incident_events)
     assert any(event["alert_id"] == "guarded-live:market-data-continuity:binance:5m" for event in incident_events)

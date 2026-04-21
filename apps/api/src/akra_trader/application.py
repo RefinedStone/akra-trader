@@ -18581,6 +18581,16 @@ class TradingApplication:
     delivery_targets = self._guarded_live_delivery_targets()
     live_runs = self._runs.list_runs(mode=RunMode.LIVE.value)
     live_context_active = bool(live_runs) or state.ownership.state in {"owned", "orphaned"}
+    guarded_live_context_symbol = self._first_non_empty_string(
+      state.ownership.symbol,
+      state.session_handoff.symbol,
+      state.session_restore.symbol,
+      state.order_book.symbol,
+    )
+    guarded_live_context_timeframe = self._first_non_empty_string(
+      state.session_handoff.timeframe,
+      state.session_restore.timeframe,
+    )
 
     alerts.extend(
       self._build_guarded_live_market_data_alerts(
@@ -18665,6 +18675,10 @@ class TradingApplication:
           ),
           run_id=state.ownership.owner_run_id,
           session_id=state.ownership.owner_session_id,
+          **self._build_operator_alert_market_context(
+            symbol=state.ownership.symbol,
+            timeframe=guarded_live_context_timeframe,
+          ),
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -18684,6 +18698,10 @@ class TradingApplication:
           detected_at=state.session_handoff.last_sync_at or state.session_handoff.handed_off_at or current_time,
           run_id=state.ownership.owner_run_id,
           session_id=state.ownership.owner_session_id,
+          **self._build_operator_alert_market_context(
+            symbol=guarded_live_context_symbol,
+            timeframe=guarded_live_context_timeframe,
+          ),
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -18699,6 +18717,10 @@ class TradingApplication:
           detected_at=state.session_handoff.last_sync_at or state.session_handoff.handed_off_at or current_time,
           run_id=state.ownership.owner_run_id,
           session_id=state.ownership.owner_session_id,
+          **self._build_operator_alert_market_context(
+            symbol=guarded_live_context_symbol,
+            timeframe=guarded_live_context_timeframe,
+          ),
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -18725,6 +18747,10 @@ class TradingApplication:
           ),
           run_id=state.ownership.owner_run_id,
           session_id=state.ownership.owner_session_id,
+          **self._build_operator_alert_market_context(
+            symbol=guarded_live_context_symbol,
+            timeframe=guarded_live_context_timeframe,
+          ),
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -18770,6 +18796,10 @@ class TradingApplication:
             summary=f"Guarded-live market-data freshness policy could not be evaluated for {timeframe}.",
             detail=f"Market-data status query failed: {exc}.",
             detected_at=current_time,
+            **self._build_operator_alert_market_context(
+              symbols=sorted(live_symbols),
+              timeframe=timeframe,
+            ),
             source="guarded_live",
             delivery_targets=delivery_targets,
           )
@@ -18783,6 +18813,12 @@ class TradingApplication:
         for instrument in status.instruments
         if not live_symbols or self._symbol_from_instrument_id(instrument.instrument_id) in live_symbols
       ]
+      relevant_symbols = sorted(
+        {
+          self._symbol_from_instrument_id(instrument.instrument_id)
+          for instrument in relevant_instruments
+        }
+      )
       if live_symbols and not relevant_instruments:
         alerts.append(
           OperatorAlert(
@@ -18795,6 +18831,10 @@ class TradingApplication:
               f"{', '.join(sorted(live_symbols))}."
             ),
             detected_at=current_time,
+            **self._build_operator_alert_market_context(
+              symbols=sorted(live_symbols),
+              timeframe=timeframe,
+            ),
             source="guarded_live",
             delivery_targets=delivery_targets,
           )
@@ -18901,6 +18941,10 @@ class TradingApplication:
               + (f" Additional issues: {len(detail_copy) - 3}." if len(detail_copy) > 3 else "")
             ),
             detected_at=detected_at,
+            **self._build_operator_alert_market_context(
+              symbols=relevant_symbols,
+              timeframe=timeframe,
+            ),
             source="guarded_live",
             delivery_targets=delivery_targets,
           )
@@ -18918,6 +18962,10 @@ class TradingApplication:
               + (f" Additional issues: {len(quality_detail_copy) - 3}." if len(quality_detail_copy) > 3 else "")
             ),
             detected_at=detected_at,
+            **self._build_operator_alert_market_context(
+              symbols=relevant_symbols,
+              timeframe=timeframe,
+            ),
             source="guarded_live",
             delivery_targets=delivery_targets,
           )
@@ -18935,6 +18983,10 @@ class TradingApplication:
               + (f" Additional issues: {len(continuity_detail_copy) - 3}." if len(continuity_detail_copy) > 3 else "")
             ),
             detected_at=detected_at,
+            **self._build_operator_alert_market_context(
+              symbols=relevant_symbols,
+              timeframe=timeframe,
+            ),
             source="guarded_live",
             delivery_targets=delivery_targets,
           )
@@ -18952,6 +19004,10 @@ class TradingApplication:
               + (f" Additional issues: {len(venue_detail_copy) - 3}." if len(venue_detail_copy) > 3 else "")
             ),
             detected_at=detected_at,
+            **self._build_operator_alert_market_context(
+              symbols=relevant_symbols,
+              timeframe=timeframe,
+            ),
             source="guarded_live",
             delivery_targets=delivery_targets,
           )
@@ -18986,6 +19042,10 @@ class TradingApplication:
 
     run_id = state.ownership.owner_run_id or handoff.owner_run_id
     session_id = state.ownership.owner_session_id or handoff.owner_session_id
+    market_context = self._build_operator_alert_market_context(
+      symbol=handoff.symbol,
+      timeframe=handoff.timeframe,
+    )
     alerts: list[OperatorAlert] = []
 
     consistency_details, consistency_detected_at, consistency_has_critical = (
@@ -19008,6 +19068,7 @@ class TradingApplication:
           detected_at=consistency_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19033,6 +19094,7 @@ class TradingApplication:
           detected_at=ladder_integrity_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19058,6 +19120,7 @@ class TradingApplication:
           detected_at=venue_ladder_integrity_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19083,6 +19146,7 @@ class TradingApplication:
           detected_at=ladder_bridge_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19108,6 +19172,7 @@ class TradingApplication:
           detected_at=ladder_sequence_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19133,6 +19198,7 @@ class TradingApplication:
           detected_at=ladder_snapshot_refresh_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19158,6 +19224,7 @@ class TradingApplication:
           detected_at=restore_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19181,6 +19248,7 @@ class TradingApplication:
           detected_at=book_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19204,6 +19272,7 @@ class TradingApplication:
           detected_at=kline_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19229,6 +19298,7 @@ class TradingApplication:
           detected_at=depth_ladder_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -19254,6 +19324,7 @@ class TradingApplication:
           detected_at=candle_sequence_detected_at,
           run_id=run_id,
           session_id=session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -20059,6 +20130,9 @@ class TradingApplication:
             detail=alert.detail,
             run_id=alert.run_id,
             session_id=alert.session_id,
+            symbol=alert.symbol,
+            symbols=alert.symbols,
+            timeframe=alert.timeframe,
             source=alert.source,
             paging_policy_id=policy.policy_id,
             paging_provider=policy.provider,
@@ -20092,6 +20166,9 @@ class TradingApplication:
             detail=alert.detail,
             run_id=alert.run_id,
             session_id=alert.session_id,
+            symbol=alert.symbol,
+            symbols=alert.symbols,
+            timeframe=alert.timeframe,
             source=alert.source,
             paging_policy_id=policy.policy_id,
             paging_provider=policy.provider,
@@ -22389,6 +22466,11 @@ class TradingApplication:
     alerts: list[OperatorAlert] = []
     symbol = run.config.symbols[0] if run.config.symbols else run.config.run_id
     delivery_targets = self._guarded_live_delivery_targets()
+    market_context = self._build_operator_alert_market_context(
+      symbol=symbol,
+      symbols=list(run.config.symbols),
+      timeframe=run.config.timeframe,
+    )
     failed_event = self._latest_runtime_note_event(run=run, kind="guarded_live_worker_failed")
     if failed_event is not None or session.lifecycle_state == "failed" or run.status == RunStatus.FAILED:
       detected_at = (
@@ -22410,6 +22492,7 @@ class TradingApplication:
           detected_at=detected_at,
           run_id=run.config.run_id,
           session_id=session.session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -22435,6 +22518,7 @@ class TradingApplication:
           detected_at=heartbeat_at,
           run_id=run.config.run_id,
           session_id=session.session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -22489,6 +22573,7 @@ class TradingApplication:
           ),
           run_id=run.config.run_id,
           session_id=session.session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -22509,6 +22594,7 @@ class TradingApplication:
           detected_at=session.last_recovered_at or heartbeat_at,
           run_id=run.config.run_id,
           session_id=session.session_id,
+          **market_context,
           source="guarded_live",
           delivery_targets=delivery_targets,
         )
@@ -22539,6 +22625,7 @@ class TradingApplication:
             detected_at=oldest_sync_at,
             run_id=run.config.run_id,
             session_id=session.session_id,
+            **market_context,
             source="guarded_live",
             delivery_targets=delivery_targets,
           )
@@ -22560,6 +22647,49 @@ class TradingApplication:
         continue
       pending_buy_notional += remaining_quantity * reference_price
     return pending_buy_notional
+
+  @staticmethod
+  def _normalize_operator_alert_symbol(symbol: str | None) -> str | None:
+    normalized = (symbol or "").strip().upper()
+    return normalized or None
+
+  @classmethod
+  def _normalize_operator_alert_symbols(cls, symbols: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for symbol in symbols:
+      candidate = cls._normalize_operator_alert_symbol(symbol)
+      if candidate is None or candidate in seen:
+        continue
+      seen.add(candidate)
+      normalized.append(candidate)
+    return tuple(normalized)
+
+  @staticmethod
+  def _normalize_operator_alert_timeframe(timeframe: str | None) -> str | None:
+    normalized = (timeframe or "").strip().lower()
+    return normalized or None
+
+  @classmethod
+  def _build_operator_alert_market_context(
+    cls,
+    *,
+    symbol: str | None = None,
+    symbols: tuple[str, ...] | list[str] = (),
+    timeframe: str | None = None,
+  ) -> dict[str, str | tuple[str, ...] | None]:
+    symbol_candidates = list(symbols)
+    if symbol is not None:
+      symbol_candidates.insert(0, symbol)
+    normalized_symbols = cls._normalize_operator_alert_symbols(symbol_candidates)
+    normalized_symbol = cls._normalize_operator_alert_symbol(symbol)
+    if normalized_symbol is None and len(normalized_symbols) == 1:
+      normalized_symbol = normalized_symbols[0]
+    return {
+      "symbol": normalized_symbol,
+      "symbols": normalized_symbols,
+      "timeframe": cls._normalize_operator_alert_timeframe(timeframe),
+    }
 
   @staticmethod
   def _symbol_from_instrument_id(instrument_id: str) -> str:
@@ -22643,6 +22773,11 @@ class TradingApplication:
 
     alerts: list[OperatorAlert] = []
     symbol = run.config.symbols[0] if run.config.symbols else run.config.run_id
+    market_context = self._build_operator_alert_market_context(
+      symbol=symbol,
+      symbols=list(run.config.symbols),
+      timeframe=run.config.timeframe,
+    )
     failed_event = self._latest_runtime_note_event(run=run, kind="sandbox_worker_failed")
     if failed_event is not None or session.lifecycle_state == "failed" or run.status == RunStatus.FAILED:
       detected_at = (
@@ -22664,6 +22799,7 @@ class TradingApplication:
           detected_at=detected_at,
           run_id=run.config.run_id,
           session_id=session.session_id,
+          **market_context,
         )
       )
 
@@ -22687,6 +22823,7 @@ class TradingApplication:
           detected_at=current_time,
           run_id=run.config.run_id,
           session_id=session.session_id,
+          **market_context,
         )
       )
     return alerts

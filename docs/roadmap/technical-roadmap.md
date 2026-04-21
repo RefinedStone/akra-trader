@@ -71,6 +71,8 @@ creation.
 - runtime operator workflows now include focused lineage-history and ingestion-job triage for the
   currently selected market-data instrument, plus alert-linked focus routing and inline lineage
   incident history
+- runtime and guarded-live alert payloads now include normalized symbol/timeframe context where the
+  runtime can resolve it directly
 
 ### Remaining work
 

@@ -1753,6 +1753,9 @@ type MarketDataLinkableAlertRecord = {
   detail: string;
   run_id?: string | null;
   session_id?: string | null;
+  symbol?: string | null;
+  symbols?: string[];
+  timeframe?: string | null;
   source?: string | null;
   provider_recovery_symbols?: string[];
   provider_recovery_timeframe?: string | null;
@@ -1874,6 +1877,26 @@ function resolveMarketDataInstrumentLink(args: {
   }
 
   const category = record.category?.trim() ?? "";
+  const explicitSymbols = Array.from(
+    new Set(
+      [record.symbol ?? null, ...(record.symbols ?? [])]
+        .filter((symbol): symbol is string => typeof symbol === "string" && symbol.trim().length > 0)
+        .map((symbol) => normalizeMarketSymbol(symbol)),
+    ),
+  );
+  const explicitTimeframe = record.timeframe?.trim() || null;
+  if (explicitSymbols.length) {
+    const explicitInstrument = pickPreferredMarketDataInstrument(
+      resolveInstrumentsBySymbolsAndTimeframe({
+        marketStatus,
+        symbols: explicitSymbols,
+        timeframe: explicitTimeframe,
+      }),
+    );
+    if (explicitInstrument) {
+      return buildLinkedMarketInstrumentContext(explicitInstrument, "payload_market_context");
+    }
+  }
   const run = record.run_id ? runById.get(record.run_id) : undefined;
   if (run) {
     const runInstrument = pickPreferredMarketDataInstrument(
@@ -1910,7 +1933,10 @@ function resolveMarketDataInstrumentLink(args: {
     ?? guardedLive?.order_book.symbol
     ?? guardedLive?.session_restore.symbol
     ?? null;
-  const matchedTimeframe = extractMatchingMarketTimeframe(combinedText, marketStatus) ?? guardedLiveTimeframe;
+  const matchedTimeframe =
+    explicitTimeframe
+    ?? extractMatchingMarketTimeframe(combinedText, marketStatus)
+    ?? guardedLiveTimeframe;
 
   if (matchedSymbols.length && matchedTimeframe) {
     const exactInstrument = pickPreferredMarketDataInstrument(
@@ -3356,6 +3382,9 @@ export default function App() {
               detail: event.detail,
               run_id: event.run_id ?? alertContext?.run_id ?? null,
               session_id: event.session_id ?? alertContext?.session_id ?? null,
+              symbol: event.symbol ?? alertContext?.symbol ?? null,
+              symbols: event.symbols.length ? event.symbols : (alertContext?.symbols ?? []),
+              timeframe: event.timeframe ?? alertContext?.timeframe ?? null,
               source: event.source ?? alertContext?.source ?? null,
               provider_recovery_symbols: event.remediation.provider_recovery.symbols,
               provider_recovery_timeframe: event.remediation.provider_recovery.timeframe,

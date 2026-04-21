@@ -17,6 +17,8 @@ unclear dataset lineage.
 - control-room triage workflow that binds the currently selected instrument to lineage and
   ingestion history review, auto-links runtime alerts into that focus, and keeps a merged lineage
   incident history in view
+- operator and guarded-live alert payloads now carry normalized symbol/timeframe context when the
+  runtime knows it
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

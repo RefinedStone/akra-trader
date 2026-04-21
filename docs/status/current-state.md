@@ -135,8 +135,9 @@ It is not yet a finished live trading product:
   durable strategy registry
 - dataset-boundary contracts, rerun validation categories, operator-visible lineage summaries, and
   normalized lineage or ingestion history surfaces now exist, and the control room now consumes
-  focused history for incident triage with alert-linked focus routing and merged lineage incident
-  history, but deeper operator action guidance on top of those surfaces is still thin
+  focused history for incident triage with alert-linked focus routing, merged lineage incident
+  history, and normalized alert symbol/timeframe payloads, but deeper operator action guidance and
+  richer history query controls on top of those surfaces are still thin
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to

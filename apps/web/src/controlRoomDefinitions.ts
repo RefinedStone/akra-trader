@@ -993,6 +993,9 @@ export type OperatorVisibility = {
     detected_at: string;
     run_id?: string | null;
     session_id?: string | null;
+    symbol?: string | null;
+    symbols: string[];
+    timeframe?: string | null;
     status: string;
     resolved_at?: string | null;
     source: string;
@@ -1007,6 +1010,9 @@ export type OperatorVisibility = {
     detected_at: string;
     run_id?: string | null;
     session_id?: string | null;
+    symbol?: string | null;
+    symbols: string[];
+    timeframe?: string | null;
     status: string;
     resolved_at?: string | null;
     source: string;
@@ -1022,6 +1028,9 @@ export type OperatorVisibility = {
     detail: string;
     run_id?: string | null;
     session_id?: string | null;
+    symbol?: string | null;
+    symbols: string[];
+    timeframe?: string | null;
     source: string;
     paging_policy_id: string;
     paging_provider?: string | null;
@@ -2039,6 +2048,9 @@ export type GuardedLiveStatus = {
     detected_at: string;
     run_id?: string | null;
     session_id?: string | null;
+    symbol?: string | null;
+    symbols: string[];
+    timeframe?: string | null;
     status: string;
     resolved_at?: string | null;
     source: string;
@@ -2053,6 +2065,9 @@ export type GuardedLiveStatus = {
     detected_at: string;
     run_id?: string | null;
     session_id?: string | null;
+    symbol?: string | null;
+    symbols: string[];
+    timeframe?: string | null;
     status: string;
     resolved_at?: string | null;
     source: string;
@@ -2068,6 +2083,9 @@ export type GuardedLiveStatus = {
     detail: string;
     run_id?: string | null;
     session_id?: string | null;
+    symbol?: string | null;
+    symbols: string[];
+    timeframe?: string | null;
     source: string;
     paging_policy_id: string;
     paging_provider?: string | null;

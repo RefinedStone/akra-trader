@@ -1339,6 +1339,9 @@ class OperatorAlert:
   detected_at: datetime
   run_id: str | None = None
   session_id: str | None = None
+  symbol: str | None = None
+  symbols: tuple[str, ...] = ()
+  timeframe: str | None = None
   status: str = "active"
   resolved_at: datetime | None = None
   source: str = "runtime"
@@ -2841,6 +2844,9 @@ class OperatorIncidentEvent:
   detail: str
   run_id: str | None = None
   session_id: str | None = None
+  symbol: str | None = None
+  symbols: tuple[str, ...] = ()
+  timeframe: str | None = None
   source: str = "guarded_live"
   paging_policy_id: str = "default"
   paging_provider: str | None = None
