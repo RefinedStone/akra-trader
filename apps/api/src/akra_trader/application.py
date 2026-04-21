@@ -37,6 +37,8 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
@@ -4591,6 +4593,156 @@ class TradingApplication:
       actor_tab_label=actor_tab_label,
     )
 
+  def _normalize_provider_provenance_scheduler_narrative_bulk_ids(
+    self,
+    values: Iterable[str],
+  ) -> tuple[str, ...]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+      if not isinstance(value, str):
+        continue
+      stripped = value.strip()
+      if not stripped or stripped in seen:
+        continue
+      normalized.append(stripped)
+      seen.add(stripped)
+      if len(normalized) >= 100:
+        break
+    return tuple(normalized)
+
+  def _find_latest_active_provider_provenance_scheduler_narrative_template_revision(
+    self,
+    template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord | None:
+    for revision in reversed(
+      self.list_provider_provenance_scheduler_narrative_template_revisions(template_id)
+    ):
+      if revision.status == "active":
+        return revision
+    return None
+
+  def bulk_govern_provider_provenance_scheduler_narrative_templates(
+    self,
+    template_ids: Iterable[str],
+    *,
+    action: str,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeBulkGovernanceResult:
+    normalized_action = action.strip().lower()
+    if normalized_action not in {"delete", "restore"}:
+      raise ValueError("Unsupported scheduler narrative template bulk action.")
+    normalized_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(template_ids)
+    resolved_reason = (
+      reason.strip()
+      if isinstance(reason, str) and reason.strip()
+      else (
+        "scheduler_narrative_template_bulk_deleted"
+        if normalized_action == "delete"
+        else "scheduler_narrative_template_bulk_restored"
+      )
+    )
+    results: list[ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult] = []
+    applied_count = 0
+    skipped_count = 0
+    failed_count = 0
+    for template_id in normalized_ids:
+      try:
+        current = self.get_provider_provenance_scheduler_narrative_template(template_id)
+        if normalized_action == "delete":
+          if current.status == "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.template_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Template is already deleted.",
+              )
+            )
+            continue
+          updated = self.delete_provider_provenance_scheduler_narrative_template(
+            template_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=resolved_reason,
+          )
+        else:
+          if current.status != "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.template_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Template is already active.",
+              )
+            )
+            continue
+          revision = self._find_latest_active_provider_provenance_scheduler_narrative_template_revision(
+            template_id
+          )
+          if revision is None:
+            failed_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.template_id,
+                item_name=current.name,
+                outcome="failed",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="No active revision is available for restore.",
+              )
+            )
+            continue
+          updated = self.restore_provider_provenance_scheduler_narrative_template_revision(
+            template_id,
+            revision.revision_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=resolved_reason,
+          )
+        applied_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=updated.template_id,
+            item_name=updated.name,
+            outcome="applied",
+            status=updated.status,
+            current_revision_id=updated.current_revision_id,
+            message=(
+              "Template deleted."
+              if normalized_action == "delete"
+              else "Template restored from the latest active revision."
+            ),
+          )
+        )
+      except (LookupError, RuntimeError, ValueError) as exc:
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=template_id,
+            outcome="failed",
+            message=str(exc),
+          )
+        )
+    return ProviderProvenanceSchedulerNarrativeBulkGovernanceResult(
+      item_type="template",
+      action=normalized_action,
+      reason=resolved_reason,
+      requested_count=len(normalized_ids),
+      applied_count=applied_count,
+      skipped_count=skipped_count,
+      failed_count=failed_count,
+      results=tuple(results),
+    )
+
   def create_provider_provenance_scheduler_narrative_registry_entry(
     self,
     *,
@@ -4933,6 +5085,138 @@ class TradingApplication:
       source_revision_id=revision.revision_id,
       actor_tab_id=actor_tab_id,
       actor_tab_label=actor_tab_label,
+    )
+
+  def _find_latest_active_provider_provenance_scheduler_narrative_registry_revision(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord | None:
+    for revision in reversed(
+      self.list_provider_provenance_scheduler_narrative_registry_revisions(registry_id)
+    ):
+      if revision.status == "active":
+        return revision
+    return None
+
+  def bulk_govern_provider_provenance_scheduler_narrative_registry_entries(
+    self,
+    registry_ids: Iterable[str],
+    *,
+    action: str,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeBulkGovernanceResult:
+    normalized_action = action.strip().lower()
+    if normalized_action not in {"delete", "restore"}:
+      raise ValueError("Unsupported scheduler narrative registry bulk action.")
+    normalized_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(registry_ids)
+    resolved_reason = (
+      reason.strip()
+      if isinstance(reason, str) and reason.strip()
+      else (
+        "scheduler_narrative_registry_bulk_deleted"
+        if normalized_action == "delete"
+        else "scheduler_narrative_registry_bulk_restored"
+      )
+    )
+    results: list[ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult] = []
+    applied_count = 0
+    skipped_count = 0
+    failed_count = 0
+    for registry_id in normalized_ids:
+      try:
+        current = self.get_provider_provenance_scheduler_narrative_registry_entry(registry_id)
+        if normalized_action == "delete":
+          if current.status == "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.registry_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Registry is already deleted.",
+              )
+            )
+            continue
+          updated = self.delete_provider_provenance_scheduler_narrative_registry_entry(
+            registry_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=resolved_reason,
+          )
+        else:
+          if current.status != "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.registry_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Registry is already active.",
+              )
+            )
+            continue
+          revision = self._find_latest_active_provider_provenance_scheduler_narrative_registry_revision(
+            registry_id
+          )
+          if revision is None:
+            failed_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.registry_id,
+                item_name=current.name,
+                outcome="failed",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="No active revision is available for restore.",
+              )
+            )
+            continue
+          updated = self.restore_provider_provenance_scheduler_narrative_registry_revision(
+            registry_id,
+            revision.revision_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=resolved_reason,
+          )
+        applied_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=updated.registry_id,
+            item_name=updated.name,
+            outcome="applied",
+            status=updated.status,
+            current_revision_id=updated.current_revision_id,
+            message=(
+              "Registry deleted."
+              if normalized_action == "delete"
+              else "Registry restored from the latest active revision."
+            ),
+          )
+        )
+      except (LookupError, RuntimeError, ValueError) as exc:
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=registry_id,
+            outcome="failed",
+            message=str(exc),
+          )
+        )
+    return ProviderProvenanceSchedulerNarrativeBulkGovernanceResult(
+      item_type="registry",
+      action=normalized_action,
+      reason=resolved_reason,
+      requested_count=len(normalized_ids),
+      applied_count=applied_count,
+      skipped_count=skipped_count,
+      failed_count=failed_count,
+      results=tuple(results),
     )
 
   def create_provider_provenance_scheduled_report(
@@ -30522,6 +30806,35 @@ def serialize_provider_provenance_scheduler_narrative_template_revision_list(
     "history": [
       serialize_provider_provenance_scheduler_narrative_template_revision_record(revision)
       for revision in revisions
+    ],
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_bulk_governance_result(
+  record: ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
+) -> dict[str, Any]:
+  return {
+    "item_type": record.item_type,
+    "action": record.action,
+    "reason": record.reason,
+    "requested_count": record.requested_count,
+    "applied_count": record.applied_count,
+    "skipped_count": record.skipped_count,
+    "failed_count": record.failed_count,
+    "results": [
+      {
+        "item_id": item.item_id,
+        "item_name": item.item_name,
+        "outcome": item.outcome,
+        "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+          item.status
+        )
+        if item.status is not None
+        else None,
+        "current_revision_id": item.current_revision_id,
+        "message": item.message,
+      }
+      for item in record.results
     ],
   }
 

@@ -129,6 +129,10 @@ def serialize_provider_provenance_scheduler_narrative_template_revision_list(*ar
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_revision_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_narrative_bulk_governance_result(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_bulk_governance_result')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduler_narrative_registry_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_registry_record')(*args, **kwargs)
 
@@ -663,6 +667,16 @@ def execute_standalone_surface_binding(
         reason=resolved_payload.get("reason", "scheduler_narrative_template_deleted"),
       )
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_bulk_governance":
+    return serialize_provider_provenance_scheduler_narrative_bulk_governance_result(
+      app.bulk_govern_provider_provenance_scheduler_narrative_templates(
+        resolved_payload.get("template_ids", ()),
+        action=resolved_payload.get("action", ""),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason"),
+      )
+    )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_revision_list":
     template = app.get_provider_provenance_scheduler_narrative_template(
       resolved_path_params["template_id"]
@@ -728,6 +742,16 @@ def execute_standalone_surface_binding(
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
         reason=resolved_payload.get("reason", "scheduler_narrative_registry_deleted"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_bulk_governance":
+    return serialize_provider_provenance_scheduler_narrative_bulk_governance_result(
+      app.bulk_govern_provider_provenance_scheduler_narrative_registry_entries(
+        resolved_payload.get("registry_ids", ()),
+        action=resolved_payload.get("action", ""),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_revision_list":

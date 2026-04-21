@@ -623,6 +623,10 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "request",
     "app",
   )
+  assert tuple(inspect.signature(routes["bulk_govern_operator_provider_provenance_scheduler_narrative_templates"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
   assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_narrative_template_revisions"].endpoint).parameters) == (
     "template_id",
     "app",
@@ -656,6 +660,10 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
   )
   assert tuple(inspect.signature(routes["delete_operator_provider_provenance_scheduler_narrative_registry_entry"].endpoint).parameters) == (
     "registry_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["bulk_govern_operator_provider_provenance_scheduler_narrative_registry_entries"].endpoint).parameters) == (
     "request",
     "app",
   )
@@ -1445,6 +1453,59 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert restored_template_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
   assert restored_template_payload["revision_count"] == 4
 
+  bulk_template_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    json={
+      "name": "Failure narrative",
+      "description": "Reusable failure narrative lens.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_failure",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "resolved_narratives",
+        "window_days": 14,
+        "result_limit": 8,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert bulk_template_response.status_code == 200
+  bulk_template_payload = bulk_template_response.json()
+
+  bulk_delete_templates_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates/bulk-governance",
+    json={
+      "action": "delete",
+      "template_ids": [template_payload["template_id"], bulk_template_payload["template_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_template_governance_delete",
+    },
+  )
+  assert bulk_delete_templates_response.status_code == 200
+  bulk_delete_templates_payload = bulk_delete_templates_response.json()
+  assert bulk_delete_templates_payload["action"] == "delete"
+  assert bulk_delete_templates_payload["requested_count"] == 2
+  assert bulk_delete_templates_payload["applied_count"] == 2
+  assert {item["status"] for item in bulk_delete_templates_payload["results"]} == {"deleted"}
+
+  bulk_restore_templates_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates/bulk-governance",
+    json={
+      "action": "restore",
+      "template_ids": [template_payload["template_id"], bulk_template_payload["template_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_template_governance_restore",
+    },
+  )
+  assert bulk_restore_templates_response.status_code == 200
+  bulk_restore_templates_payload = bulk_restore_templates_response.json()
+  assert bulk_restore_templates_payload["action"] == "restore"
+  assert bulk_restore_templates_payload["applied_count"] == 2
+  assert all(item["status"] == "active" for item in bulk_restore_templates_payload["results"])
+
   registry_response = client.post(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
     json={
@@ -1549,6 +1610,65 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert restored_registry_payload["status"] == "active"
   assert restored_registry_payload["template_id"] == template_payload["template_id"]
   assert restored_registry_payload["revision_count"] == 4
+
+  bulk_registry_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    json={
+      "name": "Failure board",
+      "description": "Failure narrative board.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_failure",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "resolved_narratives",
+        "window_days": 14,
+        "result_limit": 8,
+      },
+      "layout": {
+        "highlight_panel": "rollups",
+        "show_rollups": True,
+        "show_time_series": False,
+        "show_recent_exports": False,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert bulk_registry_response.status_code == 200
+  bulk_registry_payload = bulk_registry_response.json()
+
+  bulk_delete_registry_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry/bulk-governance",
+    json={
+      "action": "delete",
+      "registry_ids": [registry_payload["registry_id"], bulk_registry_payload["registry_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_registry_governance_delete",
+    },
+  )
+  assert bulk_delete_registry_response.status_code == 200
+  bulk_delete_registry_payload = bulk_delete_registry_response.json()
+  assert bulk_delete_registry_payload["action"] == "delete"
+  assert bulk_delete_registry_payload["requested_count"] == 2
+  assert bulk_delete_registry_payload["applied_count"] == 2
+  assert {item["status"] for item in bulk_delete_registry_payload["results"]} == {"deleted"}
+
+  bulk_restore_registry_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry/bulk-governance",
+    json={
+      "action": "restore",
+      "registry_ids": [registry_payload["registry_id"], bulk_registry_payload["registry_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_registry_governance_restore",
+    },
+  )
+  assert bulk_restore_registry_response.status_code == 200
+  bulk_restore_registry_payload = bulk_restore_registry_response.json()
+  assert bulk_restore_registry_payload["action"] == "restore"
+  assert bulk_restore_registry_payload["applied_count"] == 2
+  assert all(item["status"] == "active" for item in bulk_restore_registry_payload["results"])
 
   report_response = client.post(
     "/api/operator/provider-provenance-analytics/reports",

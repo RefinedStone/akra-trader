@@ -58,6 +58,8 @@ import {
   createProviderProvenanceSchedulerNarrativeTemplate,
   createProviderProvenanceScheduledReport,
   approveProviderProvenanceExportJob,
+  bulkGovernProviderProvenanceSchedulerNarrativeRegistryEntries,
+  bulkGovernProviderProvenanceSchedulerNarrativeTemplates,
   deleteProviderProvenanceSchedulerNarrativeRegistryEntry,
   deleteProviderProvenanceSchedulerNarrativeTemplate,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
@@ -300,6 +302,7 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
   ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry,
   ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload,
@@ -3034,6 +3037,10 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerNarrativeTemplatesError, setProviderProvenanceSchedulerNarrativeTemplatesError] =
     useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeTemplateIds, setSelectedProviderProvenanceSchedulerNarrativeTemplateIds] =
+    useState<string[]>([]);
+  const [providerProvenanceSchedulerNarrativeTemplateBulkAction, setProviderProvenanceSchedulerNarrativeTemplateBulkAction] =
+    useState<"delete" | "restore" | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeTemplateId, setSelectedProviderProvenanceSchedulerNarrativeTemplateId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeTemplateHistory, setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory] =
@@ -3048,6 +3055,10 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerNarrativeRegistryEntriesError, setProviderProvenanceSchedulerNarrativeRegistryEntriesError] =
     useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeRegistryIds, setSelectedProviderProvenanceSchedulerNarrativeRegistryIds] =
+    useState<string[]>([]);
+  const [providerProvenanceSchedulerNarrativeRegistryBulkAction, setProviderProvenanceSchedulerNarrativeRegistryBulkAction] =
+    useState<"delete" | "restore" | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeRegistryId, setSelectedProviderProvenanceSchedulerNarrativeRegistryId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeRegistryHistory, setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory] =
@@ -3276,6 +3287,34 @@ export default function App() {
         providerProvenanceSchedulerNarrativeTemplates.map((entry) => [entry.template_id, entry.name]),
       ),
     [providerProvenanceSchedulerNarrativeTemplates],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeTemplateIdSet = useMemo(
+    () => new Set(selectedProviderProvenanceSchedulerNarrativeTemplateIds),
+    [selectedProviderProvenanceSchedulerNarrativeTemplateIds],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeRegistryIdSet = useMemo(
+    () => new Set(selectedProviderProvenanceSchedulerNarrativeRegistryIds),
+    [selectedProviderProvenanceSchedulerNarrativeRegistryIds],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeTemplateEntries = useMemo(
+    () =>
+      providerProvenanceSchedulerNarrativeTemplates.filter((entry) =>
+        selectedProviderProvenanceSchedulerNarrativeTemplateIdSet.has(entry.template_id),
+      ),
+    [
+      selectedProviderProvenanceSchedulerNarrativeTemplateIdSet,
+      providerProvenanceSchedulerNarrativeTemplates,
+    ],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeRegistryEntries = useMemo(
+    () =>
+      providerProvenanceSchedulerNarrativeRegistryEntries.filter((entry) =>
+        selectedProviderProvenanceSchedulerNarrativeRegistryIdSet.has(entry.registry_id),
+      ),
+    [
+      providerProvenanceSchedulerNarrativeRegistryEntries,
+      selectedProviderProvenanceSchedulerNarrativeRegistryIdSet,
+    ],
   );
   const selectedProviderProvenanceSchedulerExportEntry = useMemo(
     () =>
@@ -5754,6 +5793,16 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeTemplates(templatePayload.items);
       setProviderProvenanceSchedulerNarrativeRegistryEntries(narrativeRegistryPayload.items);
       setProviderProvenanceScheduledReports(reportPayload.items);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateIds((current) =>
+        current.filter((templateId) =>
+          templatePayload.items.some((entry) => entry.template_id === templateId),
+        ),
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryIds((current) =>
+        current.filter((registryId) =>
+          narrativeRegistryPayload.items.some((entry) => entry.registry_id === registryId),
+        ),
+      );
       if (
         selectedProviderProvenanceSchedulerNarrativeTemplateId
         && !templatePayload.items.some((entry) => entry.template_id === selectedProviderProvenanceSchedulerNarrativeTemplateId)
@@ -5794,6 +5843,8 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeTemplates([]);
       setProviderProvenanceSchedulerNarrativeRegistryEntries([]);
       setProviderProvenanceScheduledReports([]);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateId(null);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeRegistryId(null);
@@ -6053,6 +6104,51 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeRegistryDraft(
       defaultProviderProvenanceSchedulerNarrativeRegistryDraft,
     );
+  }
+
+  function toggleProviderProvenanceSchedulerNarrativeTemplateSelection(templateId: string) {
+    setSelectedProviderProvenanceSchedulerNarrativeTemplateIds((current) =>
+      current.includes(templateId)
+        ? current.filter((candidate) => candidate !== templateId)
+        : [...current, templateId],
+    );
+  }
+
+  function toggleAllProviderProvenanceSchedulerNarrativeTemplateSelections() {
+    setSelectedProviderProvenanceSchedulerNarrativeTemplateIds((current) =>
+      current.length === providerProvenanceSchedulerNarrativeTemplates.length
+        ? []
+        : providerProvenanceSchedulerNarrativeTemplates.map((entry) => entry.template_id),
+    );
+  }
+
+  function toggleProviderProvenanceSchedulerNarrativeRegistrySelection(registryId: string) {
+    setSelectedProviderProvenanceSchedulerNarrativeRegistryIds((current) =>
+      current.includes(registryId)
+        ? current.filter((candidate) => candidate !== registryId)
+        : [...current, registryId],
+    );
+  }
+
+  function toggleAllProviderProvenanceSchedulerNarrativeRegistrySelections() {
+    setSelectedProviderProvenanceSchedulerNarrativeRegistryIds((current) =>
+      current.length === providerProvenanceSchedulerNarrativeRegistryEntries.length
+        ? []
+        : providerProvenanceSchedulerNarrativeRegistryEntries.map((entry) => entry.registry_id),
+    );
+  }
+
+  function formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(
+    result: ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
+  ) {
+    const label = result.item_type === "registry" ? "registry entries" : "templates";
+    const parts = [
+      `${result.applied_count} applied`,
+      `${result.skipped_count} skipped`,
+      `${result.failed_count} failed`,
+    ];
+    const firstFailure = result.results.find((entry) => entry.outcome === "failed" && entry.message);
+    return `${formatWorkflowToken(result.action)} ${label}: ${parts.join(" · ")}.${firstFailure?.message ? ` ${firstFailure.message}` : ""}`;
   }
 
   async function saveCurrentProviderProvenanceSchedulerNarrativeTemplate() {
@@ -6364,6 +6460,120 @@ export default function App() {
       setProviderProvenanceWorkspaceFeedback(
         `Scheduler narrative registry delete failed: ${(error as Error).message}`,
       );
+    }
+  }
+
+  async function runProviderProvenanceSchedulerNarrativeTemplateBulkGovernance(
+    action: "delete" | "restore",
+  ) {
+    if (!selectedProviderProvenanceSchedulerNarrativeTemplateIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more scheduler narrative templates first.");
+      return;
+    }
+    if (
+      action === "delete"
+      && typeof window !== "undefined"
+      && !window.confirm(
+        `Apply bulk delete to ${selectedProviderProvenanceSchedulerNarrativeTemplateIds.length} scheduler narrative template(s)?`,
+      )
+    ) {
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeTemplateBulkAction(action);
+    try {
+      const selectedIds = [...selectedProviderProvenanceSchedulerNarrativeTemplateIds];
+      const result = await bulkGovernProviderProvenanceSchedulerNarrativeTemplates({
+        action,
+        templateIds: selectedIds,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: `scheduler_narrative_template_bulk_${action}_from_control_room`,
+      });
+      if (
+        action === "delete"
+        && editingProviderProvenanceSchedulerNarrativeTemplateId
+        && selectedIds.includes(editingProviderProvenanceSchedulerNarrativeTemplateId)
+      ) {
+        resetProviderProvenanceSchedulerNarrativeTemplateDraft();
+      }
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (
+        selectedProviderProvenanceSchedulerNarrativeTemplateId
+        && selectedIds.includes(selectedProviderProvenanceSchedulerNarrativeTemplateId)
+      ) {
+        const history = await listProviderProvenanceSchedulerNarrativeTemplateRevisions(
+          selectedProviderProvenanceSchedulerNarrativeTemplateId,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(history);
+        setProviderProvenanceSchedulerNarrativeTemplateHistoryError(null);
+      }
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
+      setProviderProvenanceWorkspaceFeedback(
+        formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler narrative template bulk governance failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeTemplateBulkAction(null);
+    }
+  }
+
+  async function runProviderProvenanceSchedulerNarrativeRegistryBulkGovernance(
+    action: "delete" | "restore",
+  ) {
+    if (!selectedProviderProvenanceSchedulerNarrativeRegistryIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more scheduler narrative registry entries first.");
+      return;
+    }
+    if (
+      action === "delete"
+      && typeof window !== "undefined"
+      && !window.confirm(
+        `Apply bulk delete to ${selectedProviderProvenanceSchedulerNarrativeRegistryIds.length} scheduler narrative registry entr${selectedProviderProvenanceSchedulerNarrativeRegistryIds.length === 1 ? "y" : "ies"}?`,
+      )
+    ) {
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeRegistryBulkAction(action);
+    try {
+      const selectedIds = [...selectedProviderProvenanceSchedulerNarrativeRegistryIds];
+      const result = await bulkGovernProviderProvenanceSchedulerNarrativeRegistryEntries({
+        action,
+        registryIds: selectedIds,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: `scheduler_narrative_registry_bulk_${action}_from_control_room`,
+      });
+      if (
+        action === "delete"
+        && editingProviderProvenanceSchedulerNarrativeRegistryId
+        && selectedIds.includes(editingProviderProvenanceSchedulerNarrativeRegistryId)
+      ) {
+        resetProviderProvenanceSchedulerNarrativeRegistryDraft();
+      }
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (
+        selectedProviderProvenanceSchedulerNarrativeRegistryId
+        && selectedIds.includes(selectedProviderProvenanceSchedulerNarrativeRegistryId)
+      ) {
+        const history = await listProviderProvenanceSchedulerNarrativeRegistryRevisions(
+          selectedProviderProvenanceSchedulerNarrativeRegistryId,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(history);
+        setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
+      }
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
+      setProviderProvenanceWorkspaceFeedback(
+        formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler narrative registry bulk governance failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeRegistryBulkAction(null);
     }
   }
 
@@ -8833,6 +9043,54 @@ export default function App() {
                                       </div>
                                     </label>
                                   </div>
+                                  {providerProvenanceSchedulerNarrativeTemplates.length ? (
+                                    <div className="provider-provenance-governance-bar">
+                                      <div className="provider-provenance-governance-summary">
+                                        <strong>
+                                          {selectedProviderProvenanceSchedulerNarrativeTemplateIds.length} selected
+                                        </strong>
+                                        <span>
+                                          {selectedProviderProvenanceSchedulerNarrativeTemplateEntries.filter((entry) => entry.status === "active").length} active · {" "}
+                                          {selectedProviderProvenanceSchedulerNarrativeTemplateEntries.filter((entry) => entry.status === "deleted").length} deleted
+                                        </span>
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <button
+                                          className="ghost-button"
+                                          onClick={toggleAllProviderProvenanceSchedulerNarrativeTemplateSelections}
+                                          type="button"
+                                        >
+                                          {selectedProviderProvenanceSchedulerNarrativeTemplateIds.length === providerProvenanceSchedulerNarrativeTemplates.length
+                                            ? "Clear all"
+                                            : "Select all"}
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={!selectedProviderProvenanceSchedulerNarrativeTemplateIds.length || providerProvenanceSchedulerNarrativeTemplateBulkAction !== null}
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerNarrativeTemplateBulkGovernance("delete");
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerNarrativeTemplateBulkAction === "delete"
+                                            ? "Deleting…"
+                                            : "Delete selected"}
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={!selectedProviderProvenanceSchedulerNarrativeTemplateIds.length || providerProvenanceSchedulerNarrativeTemplateBulkAction !== null}
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerNarrativeTemplateBulkGovernance("restore");
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerNarrativeTemplateBulkAction === "restore"
+                                            ? "Restoring…"
+                                            : "Restore selected"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
                                   {providerProvenanceSchedulerNarrativeTemplatesLoading ? (
                                     <p className="empty-state">Loading scheduler narrative templates…</p>
                                   ) : null}
@@ -8845,14 +9103,35 @@ export default function App() {
                                     <table className="data-table">
                                       <thead>
                                         <tr>
+                                          <th>
+                                            <input
+                                              aria-label="Select all scheduler narrative templates"
+                                              checked={
+                                                providerProvenanceSchedulerNarrativeTemplates.length > 0
+                                                && selectedProviderProvenanceSchedulerNarrativeTemplateIds.length === providerProvenanceSchedulerNarrativeTemplates.length
+                                              }
+                                              onChange={toggleAllProviderProvenanceSchedulerNarrativeTemplateSelections}
+                                              type="checkbox"
+                                            />
+                                          </th>
                                           <th>Template</th>
                                           <th>Lens</th>
                                           <th>Action</th>
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {providerProvenanceSchedulerNarrativeTemplates.slice(0, 6).map((entry) => (
+                                        {providerProvenanceSchedulerNarrativeTemplates.map((entry) => (
                                           <tr key={entry.template_id}>
+                                            <td className="provider-provenance-selection-cell">
+                                              <input
+                                                aria-label={`Select scheduler narrative template ${entry.name}`}
+                                                checked={selectedProviderProvenanceSchedulerNarrativeTemplateIdSet.has(entry.template_id)}
+                                                onChange={() => {
+                                                  toggleProviderProvenanceSchedulerNarrativeTemplateSelection(entry.template_id);
+                                                }}
+                                                type="checkbox"
+                                              />
+                                            </td>
                                             <td>
                                               <strong>{entry.name}</strong>
                                               <p className="run-lineage-symbol-copy">
@@ -8893,6 +9172,7 @@ export default function App() {
                                                 </button>
                                                 <button
                                                   className="ghost-button"
+                                                  disabled={providerProvenanceSchedulerNarrativeTemplateBulkAction !== null}
                                                   onClick={() => {
                                                     void editProviderProvenanceSchedulerNarrativeTemplate(entry);
                                                   }}
@@ -8902,7 +9182,7 @@ export default function App() {
                                                 </button>
                                                 <button
                                                   className="ghost-button"
-                                                  disabled={entry.status !== "active"}
+                                                  disabled={entry.status !== "active" || providerProvenanceSchedulerNarrativeTemplateBulkAction !== null}
                                                   onClick={() => {
                                                     void removeProviderProvenanceSchedulerNarrativeTemplate(entry);
                                                   }}
@@ -8912,6 +9192,7 @@ export default function App() {
                                                 </button>
                                                 <button
                                                   className="ghost-button"
+                                                  disabled={providerProvenanceSchedulerNarrativeTemplateBulkAction !== null}
                                                   onClick={() => {
                                                     void toggleProviderProvenanceSchedulerNarrativeTemplateHistory(entry.template_id);
                                                   }}
@@ -9081,6 +9362,54 @@ export default function App() {
                                       </div>
                                     </label>
                                   </div>
+                                  {providerProvenanceSchedulerNarrativeRegistryEntries.length ? (
+                                    <div className="provider-provenance-governance-bar">
+                                      <div className="provider-provenance-governance-summary">
+                                        <strong>
+                                          {selectedProviderProvenanceSchedulerNarrativeRegistryIds.length} selected
+                                        </strong>
+                                        <span>
+                                          {selectedProviderProvenanceSchedulerNarrativeRegistryEntries.filter((entry) => entry.status === "active").length} active · {" "}
+                                          {selectedProviderProvenanceSchedulerNarrativeRegistryEntries.filter((entry) => entry.status === "deleted").length} deleted
+                                        </span>
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <button
+                                          className="ghost-button"
+                                          onClick={toggleAllProviderProvenanceSchedulerNarrativeRegistrySelections}
+                                          type="button"
+                                        >
+                                          {selectedProviderProvenanceSchedulerNarrativeRegistryIds.length === providerProvenanceSchedulerNarrativeRegistryEntries.length
+                                            ? "Clear all"
+                                            : "Select all"}
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={!selectedProviderProvenanceSchedulerNarrativeRegistryIds.length || providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerNarrativeRegistryBulkGovernance("delete");
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerNarrativeRegistryBulkAction === "delete"
+                                            ? "Deleting…"
+                                            : "Delete selected"}
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={!selectedProviderProvenanceSchedulerNarrativeRegistryIds.length || providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerNarrativeRegistryBulkGovernance("restore");
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerNarrativeRegistryBulkAction === "restore"
+                                            ? "Restoring…"
+                                            : "Restore selected"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
                                   {providerProvenanceSchedulerNarrativeRegistryEntriesLoading ? (
                                     <p className="empty-state">Loading scheduler narrative registry…</p>
                                   ) : null}
@@ -9093,14 +9422,35 @@ export default function App() {
                                     <table className="data-table">
                                       <thead>
                                         <tr>
+                                          <th>
+                                            <input
+                                              aria-label="Select all scheduler narrative registry entries"
+                                              checked={
+                                                providerProvenanceSchedulerNarrativeRegistryEntries.length > 0
+                                                && selectedProviderProvenanceSchedulerNarrativeRegistryIds.length === providerProvenanceSchedulerNarrativeRegistryEntries.length
+                                              }
+                                              onChange={toggleAllProviderProvenanceSchedulerNarrativeRegistrySelections}
+                                              type="checkbox"
+                                            />
+                                          </th>
                                           <th>Registry</th>
                                           <th>Linked lens</th>
                                           <th>Action</th>
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {providerProvenanceSchedulerNarrativeRegistryEntries.slice(0, 6).map((entry) => (
+                                        {providerProvenanceSchedulerNarrativeRegistryEntries.map((entry) => (
                                           <tr key={entry.registry_id}>
+                                            <td className="provider-provenance-selection-cell">
+                                              <input
+                                                aria-label={`Select scheduler narrative registry ${entry.name}`}
+                                                checked={selectedProviderProvenanceSchedulerNarrativeRegistryIdSet.has(entry.registry_id)}
+                                                onChange={() => {
+                                                  toggleProviderProvenanceSchedulerNarrativeRegistrySelection(entry.registry_id);
+                                                }}
+                                                type="checkbox"
+                                              />
+                                            </td>
                                             <td>
                                               <strong>{entry.name}</strong>
                                               <p className="run-lineage-symbol-copy">
@@ -9140,6 +9490,7 @@ export default function App() {
                                                 </button>
                                                 <button
                                                   className="ghost-button"
+                                                  disabled={providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
                                                   onClick={() => {
                                                     void editProviderProvenanceSchedulerNarrativeRegistryEntry(entry);
                                                   }}
@@ -9149,7 +9500,7 @@ export default function App() {
                                                 </button>
                                                 <button
                                                   className="ghost-button"
-                                                  disabled={entry.status !== "active"}
+                                                  disabled={entry.status !== "active" || providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
                                                   onClick={() => {
                                                     void removeProviderProvenanceSchedulerNarrativeRegistry(entry);
                                                   }}
@@ -9159,6 +9510,7 @@ export default function App() {
                                                 </button>
                                                 <button
                                                   className="ghost-button"
+                                                  disabled={providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
                                                   onClick={() => {
                                                     void toggleProviderProvenanceSchedulerNarrativeRegistryHistory(entry.registry_id);
                                                   }}

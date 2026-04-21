@@ -2441,6 +2441,40 @@ select {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.provider-provenance-governance-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid rgba(24, 191, 191, 0.22);
+  border-radius: 14px;
+  background: rgba(24, 191, 191, 0.05);
+}
+
+.provider-provenance-governance-summary {
+  display: grid;
+  gap: 2px;
+}
+
+.provider-provenance-governance-summary strong {
+  font-size: 0.84rem;
+}
+
+.provider-provenance-governance-summary span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.provider-provenance-selection-cell {
+  width: 44px;
+}
+
+.provider-provenance-selection-cell input {
+  margin: 0;
+}
+
 .provider-provenance-checkbox {
   display: flex;
   align-items: center;

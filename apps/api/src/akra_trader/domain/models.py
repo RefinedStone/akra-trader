@@ -1005,6 +1005,28 @@ class ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult:
+  item_id: str
+  item_name: str | None = None
+  outcome: str = "applied"
+  status: str | None = None
+  current_revision_id: str | None = None
+  message: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeBulkGovernanceResult:
+  item_type: str
+  action: str
+  reason: str
+  requested_count: int = 0
+  applied_count: int = 0
+  skipped_count: int = 0
+  failed_count: int = 0
+  results: tuple[ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult, ...] = ()
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceScheduledReportAuditRecord:
   audit_id: str
   report_id: str

@@ -182,6 +182,9 @@ It is not yet a finished live trading product:
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots
+- those same scheduler templates and registry boards now also support bulk governance, so control
+  room operators can select, delete, or restore multiple saved review lenses in one workflow
+  instead of repeating single-entry maintenance
 
 ### Operator discipline baseline
 

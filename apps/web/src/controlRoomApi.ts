@@ -17,6 +17,7 @@ import type {
   ProviderProvenanceSchedulerAlertHistoryPayload,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
   ProviderProvenanceSchedulerNarrativeRegistryListPayload,
   ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload,
@@ -695,6 +696,28 @@ export async function deleteProviderProvenanceSchedulerNarrativeTemplate(params:
   );
 }
 
+export async function bulkGovernProviderProvenanceSchedulerNarrativeTemplates(params: {
+  action: "delete" | "restore";
+  templateIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-templates/bulk-governance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: params.action,
+        template_ids: params.templateIds,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
 export async function listProviderProvenanceSchedulerNarrativeTemplateRevisions(templateId: string) {
   return fetchJson<ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload>(
     `/operator/provider-provenance-analytics/scheduler-narrative-templates/${encodeURIComponent(templateId)}/revisions`,
@@ -824,6 +847,28 @@ export async function deleteProviderProvenanceSchedulerNarrativeRegistryEntry(pa
     {
       method: "POST",
       body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function bulkGovernProviderProvenanceSchedulerNarrativeRegistryEntries(params: {
+  action: "delete" | "restore";
+  registryIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-registry/bulk-governance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: params.action,
+        registry_ids: params.registryIds,
         ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
         ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
         ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),

@@ -1614,6 +1614,26 @@ export type ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload = {
   history: ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry[];
 };
 
+export type ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult = {
+  item_id: string;
+  item_name?: string | null;
+  outcome: "applied" | "skipped" | "failed" | string;
+  status?: "active" | "deleted" | string | null;
+  current_revision_id?: string | null;
+  message?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeBulkGovernanceResult = {
+  item_type: "template" | "registry" | string;
+  action: "delete" | "restore" | string;
+  reason: string;
+  requested_count: number;
+  applied_count: number;
+  skipped_count: number;
+  failed_count: number;
+  results: ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult[];
+};
+
 export type ProviderProvenanceSchedulerNarrativeRegistryEntry = {
   registry_id: string;
   name: string;

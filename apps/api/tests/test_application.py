@@ -15146,12 +15146,14 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_template_list",
     "operator_provider_provenance_scheduler_narrative_template_update",
     "operator_provider_provenance_scheduler_narrative_template_delete",
+    "operator_provider_provenance_scheduler_narrative_template_bulk_governance",
     "operator_provider_provenance_scheduler_narrative_template_revision_list",
     "operator_provider_provenance_scheduler_narrative_template_revision_restore",
     "operator_provider_provenance_scheduler_narrative_registry_create",
     "operator_provider_provenance_scheduler_narrative_registry_list",
     "operator_provider_provenance_scheduler_narrative_registry_update",
     "operator_provider_provenance_scheduler_narrative_registry_delete",
+    "operator_provider_provenance_scheduler_narrative_registry_bulk_governance",
     "operator_provider_provenance_scheduler_narrative_registry_revision_list",
     "operator_provider_provenance_scheduler_narrative_registry_revision_restore",
     "operator_provider_provenance_scheduled_report_create",
@@ -15294,6 +15296,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_delete"].path_param_keys == (
     "template_id",
   )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_bulk_governance"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_revision_list"].route_path.endswith(
     "/scheduler-narrative-templates/{template_id}/revisions"
   )
@@ -15310,6 +15313,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_delete"].path_param_keys == (
     "registry_id",
   )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_bulk_governance"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_revision_list"].route_path.endswith(
     "/scheduler-narrative-registry/{registry_id}/revisions"
   )
@@ -16455,6 +16459,56 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert restored_template_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
   assert restored_template_payload["revision_count"] == 4
 
+  bulk_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"],
+    app=app,
+    request_payload={
+      "name": "Failure narrative",
+      "description": "Reusable failure narrative lens.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_failure",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "resolved_narratives",
+        "window_days": 14,
+        "result_limit": 8,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  bulk_delete_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_bulk_governance"],
+    app=app,
+    request_payload={
+      "action": "delete",
+      "template_ids": [template_payload["template_id"], bulk_template_payload["template_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_template_governance_delete",
+    },
+  )
+  assert bulk_delete_template_payload["action"] == "delete"
+  assert bulk_delete_template_payload["requested_count"] == 2
+  assert bulk_delete_template_payload["applied_count"] == 2
+  assert bulk_delete_template_payload["failed_count"] == 0
+  assert {item["status"] for item in bulk_delete_template_payload["results"]} == {"deleted"}
+
+  bulk_restore_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_bulk_governance"],
+    app=app,
+    request_payload={
+      "action": "restore",
+      "template_ids": [template_payload["template_id"], bulk_template_payload["template_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_template_governance_restore",
+    },
+  )
+  assert bulk_restore_template_payload["action"] == "restore"
+  assert bulk_restore_template_payload["applied_count"] == 2
+  assert all(item["status"] == "active" for item in bulk_restore_template_payload["results"])
+
   registry_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_create"],
     app=app,
@@ -16561,6 +16615,61 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert restored_registry_payload["status"] == "active"
   assert restored_registry_payload["template_id"] == template_payload["template_id"]
   assert restored_registry_payload["revision_count"] == 4
+
+  bulk_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_create"],
+    app=app,
+    request_payload={
+      "name": "Failure board",
+      "description": "Failure narrative board.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_failure",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "resolved_narratives",
+        "window_days": 14,
+        "result_limit": 8,
+      },
+      "layout": {
+        "highlight_panel": "rollups",
+        "show_rollups": True,
+        "show_time_series": False,
+        "show_recent_exports": False,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  bulk_delete_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_bulk_governance"],
+    app=app,
+    request_payload={
+      "action": "delete",
+      "registry_ids": [registry_payload["registry_id"], bulk_registry_payload["registry_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_registry_governance_delete",
+    },
+  )
+  assert bulk_delete_registry_payload["action"] == "delete"
+  assert bulk_delete_registry_payload["requested_count"] == 2
+  assert bulk_delete_registry_payload["applied_count"] == 2
+  assert {item["status"] for item in bulk_delete_registry_payload["results"]} == {"deleted"}
+
+  bulk_restore_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_bulk_governance"],
+    app=app,
+    request_payload={
+      "action": "restore",
+      "registry_ids": [registry_payload["registry_id"], bulk_registry_payload["registry_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_registry_governance_restore",
+    },
+  )
+  assert bulk_restore_registry_payload["action"] == "restore"
+  assert bulk_restore_registry_payload["applied_count"] == 2
+  assert all(item["status"] == "active" for item in bulk_restore_registry_payload["results"])
 
   report_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduled_report_create"],

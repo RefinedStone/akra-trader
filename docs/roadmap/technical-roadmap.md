@@ -128,6 +128,8 @@ creation.
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries
+- that saved scheduler review layer now also has bulk governance workflow, so operators can clean
+  up or reinstate multiple narrative templates and boards without repeating single-item actions
 
 ### Remaining work
 

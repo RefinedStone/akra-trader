@@ -1582,6 +1582,16 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("template_id",),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_template_delete",
   )
+  operator_provider_provenance_scheduler_narrative_template_bulk_governance_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_template_bulk_governance",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates/bulk-governance",
+    route_name="bulk_govern_operator_provider_provenance_scheduler_narrative_templates",
+    response_title="Bulk govern provider provenance scheduler narrative templates",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_template_bulk_governance",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_template_bulk_governance",
+  )
   operator_provider_provenance_scheduler_narrative_template_revision_list_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_template_revision_list",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_id}/revisions",
@@ -1721,6 +1731,16 @@ def build_standalone_surface_runtime_bindings(
     methods=("POST",),
     path_param_keys=("registry_id",),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_registry_delete",
+  )
+  operator_provider_provenance_scheduler_narrative_registry_bulk_governance_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_registry_bulk_governance",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-registry/bulk-governance",
+    route_name="bulk_govern_operator_provider_provenance_scheduler_narrative_registry_entries",
+    response_title="Bulk govern provider provenance scheduler narrative registry entries",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_registry_bulk_governance",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_registry_bulk_governance",
   )
   operator_provider_provenance_scheduler_narrative_registry_revision_list_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_registry_revision_list",
@@ -3417,12 +3437,14 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_template_list_binding,
     operator_provider_provenance_scheduler_narrative_template_update_binding,
     operator_provider_provenance_scheduler_narrative_template_delete_binding,
+    operator_provider_provenance_scheduler_narrative_template_bulk_governance_binding,
     operator_provider_provenance_scheduler_narrative_template_revision_list_binding,
     operator_provider_provenance_scheduler_narrative_template_revision_restore_binding,
     operator_provider_provenance_scheduler_narrative_registry_create_binding,
     operator_provider_provenance_scheduler_narrative_registry_list_binding,
     operator_provider_provenance_scheduler_narrative_registry_update_binding,
     operator_provider_provenance_scheduler_narrative_registry_delete_binding,
+    operator_provider_provenance_scheduler_narrative_registry_bulk_governance_binding,
     operator_provider_provenance_scheduler_narrative_registry_revision_list_binding,
     operator_provider_provenance_scheduler_narrative_registry_revision_restore_binding,
     operator_provider_provenance_scheduled_report_create_binding,

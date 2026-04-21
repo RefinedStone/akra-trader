@@ -78,6 +78,9 @@ unclear dataset lineage.
 - those saved scheduler narrative templates and boards now also support edit, delete, and
   revision-restore workflow, so teams can correct or retire shared review lenses without losing
   the previous incident-handoff snapshot
+- the same scheduler narrative workspace now also has bulk governance controls, so shift leads
+  can review, delete, or restore multiple saved templates and boards during cleanup without
+  repeating one-by-one actions
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

@@ -273,6 +273,14 @@ class OperatorProviderProvenanceSchedulerNarrativeTemplateDeleteRequest(BaseMode
   reason: str = "scheduler_narrative_template_deleted"
 
 
+class OperatorProviderProvenanceSchedulerNarrativeTemplateBulkGovernanceRequest(BaseModel):
+  action: str
+  template_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+
+
 class OperatorProviderProvenanceSchedulerNarrativeTemplateRevisionRestoreRequest(BaseModel):
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
@@ -304,6 +312,14 @@ class OperatorProviderProvenanceSchedulerNarrativeRegistryDeleteRequest(BaseMode
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
   reason: str = "scheduler_narrative_registry_deleted"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceRequest(BaseModel):
+  action: str
+  registry_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
 
 
 class OperatorProviderProvenanceSchedulerNarrativeRegistryRevisionRestoreRequest(BaseModel):
@@ -361,6 +377,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
     OperatorProviderProvenanceSchedulerNarrativeTemplateDeleteRequest,
     {},
   ),
+  "operator_provider_provenance_scheduler_narrative_template_bulk_governance": (
+    OperatorProviderProvenanceSchedulerNarrativeTemplateBulkGovernanceRequest,
+    {},
+  ),
   "operator_provider_provenance_scheduler_narrative_template_revision_restore": (
     OperatorProviderProvenanceSchedulerNarrativeTemplateRevisionRestoreRequest,
     {},
@@ -375,6 +395,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_registry_delete": (
     OperatorProviderProvenanceSchedulerNarrativeRegistryDeleteRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_narrative_registry_bulk_governance": (
+    OperatorProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceRequest,
     {},
   ),
   "operator_provider_provenance_scheduler_narrative_registry_revision_restore": (
