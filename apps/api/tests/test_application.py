@@ -1614,6 +1614,135 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
   )
 
 
+def test_multi_symbol_market_data_alerts_embed_primary_focus_metadata(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 15, 0, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    operator_alert_delivery=FakeOperatorAlertDeliveryAdapter(),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="multi_symbol_primary_focus",
+  )
+  secondary_run = replace(
+    run,
+    config=replace(
+      run.config,
+      run_id="live-run-btc-primary-focus",
+      symbols=("BTC/USDT",),
+    ),
+    provenance=replace(
+      run.provenance,
+      runtime_session=replace(
+        run.provenance.runtime_session,
+        session_id="worker-live-btc-primary-focus",
+      ) if run.provenance.runtime_session is not None else None,
+    ),
+    orders=[],
+    fills=[],
+    positions={},
+    equity_curve=[],
+    closed_trades=[],
+    metrics={},
+    notes=list(run.notes),
+  )
+  runs.save_run(secondary_run)
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:BTC/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=18),
+          sync_status="stale",
+          lag_seconds=1_080,
+          last_sync_at=clock.current - timedelta(minutes=12),
+          failure_count_24h=2,
+          backfill_gap_windows=(
+            GapWindow(
+              start_at=clock.current - timedelta(hours=1),
+              end_at=clock.current - timedelta(hours=1) + timedelta(minutes=10),
+              missing_candles=2,
+            ),
+          ),
+          issues=("freshness_threshold_exceeded:1080:600", "repeated_sync_failures:2"),
+        ),
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=1),
+          sync_status="synced",
+          lag_seconds=0,
+          last_sync_at=clock.current - timedelta(minutes=1),
+          issues=(),
+        ),
+      ],
+    ),
+  )
+
+  visibility = app.get_operator_visibility()
+  guarded_live_status = app.get_guarded_live_status()
+
+  market_data_alert = next(
+    alert for alert in visibility.alerts
+    if alert.category == "market_data_freshness"
+  )
+  assert market_data_alert.symbol is None
+  assert market_data_alert.symbols == ("BTC/USDT", "ETH/USDT")
+  assert market_data_alert.primary_focus is not None
+  assert market_data_alert.primary_focus.symbol == "BTC/USDT"
+  assert market_data_alert.primary_focus.timeframe == "5m"
+  assert market_data_alert.primary_focus.candidate_symbols == ("BTC/USDT", "ETH/USDT")
+  assert market_data_alert.primary_focus.candidate_count == 2
+  assert market_data_alert.primary_focus.policy == "market_data_risk_order"
+  assert "highest-risk market-data candidate" in (market_data_alert.primary_focus.reason or "")
+
+  market_data_incident = next(
+    event
+    for event in guarded_live_status.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+  assert market_data_incident.symbol is None
+  assert market_data_incident.symbols == ("BTC/USDT", "ETH/USDT")
+  assert market_data_incident.primary_focus == market_data_alert.primary_focus
+
+
 def test_market_data_incidents_request_remediation_and_provider_workflow(
   tmp_path: Path,
 ) -> None:

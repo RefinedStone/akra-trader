@@ -53,6 +53,7 @@ from akra_trader.domain.models import GuardedLiveVenueSessionSync
 from akra_trader.domain.models import Fill
 from akra_trader.domain.models import ExperimentPreset
 from akra_trader.domain.models import Instrument
+from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import Order
@@ -60,6 +61,7 @@ from akra_trader.domain.models import OrderSide
 from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import OperatorAlert
+from akra_trader.domain.models import OperatorAlertPrimaryFocus
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
@@ -18779,6 +18781,13 @@ class TradingApplication:
   ) -> list[OperatorAlert]:
     alerts: list[OperatorAlert] = []
     delivery_targets = self._guarded_live_delivery_targets()
+    live_symbol_order = self._normalize_operator_alert_symbols(
+      [
+        symbol
+        for run in live_runs
+        for symbol in run.config.symbols
+      ]
+    )
     live_symbols = {
       symbol
       for run in live_runs
@@ -18799,6 +18808,15 @@ class TradingApplication:
             **self._build_operator_alert_market_context(
               symbols=sorted(live_symbols),
               timeframe=timeframe,
+              primary_focus=self._build_operator_alert_primary_focus(
+                symbols=live_symbol_order or sorted(live_symbols),
+                timeframe=timeframe,
+                policy="live_symbol_order",
+                reason=(
+                  "Primary focus follows the active live symbol order because "
+                  "market-data status could not be scored."
+                ),
+              ),
             ),
             source="guarded_live",
             delivery_targets=delivery_targets,
@@ -18819,6 +18837,11 @@ class TradingApplication:
           for instrument in relevant_instruments
         }
       )
+      primary_focus = self._resolve_market_data_alert_primary_focus(
+        instruments=relevant_instruments,
+        timeframe=timeframe,
+        symbol_order=live_symbol_order or relevant_symbols,
+      )
       if live_symbols and not relevant_instruments:
         alerts.append(
           OperatorAlert(
@@ -18834,6 +18857,15 @@ class TradingApplication:
             **self._build_operator_alert_market_context(
               symbols=sorted(live_symbols),
               timeframe=timeframe,
+              primary_focus=self._build_operator_alert_primary_focus(
+                symbols=live_symbol_order or sorted(live_symbols),
+                timeframe=timeframe,
+                policy="live_symbol_order",
+                reason=(
+                  "Primary focus follows the active live symbol order because "
+                  "no market-data status covered the live symbol set."
+                ),
+              ),
             ),
             source="guarded_live",
             delivery_targets=delivery_targets,
@@ -18944,6 +18976,7 @@ class TradingApplication:
             **self._build_operator_alert_market_context(
               symbols=relevant_symbols,
               timeframe=timeframe,
+              primary_focus=primary_focus,
             ),
             source="guarded_live",
             delivery_targets=delivery_targets,
@@ -18965,6 +18998,7 @@ class TradingApplication:
             **self._build_operator_alert_market_context(
               symbols=relevant_symbols,
               timeframe=timeframe,
+              primary_focus=primary_focus,
             ),
             source="guarded_live",
             delivery_targets=delivery_targets,
@@ -18986,6 +19020,7 @@ class TradingApplication:
             **self._build_operator_alert_market_context(
               symbols=relevant_symbols,
               timeframe=timeframe,
+              primary_focus=primary_focus,
             ),
             source="guarded_live",
             delivery_targets=delivery_targets,
@@ -19007,6 +19042,7 @@ class TradingApplication:
             **self._build_operator_alert_market_context(
               symbols=relevant_symbols,
               timeframe=timeframe,
+              primary_focus=primary_focus,
             ),
             source="guarded_live",
             delivery_targets=delivery_targets,
@@ -20133,6 +20169,7 @@ class TradingApplication:
             symbol=alert.symbol,
             symbols=alert.symbols,
             timeframe=alert.timeframe,
+            primary_focus=alert.primary_focus,
             source=alert.source,
             paging_policy_id=policy.policy_id,
             paging_provider=policy.provider,
@@ -20169,6 +20206,7 @@ class TradingApplication:
             symbol=alert.symbol,
             symbols=alert.symbols,
             timeframe=alert.timeframe,
+            primary_focus=alert.primary_focus,
             source=alert.source,
             paging_policy_id=policy.policy_id,
             paging_provider=policy.provider,
@@ -22670,6 +22708,155 @@ class TradingApplication:
     normalized = (timeframe or "").strip().lower()
     return normalized or None
 
+  @staticmethod
+  def _operator_market_data_sync_severity_rank(sync_status: str) -> int:
+    normalized = sync_status.strip().lower()
+    if normalized == "error":
+      return 4
+    if normalized == "stale":
+      return 3
+    if normalized == "lagging":
+      return 2
+    if normalized == "syncing":
+      return 1
+    if normalized == "synced":
+      return 0
+    return 1 if normalized else 0
+
+  @classmethod
+  def _score_operator_market_data_instrument(cls, instrument: InstrumentStatus) -> int:
+    return (
+      cls._operator_market_data_sync_severity_rank(instrument.sync_status) * 1000
+      + min(instrument.failure_count_24h, 99) * 100
+      + len(instrument.backfill_gap_windows) * 40
+      + len(instrument.issues) * 35
+      + (20 if (instrument.backfill_contiguous_missing_candles or 0) > 0 else 0)
+      + (10 if instrument.backfill_target_candles is not None and instrument.backfill_complete is False else 0)
+      + min(int((instrument.lag_seconds or 0) / 60), 15)
+    )
+
+  @classmethod
+  def _build_operator_alert_primary_focus(
+    cls,
+    *,
+    primary_symbol: str | None = None,
+    symbols: tuple[str, ...] | list[str] = (),
+    candidate_symbols: tuple[str, ...] | list[str] | None = None,
+    timeframe: str | None = None,
+    policy: str | None = None,
+    reason: str | None = None,
+  ) -> OperatorAlertPrimaryFocus | None:
+    normalized_symbols = cls._normalize_operator_alert_symbols(symbols)
+    normalized_candidate_symbols = cls._normalize_operator_alert_symbols(
+      candidate_symbols if candidate_symbols is not None else normalized_symbols
+    )
+    normalized_primary_symbol = cls._normalize_operator_alert_symbol(primary_symbol)
+    normalized_timeframe = cls._normalize_operator_alert_timeframe(timeframe)
+
+    if normalized_primary_symbol is None and normalized_candidate_symbols:
+      normalized_primary_symbol = normalized_candidate_symbols[0]
+    if normalized_primary_symbol is None and len(normalized_symbols) == 1:
+      normalized_primary_symbol = normalized_symbols[0]
+    if (
+      normalized_primary_symbol is not None
+      and normalized_primary_symbol not in normalized_candidate_symbols
+    ):
+      normalized_candidate_symbols = (
+        normalized_primary_symbol,
+        *tuple(
+          symbol
+          for symbol in normalized_candidate_symbols
+          if symbol != normalized_primary_symbol
+        ),
+      )
+    if not normalized_candidate_symbols and normalized_primary_symbol is not None:
+      normalized_candidate_symbols = (normalized_primary_symbol,)
+    if (
+      normalized_primary_symbol is None
+      and normalized_timeframe is None
+      and not normalized_candidate_symbols
+    ):
+      return None
+
+    candidate_count = len(normalized_candidate_symbols)
+    resolved_policy = policy
+    resolved_reason = reason
+    if resolved_policy is None:
+      if candidate_count > 1:
+        resolved_policy = "explicit_symbol" if cls._normalize_operator_alert_symbol(primary_symbol) else "symbol_order"
+      else:
+        resolved_policy = "single_symbol_context"
+    if resolved_reason is None:
+      if candidate_count > 1:
+        if cls._normalize_operator_alert_symbol(primary_symbol) is not None:
+          resolved_reason = "Runtime context supplied the primary symbol for a multi-symbol alert."
+        else:
+          resolved_reason = "Primary focus follows the normalized alert symbol order."
+      else:
+        resolved_reason = "Alert context resolved to one market-data instrument."
+
+    return OperatorAlertPrimaryFocus(
+      symbol=normalized_primary_symbol,
+      timeframe=normalized_timeframe,
+      candidate_symbols=normalized_candidate_symbols,
+      candidate_count=candidate_count,
+      policy=resolved_policy,
+      reason=resolved_reason,
+    )
+
+  @classmethod
+  def _resolve_market_data_alert_primary_focus(
+    cls,
+    *,
+    instruments: list[InstrumentStatus],
+    timeframe: str,
+    symbol_order: tuple[str, ...] | list[str] = (),
+  ) -> OperatorAlertPrimaryFocus | None:
+    if not instruments:
+      return None
+    normalized_order = cls._normalize_operator_alert_symbols(symbol_order)
+    order_index = {symbol: index for index, symbol in enumerate(normalized_order)}
+    ranked_candidates = sorted(
+      instruments,
+      key=lambda instrument: (
+        -cls._score_operator_market_data_instrument(instrument),
+        order_index.get(cls._symbol_from_instrument_id(instrument.instrument_id), float("inf")),
+        cls._symbol_from_instrument_id(instrument.instrument_id),
+      ),
+    )
+    candidate_symbols = tuple(
+      cls._symbol_from_instrument_id(instrument.instrument_id)
+      for instrument in ranked_candidates
+    )
+    primary_symbol = candidate_symbols[0] if candidate_symbols else None
+    if len(candidate_symbols) <= 1:
+      reason = "Alert context resolved to one market-data instrument."
+    else:
+      primary_instrument = ranked_candidates[0]
+      second_instrument = ranked_candidates[1]
+      primary_score = cls._score_operator_market_data_instrument(primary_instrument)
+      second_score = cls._score_operator_market_data_instrument(second_instrument)
+      if primary_score != second_score:
+        reason = (
+          f"Selected {primary_symbol} as the highest-risk market-data candidate from "
+          f"{len(candidate_symbols)} symbols."
+        )
+      elif order_index.get(primary_symbol, float("inf")) != order_index.get(
+        cls._symbol_from_instrument_id(second_instrument.instrument_id),
+        float("inf"),
+      ):
+        reason = "Risk tied, so the live symbol order broke the tie."
+      else:
+        reason = "Risk and live order tied, so lexical ordering kept focus stable."
+    return cls._build_operator_alert_primary_focus(
+      primary_symbol=primary_symbol,
+      symbols=normalized_order or candidate_symbols,
+      candidate_symbols=candidate_symbols,
+      timeframe=timeframe,
+      policy="market_data_risk_order",
+      reason=reason,
+    )
+
   @classmethod
   def _build_operator_alert_market_context(
     cls,
@@ -22677,7 +22864,8 @@ class TradingApplication:
     symbol: str | None = None,
     symbols: tuple[str, ...] | list[str] = (),
     timeframe: str | None = None,
-  ) -> dict[str, str | tuple[str, ...] | None]:
+    primary_focus: OperatorAlertPrimaryFocus | None = None,
+  ) -> dict[str, str | tuple[str, ...] | OperatorAlertPrimaryFocus | None]:
     symbol_candidates = list(symbols)
     if symbol is not None:
       symbol_candidates.insert(0, symbol)
@@ -22685,10 +22873,16 @@ class TradingApplication:
     normalized_symbol = cls._normalize_operator_alert_symbol(symbol)
     if normalized_symbol is None and len(normalized_symbols) == 1:
       normalized_symbol = normalized_symbols[0]
+    normalized_timeframe = cls._normalize_operator_alert_timeframe(timeframe)
     return {
       "symbol": normalized_symbol,
       "symbols": normalized_symbols,
-      "timeframe": cls._normalize_operator_alert_timeframe(timeframe),
+      "timeframe": normalized_timeframe,
+      "primary_focus": primary_focus or cls._build_operator_alert_primary_focus(
+        primary_symbol=normalized_symbol,
+        symbols=normalized_symbols,
+        timeframe=normalized_timeframe,
+      ),
     }
 
   @staticmethod

@@ -19,6 +19,8 @@ unclear dataset lineage.
   incident history in view
 - multi-symbol alerts resolve to one explicit primary triage focus using instrument risk,
   live-session relevance, payload symbol order, and stable fallback, and the control room shows why
+- backend operator alert and incident payloads now carry explicit `primary_focus` metadata for that
+  selected symbol/timeframe and candidate set
 - operator and guarded-live alert payloads now carry normalized symbol/timeframe context when the
   runtime knows it
 - run provenance and rerun-boundary views

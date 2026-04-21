@@ -982,6 +982,15 @@ export type MarketDataIngestionJobRecord = {
   last_error?: string | null;
 };
 
+export type OperatorAlertPrimaryFocus = {
+  symbol?: string | null;
+  timeframe?: string | null;
+  candidate_symbols: string[];
+  candidate_count: number;
+  policy: string;
+  reason?: string | null;
+};
+
 export type OperatorVisibility = {
   generated_at: string;
   alerts: {
@@ -996,6 +1005,7 @@ export type OperatorVisibility = {
     symbol?: string | null;
     symbols: string[];
     timeframe?: string | null;
+    primary_focus?: OperatorAlertPrimaryFocus | null;
     status: string;
     resolved_at?: string | null;
     source: string;
@@ -1013,6 +1023,7 @@ export type OperatorVisibility = {
     symbol?: string | null;
     symbols: string[];
     timeframe?: string | null;
+    primary_focus?: OperatorAlertPrimaryFocus | null;
     status: string;
     resolved_at?: string | null;
     source: string;
@@ -1031,6 +1042,7 @@ export type OperatorVisibility = {
     symbol?: string | null;
     symbols: string[];
     timeframe?: string | null;
+    primary_focus?: OperatorAlertPrimaryFocus | null;
     source: string;
     paging_policy_id: string;
     paging_provider?: string | null;
@@ -2051,6 +2063,7 @@ export type GuardedLiveStatus = {
     symbol?: string | null;
     symbols: string[];
     timeframe?: string | null;
+    primary_focus?: OperatorAlertPrimaryFocus | null;
     status: string;
     resolved_at?: string | null;
     source: string;
@@ -2068,6 +2081,7 @@ export type GuardedLiveStatus = {
     symbol?: string | null;
     symbols: string[];
     timeframe?: string | null;
+    primary_focus?: OperatorAlertPrimaryFocus | null;
     status: string;
     resolved_at?: string | null;
     source: string;
@@ -2086,6 +2100,7 @@ export type GuardedLiveStatus = {
     symbol?: string | null;
     symbols: string[];
     timeframe?: string | null;
+    primary_focus?: OperatorAlertPrimaryFocus | null;
     source: string;
     paging_policy_id: string;
     paging_provider?: string | null;

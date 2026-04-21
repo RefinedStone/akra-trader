@@ -123,6 +123,9 @@ It is not yet a finished live trading product:
 - multi-symbol runtime alerts now resolve to a deterministic primary triage focus using instrument
   risk, live-session relevance, payload symbol order, and stable lexical fallback, with the reason
   shown inline to operators
+- backend operator alert and incident payloads now embed explicit `primary_focus` metadata for
+  multi-symbol contexts so the control room does not have to infer the lead symbol only from
+  heuristic parsing
 
 ### Operator discipline baseline
 
@@ -140,8 +143,8 @@ It is not yet a finished live trading product:
   normalized lineage or ingestion history surfaces now exist, and the control room now consumes
   focused history for incident triage with alert-linked focus routing, merged lineage incident
   history, normalized alert symbol/timeframe payloads, and deterministic multi-symbol primary-focus
-  routing, but deeper operator action guidance and richer history query controls on top of those
-  surfaces are still thin
+  routing plus backend `primary_focus` metadata, but deeper operator action guidance and richer
+  history query controls on top of those surfaces are still thin
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to

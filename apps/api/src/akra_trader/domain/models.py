@@ -1330,6 +1330,16 @@ class MarketDataIngestionJobRecord:
 
 
 @dataclass(frozen=True)
+class OperatorAlertPrimaryFocus:
+  symbol: str | None = None
+  timeframe: str | None = None
+  candidate_symbols: tuple[str, ...] = ()
+  candidate_count: int = 0
+  policy: str = "none"
+  reason: str | None = None
+
+
+@dataclass(frozen=True)
 class OperatorAlert:
   alert_id: str
   severity: str
@@ -1342,6 +1352,7 @@ class OperatorAlert:
   symbol: str | None = None
   symbols: tuple[str, ...] = ()
   timeframe: str | None = None
+  primary_focus: OperatorAlertPrimaryFocus | None = None
   status: str = "active"
   resolved_at: datetime | None = None
   source: str = "runtime"
@@ -2847,6 +2858,7 @@ class OperatorIncidentEvent:
   symbol: str | None = None
   symbols: tuple[str, ...] = ()
   timeframe: str | None = None
+  primary_focus: OperatorAlertPrimaryFocus | None = None
   source: str = "guarded_live"
   paging_policy_id: str = "default"
   paging_provider: str | None = None

@@ -237,6 +237,7 @@ import type {
   MarketDataIngestionJobRecord,
   MarketDataLineageHistoryRecord,
   MarketDataStatus,
+  OperatorAlertPrimaryFocus,
   OperatorVisibility,
   PendingTouchGapWindowSweepState,
   PresetDraftConflict,
@@ -1760,6 +1761,7 @@ type MarketDataLinkableAlertRecord = {
   symbol?: string | null;
   symbols?: string[];
   timeframe?: string | null;
+  primary_focus?: OperatorAlertPrimaryFocus | null;
   source?: string | null;
   provider_recovery_symbols?: string[];
   provider_recovery_timeframe?: string | null;
@@ -2010,6 +2012,34 @@ function buildLinkedMarketInstrumentContext(
   };
 }
 
+function buildLinkedMarketInstrumentContextFromPayload(args: {
+  instrument: MarketDataStatus["instruments"][number];
+  primaryFocus: OperatorAlertPrimaryFocus;
+  matchReason: string;
+}): LinkedMarketInstrumentContext {
+  const { instrument, primaryFocus, matchReason } = args;
+  const candidateSymbols = Array.from(
+    new Set(
+      primaryFocus.candidate_symbols
+        .map((symbol) => normalizeMarketSymbol(symbol))
+        .filter((symbol) => symbol.length > 0),
+    ),
+  );
+  const candidateTimeframe = primaryFocus.timeframe?.trim() || instrument.timeframe;
+  return {
+    instrument,
+    focusKey: buildMarketDataInstrumentFocusKey(instrument),
+    symbol: resolveMarketDataSymbol(instrument.instrument_id),
+    timeframe: instrument.timeframe,
+    matchReason,
+    candidateCount: primaryFocus.candidate_count || candidateSymbols.length || 1,
+    candidateLabels: (candidateSymbols.length ? candidateSymbols : [resolveMarketDataSymbol(instrument.instrument_id)])
+      .map((symbol) => `${symbol} · ${candidateTimeframe}`),
+    primaryFocusPolicy: primaryFocus.policy || "payload_primary_focus",
+    primaryFocusReason: primaryFocus.reason?.trim() || "Backend supplied explicit primary-focus metadata.",
+  };
+}
+
 function formatLinkedMarketPrimaryFocusNote(
   link: LinkedMarketInstrumentContext | null,
 ) {
@@ -2047,6 +2077,23 @@ function resolveMarketDataInstrumentLink(args: {
   }
 
   const category = record.category?.trim() ?? "";
+  const payloadPrimaryFocus = record.primary_focus ?? null;
+  const payloadPrimaryFocusSymbol = payloadPrimaryFocus?.symbol?.trim() || null;
+  const payloadPrimaryFocusTimeframe = payloadPrimaryFocus?.timeframe?.trim() || null;
+  if (payloadPrimaryFocus && payloadPrimaryFocusSymbol) {
+    const primaryFocusInstrument = resolveInstrumentsBySymbolsAndTimeframe({
+      marketStatus,
+      symbols: [payloadPrimaryFocusSymbol],
+      timeframe: payloadPrimaryFocusTimeframe,
+    })[0];
+    if (primaryFocusInstrument) {
+      return buildLinkedMarketInstrumentContextFromPayload({
+        instrument: primaryFocusInstrument,
+        primaryFocus: payloadPrimaryFocus,
+        matchReason: "payload_primary_focus",
+      });
+    }
+  }
   const explicitSymbols = Array.from(
     new Set(
       [record.symbol ?? null, ...(record.symbols ?? [])]
@@ -3582,6 +3629,7 @@ export default function App() {
               symbol: event.symbol ?? alertContext?.symbol ?? null,
               symbols: event.symbols.length ? event.symbols : (alertContext?.symbols ?? []),
               timeframe: event.timeframe ?? alertContext?.timeframe ?? null,
+              primary_focus: event.primary_focus ?? alertContext?.primary_focus ?? null,
               source: event.source ?? alertContext?.source ?? null,
               provider_recovery_symbols: event.remediation.provider_recovery.symbols,
               provider_recovery_timeframe: event.remediation.provider_recovery.timeframe,

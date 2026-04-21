@@ -3740,6 +3740,140 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
     assert any(event["alert_id"].startswith("guarded-live:risk-breach:") for event in incident_events)
 
 
+def test_operator_visibility_endpoint_embeds_multi_symbol_primary_focus_metadata(
+  tmp_path: Path,
+) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    app._market_data = market_data
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 18, 0, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_check"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "pre_live_recovery"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "api_multi_symbol_primary_focus",
+      },
+    )
+    assert live_response.status_code == 200
+    run = app.get_run(live_response.json()["config"]["run_id"])
+    assert run is not None
+    secondary_run = replace(
+      run,
+      config=replace(
+        run.config,
+        run_id="api-live-run-btc-primary-focus",
+        symbols=("BTC/USDT",),
+      ),
+      provenance=replace(
+        run.provenance,
+        runtime_session=replace(
+          run.provenance.runtime_session,
+          session_id="worker-live-btc-primary-focus-api",
+        ) if run.provenance.runtime_session is not None else None,
+      ),
+      orders=[],
+      fills=[],
+      positions={},
+      equity_curve=[],
+      closed_trades=[],
+      metrics={},
+      notes=list(run.notes),
+    )
+    app._runs.save_run(secondary_run)
+    market_data.set_status(
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:BTC/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 0, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 17, 42, tzinfo=UTC),
+            sync_status="stale",
+            lag_seconds=1_080,
+            last_sync_at=datetime(2025, 1, 3, 17, 48, tzinfo=UTC),
+            failure_count_24h=2,
+            backfill_gap_windows=(
+              GapWindow(
+                start_at=datetime(2025, 1, 3, 17, 0, tzinfo=UTC),
+                end_at=datetime(2025, 1, 3, 17, 10, tzinfo=UTC),
+                missing_candles=2,
+              ),
+            ),
+            issues=("freshness_threshold_exceeded:1080:600", "repeated_sync_failures:2"),
+          ),
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 0, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 17, 59, tzinfo=UTC),
+            sync_status="synced",
+            lag_seconds=0,
+            last_sync_at=datetime(2025, 1, 3, 17, 59, tzinfo=UTC),
+            issues=(),
+          ),
+        ],
+      ),
+    )
+
+    visibility_response = client.get("/api/operator/visibility")
+    assert visibility_response.status_code == 200
+    market_data_alert = next(
+      alert
+      for alert in visibility_response.json()["alerts"]
+      if alert["category"] == "market_data_freshness"
+    )
+    assert market_data_alert["symbol"] is None
+    assert market_data_alert["symbols"] == ["BTC/USDT", "ETH/USDT"]
+    assert market_data_alert["primary_focus"] == {
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "candidate_symbols": ["BTC/USDT", "ETH/USDT"],
+      "candidate_count": 2,
+      "policy": "market_data_risk_order",
+      "reason": "Selected BTC/USDT as the highest-risk market-data candidate from 2 symbols.",
+    }
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    market_data_incident = next(
+      event
+      for event in guarded_live_response.json()["incident_events"]
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:market-data:5m"
+    )
+    assert market_data_incident["symbol"] is None
+    assert market_data_incident["symbols"] == ["BTC/USDT", "ETH/USDT"]
+    assert market_data_incident["primary_focus"] == market_data_alert["primary_focus"]
+
+
 def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflow(
   tmp_path: Path,
 ) -> None:

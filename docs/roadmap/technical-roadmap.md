@@ -75,6 +75,8 @@ creation.
   runtime can resolve it directly
 - multi-symbol operator alerts now collapse onto one deterministic primary market-data focus using
   instrument risk, live-session relevance, payload order, and stable fallback
+- backend operator payloads now expose explicit `primary_focus` metadata so consumers can use the
+  selected symbol/timeframe directly instead of rebuilding that choice from raw symbol lists
 
 ### Remaining work
 
