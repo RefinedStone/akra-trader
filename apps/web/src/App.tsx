@@ -15274,6 +15274,7 @@ function RunSection({
                     : null}
                   lineage={run.provenance.market_data}
                   lineageBySymbol={run.provenance.market_data_by_symbol}
+                  lineageSummary={run.provenance.lineage_summary}
                   onDrillBackScoreLink={
                     comparisonLinkedRunRole
                       ? (section, componentKey, options) =>
@@ -15290,6 +15291,8 @@ function RunSection({
                   rerunBoundaryId={run.provenance.rerun_boundary_id}
                   rerunBoundaryState={run.provenance.rerun_boundary_state}
                   rerunMatchStatus={run.provenance.rerun_match_status}
+                  rerunValidationCategory={run.provenance.rerun_validation_category}
+                  rerunValidationSummary={run.provenance.rerun_validation_summary}
                   rerunSourceRunId={run.provenance.rerun_source_run_id}
                   rerunTargetBoundaryId={run.provenance.rerun_target_boundary_id}
                 />
@@ -21270,18 +21273,22 @@ function RunMarketDataLineage({
   linkedScore,
   lineage,
   lineageBySymbol,
+  lineageSummary,
   onDrillBackScoreLink,
   panelRunId,
   registerSubFocusRef,
   rerunBoundaryId,
   rerunBoundaryState,
   rerunMatchStatus,
+  rerunValidationCategory,
+  rerunValidationSummary,
   rerunSourceRunId,
   rerunTargetBoundaryId,
 }: {
   linkedScore: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
   lineage: NonNullable<Run["provenance"]["market_data"]>;
   lineageBySymbol?: NonNullable<Run["provenance"]["market_data_by_symbol"]>;
+  lineageSummary?: Run["provenance"]["lineage_summary"];
   onDrillBackScoreLink?: (
     section: ComparisonScoreSection,
     componentKey: string,
@@ -21292,11 +21299,16 @@ function RunMarketDataLineage({
   rerunBoundaryId?: string | null;
   rerunBoundaryState: string;
   rerunMatchStatus: string;
+  rerunValidationCategory: string;
+  rerunValidationSummary?: string | null;
   rerunSourceRunId?: string | null;
   rerunTargetBoundaryId?: string | null;
 }) {
   const symbolEntries = Object.entries(lineageBySymbol ?? {});
   const dataLineageSubFocusKey = buildComparisonRunListLineSubFocusKey("data_lineage");
+  const dataLineageAssessmentSubFocusKey = buildComparisonRunListLineSubFocusKey("data_lineage_assessment");
+  const dataLineageActionSubFocusKey = buildComparisonRunListLineSubFocusKey("data_lineage_action");
+  const dataLineagePostureSubFocusKey = buildComparisonRunListLineSubFocusKey("data_lineage_posture");
   const dataProviderSubFocusKey = buildComparisonRunListLineSubFocusKey("data_provider");
   const dataSyncSubFocusKey = buildComparisonRunListLineSubFocusKey("data_sync");
   const dataReproSubFocusKey = buildComparisonRunListLineSubFocusKey("data_repro");
@@ -21309,6 +21321,7 @@ function RunMarketDataLineage({
   const dataSyncCheckpointSubFocusKey = buildComparisonRunListLineSubFocusKey("data_sync_checkpoint");
   const dataRerunBoundarySubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_boundary");
   const dataRerunStatusSubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_status");
+  const dataRerunValidationSubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_validation");
   const dataRerunSourceSubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_source");
   const dataRerunTargetSubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_target");
   const dataLastSyncSubFocusKey = buildComparisonRunListLineSubFocusKey("data_last_sync");
@@ -21327,6 +21340,12 @@ function RunMarketDataLineage({
       linkedScore.subFocusKey === dataLineageSubFocusKey
       || linkedScore.subFocusKey?.startsWith("run-list-line:data_"),
     );
+  const rerunStatusValue =
+    rerunValidationCategory && rerunValidationCategory !== "not_rerun"
+      ? `${rerunMatchStatus} / ${rerunValidationCategory}`
+      : rerunMatchStatus;
+  const lineagePostureLabel = formatLineagePosture(lineageSummary?.posture);
+  const lineageStatusLabel = formatLineageIndicator(lineageSummary?.status);
   const renderLineageMetric = (label: string, value: string, subFocusKey: string) => {
     if (!onDrillBackScoreLink || !panelRunId) {
       return <Metric label={label} value={value} />;
@@ -21424,6 +21443,31 @@ function RunMarketDataLineage({
         <span>Data lineage</span>
         <strong>{lineage.provider}</strong>
       </div>
+      {lineageSummary ? (
+        <div className={`run-lineage-summary-card is-${lineageSummary.status}`}>
+          <div className="run-lineage-summary-head">
+            <p className="kicker">Lineage posture</p>
+            <span className={`meta-pill run-lineage-summary-pill is-${lineageSummary.status}`}>
+              {lineagePostureLabel}
+            </span>
+          </div>
+          <p className="run-lineage-summary-title">{lineageSummary.title}</p>
+          <div className="run-lineage-summary-copy">
+            {renderLineageLine(
+              `Assessment: ${lineageSummary.summary}`,
+              dataLineageAssessmentSubFocusKey,
+            )}
+            {renderLineageLine(
+              `Operator action: ${lineageSummary.operator_action}`,
+              dataLineageActionSubFocusKey,
+            )}
+            {renderLineageLine(
+              `Posture: ${lineagePostureLabel} / ${lineageStatusLabel}`,
+              dataLineagePostureSubFocusKey,
+            )}
+          </div>
+        </div>
+      ) : null}
       <div className="run-lineage-grid">
         {renderLineageMetric("Provider", lineage.provider, dataProviderSubFocusKey)}
         {renderLineageMetric("Sync", lineage.sync_status, dataSyncSubFocusKey)}
@@ -21445,7 +21489,10 @@ function RunMarketDataLineage({
         {renderLineageLine(`Dataset ID: ${lineage.dataset_identity ?? "unavailable"}`, dataDatasetSubFocusKey)}
         {renderLineageLine(`Sync checkpoint: ${lineage.sync_checkpoint_id ?? "unavailable"}`, dataSyncCheckpointSubFocusKey)}
         {renderLineageLine(`Rerun boundary: ${rerunBoundaryId ?? "unavailable"}`, dataRerunBoundarySubFocusKey)}
-        {renderLineageLine(`Rerun status: ${rerunMatchStatus}`, dataRerunStatusSubFocusKey)}
+        {renderLineageLine(`Rerun status: ${rerunStatusValue}`, dataRerunStatusSubFocusKey)}
+        {rerunValidationSummary
+          ? renderLineageLine(`Validation summary: ${rerunValidationSummary}`, dataRerunValidationSubFocusKey)
+          : null}
         {renderLineageLine(`Rerun source: ${rerunSourceRunId ?? "n/a"}`, dataRerunSourceSubFocusKey)}
         {renderLineageLine(`Rerun target: ${rerunTargetBoundaryId ?? "n/a"}`, dataRerunTargetSubFocusKey)}
         {renderLineageLine(`Last sync: ${formatTimestamp(lineage.last_sync_at)}`, dataLastSyncSubFocusKey)}
@@ -21534,6 +21581,20 @@ function formatMetric(value?: number, suffix = "") {
     return "n/a";
   }
   return `${value}${suffix}`;
+}
+
+function formatLineagePosture(value?: string | null) {
+  if (!value) {
+    return "unresolved";
+  }
+  return value.replace(/-/g, " ");
+}
+
+function formatLineageIndicator(value?: string | null) {
+  if (!value) {
+    return "review";
+  }
+  return value;
 }
 
 function formatComparisonScoreValue(value: number) {
@@ -21708,7 +21769,10 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
     experiment_dataset: "Dataset identity",
     experiment_preset: "Preset",
     data_candles: "Candles",
+    data_lineage_action: "Lineage action",
+    data_lineage_assessment: "Lineage assessment",
     data_lineage: "Data lineage",
+    data_lineage_posture: "Lineage posture",
     data_dataset_identity: "Dataset identity",
     data_effective_window: "Effective window",
     data_issues: "Issues",
@@ -21720,6 +21784,7 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
     data_rerun_source: "Rerun source",
     data_rerun_status: "Rerun status",
     data_rerun_target: "Rerun target",
+    data_rerun_validation: "Validation summary",
     data_sync: "Sync status",
     data_sync_checkpoint: "Sync checkpoint",
     data_timeframe: "Timeframe",

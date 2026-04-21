@@ -11,6 +11,7 @@ from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
 from akra_trader.lineage import assess_rerun_validation
+from akra_trader.lineage import build_operator_lineage_summary
 from akra_trader.lineage import build_dataset_boundary_contract
 
 
@@ -209,3 +210,73 @@ def test_assess_rerun_validation_reports_dataset_change() -> None:
 
   assert assessment.status == "drifted"
   assert assessment.category == "dataset_changed"
+
+
+def test_build_operator_lineage_summary_marks_exact_match_clear() -> None:
+  lineage = _build_lineage(
+    reproducibility_state="pinned",
+    dataset_identity="dataset-v1:exact",
+    sync_checkpoint_id="checkpoint-group-v1:exact",
+  )
+  run = _build_run(
+    run_id="rerun",
+    mode=RunMode.BACKTEST,
+    lineage=lineage,
+    rerun_boundary_id="rerun-v1:exact",
+  )
+  run.provenance.rerun_validation_category = "exact_match"
+  run.provenance.rerun_validation_summary = "Exact dataset boundary matched the stored rerun boundary."
+
+  summary = build_operator_lineage_summary(run=run)
+
+  assert summary is not None
+  assert summary.status == "clear"
+  assert summary.posture == "exact-match"
+  assert summary.title == "Exact dataset boundary"
+  assert summary.blocking is False
+
+
+def test_build_operator_lineage_summary_marks_mode_translation_review() -> None:
+  lineage = _build_lineage(
+    reproducibility_state="pinned",
+    dataset_identity="dataset-v1:exact",
+    sync_checkpoint_id="checkpoint-group-v1:exact",
+  )
+  run = _build_run(
+    run_id="rerun",
+    mode=RunMode.PAPER,
+    lineage=lineage,
+    rerun_boundary_id="rerun-v1:paper",
+  )
+  run.provenance.rerun_validation_category = "mode_translation"
+  run.provenance.rerun_validation_summary = (
+    "Dataset boundary matched, but the rerun translated it into a different execution mode."
+  )
+
+  summary = build_operator_lineage_summary(run=run)
+
+  assert summary is not None
+  assert summary.status == "review"
+  assert summary.posture == "drift-aware"
+  assert summary.title == "Expected mode translation"
+  assert summary.blocking is False
+
+
+def test_build_operator_lineage_summary_marks_window_only_boundary_as_drift_aware() -> None:
+  run = _build_run(
+    run_id="source",
+    mode=RunMode.BACKTEST,
+    lineage=_build_lineage(
+      reproducibility_state="range_only",
+      dataset_identity=None,
+      sync_checkpoint_id=None,
+    ),
+    rerun_boundary_id="rerun-v1:window",
+  )
+
+  summary = build_operator_lineage_summary(run=run)
+
+  assert summary is not None
+  assert summary.status == "review"
+  assert summary.posture == "drift-aware"
+  assert summary.category == "window_only"

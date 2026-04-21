@@ -404,6 +404,36 @@ export type RunActionAvailabilityEntry = {
   level?: string | null;
 };
 
+export type DatasetBoundaryContract = {
+  contract_version: string;
+  provider: string;
+  venue: string;
+  symbols: string[];
+  timeframe: string;
+  reproducibility_state: string;
+  validation_claim: string;
+  boundary_id?: string | null;
+  dataset_identity?: string | null;
+  sync_checkpoint_id?: string | null;
+  requested_start_at?: string | null;
+  requested_end_at?: string | null;
+  effective_start_at?: string | null;
+  effective_end_at?: string | null;
+  candle_count: number;
+};
+
+export type OperatorLineageSummary = {
+  status: string;
+  posture: string;
+  title: string;
+  summary: string;
+  operator_action: string;
+  category: string;
+  validation_claim?: string | null;
+  boundary_id?: string | null;
+  blocking: boolean;
+};
+
 export type Run = {
   config: {
     run_id: string;
@@ -427,6 +457,9 @@ export type Run = {
     rerun_source_run_id?: string | null;
     rerun_target_boundary_id?: string | null;
     rerun_match_status: string;
+    rerun_validation_category: string;
+    rerun_validation_summary?: string | null;
+    lineage_summary?: OperatorLineageSummary | null;
     reference?: ReferenceSource | null;
     working_directory?: string | null;
     external_command: string[];
@@ -484,6 +517,7 @@ export type Run = {
       sync_status: string;
       last_sync_at?: string | null;
       issues: string[];
+      dataset_boundary?: DatasetBoundaryContract | null;
     } | null;
     market_data_by_symbol?: Record<
       string,
@@ -503,6 +537,7 @@ export type Run = {
         sync_status: string;
         last_sync_at?: string | null;
         issues: string[];
+        dataset_boundary?: DatasetBoundaryContract | null;
       }
     >;
     runtime_session?: {

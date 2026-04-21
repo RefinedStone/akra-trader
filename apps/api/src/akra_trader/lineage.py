@@ -19,6 +19,19 @@ class RerunValidationAssessment:
   summary: str
 
 
+@dataclass(frozen=True)
+class OperatorLineageSummary:
+  status: str
+  posture: str
+  title: str
+  summary: str
+  operator_action: str
+  category: str
+  validation_claim: str | None = None
+  boundary_id: str | None = None
+  blocking: bool = False
+
+
 def build_dataset_boundary_contract(*, lineage: MarketDataLineage | None) -> DatasetBoundaryContract | None:
   if lineage is None:
     return None
@@ -69,6 +82,57 @@ def serialize_dataset_boundary_contract(
     "effective_start_at": _serialize_optional_datetime(contract.effective_start_at),
     "effective_end_at": _serialize_optional_datetime(contract.effective_end_at),
     "candle_count": contract.candle_count,
+  }
+
+
+def build_operator_lineage_summary(*, run: RunRecord) -> OperatorLineageSummary | None:
+  boundary = build_dataset_boundary_contract(lineage=run.provenance.market_data)
+  if boundary is None:
+    return None
+  category = run.provenance.rerun_validation_category
+  if category != "not_rerun":
+    summary = run.provenance.rerun_validation_summary or _validation_summary(category)
+    status, posture, title, operator_action, blocking = _rerun_operator_summary_shape(category)
+    return OperatorLineageSummary(
+      status=status,
+      posture=posture,
+      title=title,
+      summary=summary,
+      operator_action=operator_action,
+      category=category,
+      validation_claim=boundary.validation_claim,
+      boundary_id=boundary.boundary_id,
+      blocking=blocking,
+    )
+  status, posture, title, summary, operator_action, blocking = _boundary_operator_summary_shape(boundary)
+  return OperatorLineageSummary(
+    status=status,
+    posture=posture,
+    title=title,
+    summary=summary,
+    operator_action=operator_action,
+    category=boundary.validation_claim,
+    validation_claim=boundary.validation_claim,
+    boundary_id=boundary.boundary_id,
+    blocking=blocking,
+  )
+
+
+def serialize_operator_lineage_summary(
+  summary: OperatorLineageSummary | None,
+) -> dict[str, object] | None:
+  if summary is None:
+    return None
+  return {
+    "status": summary.status,
+    "posture": summary.posture,
+    "title": summary.title,
+    "summary": summary.summary,
+    "operator_action": summary.operator_action,
+    "category": summary.category,
+    "validation_claim": summary.validation_claim,
+    "boundary_id": summary.boundary_id,
+    "blocking": summary.blocking,
   }
 
 
@@ -454,3 +518,166 @@ def _claim_rank(validation_claim: str) -> int:
     "checkpoint_window": 2,
     "exact_dataset": 3,
   }.get(validation_claim, -1)
+
+
+def _rerun_operator_summary_shape(category: str) -> tuple[str, str, str, str, bool]:
+  mapping = {
+    "exact_match": (
+      "clear",
+      "exact-match",
+      "Exact dataset boundary",
+      "Safe to use for exact rerun and benchmark claims against this boundary.",
+      False,
+    ),
+    "checkpoint_match": (
+      "clear",
+      "exact-match",
+      "Checkpoint-anchored match",
+      "Safe to use for checkpoint-based rerun claims when exact candle digests are not recorded.",
+      False,
+    ),
+    "window_match": (
+      "review",
+      "drift-aware",
+      "Window-only replay",
+      "Treat this as drift-aware research. Do not claim an identical replay from this boundary alone.",
+      False,
+    ),
+    "delegated_match": (
+      "review",
+      "drift-aware",
+      "Delegated validation",
+      "Keep this in the benchmark lane until the external runtime can prove its dataset boundary.",
+      False,
+    ),
+    "mode_translation": (
+      "review",
+      "drift-aware",
+      "Expected mode translation",
+      "Compare behavior as a mode translation, not as an identical rerun.",
+      False,
+    ),
+    "dataset_changed": (
+      "blocked",
+      "drift-aware",
+      "Dataset changed",
+      "Block promotion and exact rerun claims until the intended dataset boundary is explicit again.",
+      True,
+    ),
+    "checkpoint_changed": (
+      "blocked",
+      "drift-aware",
+      "Checkpoint changed",
+      "Resync or rerun against the intended checkpoint before treating results as comparable.",
+      True,
+    ),
+    "window_changed": (
+      "blocked",
+      "drift-aware",
+      "Window changed",
+      "Use the same requested and effective window before comparing results.",
+      True,
+    ),
+    "validation_downgrade": (
+      "blocked",
+      "drift-aware",
+      "Validation downgraded",
+      "Do not promote this rerun until it regains the source boundary claim.",
+      True,
+    ),
+    "validation_claim_changed": (
+      "blocked",
+      "drift-aware",
+      "Validation claim changed",
+      "Hold promotion and benchmark work until the source and target runs share one boundary claim.",
+      True,
+    ),
+    "execution_contract_changed": (
+      "blocked",
+      "drift-aware",
+      "Execution inputs changed",
+      "Use the same execution mode, cash, fees, slippage, strategy version, and resolved params for rerun validation.",
+      True,
+    ),
+    "boundary_mismatch": (
+      "blocked",
+      "drift-aware",
+      "Unclassified boundary drift",
+      "Pause promotion and inspect lineage details before continuing.",
+      True,
+    ),
+    "source_boundary_unavailable": (
+      "blocked",
+      "unresolved",
+      "Source boundary unavailable",
+      "Pause rerun and promotion work until the source run exposes an explicit dataset boundary.",
+      True,
+    ),
+    "target_boundary_unavailable": (
+      "blocked",
+      "unresolved",
+      "Rerun boundary unavailable",
+      "Pause rerun and promotion work until the rerun exposes an explicit dataset boundary.",
+      True,
+    ),
+  }
+  return mapping.get(
+    category,
+    (
+      "blocked",
+      "unresolved",
+      "Unresolved lineage state",
+      "Keep the run blocked until the lineage posture is explicit again.",
+      True,
+    ),
+  )
+
+
+def _boundary_operator_summary_shape(
+  boundary: DatasetBoundaryContract,
+) -> tuple[str, str, str, str, str, bool]:
+  mapping = {
+    "exact_dataset": (
+      "clear",
+      "exact-match",
+      "Exact dataset boundary",
+      "Run carries an exact dataset identity for its captured market-data window.",
+      "Use this run for exact rerun and benchmark claims.",
+      False,
+    ),
+    "checkpoint_window": (
+      "clear",
+      "exact-match",
+      "Checkpoint boundary",
+      "Run is anchored to a stable sync checkpoint even though an exact candle digest is not recorded.",
+      "Use checkpoint-based reruns when you need a defendable data boundary.",
+      False,
+    ),
+    "window_only": (
+      "review",
+      "drift-aware",
+      "Window-only boundary",
+      "Run records the requested and effective window but not a stable dataset identity or checkpoint.",
+      "Treat comparisons as drift-aware and avoid identical replay claims.",
+      False,
+    ),
+    "delegated": (
+      "review",
+      "drift-aware",
+      "Delegated boundary",
+      "Exact dataset validation remains with the external runtime.",
+      "Use this lane for benchmark context until the external runtime can prove its boundary.",
+      False,
+    ),
+  }
+  return mapping.get(
+    boundary.validation_claim,
+    (
+      "blocked",
+      "unresolved",
+      "Unresolved boundary",
+      "Run does not expose a defendable dataset boundary.",
+      "Pause promotion and rerun work until the boundary is explicit again.",
+      True,
+    ),
+  )

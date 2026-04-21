@@ -129,8 +129,8 @@ It is not yet a finished live trading product:
 
 - custom strategy registration exists, but registration metadata is still process-local rather than a
   durable strategy registry
-- dataset-boundary contracts and rerun validation categories now exist, but operator-visible lineage
-  mismatch summaries and normalized lineage history surfaces are still missing
+- dataset-boundary contracts, rerun validation categories, and operator-visible lineage summaries now
+  exist, but normalized lineage history and ingestion-job surfaces are still missing
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to

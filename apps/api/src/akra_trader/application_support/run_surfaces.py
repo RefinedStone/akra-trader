@@ -10,7 +10,9 @@ from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import RunSurfaceSharedContract
+from akra_trader.lineage import build_operator_lineage_summary
 from akra_trader.lineage import build_dataset_boundary_contract
+from akra_trader.lineage import serialize_operator_lineage_summary
 from akra_trader.lineage import serialize_dataset_boundary_contract
 
 
@@ -263,6 +265,9 @@ def serialize_run(run: RunRecord, *, capabilities: RunSurfaceCapabilities | None
     asdict(artifact)
     for artifact in run.provenance.benchmark_artifacts
   ]
+  payload["provenance"]["lineage_summary"] = serialize_operator_lineage_summary(
+    build_operator_lineage_summary(run=run)
+  )
   if run.provenance.market_data is not None:
     payload["provenance"]["market_data"]["dataset_boundary"] = serialize_dataset_boundary_contract(
       build_dataset_boundary_contract(lineage=run.provenance.market_data)

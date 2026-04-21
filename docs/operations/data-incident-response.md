@@ -14,6 +14,8 @@ unclear dataset lineage.
 
 - market-data health and sync status surfaces
 - run provenance and rerun-boundary views
+- lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
+  operator guidance
 - comparison and lineage-oriented research surfaces
 - incident and operator-event history
 

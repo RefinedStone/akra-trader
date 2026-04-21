@@ -2227,6 +2227,10 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
   assert payload["provenance"]["rerun_boundary_id"].startswith("rerun-v1:")
   assert payload["provenance"]["rerun_boundary_state"] == "pinned"
+  assert payload["provenance"]["lineage_summary"]["status"] == "clear"
+  assert payload["provenance"]["lineage_summary"]["posture"] == "exact-match"
+  assert payload["provenance"]["lineage_summary"]["title"] == "Exact dataset boundary"
+  assert payload["provenance"]["lineage_summary"]["category"] == "exact_dataset"
   assert payload["provenance"]["experiment"]["tags"] == ["baseline", "momentum"]
   assert payload["provenance"]["experiment"]["preset_id"] == "core_5m"
   assert payload["provenance"]["experiment"]["benchmark_family"] == "native_validation"
@@ -5618,6 +5622,8 @@ def test_rerun_boundary_endpoint_creates_backtest_from_stored_boundary(tmp_path:
   assert rerun_payload["provenance"]["rerun_validation_summary"] == (
     "Exact dataset boundary matched the stored rerun boundary."
   )
+  assert rerun_payload["provenance"]["lineage_summary"]["status"] == "clear"
+  assert rerun_payload["provenance"]["lineage_summary"]["posture"] == "exact-match"
   assert rerun_payload["provenance"]["rerun_boundary_id"] == rerun_boundary_id
   assert rerun_payload["provenance"]["market_data"]["effective_start_at"] == source_payload["provenance"]["market_data"]["effective_start_at"]
   assert rerun_payload["provenance"]["market_data"]["effective_end_at"] == source_payload["provenance"]["market_data"]["effective_end_at"]
@@ -5697,6 +5703,9 @@ def test_rerun_boundary_paper_endpoint_replays_boundary_with_expected_mode_drift
   assert rerun_payload["provenance"]["rerun_validation_summary"] == (
     "Dataset boundary matched, but the rerun translated it into a different execution mode."
   )
+  assert rerun_payload["provenance"]["lineage_summary"]["status"] == "review"
+  assert rerun_payload["provenance"]["lineage_summary"]["posture"] == "drift-aware"
+  assert rerun_payload["provenance"]["lineage_summary"]["title"] == "Expected mode translation"
   assert rerun_payload["provenance"]["market_data"]["effective_start_at"] == source_payload["provenance"]["market_data"]["effective_start_at"]
   assert rerun_payload["provenance"]["market_data"]["effective_end_at"] == source_payload["provenance"]["market_data"]["effective_end_at"]
 
