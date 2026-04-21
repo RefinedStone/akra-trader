@@ -60,6 +60,7 @@ from akra_trader.domain.models import StrategyDecisionEnvelope
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import SyncFailure
 from akra_trader.domain.models import WarmupSpec
+from akra_trader.lineage import build_dataset_boundary_contract
 from akra_trader.strategies.base import Strategy
 
 
@@ -14858,6 +14859,10 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   assert run.provenance.market_data.dataset_identity is None
   assert run.provenance.market_data.reproducibility_state == "delegated"
   assert run.provenance.market_data.sync_status == "delegated"
+  delegated_boundary = build_dataset_boundary_contract(lineage=run.provenance.market_data)
+  assert delegated_boundary is not None
+  assert delegated_boundary.validation_claim == "delegated"
+  assert delegated_boundary.boundary_id is None
   assert run.provenance.market_data_by_symbol["BTC/USDT"].dataset_identity is None
   assert run.provenance.market_data_by_symbol["BTC/USDT"].reproducibility_state == "delegated"
   assert run.provenance.market_data_by_symbol["BTC/USDT"].sync_status == "delegated"
@@ -15364,12 +15369,16 @@ def test_rerun_backtest_from_boundary_uses_stored_effective_window_and_records_m
   assert rerun.provenance.rerun_source_run_id == source.config.run_id
   assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
   assert rerun.provenance.rerun_match_status == "matched"
+  assert rerun.provenance.rerun_validation_category == "exact_match"
+  assert rerun.provenance.rerun_validation_summary == (
+    "Exact dataset boundary matched the stored rerun boundary."
+  )
   assert rerun.provenance.rerun_boundary_id == source.provenance.rerun_boundary_id
   assert rerun.provenance.market_data is not None
   assert rerun.provenance.market_data.effective_start_at == source.provenance.market_data.effective_start_at
   assert rerun.provenance.market_data.effective_end_at == source.provenance.market_data.effective_end_at
   assert rerun.notes[0].startswith("Explicit backtest rerun from boundary ")
-  assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
+  assert rerun.notes[-1] == "Exact dataset boundary matched the stored rerun boundary."
 
 
 def test_rerun_backtest_from_boundary_rejects_when_control_surface_rule_is_disabled(tmp_path: Path) -> None:
@@ -15458,6 +15467,7 @@ def test_rerun_sandbox_from_boundary_uses_stored_effective_window_and_replays_sa
   assert rerun.provenance.rerun_source_run_id == source.config.run_id
   assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
   assert rerun.provenance.rerun_match_status == "matched"
+  assert rerun.provenance.rerun_validation_category == "exact_match"
   assert rerun.provenance.rerun_boundary_id == source.provenance.rerun_boundary_id
   assert rerun.provenance.market_data is not None
   assert rerun.provenance.market_data.effective_start_at == source.provenance.market_data.effective_start_at
@@ -15465,7 +15475,7 @@ def test_rerun_sandbox_from_boundary_uses_stored_effective_window_and_replays_sa
   assert rerun.provenance.runtime_session is not None
   assert rerun.notes[0].startswith("Explicit sandbox rerun from boundary ")
   assert rerun.notes[1] == "Sandbox rerun restored the stored worker-session priming window."
-  assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
+  assert rerun.notes[-1] == "Exact dataset boundary matched the stored rerun boundary."
 
 
 def test_rerun_paper_from_boundary_uses_stored_effective_window_and_replays_same_mode_boundary(
@@ -15498,10 +15508,11 @@ def test_rerun_paper_from_boundary_uses_stored_effective_window_and_replays_same
   assert rerun.provenance.rerun_source_run_id == source.config.run_id
   assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
   assert rerun.provenance.rerun_match_status == "matched"
+  assert rerun.provenance.rerun_validation_category == "exact_match"
   assert rerun.provenance.rerun_boundary_id == source.provenance.rerun_boundary_id
   assert rerun.notes[0].startswith("Explicit paper rerun from boundary ")
   assert rerun.notes[1] == "Paper rerun seeded the current paper session from the stored priming window."
-  assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
+  assert rerun.notes[-1] == "Exact dataset boundary matched the stored rerun boundary."
 
 
 def test_rerun_paper_from_backtest_boundary_records_expected_mode_drift(tmp_path: Path) -> None:
@@ -15532,6 +15543,10 @@ def test_rerun_paper_from_backtest_boundary_records_expected_mode_drift(tmp_path
   assert rerun.provenance.rerun_source_run_id == source.config.run_id
   assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
   assert rerun.provenance.rerun_match_status == "drifted"
+  assert rerun.provenance.rerun_validation_category == "mode_translation"
+  assert rerun.provenance.rerun_validation_summary == (
+    "Dataset boundary matched, but the rerun translated it into a different execution mode."
+  )
   assert rerun.provenance.market_data is not None
   assert rerun.provenance.market_data.effective_start_at == source.provenance.market_data.effective_start_at
   assert rerun.provenance.market_data.effective_end_at == source.provenance.market_data.effective_end_at
@@ -15540,7 +15555,7 @@ def test_rerun_paper_from_backtest_boundary_records_expected_mode_drift(tmp_path
   assert rerun.notes[0].startswith("Explicit paper rerun from boundary ")
   assert rerun.notes[1] == "Paper rerun seeded the current paper session from the stored effective market-data window."
   assert rerun.notes[-1] == (
-    "Mode-specific rerun boundary drift is expected when replaying a stored boundary into a different execution mode."
+    "Dataset boundary matched, but the rerun translated it into a different execution mode."
   )
 
 
@@ -16159,6 +16174,10 @@ def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path)
   assert run.provenance.market_data.dataset_identity is None
   assert run.provenance.market_data.sync_checkpoint_id is None
   assert run.provenance.market_data.reproducibility_state == "range_only"
+  window_boundary = build_dataset_boundary_contract(lineage=run.provenance.market_data)
+  assert window_boundary is not None
+  assert window_boundary.validation_claim == "window_only"
+  assert window_boundary.boundary_id is None
   assert run.provenance.market_data.requested_start_at == datetime(2030, 1, 1, tzinfo=UTC)
   assert run.provenance.market_data.candle_count == 0
   assert run.provenance.rerun_boundary_id is not None

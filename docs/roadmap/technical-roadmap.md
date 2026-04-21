@@ -31,13 +31,15 @@ creation.
 
 - candle-backed runs already store dataset identity fingerprints
 - runs can link directly to sync checkpoints and rerun boundaries
+- canonical dataset-boundary contracts and claim-aware rerun validation categories now exist in run
+  provenance
 - market-data status already exposes checkpoints, gap windows, backfill, lag, and failure history
 
 ### Remaining work
 
-- stronger deterministic claims for repeated identical inputs
 - clearer lineage mismatch reporting when rerun guarantees cannot be made
 - normalized lineage queries and ingestion-job history surfaces
+- stronger operator-facing summaries around data-boundary health and mismatch interpretation
 
 ## Track B: Experiment OS And Persistence
 

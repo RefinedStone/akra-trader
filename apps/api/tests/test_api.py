@@ -2216,6 +2216,12 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert "eligibility_contract" not in payload
   assert payload["provenance"]["market_data"]["provider"] == "seeded"
   assert payload["provenance"]["market_data"]["dataset_identity"].startswith("dataset-v1:")
+  assert payload["provenance"]["market_data"]["dataset_boundary"]["contract_version"] == "dataset_boundary.v1"
+  assert payload["provenance"]["market_data"]["dataset_boundary"]["validation_claim"] == "exact_dataset"
+  assert (
+    payload["provenance"]["market_data"]["dataset_boundary"]["boundary_id"]
+    == payload["provenance"]["market_data"]["dataset_identity"]
+  )
   assert payload["provenance"]["market_data"]["sync_checkpoint_id"] is None
   assert payload["provenance"]["market_data"]["reproducibility_state"] == "pinned"
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
@@ -2235,6 +2241,9 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["provider"] == "seeded"
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["dataset_identity"].startswith(
     "candles-v1:"
+  )
+  assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["dataset_boundary"]["validation_claim"] == (
+    "exact_dataset"
   )
 
 
@@ -5605,6 +5614,10 @@ def test_rerun_boundary_endpoint_creates_backtest_from_stored_boundary(tmp_path:
   assert rerun_payload["provenance"]["rerun_source_run_id"] == source_payload["config"]["run_id"]
   assert rerun_payload["provenance"]["rerun_target_boundary_id"] == rerun_boundary_id
   assert rerun_payload["provenance"]["rerun_match_status"] == "matched"
+  assert rerun_payload["provenance"]["rerun_validation_category"] == "exact_match"
+  assert rerun_payload["provenance"]["rerun_validation_summary"] == (
+    "Exact dataset boundary matched the stored rerun boundary."
+  )
   assert rerun_payload["provenance"]["rerun_boundary_id"] == rerun_boundary_id
   assert rerun_payload["provenance"]["market_data"]["effective_start_at"] == source_payload["provenance"]["market_data"]["effective_start_at"]
   assert rerun_payload["provenance"]["market_data"]["effective_end_at"] == source_payload["provenance"]["market_data"]["effective_end_at"]
@@ -5644,6 +5657,7 @@ def test_rerun_boundary_endpoint_creates_sandbox_run_from_stored_boundary(tmp_pa
   assert rerun_payload["provenance"]["rerun_source_run_id"] == source_payload["config"]["run_id"]
   assert rerun_payload["provenance"]["rerun_target_boundary_id"] == rerun_boundary_id
   assert rerun_payload["provenance"]["rerun_match_status"] == "matched"
+  assert rerun_payload["provenance"]["rerun_validation_category"] == "exact_match"
   assert rerun_payload["provenance"]["rerun_boundary_id"] == rerun_boundary_id
   assert rerun_payload["provenance"]["market_data"]["effective_start_at"] == source_payload["provenance"]["market_data"]["effective_start_at"]
   assert rerun_payload["provenance"]["market_data"]["effective_end_at"] == source_payload["provenance"]["market_data"]["effective_end_at"]
@@ -5679,6 +5693,10 @@ def test_rerun_boundary_paper_endpoint_replays_boundary_with_expected_mode_drift
   assert rerun_payload["provenance"]["rerun_source_run_id"] == source_payload["config"]["run_id"]
   assert rerun_payload["provenance"]["rerun_target_boundary_id"] == rerun_boundary_id
   assert rerun_payload["provenance"]["rerun_match_status"] == "drifted"
+  assert rerun_payload["provenance"]["rerun_validation_category"] == "mode_translation"
+  assert rerun_payload["provenance"]["rerun_validation_summary"] == (
+    "Dataset boundary matched, but the rerun translated it into a different execution mode."
+  )
   assert rerun_payload["provenance"]["market_data"]["effective_start_at"] == source_payload["provenance"]["market_data"]["effective_start_at"]
   assert rerun_payload["provenance"]["market_data"]["effective_end_at"] == source_payload["provenance"]["market_data"]["effective_end_at"]
 

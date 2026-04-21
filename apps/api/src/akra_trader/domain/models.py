@@ -289,6 +289,25 @@ class RunConfig:
 
 
 @dataclass(frozen=True)
+class DatasetBoundaryContract:
+  contract_version: str = "dataset_boundary.v1"
+  provider: str = "unknown"
+  venue: str = ""
+  symbols: tuple[str, ...] = ()
+  timeframe: str = ""
+  reproducibility_state: str = "range_only"
+  validation_claim: str = "window_only"
+  boundary_id: str | None = None
+  dataset_identity: str | None = None
+  sync_checkpoint_id: str | None = None
+  requested_start_at: datetime | None = None
+  requested_end_at: datetime | None = None
+  effective_start_at: datetime | None = None
+  effective_end_at: datetime | None = None
+  candle_count: int = 0
+
+
+@dataclass(frozen=True)
 class MarketDataLineage:
   provider: str
   venue: str
@@ -438,6 +457,8 @@ class RunProvenance:
   rerun_source_run_id: str | None = None
   rerun_target_boundary_id: str | None = None
   rerun_match_status: str = "not_rerun"
+  rerun_validation_category: str = "not_rerun"
+  rerun_validation_summary: str | None = None
   market_data: MarketDataLineage | None = None
   market_data_by_symbol: dict[str, MarketDataLineage] = field(default_factory=dict)
   runtime_session: RuntimeSessionState | None = None

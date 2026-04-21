@@ -53,8 +53,8 @@ It is not yet a finished live trading product:
 - repo-local SQLite defaults with configurable Postgres support
 - native backtest execution with persisted config, metrics, orders, fills, positions, notes, equity,
   and provenance
-- native market-data lineage with dataset identity fingerprints, sync-checkpoint links, and rerun
-  boundaries
+- native market-data lineage with dataset identity fingerprints, sync-checkpoint links, canonical
+  dataset-boundary contracts, and rerun boundaries
 - reference-runtime delegation for NostalgiaForInfinity backtests with stored benchmark provenance
 
 ### Experiment OS baseline
@@ -68,7 +68,8 @@ It is not yet a finished live trading product:
 - strategy semantic metadata and parameter-contract hints propagated from catalog records into run
   snapshot and provenance views
 - replay-link alias governance, audit browsing, and export-job utilities for query-builder surfaces
-- native, sandbox, and paper reruns from stored rerun boundaries with match-or-drift tracking
+- native, sandbox, and paper reruns from stored rerun boundaries with claim-aware validation
+  categories for exact-match, checkpoint, window-only, delegated, and mode-translation results
 
 ### Runtime ops baseline
 
@@ -128,6 +129,8 @@ It is not yet a finished live trading product:
 
 - custom strategy registration exists, but registration metadata is still process-local rather than a
   durable strategy registry
+- dataset-boundary contracts and rerun validation categories now exist, but operator-visible lineage
+  mismatch summaries and normalized lineage history surfaces are still missing
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to

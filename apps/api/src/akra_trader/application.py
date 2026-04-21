@@ -230,6 +230,8 @@ from akra_trader.application_support.standalone_surfaces import serialize_standa
 from akra_trader.domain.services import apply_signal
 from akra_trader.domain.services import build_equity_point
 from akra_trader.domain.services import summarize_performance
+from akra_trader.lineage import assess_rerun_validation
+from akra_trader.lineage import build_dataset_boundary_contract
 from akra_trader.lineage import build_rerun_boundary_identity
 from akra_trader.ports import GuardedLiveStatePort
 from akra_trader.ports import ExperimentPresetCatalogPort
@@ -22889,11 +22891,15 @@ class TradingApplication:
       return
 
     strategy = run.provenance.strategy
-    symbol_checkpoint_ids = {
-      symbol: lineage.sync_checkpoint_id
+    symbol_boundaries = {
+      symbol: build_dataset_boundary_contract(lineage=lineage)
       for symbol, lineage in sorted(run.provenance.market_data_by_symbol.items())
-      if lineage.sync_checkpoint_id is not None
     }
+    market_data_boundary = build_dataset_boundary_contract(lineage=market_data)
+    if market_data_boundary is None:
+      run.provenance.rerun_boundary_id = None
+      run.provenance.rerun_boundary_state = "range_only"
+      return
     resolved_parameters = (
       deepcopy(strategy.parameter_snapshot.resolved)
       if strategy is not None
@@ -22911,10 +22917,12 @@ class TradingApplication:
       initial_cash=run.config.initial_cash,
       fee_rate=run.config.fee_rate,
       slippage_bps=run.config.slippage_bps,
-      market_data_reproducibility_state=market_data.reproducibility_state,
-      market_data_dataset_identity=market_data.dataset_identity,
-      market_data_sync_checkpoint_id=market_data.sync_checkpoint_id,
-      market_data_symbol_checkpoint_ids=symbol_checkpoint_ids,
+      market_data_boundary=market_data_boundary,
+      market_data_symbol_boundaries={
+        symbol: boundary
+        for symbol, boundary in symbol_boundaries.items()
+        if boundary is not None
+      },
       requested_start_at=market_data.requested_start_at,
       requested_end_at=market_data.requested_end_at,
       effective_start_at=market_data.effective_start_at,
@@ -23123,11 +23131,14 @@ class TradingApplication:
   ) -> RunRecord:
     rerun.provenance.rerun_source_run_id = source_run.config.run_id
     rerun.provenance.rerun_target_boundary_id = rerun_boundary_id
-    rerun.provenance.rerun_match_status = (
-      "matched"
-      if rerun.provenance.rerun_boundary_id == rerun_boundary_id
-      else "drifted"
+    validation = assess_rerun_validation(
+      source_run=source_run,
+      rerun=rerun,
+      expected_boundary_id=rerun_boundary_id,
     )
+    rerun.provenance.rerun_match_status = validation.status
+    rerun.provenance.rerun_validation_category = validation.category
+    rerun.provenance.rerun_validation_summary = validation.summary
     rerun.notes.insert(
       0,
       f"Explicit {requested_mode_label} rerun from boundary {rerun_boundary_id} using source run {source_run.config.run_id}.",
@@ -23138,16 +23149,15 @@ class TradingApplication:
         preview_window_note,
       )
     if rerun.provenance.rerun_match_status == "matched":
-      rerun.notes.append("Explicit rerun matched the stored rerun boundary.")
+      rerun.notes.append(validation.summary)
+    elif rerun.provenance.rerun_match_status == "unavailable":
+      rerun.notes.append(validation.summary)
     else:
       rerun.notes.append(
         "Explicit rerun drifted from the stored rerun boundary. "
         f"Expected {rerun_boundary_id}, got {rerun.provenance.rerun_boundary_id or 'unavailable'}."
       )
-      if source_run.config.mode != rerun.config.mode:
-        rerun.notes.append(
-          "Mode-specific rerun boundary drift is expected when replaying a stored boundary into a different execution mode."
-        )
+      rerun.notes.append(validation.summary)
     return self._runs.save_run(rerun)
 
   def _resolve_rerun_parameters(self, run: RunRecord) -> dict:
