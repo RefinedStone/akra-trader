@@ -21,55 +21,110 @@
       "direction_id": "data-trust-and-lineage",
       "title": "Ship operator-visible lineage mismatch summary from rerun taxonomy",
       "description": "Use the new rerun validation categories to expose operator-visible lineage mismatch summaries so exact_match, checkpoint_match, window_match, delegated_match, mode_translation, and dataset_changed are understandable without reading raw payload internals.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 17,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T20:51:00+09:00",
+      "updated_at": "2026-04-21T21:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-dataset-boundary-contract"
       ],
-      "direction_relation_note": "The latest main-session reply names the missing operator-visible lineage mismatch summary as the immediate next step after commit c21c51c established the backend taxonomy.",
-      "priority_reason": "This is now the clearest executable follow-up because the taxonomy exists in backend state but operators still cannot consume its meaning directly."
+      "direction_relation_note": "Completed on main in commit 58308b8 with lineage summary builders, API serialization through provenance.lineage_summary, control-room summary cards, and matching docs updates.",
+      "priority_reason": "Closed after backend, UI, tests, docs, commit, and push all landed, so queue selection should move to the remaining lineage follow-up surfaces."
     },
     {
       "id": "task-b1-lineage-query-surfaces",
       "direction_id": "data-trust-and-lineage",
-      "title": "Add ingestion-job history and normalized lineage/history query surfaces",
-      "description": "Make ingestion-job history plus normalized lineage/history queries first-class so operators can inspect provenance, sync checkpoints, and rerun context without payload-heavy or shell-based workflows.",
-      "status": "proposed",
+      "title": "Add normalized lineage history and ingestion-job query surfaces",
+      "description": "Build the next lineage slice after the shipped summary by exposing normalized lineage history, ingestion-job history, and summary-driven filtering/query surfaces so operators can inspect provenance and rerun context without payload-heavy or shell-based workflows.",
+      "status": "done",
       "base_priority": 84,
-      "dynamic_priority_delta": 7,
+      "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T20:51:00+09:00",
+      "updated_at": "2026-04-21T21:15:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-dataset-boundary-contract",
         "task-b1-lineage-mismatch-taxonomy"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly keeps normalized lineage/history surfaces and ingestion-job history open after the boundary contract landed.",
-      "priority_reason": "This remains the next backend slice after the operator-visible mismatch summary because the normalized query surface should reflect the final mismatch semantics."
+      "direction_relation_note": "Completed on main in commit f0bac34 with append-only ingestion job and normalized lineage snapshot recording plus standalone query surfaces for /api/market-data/lineage-history and /api/market-data/ingestion-jobs, seeded adapter coverage, and related docs updates.",
+      "priority_reason": "Closed after API, adapter, tests, compileall, docs, commit, and push all landed, so follow-up work should move from backend surfaces to operator workflows, retention policy, and alert correlation."
+    },
+    {
+      "id": "task-b1-control-room-lineage-operations",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Consume lineage and ingestion history in control room workflows",
+      "description": "Use the new lineage-history and ingestion-jobs surfaces in the control room so operators can inspect recent sync attempts, failures, validation claims, and dataset boundaries without leaving the main operational UI.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 16,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T21:15:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-lineage-query-surfaces",
+        "task-b1-lineage-category-ui"
+      ],
+      "direction_relation_note": "The latest main-session reply says the main missing operational slice is full control-room consumption of lineage and ingestion history, making this the clearest next executable task after commit f0bac34.",
+      "priority_reason": "This should become the queue head because the backend history surfaces are now shipped and the operator requested the next queued task to continue immediately."
+    },
+    {
+      "id": "task-b1-lineage-history-retention-pagination",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Define retention and pagination policy for lineage and ingestion history",
+      "description": "Add the retention boundaries, pagination contract, and query limits needed to keep lineage-history and ingestion-jobs usable as append-only operational records rather than unbounded payload dumps.",
+      "status": "proposed",
+      "base_priority": 80,
+      "dynamic_priority_delta": 10,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T21:15:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-lineage-query-surfaces"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly identifies retention and pagination as missing follow-up work on the new lineage and ingestion history surfaces.",
+      "priority_reason": "This is important for durability and operator usability, but it can stay proposed while the control-room consumer is built first."
+    },
+    {
+      "id": "task-b1-alert-lineage-correlation",
+      "direction_id": "runtime-ops",
+      "title": "Correlate alerts with lineage and ingestion incident history",
+      "description": "Expose direct alert-to-lineage and alert-to-ingestion-history correlations so stale-data and failure alerts point operators to the exact boundary, checkpoint, and failed sync job context.",
+      "status": "proposed",
+      "base_priority": 78,
+      "dynamic_priority_delta": 9,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T21:15:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-lineage-query-surfaces"
+      ],
+      "direction_relation_note": "The latest main-session reply calls out missing direct correlation between alerts and the new lineage or ingestion history, which makes this a distinct runtime-ops follow-up rather than part of the base API surface task.",
+      "priority_reason": "Keep this proposed until the core control-room history view lands, then connect alert workflows to the same operator-visible records."
     },
     {
       "id": "task-b1-lineage-category-ui",
       "direction_id": "operator-trust-and-discipline",
       "title": "Interpret rerun lineage categories in operator-facing UI",
       "description": "Update operator-facing frontend views to actively interpret rerun lineage categories and dataset-boundary claims instead of showing opaque matched or drifted states.",
-      "status": "proposed",
+      "status": "done",
       "base_priority": 78,
       "dynamic_priority_delta": 6,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T20:51:00+09:00",
+      "updated_at": "2026-04-21T21:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-lineage-mismatch-taxonomy"
       ],
-      "direction_relation_note": "The latest main-session reply calls out the missing frontend interpretation of the new rerun categories as a remaining follow-up after the backend taxonomy landed.",
-      "priority_reason": "This is executable work, but it should stay behind the operator-visible summary slice so the UI builds on a settled backend surface rather than raw category strings."
+      "direction_relation_note": "Completed on main in commit 58308b8 via control-room summary cards and validation summary rendering in App.tsx, controlRoomDefinitions.ts, and styles.css.",
+      "priority_reason": "Closed because the UI now interprets the rerun lineage categories directly for operators instead of exposing only raw taxonomy state."
     },
     {
       "id": "task-b1-durable-strategy-registry",
