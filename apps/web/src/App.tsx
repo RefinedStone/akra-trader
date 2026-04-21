@@ -386,6 +386,10 @@ type ProviderProvenanceSchedulerExportPolicyDraft = {
   approval_note: string;
 };
 
+type OperatorVisibilityAlertEntry =
+  | OperatorVisibility["alerts"][number]
+  | OperatorVisibility["alert_history"][number];
+
 const defaultProviderProvenanceAnalyticsQueryState: ProviderProvenanceAnalyticsQueryState = {
   scope: "current_focus",
   provider_label: ALL_FILTER_VALUE,
@@ -424,6 +428,20 @@ function buildProviderProvenanceSchedulerExportPolicyDraft(
       : [...(entry?.available_delivery_targets ?? [])],
     approval_note: entry?.approval_note?.trim() ?? "",
   };
+}
+
+function isProviderProvenanceSchedulerAlertCategory(category?: string | null) {
+  return category === "scheduler_lag" || category === "scheduler_failure";
+}
+
+function buildProviderProvenanceSchedulerAlertWorkflowReason(
+  alert: OperatorVisibilityAlertEntry,
+  mode: "workflow" | "escalation",
+) {
+  const category = alert.category === "scheduler_failure" ? "scheduler_failure" : "scheduler_lag";
+  return mode === "escalation"
+    ? `${category}_alert_triggered`
+    : `${category}_alert_workflow`;
 }
 
 const defaultProviderProvenanceDashboardLayout: ProviderProvenanceDashboardLayout = {
@@ -5164,27 +5182,45 @@ export default function App() {
     }
   }
 
+  async function createSharedProviderProvenanceSchedulerExportSnapshot(
+    options?: {
+      sourceLabel?: string;
+      selectCreatedJob?: boolean;
+    },
+  ) {
+    const sourceLabel = options?.sourceLabel ?? "scheduler automation";
+    const exportPayload = await exportProviderProvenanceSchedulerHealth({
+      format: "json",
+      windowDays: providerProvenanceAnalyticsQuery.window_days,
+      historyLimit: 8,
+      offset: 0,
+      limit: 8,
+    });
+    const sharedEntry = await createProviderProvenanceExportJob({
+      content: exportPayload.content,
+      requestedByTabId: comparisonHistoryTabIdentity.tabId,
+      requestedByTabLabel: comparisonHistoryTabIdentity.label,
+    });
+    setProviderProvenanceSchedulerExports((current) => [
+      sharedEntry,
+      ...current.filter((entry) => entry.job_id !== sharedEntry.job_id),
+    ].slice(0, 8));
+    setProviderProvenanceSchedulerExportsError(null);
+    if (options?.selectCreatedJob) {
+      setSelectedProviderProvenanceSchedulerExportJobId(sharedEntry.job_id);
+      await refreshSelectedProviderProvenanceSchedulerExportHistory(sharedEntry.job_id);
+    }
+    setProviderProvenanceWorkspaceFeedback(
+      `Created shared scheduler export ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
+    );
+    return sharedEntry;
+  }
+
   async function shareProviderProvenanceSchedulerHealthExport() {
     try {
-      const exportPayload = await exportProviderProvenanceSchedulerHealth({
-        format: "json",
-        windowDays: providerProvenanceAnalyticsQuery.window_days,
-        historyLimit: 8,
-        drilldownBucketKey: providerProvenanceSchedulerDrilldownBucketKey ?? undefined,
-        drilldownHistoryLimit: 12,
-        offset: providerProvenanceSchedulerHistoryOffset,
-        limit: 8,
+      const sharedEntry = await createSharedProviderProvenanceSchedulerExportSnapshot({
+        sourceLabel: "scheduler automation panel",
       });
-      const sharedEntry = await createProviderProvenanceExportJob({
-        content: exportPayload.content,
-        requestedByTabId: comparisonHistoryTabIdentity.tabId,
-        requestedByTabLabel: comparisonHistoryTabIdentity.label,
-      });
-      setProviderProvenanceSchedulerExports((current) => [
-        sharedEntry,
-        ...current.filter((entry) => entry.job_id !== sharedEntry.job_id),
-      ].slice(0, 8));
-      setProviderProvenanceSchedulerExportsError(null);
       setProviderProvenanceWorkspaceFeedback(
         `Shared scheduler health export ${shortenIdentifier(sharedEntry.job_id, 10)} with ${sharedEntry.result_count} recorded cycle(s).`,
       );
@@ -5339,6 +5375,53 @@ export default function App() {
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
         `Shared scheduler export escalation failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function triggerProviderProvenanceSchedulerAlertExportWorkflow(
+    alert: OperatorVisibilityAlertEntry,
+    options?: {
+      escalate?: boolean;
+      sourceLabel?: string;
+    },
+  ) {
+    const sourceLabel = options?.sourceLabel ?? alert.summary;
+    try {
+      const sharedEntry = await createSharedProviderProvenanceSchedulerExportSnapshot({
+        sourceLabel,
+        selectCreatedJob: true,
+      });
+      if (!options?.escalate) {
+        setProviderProvenanceWorkspaceFeedback(
+          `Started scheduler export workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
+        );
+        return;
+      }
+      if (sharedEntry.approval_required && sharedEntry.approval_state !== "approved") {
+        setProviderProvenanceWorkspaceFeedback(
+          `Started scheduler export workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}, but the saved route still requires approval before escalation.`,
+        );
+        return;
+      }
+      const result: ProviderProvenanceExportJobEscalationResult = await escalateProviderProvenanceExportJob({
+        jobId: sharedEntry.job_id,
+        actor: "operator",
+        reason: buildProviderProvenanceSchedulerAlertWorkflowReason(alert, "escalation"),
+        sourceTabId: comparisonHistoryTabIdentity.tabId,
+        sourceTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceSchedulerExports((current) => current.map((candidate) => (
+        candidate.job_id === result.export_job.job_id ? result.export_job : candidate
+      )));
+      await refreshSelectedProviderProvenanceSchedulerExportHistory(sharedEntry.job_id);
+      setProviderProvenanceWorkspaceFeedback(
+        result.audit_record.delivery_summary
+          ?? `Escalated scheduler export ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler alert export workflow failed for ${sourceLabel}: ${(error as Error).message}`,
       );
     }
   }
@@ -9571,6 +9654,33 @@ export default function App() {
                                   <p className="run-lineage-symbol-copy">
                                     Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
                                   </p>
+                                  {isProviderProvenanceSchedulerAlertCategory(alert.category) ? (
+                                    <div className="market-data-provenance-history-actions">
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          void triggerProviderProvenanceSchedulerAlertExportWorkflow(alert, {
+                                            sourceLabel: alert.summary,
+                                          });
+                                        }}
+                                        type="button"
+                                      >
+                                        Start export workflow
+                                      </button>
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          void triggerProviderProvenanceSchedulerAlertExportWorkflow(alert, {
+                                            escalate: true,
+                                            sourceLabel: alert.summary,
+                                          });
+                                        }}
+                                        type="button"
+                                      >
+                                        Escalate snapshot
+                                      </button>
+                                    </div>
+                                  ) : null}
                                   {linkedInstrument ? (
                                     <>
                                       <button
@@ -9836,6 +9946,33 @@ export default function App() {
                               <p className="run-lineage-symbol-copy">
                                 Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
                               </p>
+                              {isProviderProvenanceSchedulerAlertCategory(alert.category) ? (
+                                <div className="market-data-provenance-history-actions">
+                                  <button
+                                    className="ghost-button"
+                                    onClick={() => {
+                                      void triggerProviderProvenanceSchedulerAlertExportWorkflow(alert, {
+                                        sourceLabel: `${alert.summary} history row`,
+                                      });
+                                    }}
+                                    type="button"
+                                  >
+                                    Start current workflow
+                                  </button>
+                                  <button
+                                    className="ghost-button"
+                                    onClick={() => {
+                                      void triggerProviderProvenanceSchedulerAlertExportWorkflow(alert, {
+                                        escalate: true,
+                                        sourceLabel: `${alert.summary} history row`,
+                                      });
+                                    }}
+                                    type="button"
+                                  >
+                                    Escalate current snapshot
+                                  </button>
+                                </div>
+                              ) : null}
                               {linkedInstrument ? (
                                 <>
                                   <button
