@@ -1096,6 +1096,67 @@ export type ProviderProvenanceExportAnalyticsRollupEntry = {
   venue?: string | null;
 };
 
+export type ProviderProvenanceExportDriftSeriesEntry = {
+  bucket_key: string;
+  bucket_label: string;
+  started_at: string;
+  ended_at: string;
+  export_count: number;
+  result_count: number;
+  provider_provenance_count: number;
+  focus_count: number;
+  provider_label_count: number;
+  provider_labels: string[];
+  vendor_fields: string[];
+  drift_intensity: number;
+};
+
+export type ProviderProvenanceExportBurnUpSeriesEntry = {
+  bucket_key: string;
+  bucket_label: string;
+  started_at: string;
+  ended_at: string;
+  export_count: number;
+  result_count: number;
+  provider_provenance_count: number;
+  download_count: number;
+  cumulative_export_count: number;
+  cumulative_result_count: number;
+  cumulative_provider_provenance_count: number;
+  cumulative_download_count: number;
+};
+
+export type ProviderProvenanceExportTimeSeriesPayload = {
+  bucket_size: string;
+  window_days: number;
+  window_started_at: string;
+  window_ended_at: string;
+  provider_drift: {
+    series: ProviderProvenanceExportDriftSeriesEntry[];
+    summary: {
+      peak_bucket_key?: string | null;
+      peak_bucket_label?: string | null;
+      peak_export_count: number;
+      peak_provider_provenance_count: number;
+      latest_bucket_key?: string | null;
+      latest_bucket_label?: string | null;
+      latest_export_count: number;
+      latest_provider_provenance_count: number;
+    };
+  };
+  export_burn_up: {
+    series: ProviderProvenanceExportBurnUpSeriesEntry[];
+    summary: {
+      latest_bucket_key?: string | null;
+      latest_bucket_label?: string | null;
+      cumulative_export_count: number;
+      cumulative_result_count: number;
+      cumulative_provider_provenance_count: number;
+      cumulative_download_count: number;
+    };
+  };
+};
+
 export type ProviderProvenanceExportAnalyticsPayload = {
   generated_at: string;
   query: {
@@ -1110,6 +1171,7 @@ export type ProviderProvenanceExportAnalyticsPayload = {
     status?: string | null;
     search?: string | null;
     result_limit: number;
+    window_days: number;
   };
   totals: {
     export_count: number;
@@ -1137,6 +1199,7 @@ export type ProviderProvenanceExportAnalyticsPayload = {
     focuses: ProviderProvenanceExportAnalyticsRollupEntry[];
     requesters: ProviderProvenanceExportAnalyticsRollupEntry[];
   };
+  time_series: ProviderProvenanceExportTimeSeriesPayload;
   recent_exports: ProviderProvenanceExportJobEntry[];
 };
 

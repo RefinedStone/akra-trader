@@ -14420,7 +14420,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_export_analytics"].route_path == (
     "/operator/provider-provenance-exports/analytics"
   )
-  assert bindings_by_key["operator_provider_provenance_export_analytics"].filter_param_specs[-1].key == "result_limit"
+  assert bindings_by_key["operator_provider_provenance_export_analytics"].filter_param_specs[-2].key == "result_limit"
+  assert bindings_by_key["operator_provider_provenance_export_analytics"].filter_param_specs[-1].key == "window_days"
   assert bindings_by_key["operator_provider_provenance_export_job_download"].path_param_keys == ("job_id",)
   assert bindings_by_key["operator_provider_provenance_export_job_download"].filter_param_specs[0].key == "source_tab_id"
   assert bindings_by_key["operator_provider_provenance_export_job_history"].route_path == (
@@ -15173,11 +15174,13 @@ def test_replay_link_alias_audit_admin_binding_enforces_scoped_tokens(tmp_path: 
 
 
 def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: Path) -> None:
+  clock = MutableClock(datetime(2026, 4, 20, 9, 0, tzinfo=UTC))
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
     references=build_references(),
     runs=build_runs_repository(tmp_path),
+    clock=clock,
   )
   bindings_by_key = {
     binding.surface_key: binding
@@ -15185,7 +15188,7 @@ def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: P
   }
   export_content = json.dumps(
     {
-      "exported_at": "2026-04-22T00:00:00Z",
+      "exported_at": "2026-04-20T09:00:00Z",
       "export_scope": "provider_market_context_provenance",
       "export_filter": {
         "provider": "pagerduty",
@@ -15206,6 +15209,36 @@ def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: P
       "provider_provenance_incidents": [
         {
           "event_id": "incident_1",
+          "provider": "pagerduty",
+          "vendor_field": "custom_details.market_context",
+        }
+      ],
+    },
+    indent=2,
+  )
+  later_export_content = json.dumps(
+    {
+      "exported_at": "2026-04-21T09:00:00Z",
+      "export_scope": "provider_market_context_provenance",
+      "export_filter": {
+        "provider": "pagerduty",
+        "vendor_field": "custom_details.market_context",
+        "search_query": "",
+        "sort": "newest",
+      },
+      "export_filter_summary": "provider pagerduty / vendor field custom_details.market_context",
+      "export_result_count": 2,
+      "focus": {
+        "provider": "binance",
+        "venue": "binance",
+        "instrument_id": "binance:BTC/USDT",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "provider_provenance_incident_count": 3,
+      },
+      "provider_provenance_incidents": [
+        {
+          "event_id": "incident_2",
           "provider": "pagerduty",
           "vendor_field": "custom_details.market_context",
         }
@@ -15244,6 +15277,24 @@ def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: P
   )
   assert downloaded_payload["content"] == export_content
 
+  clock.advance(timedelta(days=1))
+  later_created_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_create"],
+    app=app,
+    request_payload={
+      "content": later_export_content,
+      "requested_by_tab_id": "tab_ops",
+      "requested_by_tab_label": "Ops desk",
+    },
+  )
+  execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_download"],
+    app=app,
+    path_params={"job_id": later_created_payload["job_id"]},
+    filters={"source_tab_id": "tab_review", "source_tab_label": "Review tab"},
+  )
+  clock.advance(timedelta(days=1))
+
   analytics_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_export_analytics"],
     app=app,
@@ -15252,13 +15303,38 @@ def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: P
       "provider_label": "pagerduty",
       "vendor_field": "custom_details.market_context",
       "result_limit": 10,
+      "window_days": 3,
     },
   )
-  assert analytics_payload["totals"]["export_count"] == 1
-  assert analytics_payload["totals"]["download_count"] == 1
+  assert analytics_payload["totals"]["export_count"] == 2
+  assert analytics_payload["totals"]["download_count"] == 2
+  assert analytics_payload["query"]["window_days"] == 3
   assert analytics_payload["rollups"]["providers"][0]["key"] == "pagerduty"
   assert analytics_payload["rollups"]["focuses"][0]["key"] == "binance:BTC/USDT|5m"
-  assert analytics_payload["recent_exports"][0]["job_id"] == created_payload["job_id"]
+  assert analytics_payload["recent_exports"][0]["job_id"] == later_created_payload["job_id"]
+  assert [bucket["bucket_key"] for bucket in analytics_payload["time_series"]["provider_drift"]["series"]] == [
+    "2026-04-20",
+    "2026-04-21",
+    "2026-04-22",
+  ]
+  assert analytics_payload["time_series"]["provider_drift"]["summary"] == {
+    "peak_bucket_key": "2026-04-21",
+    "peak_bucket_label": "Apr 21",
+    "peak_export_count": 1,
+    "peak_provider_provenance_count": 3,
+    "latest_bucket_key": "2026-04-22",
+    "latest_bucket_label": "Apr 22",
+    "latest_export_count": 0,
+    "latest_provider_provenance_count": 0,
+  }
+  assert analytics_payload["time_series"]["export_burn_up"]["summary"] == {
+    "latest_bucket_key": "2026-04-22",
+    "latest_bucket_label": "Apr 22",
+    "cumulative_export_count": 2,
+    "cumulative_result_count": 3,
+    "cumulative_provider_provenance_count": 5,
+    "cumulative_download_count": 2,
+  }
 
   history_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_export_job_history"],

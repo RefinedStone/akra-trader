@@ -448,6 +448,7 @@ def execute_standalone_surface_binding(
       status=resolved_filters.get("status"),
       search=resolved_filters.get("search"),
       result_limit=resolved_filters.get("result_limit", 12),
+      window_days=resolved_filters.get("window_days", 14),
     )
   if binding.binding_kind == "operator_provider_provenance_export_job_download":
     return app.download_provider_provenance_export_job(

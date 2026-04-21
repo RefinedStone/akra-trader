@@ -177,6 +177,7 @@ export async function getProviderProvenanceExportAnalytics(params: {
   timeframe?: string;
   vendorField?: string;
   venue?: string;
+  windowDays?: number;
 } = {}) {
   const searchParams = new URLSearchParams();
   if (params.focusKey?.trim()) {
@@ -211,6 +212,9 @@ export async function getProviderProvenanceExportAnalytics(params: {
   }
   if (typeof params.resultLimit === "number" && Number.isFinite(params.resultLimit)) {
     searchParams.set("result_limit", `${Math.max(1, Math.min(Math.round(params.resultLimit), 50))}`);
+  }
+  if (typeof params.windowDays === "number" && Number.isFinite(params.windowDays)) {
+    searchParams.set("window_days", `${Math.max(3, Math.min(Math.round(params.windowDays), 90))}`);
   }
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceExportAnalyticsPayload>(

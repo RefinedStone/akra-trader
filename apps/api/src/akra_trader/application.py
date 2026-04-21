@@ -2240,6 +2240,7 @@ class TradingApplication:
     status: str | None = None,
     search: str | None = None,
     result_limit: int = 12,
+    window_days: int = 14,
   ) -> dict[str, Any]:
     self._prune_provider_provenance_export_artifact_records()
     self._prune_provider_provenance_export_job_records()
@@ -2431,6 +2432,12 @@ class TradingApplication:
     all_statuses = self._normalize_provider_provenance_export_strings(record.status for record in records)
 
     recent_exports = list(records[:normalized_result_limit])
+    time_series = self._build_provider_provenance_export_time_series(
+      records=records,
+      audit_records=audit_records,
+      window_days=window_days,
+      now=self._clock(),
+    )
     return {
       "generated_at": self._clock().isoformat(),
       "query": {
@@ -2445,6 +2452,7 @@ class TradingApplication:
         "status": status,
         "search": search,
         "result_limit": normalized_result_limit,
+        "window_days": time_series["window_days"],
       },
       "totals": {
         "export_count": len(records),
@@ -2482,10 +2490,230 @@ class TradingApplication:
         "focuses": sort_rollup_items(focus_items)[:6],
         "requesters": sort_rollup_items(requester_items)[:5],
       },
+      "time_series": time_series,
       "recent_exports": [
         serialize_provider_provenance_export_job_record(record)
         for record in recent_exports
       ],
+    }
+
+  @staticmethod
+  def _normalize_provider_provenance_export_bucket_start(value: datetime) -> datetime:
+    normalized_value = value.astimezone(UTC) if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    return normalized_value.replace(hour=0, minute=0, second=0, microsecond=0)
+
+  @classmethod
+  def _build_provider_provenance_export_time_series(
+    cls,
+    *,
+    records: tuple[ProviderProvenanceExportJobRecord, ...],
+    audit_records: tuple[ProviderProvenanceExportJobAuditRecord, ...],
+    window_days: int,
+    now: datetime,
+  ) -> dict[str, Any]:
+    normalized_window_days = max(3, min(window_days, 90))
+    anchor_candidates = [now]
+    anchor_candidates.extend(record.exported_at or record.created_at for record in records)
+    anchor_candidates.extend(
+      audit_record.recorded_at
+      for audit_record in audit_records
+      if audit_record.action == "downloaded"
+    )
+    window_anchor = cls._normalize_provider_provenance_export_bucket_start(max(anchor_candidates))
+    window_started_at = window_anchor - timedelta(days=normalized_window_days - 1)
+    window_ended_at = window_anchor + timedelta(days=1)
+
+    record_buckets: dict[datetime, list[ProviderProvenanceExportJobRecord]] = {}
+    download_counts_by_bucket: dict[datetime, int] = {}
+    for record in records:
+      bucket_start = cls._normalize_provider_provenance_export_bucket_start(
+        record.exported_at or record.created_at
+      )
+      if not (window_started_at <= bucket_start < window_ended_at):
+        continue
+      record_buckets.setdefault(bucket_start, []).append(record)
+    for audit_record in audit_records:
+      if audit_record.action != "downloaded":
+        continue
+      bucket_start = cls._normalize_provider_provenance_export_bucket_start(audit_record.recorded_at)
+      if not (window_started_at <= bucket_start < window_ended_at):
+        continue
+      download_counts_by_bucket[bucket_start] = download_counts_by_bucket.get(bucket_start, 0) + 1
+
+    provider_drift_series: list[dict[str, Any]] = []
+    export_burn_up_series: list[dict[str, Any]] = []
+    cumulative_exports = 0
+    cumulative_results = 0
+    cumulative_provider_provenance = 0
+    cumulative_downloads = 0
+
+    for offset in range(normalized_window_days):
+      bucket_start = window_started_at + timedelta(days=offset)
+      bucket_end = bucket_start + timedelta(days=1)
+      bucket_records = record_buckets.get(bucket_start, [])
+      export_count = len(bucket_records)
+      result_count = sum(record.result_count for record in bucket_records)
+      provider_provenance_count = sum(
+        record.provider_provenance_count
+        for record in bucket_records
+      )
+      download_count = download_counts_by_bucket.get(bucket_start, 0)
+      provider_labels = cls._normalize_provider_provenance_export_strings(
+        provider
+        for record in bucket_records
+        for provider in record.provider_labels
+      )
+      vendor_fields = cls._normalize_provider_provenance_export_strings(
+        field
+        for record in bucket_records
+        for field in record.vendor_fields
+      )
+      focus_count = len({
+        record.focus_key
+        for record in bucket_records
+        if isinstance(record.focus_key, str) and record.focus_key
+      })
+      provider_label_count = len(provider_labels)
+      drift_intensity = round(
+        provider_provenance_count / export_count,
+        2,
+      ) if export_count else 0.0
+      bucket_key = bucket_start.date().isoformat()
+      bucket_label = bucket_start.strftime("%b %d")
+      provider_drift_series.append(
+        {
+          "bucket_key": bucket_key,
+          "bucket_label": bucket_label,
+          "started_at": bucket_start.isoformat(),
+          "ended_at": bucket_end.isoformat(),
+          "export_count": export_count,
+          "result_count": result_count,
+          "provider_provenance_count": provider_provenance_count,
+          "focus_count": focus_count,
+          "provider_label_count": provider_label_count,
+          "provider_labels": list(provider_labels),
+          "vendor_fields": list(vendor_fields),
+          "drift_intensity": drift_intensity,
+        }
+      )
+
+      cumulative_exports += export_count
+      cumulative_results += result_count
+      cumulative_provider_provenance += provider_provenance_count
+      cumulative_downloads += download_count
+      export_burn_up_series.append(
+        {
+          "bucket_key": bucket_key,
+          "bucket_label": bucket_label,
+          "started_at": bucket_start.isoformat(),
+          "ended_at": bucket_end.isoformat(),
+          "export_count": export_count,
+          "result_count": result_count,
+          "provider_provenance_count": provider_provenance_count,
+          "download_count": download_count,
+          "cumulative_export_count": cumulative_exports,
+          "cumulative_result_count": cumulative_results,
+          "cumulative_provider_provenance_count": cumulative_provider_provenance,
+          "cumulative_download_count": cumulative_downloads,
+        }
+      )
+
+    provider_drift_peak = max(
+      provider_drift_series,
+      key=lambda item: (
+        int(item["provider_provenance_count"]),
+        int(item["export_count"]),
+        item["bucket_key"],
+      ),
+      default=None,
+    )
+    burn_up_latest = export_burn_up_series[-1] if export_burn_up_series else None
+
+    return {
+      "bucket_size": "day",
+      "window_days": normalized_window_days,
+      "window_started_at": window_started_at.isoformat(),
+      "window_ended_at": window_ended_at.isoformat(),
+      "provider_drift": {
+        "series": provider_drift_series,
+        "summary": {
+          "peak_bucket_key": (
+            provider_drift_peak["bucket_key"]
+            if provider_drift_peak is not None
+            else None
+          ),
+          "peak_bucket_label": (
+            provider_drift_peak["bucket_label"]
+            if provider_drift_peak is not None
+            else None
+          ),
+          "peak_export_count": (
+            int(provider_drift_peak["export_count"])
+            if provider_drift_peak is not None
+            else 0
+          ),
+          "peak_provider_provenance_count": (
+            int(provider_drift_peak["provider_provenance_count"])
+            if provider_drift_peak is not None
+            else 0
+          ),
+          "latest_bucket_key": (
+            provider_drift_series[-1]["bucket_key"]
+            if provider_drift_series
+            else None
+          ),
+          "latest_bucket_label": (
+            provider_drift_series[-1]["bucket_label"]
+            if provider_drift_series
+            else None
+          ),
+          "latest_export_count": (
+            int(provider_drift_series[-1]["export_count"])
+            if provider_drift_series
+            else 0
+          ),
+          "latest_provider_provenance_count": (
+            int(provider_drift_series[-1]["provider_provenance_count"])
+            if provider_drift_series
+            else 0
+          ),
+        },
+      },
+      "export_burn_up": {
+        "series": export_burn_up_series,
+        "summary": {
+          "latest_bucket_key": (
+            burn_up_latest["bucket_key"]
+            if burn_up_latest is not None
+            else None
+          ),
+          "latest_bucket_label": (
+            burn_up_latest["bucket_label"]
+            if burn_up_latest is not None
+            else None
+          ),
+          "cumulative_export_count": (
+            int(burn_up_latest["cumulative_export_count"])
+            if burn_up_latest is not None
+            else 0
+          ),
+          "cumulative_result_count": (
+            int(burn_up_latest["cumulative_result_count"])
+            if burn_up_latest is not None
+            else 0
+          ),
+          "cumulative_provider_provenance_count": (
+            int(burn_up_latest["cumulative_provider_provenance_count"])
+            if burn_up_latest is not None
+            else 0
+          ),
+          "cumulative_download_count": (
+            int(burn_up_latest["cumulative_download_count"])
+            if burn_up_latest is not None
+            else 0
+          ),
+        },
+      },
     }
 
   def get_provider_provenance_export_job(

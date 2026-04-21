@@ -536,6 +536,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "status",
     "search",
     "result_limit",
+    "window_days",
     "app",
   )
   assert tuple(inspect.signature(routes["download_operator_provider_provenance_export_job"].endpoint).parameters) == (
@@ -1070,13 +1071,17 @@ def test_operator_provider_provenance_export_job_endpoints_round_trip(tmp_path: 
       "provider_label": "pagerduty",
       "vendor_field": "custom_details.market_context",
       "result_limit": 10,
+      "window_days": 5,
     },
   )
   assert analytics_response.status_code == 200
   analytics_payload = analytics_response.json()
   assert analytics_payload["totals"]["export_count"] == 1
   assert analytics_payload["totals"]["download_count"] == 1
+  assert analytics_payload["query"]["window_days"] == 5
   assert analytics_payload["rollups"]["providers"][0]["key"] == "pagerduty"
+  assert len(analytics_payload["time_series"]["provider_drift"]["series"]) == 5
+  assert analytics_payload["time_series"]["export_burn_up"]["summary"]["cumulative_export_count"] == 1
   assert analytics_payload["recent_exports"][0]["job_id"] == created_job["job_id"]
 
   history_response = client.get(

@@ -2415,6 +2415,34 @@ select {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.market-data-provenance-time-series-grid {
+  margin-top: 14px;
+}
+
+.market-data-provenance-time-series-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.market-data-provenance-timeseries-track {
+  margin-top: 8px;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(19, 117, 236, 0.1);
+  overflow: hidden;
+}
+
+.market-data-provenance-timeseries-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(19, 117, 236, 0.82), rgba(24, 191, 191, 0.88));
+}
+
+.market-data-provenance-timeseries-bar.is-burn-up {
+  background: linear-gradient(90deg, rgba(33, 173, 109, 0.84), rgba(19, 117, 236, 0.86));
+}
+
 .market-data-inline-focus-button {
   margin-top: 10px;
   padding: 8px 12px;

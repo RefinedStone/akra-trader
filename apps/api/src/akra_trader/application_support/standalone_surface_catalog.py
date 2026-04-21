@@ -1096,6 +1096,7 @@ def build_standalone_surface_runtime_bindings(
       "status",
       "search",
       "result_limit",
+      "window_days",
     ),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
@@ -1217,6 +1218,17 @@ def build_standalone_surface_runtime_bindings(
           title="Result limit",
           description="Maximum number of recent export rows to return with the analytics payload.",
           examples=(12,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "window_days",
+        int,
+        default=14,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=3, le=90),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Window days",
+          description="Number of daily buckets to include in provider provenance time-series analytics.",
+          examples=(14,),
         ),
       ),
     ),

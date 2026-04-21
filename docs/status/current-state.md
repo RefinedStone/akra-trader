@@ -142,8 +142,8 @@ It is not yet a finished live trading product:
   provenance directly to operators
 - provider provenance export in the control room now has operator-facing provider/vendor-field
   filters, sort modes, persisted local export history, a team-shared server registry with
-  download audit trail, and analytics/cross-focus dashboard rollups instead of a one-off
-  clipboard action
+  download audit trail, analytics/cross-focus dashboard rollups, and daily time-series views for
+  provider drift plus export burn-up instead of a one-off clipboard action
 
 ### Operator discipline baseline
 

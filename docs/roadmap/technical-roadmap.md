@@ -90,8 +90,9 @@ creation.
   market-context fields so downstream audit and export surfaces can distinguish vendor paths, and
   the control room now shows and exports that provenance during incident triage
 - provider provenance export in the control room now includes filter/sort controls, persisted
-  local export history, a shared server-side registry with audit trail, and analytics plus
-  cross-focus query rollups, moving it closer to a real operator handoff surface
+  local export history, a shared server-side registry with audit trail, analytics plus
+  cross-focus query rollups, and time-series drift / burn-up dashboards, moving it closer to a
+  real operator handoff surface
 
 ### Remaining work
 

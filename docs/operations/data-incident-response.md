@@ -38,8 +38,9 @@ unclear dataset lineage.
   and the control-room incident drill-down plus triage export now carry that provenance forward
 - provider provenance export in the triage panel now supports provider/vendor-field filtering,
   sort controls, persisted local export history, a team-shared registry and audit trail, plus
-  provider/vendor/focus/requester rollups with cross-focus query results so repeated incident
-  handoff does not start from an empty clipboard or an untraceable copy action
+  provider/vendor/focus/requester rollups, cross-focus query results, and daily provider-drift /
+  export burn-up dashboards so repeated incident handoff does not start from an empty clipboard
+  or an untraceable copy action
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance
