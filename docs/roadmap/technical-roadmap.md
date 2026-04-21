@@ -1,6 +1,6 @@
 # Technical Roadmap
 
-Rebased to the repository state as of April 21, 2026.
+Rebased to the repository state as of April 22, 2026.
 
 ## Goal
 
@@ -94,16 +94,15 @@ creation.
   cross-focus query rollups, and time-series drift / burn-up dashboards, moving it closer to a
   real operator handoff surface
 - provider provenance analytics now also persists saved presets, shared dashboard views, and
-  scheduled provenance reports with manual run / run-due and audit history, so analytics state is
-  durable across operators rather than pinned to one browser tab
+  scheduled provenance reports with background due-run execution, manual controls, and audit
+  history, so analytics state is durable across operators rather than pinned to one browser tab
 
 ### Remaining work
 
 - decompose the current monolithic UI into clearer product surfaces
 - improve active-session views for positions, fills, lag, and recent decisions
 - align UI state and operator workflows with runbooks and promotion rules
-- add a background execution path for scheduled provenance reports and team-level dashboard
-  collections above the current preset/view/report records
+- add team-level dashboard collections above the current preset/view/report records
 
 ## Track D: Runtime Ops And Guarded-Live Stabilization
 

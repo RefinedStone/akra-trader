@@ -27,6 +27,9 @@ class Settings:
   market_data_sync_interval_seconds: int = 60
   market_data_default_candle_limit: int = 500
   market_data_historical_candle_limit: int = 2_000
+  provider_provenance_report_scheduler_enabled: bool = True
+  provider_provenance_report_scheduler_interval_seconds: int = 60
+  provider_provenance_report_scheduler_batch_limit: int = 25
   sandbox_worker_heartbeat_interval_seconds: int = 15
   sandbox_worker_heartbeat_timeout_seconds: int = 45
   guarded_live_execution_enabled: bool = False
@@ -277,6 +280,15 @@ def load_settings() -> Settings:
     ),
     market_data_historical_candle_limit=int(
       os.getenv("AKRA_TRADER_MARKET_DATA_HISTORICAL_CANDLE_LIMIT", "2000")
+    ),
+    provider_provenance_report_scheduler_enabled=_parse_bool_env(
+      os.getenv("AKRA_TRADER_PROVIDER_PROVENANCE_REPORT_SCHEDULER_ENABLED", "true")
+    ),
+    provider_provenance_report_scheduler_interval_seconds=int(
+      os.getenv("AKRA_TRADER_PROVIDER_PROVENANCE_REPORT_SCHEDULER_INTERVAL_SECONDS", "60")
+    ),
+    provider_provenance_report_scheduler_batch_limit=int(
+      os.getenv("AKRA_TRADER_PROVIDER_PROVENANCE_REPORT_SCHEDULER_BATCH_LIMIT", "25")
     ),
     sandbox_worker_heartbeat_interval_seconds=int(
       os.getenv("AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_INTERVAL_SECONDS", "15")

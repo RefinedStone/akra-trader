@@ -22,6 +22,7 @@ from akra_trader.application import TradingApplication
 from akra_trader.config import Settings
 from akra_trader.guarded_live_workers import GuardedLiveWorkerSessionsJob
 from akra_trader.market_data_sync import MarketDataSyncJob
+from akra_trader.provider_provenance_scheduler import ProviderProvenanceReportSchedulerJob
 from akra_trader.sandbox_workers import SandboxWorkerSessionsJob
 
 
@@ -442,6 +443,14 @@ def build_background_jobs(
       GuardedLiveWorkerSessionsJob(
         application,
         interval_seconds=settings.guarded_live_worker_heartbeat_interval_seconds,
+      )
+    )
+  if settings.provider_provenance_report_scheduler_enabled:
+    jobs.append(
+      ProviderProvenanceReportSchedulerJob(
+        application,
+        interval_seconds=settings.provider_provenance_report_scheduler_interval_seconds,
+        batch_limit=settings.provider_provenance_report_scheduler_batch_limit,
       )
     )
   if settings.market_data_provider in SUPPORTED_CCXT_MARKET_DATA_VENUES:

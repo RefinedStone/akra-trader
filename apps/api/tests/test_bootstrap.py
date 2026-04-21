@@ -16,11 +16,19 @@ def test_build_container_uses_configured_runs_database_url(monkeypatch) -> None:
     def __init__(self, database_url: str) -> None:
       captured["database_url"] = database_url
 
+  class FakeExperimentPresetCatalog:
+    def __init__(self, database_url: str) -> None:
+      captured["preset_database_url"] = database_url
+
   class FakeGuardedLiveRepository:
     def __init__(self, database_url: str) -> None:
       captured["guarded_live_database_url"] = database_url
 
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr(
+    "akra_trader.bootstrap.SqlAlchemyExperimentPresetCatalog",
+    FakeExperimentPresetCatalog,
+  )
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
 
   build_container(
@@ -31,6 +39,7 @@ def test_build_container_uses_configured_runs_database_url(monkeypatch) -> None:
   )
 
   assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
+  assert captured["preset_database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
   assert captured["guarded_live_database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
 
 
@@ -72,14 +81,30 @@ def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> Non
     async def stop(self) -> None:
       return None
 
+  class FakeProviderProvenanceReportSchedulerJob:
+    def __init__(self, application, *, interval_seconds: int, batch_limit: int) -> None:
+      self._application = application
+      self._interval_seconds = interval_seconds
+      self._batch_limit = batch_limit
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
+  monkeypatch.setattr(
+    "akra_trader.bootstrap.ProviderProvenanceReportSchedulerJob",
+    FakeProviderProvenanceReportSchedulerJob,
+  )
 
   container = build_container(Settings(market_data_provider="seeded"))
 
   assert isinstance(container.app._market_data, SeededMarketDataAdapter)
-  assert len(container.background_jobs) == 1
+  assert len(container.background_jobs) == 2
 
 
 def test_build_container_adds_guarded_live_worker_job_when_enabled(monkeypatch) -> None:
@@ -115,10 +140,26 @@ def test_build_container_adds_guarded_live_worker_job_when_enabled(monkeypatch) 
     async def stop(self) -> None:
       return None
 
+  class FakeProviderProvenanceReportSchedulerJob:
+    def __init__(self, application, *, interval_seconds: int, batch_limit: int) -> None:
+      captured["scheduler_interval_seconds"] = str(interval_seconds)
+      captured["scheduler_batch_limit"] = str(batch_limit)
+      self._application = application
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
   monkeypatch.setattr("akra_trader.bootstrap.GuardedLiveWorkerSessionsJob", FakeGuardedLiveWorkerSessionsJob)
+  monkeypatch.setattr(
+    "akra_trader.bootstrap.ProviderProvenanceReportSchedulerJob",
+    FakeProviderProvenanceReportSchedulerJob,
+  )
 
   container = build_container(
     Settings(
@@ -126,12 +167,57 @@ def test_build_container_adds_guarded_live_worker_job_when_enabled(monkeypatch) 
       guarded_live_execution_enabled=True,
       sandbox_worker_heartbeat_interval_seconds=11,
       guarded_live_worker_heartbeat_interval_seconds=19,
+      provider_provenance_report_scheduler_interval_seconds=41,
+      provider_provenance_report_scheduler_batch_limit=8,
     )
   )
 
-  assert len(container.background_jobs) == 2
+  assert len(container.background_jobs) == 3
   assert captured["sandbox_interval_seconds"] == "11"
   assert captured["guarded_live_interval_seconds"] == "19"
+  assert captured["scheduler_interval_seconds"] == "41"
+  assert captured["scheduler_batch_limit"] == "8"
+
+
+def test_build_container_can_disable_provider_provenance_report_scheduler(monkeypatch) -> None:
+  class FakeRunRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeGuardedLiveRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeSandboxWorkerSessionsJob:
+    def __init__(self, application, *, interval_seconds: int) -> None:
+      self._application = application
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
+  class FakeProviderProvenanceReportSchedulerJob:
+    def __init__(self, application, *, interval_seconds: int, batch_limit: int) -> None:
+      raise AssertionError("scheduler should be disabled")
+
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
+  monkeypatch.setattr(
+    "akra_trader.bootstrap.ProviderProvenanceReportSchedulerJob",
+    FakeProviderProvenanceReportSchedulerJob,
+  )
+
+  container = build_container(
+    Settings(
+      market_data_provider="seeded",
+      provider_provenance_report_scheduler_enabled=False,
+    )
+  )
+
+  assert len(container.background_jobs) == 1
 
 
 def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> None:
@@ -1215,6 +1301,10 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
     def __init__(self, database_url: str) -> None:
       self.database_url = database_url
 
+  class FakeExperimentPresetCatalog:
+    def __init__(self, database_url: str) -> None:
+      captured["preset_database_url"] = database_url
+
   class FakeGuardedLiveRepository:
     def __init__(self, database_url: str) -> None:
       captured["guarded_live_database_url"] = database_url
@@ -1284,13 +1374,33 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
     async def stop(self) -> None:
       return None
 
+  class FakeProviderProvenanceReportSchedulerJob:
+    def __init__(self, application, *, interval_seconds: int, batch_limit: int) -> None:
+      captured["scheduler_interval_seconds"] = str(interval_seconds)
+      captured["scheduler_batch_limit"] = str(batch_limit)
+      self._application = application
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr(
+    "akra_trader.bootstrap.SqlAlchemyExperimentPresetCatalog",
+    FakeExperimentPresetCatalog,
+  )
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.CcxtMarketDataAdapter", FakeCcxtMarketDataAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.CcxtVenueStateAdapter", FakeCcxtVenueStateAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueExecutionAdapter", FakeBinanceVenueExecutionAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
   monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
+  monkeypatch.setattr(
+    "akra_trader.bootstrap.ProviderProvenanceReportSchedulerJob",
+    FakeProviderProvenanceReportSchedulerJob,
+  )
 
   container = build_container(
     Settings(
@@ -1302,12 +1412,15 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       market_data_default_candle_limit=144,
       market_data_historical_candle_limit=720,
       sandbox_worker_heartbeat_interval_seconds=11,
+      provider_provenance_report_scheduler_interval_seconds=21,
+      provider_provenance_report_scheduler_batch_limit=5,
       binance_api_key="test-key",
       binance_api_secret="test-secret",
     )
   )
 
   assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
+  assert captured["preset_database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
   assert captured["guarded_live_database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
   assert captured["market_data_venue"] == "binance"
   assert captured["tracked_symbols"] == "BTC/USDT"
@@ -1320,10 +1433,12 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   assert captured["sync_timeframes"] == "5m,1h"
   assert captured["sync_interval_seconds"] == "120"
   assert captured["sandbox_interval_seconds"] == "11"
+  assert captured["scheduler_interval_seconds"] == "21"
+  assert captured["scheduler_batch_limit"] == "5"
   assert captured["default_candle_limit"] == "144"
   assert captured["historical_candle_limit"] == "720"
   assert container.app._guarded_live_market_data_timeframes == ("5m", "1h")
-  assert len(container.background_jobs) == 2
+  assert len(container.background_jobs) == 3
 
 
 def test_build_container_supports_non_binance_ccxt_market_data_provider(monkeypatch) -> None:
@@ -1396,6 +1511,18 @@ def test_build_container_supports_non_binance_ccxt_market_data_provider(monkeypa
     async def stop(self) -> None:
       return None
 
+  class FakeProviderProvenanceReportSchedulerJob:
+    def __init__(self, application, *, interval_seconds: int, batch_limit: int) -> None:
+      captured["scheduler_interval_seconds"] = str(interval_seconds)
+      captured["scheduler_batch_limit"] = str(batch_limit)
+      self._application = application
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.CcxtMarketDataAdapter", FakeCcxtMarketDataAdapter)
@@ -1403,6 +1530,10 @@ def test_build_container_supports_non_binance_ccxt_market_data_provider(monkeypa
   monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueExecutionAdapter", FakeBinanceVenueExecutionAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
   monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
+  monkeypatch.setattr(
+    "akra_trader.bootstrap.ProviderProvenanceReportSchedulerJob",
+    FakeProviderProvenanceReportSchedulerJob,
+  )
 
   container = build_container(
     Settings(
@@ -1412,6 +1543,8 @@ def test_build_container_supports_non_binance_ccxt_market_data_provider(monkeypa
       market_data_sync_interval_seconds=90,
       market_data_default_candle_limit=128,
       market_data_historical_candle_limit=512,
+      provider_provenance_report_scheduler_interval_seconds=17,
+      provider_provenance_report_scheduler_batch_limit=6,
     )
   )
 
@@ -1421,10 +1554,12 @@ def test_build_container_supports_non_binance_ccxt_market_data_provider(monkeypa
   assert captured["historical_candle_limit"] == "512"
   assert captured["sync_timeframes"] == "5m,1h"
   assert captured["sync_interval_seconds"] == "90"
+  assert captured["scheduler_interval_seconds"] == "17"
+  assert captured["scheduler_batch_limit"] == "6"
   assert captured["venue_state_venue"] == "coinbase"
   assert captured["venue_execution_venue"] == "coinbase"
   assert container.app._guarded_live_market_data_timeframes == ("5m", "1h")
-  assert len(container.background_jobs) == 2
+  assert len(container.background_jobs) == 3
 
 
 def test_build_container_can_target_guarded_live_venue_separately_from_market_data(monkeypatch) -> None:
