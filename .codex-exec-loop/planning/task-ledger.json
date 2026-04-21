@@ -150,18 +150,54 @@
       "direction_id": "runtime-ops",
       "title": "Embed explicit primary-focus metadata in backend multi-symbol alert payloads",
       "description": "Extend backend alert payloads to emit explicit primary_symbol and timeframe or equivalent policy metadata for multi-symbol incidents so control-room consumers can stop relying on frontend-only ordering heuristics and share one durable focus contract.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 85,
       "dynamic_priority_delta": 17,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T22:05:00+09:00",
+      "updated_at": "2026-04-21T22:15:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-alert-payload-normalization"
       ],
-      "direction_relation_note": "The latest main-session reply says the new primary-focus policy is still computed in the frontend and explicitly calls out backend payload support for primary_symbol/timeframe or policy metadata as the next way to reduce heuristics.",
-      "priority_reason": "This becomes the queue head because the operator-visible heuristic has shipped and the next executable hardening step is to move the primary-focus contract into backend alert payloads."
+      "direction_relation_note": "Completed on main in commit d3a0b89 with backend primary_focus metadata added to guarded-live multi-symbol alert and incident payloads, shared backend selection logic, and control-room consumers preferring the backend contract.",
+      "priority_reason": "Closed after backend, UI, tests, docs, commit, and push landed; the next runtime follow-up is to carry the same market-context contract into external provider delivery payload builders."
+    },
+    {
+      "id": "task-b1-external-provider-primary-focus-delivery",
+      "direction_id": "runtime-ops",
+      "title": "Carry primary-focus market context into external webhook and provider payload builders",
+      "description": "Extend external webhook and provider delivery payload builders to emit the new primary_focus market-context metadata so downstream incident consumers outside the control room receive the same durable multi-symbol focus contract as the first-party API.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 18,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T22:15:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-external-incident-market-context"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says external webhook/provider delivery payload builders still do not carry the new primary_focus metadata even after the backend API and control room now rely on it.",
+      "priority_reason": "This is the clearest next executable task because the backend contract now exists and the remaining hardening gap is propagating that same contract to external delivery surfaces without introducing a second payload policy."
+    },
+    {
+      "id": "task-b1-multi-symbol-risk-scoring-expansion",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand risk-aware primary-focus scoring beyond guarded-live market-data alerts",
+      "description": "Generalize the new explicit multi-symbol primary_focus contract so non-market-data multi-symbol alerts use risk-aware scoring rather than falling back to runtime or live symbol order, keeping operator focus selection consistent across alert classes.",
+      "status": "proposed",
+      "base_priority": 81,
+      "dynamic_priority_delta": 13,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T22:15:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-external-incident-market-context"
+      ],
+      "direction_relation_note": "The latest main-session reply says explicit primary_focus is now emitted broadly, but risk-aware scoring still only applies to guarded-live market-data alerts while other multi-symbol alerts fall back to runtime or live symbol order.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind external payload propagation so the queue advances through one contract-hardening step at a time."
     },
     {
       "id": "task-b1-triage-operator-actions",
