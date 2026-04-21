@@ -531,18 +531,54 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Reconstruct historical scheduler exports for resolved alert rows",
       "description": "Add historical snapshot reconstruction or equivalent export replay so older resolved scheduler lag or failure alerts can open an export artifact tied to the alert-time scheduler-health state instead of always snapshotting current scheduler health.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 73,
       "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T14:22:00+09:00",
+      "updated_at": "2026-04-22T14:35:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-alert-auto-run"
       ],
-      "direction_relation_note": "The latest main-session reply says automatic scheduler alert workflows now ship, but generated artifacts still snapshot current scheduler health only, so resolved alert rows still cannot reopen a historically accurate export tied to the original alert-time state.",
-      "priority_reason": "Promoted to ready because the latest main-session reply narrows the remaining executable follow-ups to two items and historical reconstruction is the clearest next product gap for builtin next-task after auto-run shipped."
+      "direction_relation_note": "Completed on main in commit 404d806 with scheduler-health historical reconstruction wired through application and API surfaces, control-room actions for resolved alert_history rows, and shared export or escalation flows that rebuild artifacts from the alert-time lag or failure window instead of the current snapshot.",
+      "priority_reason": "Closed after targeted pytest coverage for provider_provenance_scheduler, operator_visibility, and provider_provenance_export plus compileall, web typecheck, and web build verification all passed; the latest main-session reply now leaves repeated resolved-occurrence selection and mixed-status post-resolution narrative export as the next explicit gaps."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-alert-occurrence-timeline",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add per-category scheduler alert occurrence timeline for resolved history rows",
+      "description": "Extend scheduler alert history beyond the latest row per category so operators can browse and select multiple resolved lag or failure occurrences within the same category, then reconstruct exports from the exact occurrence they need.",
+      "status": "ready",
+      "base_priority": 75,
+      "dynamic_priority_delta": 23,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T14:35:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-historical-alert-export-reconstruction"
+      ],
+      "direction_relation_note": "The latest main-session reply says resolved scheduler alert rows can now reconstruct historical exports, but alert_history still exposes only the latest row per category, so repeated resolved occurrences cannot yet be distinguished or selected from a timeline.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and the latest main-session reply identifies occurrence-level timeline selection as the clearest immediately executable follow-up after historical reconstruction shipped."
+    },
+    {
+      "id": "task-b1-provider-market-context-mixed-status-narrative-artifact",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Export full mixed-status post-resolution scheduler narratives",
+      "description": "Add a separate export artifact that reconstructs the full mixed-status scheduler story around a resolved alert window, not just the persisted records matching the alert status, so operators can hand off post-resolution narratives with both incident and recovery context.",
+      "status": "proposed",
+      "base_priority": 74,
+      "dynamic_priority_delta": 21,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T14:35:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-historical-alert-export-reconstruction"
+      ],
+      "direction_relation_note": "The latest main-session reply says reconstructed exports currently center on persisted scheduler records that match the alert status only, so there is still no dedicated artifact for a mixed-status post-resolution narrative that spans failure, lag, and recovery context together.",
+      "priority_reason": "This is a clear executable follow-up from the latest main-session reply, but it stays proposed behind the occurrence timeline so builtin next-task advances through the more immediate history-selection gap before expanding artifact semantics."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
