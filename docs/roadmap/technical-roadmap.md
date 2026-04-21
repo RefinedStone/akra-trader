@@ -84,6 +84,8 @@ creation.
 - provider workflow action payloads now project `market_context` into vendor-native structured
   fields like `custom_details`, `details`, or `metadata`, while note/message text keeps the same
   block human-readable in downstream timelines
+- provider workflow pull normalization now reads that vendor-native `market_context` back into the
+  normalized pull snapshot instead of relying only on top-level provider recovery fields
 
 ### Remaining work
 

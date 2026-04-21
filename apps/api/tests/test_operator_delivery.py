@@ -420,18 +420,28 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
               "title": "Guarded-live market-data incident",
               "updated_at": "2025-01-03T14:05:00Z",
               "custom_details": {
+                "market_context": {
+                  "symbol": "eth/usdt",
+                  "symbols": ["eth/usdt"],
+                  "timeframe": "5M",
+                  "primary_focus": {
+                    "symbol": "eth/usdt",
+                    "timeframe": "5M",
+                    "candidate_symbols": ["eth/usdt"],
+                    "candidate_count": 1,
+                    "policy": "single_symbol_context",
+                    "reason": "Alert context resolved to one market-data instrument.",
+                  },
+                },
                 "remediation_state": "provider_recovered",
                 "remediation_provider_payload": {
                   "job_id": "pd-job-9",
-                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
                   "verification": {"state": "passed"},
                 },
                 "remediation_provider_recovery": {
                   "lifecycle_state": "recovered",
                   "job_id": "pd-job-9",
                   "channels": ["depth", "kline"],
-                  "symbols": ["ETH/USDT"],
-                  "timeframe": "5m",
                   "verification_state": "passed",
                   "status_machine_state": "provider_running",
                   "status_machine_workflow_state": "acknowledged",
@@ -505,7 +515,12 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
   assert snapshot.workflow_state == "acknowledged"
   assert snapshot.remediation_state == "provider_recovered"
   assert snapshot.payload["job_id"] == "pd-job-9"
+  assert snapshot.payload["symbol"] == "ETH/USDT"
+  assert snapshot.payload["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["timeframe"] == "5m"
   assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["primary_focus"]["symbol"] == "ETH/USDT"
+  assert snapshot.payload["primary_focus"]["policy"] == "single_symbol_context"
   assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"
   assert snapshot.payload["provider_schema"]["kind"] == "pagerduty"
   assert snapshot.payload["provider_schema"]["pagerduty"]["incident_id"] == "PDINC-123"
@@ -13542,17 +13557,27 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
               "message": "Guarded-live market-data incident",
               "updatedAt": "2025-01-03T14:12:00Z",
               "details": {
+                "market_context": {
+                  "symbol": "eth/usdt",
+                  "symbols": ["eth/usdt"],
+                  "timeframe": "5M",
+                  "primary_focus": {
+                    "symbol": "eth/usdt",
+                    "timeframe": "5M",
+                    "candidate_symbols": ["eth/usdt"],
+                    "candidate_count": 1,
+                    "policy": "single_symbol_context",
+                    "reason": "Alert context resolved to one market-data instrument.",
+                  },
+                },
                 "remediation_state": "requested",
                 "remediation_provider_payload": {
                   "job_id": "og-job-7",
-                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
                 },
                 "remediation_provider_recovery": {
                   "lifecycle_state": "recovering",
                   "job_id": "og-job-7",
                   "channels": ["kline"],
-                  "symbols": ["ETH/USDT"],
-                  "timeframe": "5m",
                   "status_machine_state": "provider_requested",
                   "status_machine_workflow_state": "acknowledged",
                   "status_machine_job_state": "requested",
@@ -13624,6 +13649,10 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
   assert snapshot.remediation_state == "requested"
   assert snapshot.payload["job_id"] == "og-job-7"
   assert snapshot.payload["channels"] == ["kline"]
+  assert snapshot.payload["symbol"] == "ETH/USDT"
+  assert snapshot.payload["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["timeframe"] == "5m"
+  assert snapshot.payload["primary_focus"]["policy"] == "single_symbol_context"
   assert snapshot.payload["status_machine"]["job_state"] == "requested"
   assert snapshot.payload["provider_schema"]["kind"] == "opsgenie"
   assert snapshot.payload["provider_schema"]["opsgenie"]["alert_id"] == "OG-123"
@@ -13840,18 +13869,28 @@ def test_operator_alert_delivery_adapter_pulls_incidentio_provider_state() -> No
               "url": "https://incident.io/incidents/INC-123",
               "assignee": {"name": "On-call engineer"},
               "metadata": {
+                "market_context": {
+                  "symbol": "eth/usdt",
+                  "symbols": ["eth/usdt"],
+                  "timeframe": "5M",
+                  "primary_focus": {
+                    "symbol": "eth/usdt",
+                    "timeframe": "5M",
+                    "candidate_symbols": ["eth/usdt"],
+                    "candidate_count": 1,
+                    "policy": "single_symbol_context",
+                    "reason": "Alert context resolved to one market-data instrument.",
+                  },
+                },
                 "remediation_state": "provider_recovered",
                 "remediation_provider_payload": {
                   "job_id": "io-job-9",
-                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
                   "verification": {"state": "passed"},
                 },
                 "remediation_provider_recovery": {
                   "lifecycle_state": "recovered",
                   "job_id": "io-job-9",
                   "channels": ["depth", "kline"],
-                  "symbols": ["ETH/USDT"],
-                  "timeframe": "5m",
                   "verification_state": "passed",
                   "status_machine_state": "provider_running",
                   "status_machine_workflow_state": "acknowledged",
@@ -13924,7 +13963,11 @@ def test_operator_alert_delivery_adapter_pulls_incidentio_provider_state() -> No
   assert snapshot.workflow_state == "acknowledged"
   assert snapshot.remediation_state == "provider_recovered"
   assert snapshot.payload["job_id"] == "io-job-9"
+  assert snapshot.payload["symbol"] == "ETH/USDT"
+  assert snapshot.payload["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["timeframe"] == "5m"
   assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["primary_focus"]["policy"] == "single_symbol_context"
   assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"
   assert snapshot.payload["provider_schema"]["kind"] == "incidentio"
   assert snapshot.payload["provider_schema"]["incidentio"]["incident_id"] == "INC-123"

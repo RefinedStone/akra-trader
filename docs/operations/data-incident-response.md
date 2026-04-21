@@ -30,6 +30,9 @@ unclear dataset lineage.
 - provider workflow actions now also project that `market_context` into provider-native structured
   fields such as `custom_details`, `details`, or `metadata`, and render it as an explicit
   note/message section so provider timelines preserve the selected symbol/timeframe
+- provider pull normalization now reads those same vendor-native structured fields back so
+  recovered incidents keep the same selected symbol/timeframe and `primary_focus` after external
+  round-trips
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

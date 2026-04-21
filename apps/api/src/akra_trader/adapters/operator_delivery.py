@@ -22163,6 +22163,25 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     }
 
   @classmethod
+  def _extract_market_context_mapping_from_sources(
+    cls,
+    *candidates: Any,
+  ) -> dict[str, Any]:
+    for candidate in candidates:
+      payload = cls._extract_mapping(candidate)
+      if not payload:
+        continue
+      market_context = cls._extract_mapping(
+        payload.get("market_context"),
+        cls._extract_mapping(payload.get("custom_details")).get("market_context"),
+        cls._extract_mapping(payload.get("details")).get("market_context"),
+        cls._extract_mapping(payload.get("metadata")).get("market_context"),
+      )
+      if market_context:
+        return market_context
+    return {}
+
+  @classmethod
   def _build_provider_pull_market_context_payload(
     cls,
     *,
@@ -22170,6 +22189,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     provider_payload: dict[str, Any],
     provider_recovery: dict[str, Any],
   ) -> dict[str, Any]:
+    vendor_market_context = cls._extract_market_context_mapping_from_sources(
+      provider_recovery,
+      provider_payload,
+      remediation_payload,
+    )
     targets_payload = cls._extract_mapping(
       remediation_payload.get("targets"),
       provider_payload.get("targets"),
@@ -22183,6 +22207,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     primary_focus = cls._build_primary_focus_payload_from_sources(
       provider_recovery.get("primary_focus"),
       provider_payload.get("primary_focus"),
+      vendor_market_context.get("primary_focus"),
       targets_payload.get("primary_focus"),
       target_payload.get("primary_focus"),
     )
@@ -22191,6 +22216,8 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       provider_recovery.get("symbol"),
       provider_payload.get("symbols"),
       provider_payload.get("symbol"),
+      vendor_market_context.get("symbols"),
+      vendor_market_context.get("symbol"),
       remediation_payload.get("symbols"),
       remediation_payload.get("symbol"),
       targets_payload.get("symbols"),
@@ -22204,6 +22231,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       cls._first_non_empty_string(
         provider_recovery.get("symbol"),
         provider_payload.get("symbol"),
+        vendor_market_context.get("symbol"),
         remediation_payload.get("symbol"),
         targets_payload.get("symbol"),
         target_payload.get("symbol"),
@@ -22217,6 +22245,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
         provider_recovery.get("timeframe"),
         provider_payload.get("timeframe"),
         provider_payload.get("target_timeframe"),
+        vendor_market_context.get("timeframe"),
         remediation_payload.get("timeframe"),
         remediation_payload.get("target_timeframe"),
         targets_payload.get("timeframe"),
@@ -28814,7 +28843,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     if not payload:
       return None
     payload_mapping = cls._extract_mapping(payload)
-    market_context = cls._extract_mapping(payload_mapping.get("market_context"))
+    market_context = cls._extract_market_context_mapping_from_sources(payload_mapping)
     if not market_context:
       return None
     primary_focus = cls._build_primary_focus_payload_from_sources(

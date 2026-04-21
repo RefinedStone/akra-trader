@@ -133,6 +133,9 @@ It is not yet a finished live trading product:
 - provider workflow action payloads now project `market_context` into vendor-specific structured
   fields such as `custom_details`, `details`, or `metadata`, and notes/messages print that block
   separately from generic action context for operator/provider audit
+- provider workflow pull normalization now reads that same vendor-native `market_context` back from
+  `custom_details`, `details`, or `metadata` so normalized provenance survives round-trips through
+  third-party incident systems
 
 ### Operator discipline baseline
 
