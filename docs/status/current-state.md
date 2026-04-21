@@ -169,6 +169,9 @@ It is not yet a finished live trading product:
 - scheduler alert history now preserves every lag/failure occurrence per category with occurrence
   ids and timeline position metadata, and the control-room history rows surface that timeline for
   resolved entries instead of collapsing to only the latest scheduler occurrence
+- provider provenance analytics now also exposes a paginated scheduler-only alert timeline surface
+  with category/status filters, so occurrence review no longer depends on the global operator
+  alert-history table
 
 ### Operator discipline baseline
 

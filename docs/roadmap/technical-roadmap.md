@@ -116,6 +116,8 @@ creation.
 - scheduler alert history now keeps per-category lag/failure occurrence timelines instead of only
   the latest scheduler row, so resolved review can address older closed occurrences with stable
   occurrence ids and timeline context
+- scheduler automation now also has a dedicated paginated alert-occurrence surface, so repeated
+  lag/failure timelines can be queried without relying on the global operator alert-history panel
   handoff
 
 ### Remaining work

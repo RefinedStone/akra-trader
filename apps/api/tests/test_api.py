@@ -636,6 +636,15 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "offset",
     "app",
   )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_alert_history"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "category",
+    "status",
+    "limit",
+    "offset",
+    "app",
+  )
   assert tuple(inspect.signature(routes["get_operator_provider_provenance_scheduler_health_analytics"].endpoint).parameters) == (
     "request",
     "filter_expr",
@@ -3459,6 +3468,95 @@ def test_operator_visibility_endpoint_reconstructs_historical_scheduler_export_f
   assert datetime.fromisoformat(
     reconstructed["analytics"]["query"]["alert_detected_at"]
   ) == datetime.fromisoformat(resolved_alert["detected_at"].replace("Z", "+00:00"))
+
+
+def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates_occurrences(
+  tmp_path: Path,
+) -> None:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    provider_provenance_report_scheduler_enabled=False,
+  ) as client:
+    app = client.app.state.container.app
+    fixed_time = datetime(2026, 4, 22, 11, 0, tzinfo=UTC)
+    app._clock = lambda: fixed_time
+    app._provider_provenance_report_scheduler_interval_seconds = 60
+    app._provider_provenance_report_scheduler_batch_limit = 1
+    app._provider_provenance_scheduler_health_records = {}
+    app._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
+      generated_at=fixed_time,
+      enabled=True,
+      status="starting",
+      summary="Background scheduler has not completed a provider provenance automation cycle yet.",
+      interval_seconds=60,
+      batch_limit=1,
+    )
+
+    report_a = app.create_provider_provenance_scheduled_report(name="Timeline A")
+    report_b = app.create_provider_provenance_scheduled_report(name="Timeline B")
+    overdue_at = fixed_time - timedelta(minutes=10)
+    app._save_provider_provenance_scheduled_report_record(replace(report_a, next_run_at=overdue_at))
+    app._save_provider_provenance_scheduled_report_record(replace(report_b, next_run_at=overdue_at))
+
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time + timedelta(days=7))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time - timedelta(minutes=10))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time + timedelta(days=7))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+
+    first_page_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-alerts",
+      params={"category": "scheduler_lag", "status": "resolved", "limit": 1, "offset": 0},
+    )
+    second_page_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-alerts",
+      params={"category": "scheduler_lag", "status": "resolved", "limit": 1, "offset": 1},
+    )
+
+  assert first_page_response.status_code == 200
+  first_page_payload = first_page_response.json()
+  assert first_page_payload["query"]["category"] == "scheduler_lag"
+  assert first_page_payload["query"]["status"] == "resolved"
+  assert first_page_payload["summary"]["total_occurrences"] == 2
+  assert first_page_payload["returned"] == 1
+  assert first_page_payload["next_offset"] == 1
+  assert first_page_payload["items"][0]["timeline_position"] == 2
+  assert first_page_payload["items"][0]["timeline_total"] == 2
+
+  assert second_page_response.status_code == 200
+  second_page_payload = second_page_response.json()
+  assert second_page_payload["returned"] == 1
+  assert second_page_payload["previous_offset"] == 0
+  assert second_page_payload["items"][0]["timeline_position"] == 1
 
 
 def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trends(

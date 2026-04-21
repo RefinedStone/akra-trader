@@ -141,6 +141,10 @@ def serialize_provider_provenance_scheduler_health_history(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_health_history')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_alert_history(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_alert_history')(*args, **kwargs)
+
+
 def serialize_strategy(*args, **kwargs):
   return _application_symbol('serialize_strategy')(*args, **kwargs)
 
@@ -655,6 +659,14 @@ def execute_standalone_surface_binding(
       current,
       payload,
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_alert_history":
+    payload = app.get_provider_provenance_scheduler_alert_history_page(
+      category=resolved_filters.get("category"),
+      status=resolved_filters.get("status"),
+      limit=resolved_filters.get("limit", 25),
+      offset=resolved_filters.get("offset", 0),
+    )
+    return serialize_provider_provenance_scheduler_alert_history(payload)
   if binding.binding_kind == "operator_provider_provenance_scheduler_health_analytics":
     return app.get_provider_provenance_scheduler_health_analytics(
       status=resolved_filters.get("status"),

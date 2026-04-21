@@ -13,8 +13,9 @@ import type {
   ProviderProvenanceExportJobHistoryPayload,
   ProviderProvenanceExportJobListPayload,
   ProviderProvenanceExportJobPolicyResult,
-  ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
+  ProviderProvenanceSchedulerAlertHistoryPayload,
+  ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceScheduledReportEntry,
   ProviderProvenanceScheduledReportHistoryPayload,
@@ -357,6 +358,31 @@ export async function listProviderProvenanceSchedulerHealthHistory(params: {
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceSchedulerHealthHistoryPayload>(
     `/operator/provider-provenance-analytics/scheduler-health${suffix}`,
+  );
+}
+
+export async function listProviderProvenanceSchedulerAlertHistory(params: {
+  category?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.category?.trim()) {
+    searchParams.set("category", params.category.trim());
+  }
+  if (params.status?.trim()) {
+    searchParams.set("status", params.status.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
+  }
+  if (typeof params.offset === "number" && Number.isFinite(params.offset)) {
+    searchParams.set("offset", `${Math.max(0, Math.min(Math.round(params.offset), 10000))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerAlertHistoryPayload>(
+    `/operator/provider-provenance-analytics/scheduler-alerts${suffix}`,
   );
 }
 

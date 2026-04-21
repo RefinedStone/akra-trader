@@ -1597,6 +1597,133 @@ def test_scheduler_alert_history_tracks_multiple_resolved_occurrences_per_catego
   assert len({alert.occurrence_id for alert in resolved_alerts}) == 2
 
 
+def test_provider_provenance_scheduler_alert_history_page_paginates_occurrences(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 13, 30, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+
+  for name in ("Timeline page A", "Timeline page B"):
+    report = app.create_provider_provenance_scheduled_report(name=name)
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report, next_run_at=clock.current - timedelta(minutes=10))
+    )
+
+  for should_be_overdue in (False, True, False):
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    clock.advance(timedelta(minutes=1))
+    next_run_at = (
+      clock.current - timedelta(minutes=10)
+      if should_be_overdue
+      else clock.current + timedelta(days=7)
+    )
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=next_run_at)
+      )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+
+  first_page = app.get_provider_provenance_scheduler_alert_history_page(
+    category="scheduler_lag",
+    status="resolved",
+    limit=1,
+    offset=0,
+  )
+  second_page = app.get_provider_provenance_scheduler_alert_history_page(
+    category="scheduler_lag",
+    status="resolved",
+    limit=1,
+    offset=1,
+  )
+
+  assert first_page["query"]["category"] == "scheduler_lag"
+  assert first_page["query"]["status"] == "resolved"
+  assert first_page["total"] == 2
+  assert first_page["returned"] == 1
+  assert first_page["next_offset"] == 1
+  assert first_page["summary"]["by_category"][0]["category"] == "scheduler_lag"
+  assert first_page["items"][0].timeline_position == 2
+  assert first_page["items"][0].timeline_total == 2
+  assert second_page["returned"] == 1
+  assert second_page["previous_offset"] == 0
+  assert second_page["items"][0].timeline_position == 1
+
+
+def test_provider_provenance_scheduler_alert_history_binding_serializes_occurrences(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 14, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+  bindings_by_key = {
+    binding.surface_key: binding
+    for binding in list_standalone_surface_runtime_bindings()
+  }
+
+  report_a = app.create_provider_provenance_scheduled_report(name="Binding timeline watch A")
+  report_b = app.create_provider_provenance_scheduled_report(name="Binding timeline watch B")
+  for report in (report_a, report_b):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report, next_run_at=clock.current - timedelta(minutes=10))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  clock.advance(timedelta(minutes=1))
+  for record in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(record, next_run_at=clock.current + timedelta(days=7))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+
+  payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
+    app=app,
+    filters={"category": "scheduler_lag", "status": "resolved", "limit": 10, "offset": 0},
+  )
+
+  assert payload["query"]["category"] == "scheduler_lag"
+  assert payload["query"]["status"] == "resolved"
+  assert payload["summary"]["total_occurrences"] == 1
+  assert payload["summary"]["resolved_count"] == 1
+  assert payload["returned"] == 1
+  assert payload["items"][0]["category"] == "scheduler_lag"
+  assert payload["items"][0]["status"] == "resolved"
+  assert payload["items"][0]["occurrence_id"]
+  assert payload["items"][0]["timeline_total"] == 1
+
+
 def test_provider_provenance_scheduler_history_and_analytics_persist(
   monkeypatch,
   tmp_path: Path,
@@ -14907,6 +15034,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduled_report_run_due",
     "operator_provider_provenance_scheduled_report_history",
     "operator_provider_provenance_scheduler_health_history",
+    "operator_provider_provenance_scheduler_alert_history",
     "operator_provider_provenance_scheduler_health_analytics",
     "operator_provider_provenance_scheduler_health_export",
     "guarded_live_status",
@@ -15046,6 +15174,15 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "/operator/provider-provenance-analytics/scheduler-health"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_health_history"].filter_param_specs[-1].key == (
+    "offset"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].route_path == (
+    "/operator/provider-provenance-analytics/scheduler-alerts"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].filter_param_specs[0].key == (
+    "category"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].filter_param_specs[-1].key == (
     "offset"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_health_analytics"].route_path == (

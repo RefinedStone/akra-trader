@@ -1281,6 +1281,37 @@ export type ProviderProvenanceSchedulerHealthHistoryPayload = {
   previous_offset?: number | null;
 };
 
+export type ProviderProvenanceSchedulerAlertHistoryPayload = {
+  generated_at: string;
+  query: {
+    category?: string | null;
+    status?: string | null;
+    limit: number;
+    offset: number;
+  };
+  available_filters: {
+    categories: string[];
+    statuses: string[];
+  };
+  summary: {
+    total_occurrences: number;
+    active_count: number;
+    resolved_count: number;
+    by_category: {
+      category: string;
+      total: number;
+      active_count: number;
+      resolved_count: number;
+    }[];
+  };
+  items: OperatorAlertEntry[];
+  total: number;
+  returned: number;
+  has_more: boolean;
+  next_offset?: number | null;
+  previous_offset?: number | null;
+};
+
 export type ProviderProvenanceSchedulerHealthStatusSeriesEntry = {
   bucket_key: string;
   bucket_label: string;

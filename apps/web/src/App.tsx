@@ -75,6 +75,7 @@ import {
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
   listProviderProvenanceExportJobs,
+  listProviderProvenanceSchedulerAlertHistory,
   listProviderProvenanceSchedulerHealthHistory,
   listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
@@ -283,6 +284,7 @@ import type {
   ProviderProvenanceExportJobEscalationResult,
   ProviderProvenanceExportJobHistoryPayload,
   ProviderProvenanceExportJobPolicyResult,
+  ProviderProvenanceSchedulerAlertHistoryPayload,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
@@ -2954,6 +2956,18 @@ export default function App() {
     useState<string | null>(null);
   const [providerProvenanceSchedulerHistoryOffset, setProviderProvenanceSchedulerHistoryOffset] =
     useState(0);
+  const [providerProvenanceSchedulerAlertHistory, setProviderProvenanceSchedulerAlertHistory] =
+    useState<ProviderProvenanceSchedulerAlertHistoryPayload | null>(null);
+  const [providerProvenanceSchedulerAlertHistoryLoading, setProviderProvenanceSchedulerAlertHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerAlertHistoryError, setProviderProvenanceSchedulerAlertHistoryError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerAlertHistoryOffset, setProviderProvenanceSchedulerAlertHistoryOffset] =
+    useState(0);
+  const [providerProvenanceSchedulerAlertHistoryCategory, setProviderProvenanceSchedulerAlertHistoryCategory] =
+    useState(ALL_FILTER_VALUE);
+  const [providerProvenanceSchedulerAlertHistoryStatus, setProviderProvenanceSchedulerAlertHistoryStatus] =
+    useState(ALL_FILTER_VALUE);
   const [providerProvenanceSchedulerDrilldownBucketKey, setProviderProvenanceSchedulerDrilldownBucketKey] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerExports, setProviderProvenanceSchedulerExports] =
@@ -3129,6 +3143,7 @@ export default function App() {
   const providerProvenanceAnalyticsRequestIdRef = useRef(0);
   const providerProvenanceSchedulerAnalyticsRequestIdRef = useRef(0);
   const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
   const selectedProviderProvenanceSchedulerExportEntry = useMemo(
     () =>
@@ -4425,7 +4440,14 @@ export default function App() {
 
   useEffect(() => {
     void loadProviderProvenanceSchedulerSurfaces();
-  }, [providerProvenanceAnalyticsQuery.window_days, providerProvenanceSchedulerHistoryOffset, providerProvenanceSchedulerDrilldownBucketKey]);
+  }, [
+    providerProvenanceAnalyticsQuery.window_days,
+    providerProvenanceSchedulerAlertHistoryCategory,
+    providerProvenanceSchedulerAlertHistoryOffset,
+    providerProvenanceSchedulerAlertHistoryStatus,
+    providerProvenanceSchedulerHistoryOffset,
+    providerProvenanceSchedulerDrilldownBucketKey,
+  ]);
 
   useEffect(() => {
     setProviderProvenanceSchedulerExportPolicyDraft(
@@ -4485,6 +4507,27 @@ export default function App() {
         ? providerProvenanceSchedulerHistory.items
         : (providerProvenanceSchedulerAnalytics?.recent_history ?? []),
     [providerProvenanceSchedulerAnalytics, providerProvenanceSchedulerHistory],
+  );
+
+  const providerProvenanceSchedulerAlertTimelineItems = useMemo(
+    () => providerProvenanceSchedulerAlertHistory?.items ?? [],
+    [providerProvenanceSchedulerAlertHistory],
+  );
+
+  const providerProvenanceSchedulerAlertCategoryOptions = useMemo(
+    () =>
+      providerProvenanceSchedulerAlertHistory?.available_filters.categories.length
+        ? providerProvenanceSchedulerAlertHistory.available_filters.categories
+        : ["scheduler_lag", "scheduler_failure"],
+    [providerProvenanceSchedulerAlertHistory],
+  );
+
+  const providerProvenanceSchedulerAlertStatusOptions = useMemo(
+    () =>
+      providerProvenanceSchedulerAlertHistory?.available_filters.statuses.length
+        ? providerProvenanceSchedulerAlertHistory.available_filters.statuses
+        : ["active", "resolved"],
+    [providerProvenanceSchedulerAlertHistory],
   );
 
   const providerProvenanceSchedulerDrillDown = providerProvenanceSchedulerAnalytics?.drill_down ?? null;
@@ -5133,16 +5176,20 @@ export default function App() {
     providerProvenanceSchedulerAnalyticsRequestIdRef.current = analyticsRequestId;
     const historyRequestId = providerProvenanceSchedulerHistoryRequestIdRef.current + 1;
     providerProvenanceSchedulerHistoryRequestIdRef.current = historyRequestId;
+    const alertHistoryRequestId = providerProvenanceSchedulerAlertHistoryRequestIdRef.current + 1;
+    providerProvenanceSchedulerAlertHistoryRequestIdRef.current = alertHistoryRequestId;
     const exportRequestId = providerProvenanceSchedulerExportRequestIdRef.current + 1;
     providerProvenanceSchedulerExportRequestIdRef.current = exportRequestId;
     setProviderProvenanceSchedulerAnalyticsLoading(true);
     setProviderProvenanceSchedulerHistoryLoading(true);
+    setProviderProvenanceSchedulerAlertHistoryLoading(true);
     setProviderProvenanceSchedulerExportsLoading(true);
     setProviderProvenanceSchedulerAnalyticsError(null);
     setProviderProvenanceSchedulerHistoryError(null);
+    setProviderProvenanceSchedulerAlertHistoryError(null);
     setProviderProvenanceSchedulerExportsError(null);
     try {
-      const [analyticsPayload, historyPayload, exportListPayload] = await Promise.all([
+      const [analyticsPayload, historyPayload, alertHistoryPayload, exportListPayload] = await Promise.all([
         getProviderProvenanceSchedulerHealthAnalytics({
           windowDays: providerProvenanceAnalyticsQuery.window_days,
           historyLimit: schedulerHistoryLimit,
@@ -5152,6 +5199,18 @@ export default function App() {
         listProviderProvenanceSchedulerHealthHistory({
           limit: schedulerHistoryLimit,
           offset: providerProvenanceSchedulerHistoryOffset,
+        }),
+        listProviderProvenanceSchedulerAlertHistory({
+          category:
+            providerProvenanceSchedulerAlertHistoryCategory !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerAlertHistoryCategory
+              : undefined,
+          status:
+            providerProvenanceSchedulerAlertHistoryStatus !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerAlertHistoryStatus
+              : undefined,
+          limit: schedulerHistoryLimit,
+          offset: providerProvenanceSchedulerAlertHistoryOffset,
         }),
         listProviderProvenanceExportJobs({
           exportScope: "provider_provenance_scheduler_health",
@@ -5163,6 +5222,9 @@ export default function App() {
       }
       if (providerProvenanceSchedulerHistoryRequestIdRef.current === historyRequestId) {
         setProviderProvenanceSchedulerHistory(historyPayload);
+      }
+      if (providerProvenanceSchedulerAlertHistoryRequestIdRef.current === alertHistoryRequestId) {
+        setProviderProvenanceSchedulerAlertHistory(alertHistoryPayload);
       }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExports(exportListPayload.items);
@@ -5177,6 +5239,10 @@ export default function App() {
         setProviderProvenanceSchedulerHistory(null);
         setProviderProvenanceSchedulerHistoryError(message);
       }
+      if (providerProvenanceSchedulerAlertHistoryRequestIdRef.current === alertHistoryRequestId) {
+        setProviderProvenanceSchedulerAlertHistory(null);
+        setProviderProvenanceSchedulerAlertHistoryError(message);
+      }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExports([]);
         setProviderProvenanceSchedulerExportsError(message);
@@ -5187,6 +5253,9 @@ export default function App() {
       }
       if (providerProvenanceSchedulerHistoryRequestIdRef.current === historyRequestId) {
         setProviderProvenanceSchedulerHistoryLoading(false);
+      }
+      if (providerProvenanceSchedulerAlertHistoryRequestIdRef.current === alertHistoryRequestId) {
+        setProviderProvenanceSchedulerAlertHistoryLoading(false);
       }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExportsLoading(false);
@@ -8884,6 +8953,179 @@ export default function App() {
                                     </table>
                                   ) : (
                                     <p className="empty-state">No scheduler cycle history recorded yet.</p>
+                                  )}
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Scheduler alert occurrence timeline</strong>
+                                    <p>
+                                      Review paginated lag/failure occurrences without mixing them into the broader
+                                      operator alert history.
+                                    </p>
+                                  </div>
+                                  <div className="run-filter-summary-chip-row">
+                                    <span className="run-filter-summary-chip">
+                                      Total {providerProvenanceSchedulerAlertHistory?.summary.total_occurrences ?? 0} occurrence(s)
+                                    </span>
+                                    <span className="run-filter-summary-chip">
+                                      Active {providerProvenanceSchedulerAlertHistory?.summary.active_count ?? 0} · resolved {" "}
+                                      {providerProvenanceSchedulerAlertHistory?.summary.resolved_count ?? 0}
+                                    </span>
+                                    {(providerProvenanceSchedulerAlertHistory?.summary.by_category ?? []).map((entry) => (
+                                      <span
+                                        className="run-filter-summary-chip"
+                                        key={`provider-scheduler-alert-summary-${entry.category}`}
+                                      >
+                                        {formatWorkflowToken(entry.category)} {entry.total} total · {entry.resolved_count} resolved
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <div className="market-data-provenance-history-actions">
+                                    <label className="run-form-field">
+                                      <span>Category</span>
+                                      <select
+                                        value={providerProvenanceSchedulerAlertHistoryCategory}
+                                        onChange={(event) => {
+                                          setProviderProvenanceSchedulerAlertHistoryCategory(event.target.value);
+                                          setProviderProvenanceSchedulerAlertHistoryOffset(0);
+                                        }}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All categories</option>
+                                        {providerProvenanceSchedulerAlertCategoryOptions.map((value) => (
+                                          <option key={`provider-scheduler-alert-category-${value}`} value={value}>
+                                            {formatWorkflowToken(value)}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label className="run-form-field">
+                                      <span>Status</span>
+                                      <select
+                                        value={providerProvenanceSchedulerAlertHistoryStatus}
+                                        onChange={(event) => {
+                                          setProviderProvenanceSchedulerAlertHistoryStatus(event.target.value);
+                                          setProviderProvenanceSchedulerAlertHistoryOffset(0);
+                                        }}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All statuses</option>
+                                        {providerProvenanceSchedulerAlertStatusOptions.map((value) => (
+                                          <option key={`provider-scheduler-alert-status-${value}`} value={value}>
+                                            {formatWorkflowToken(value)}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <button
+                                      className="ghost-button"
+                                      disabled={!providerProvenanceSchedulerAlertHistory?.previous_offset && providerProvenanceSchedulerAlertHistoryOffset === 0}
+                                      onClick={() => {
+                                        setProviderProvenanceSchedulerAlertHistoryOffset(
+                                          providerProvenanceSchedulerAlertHistory?.previous_offset ?? 0,
+                                        );
+                                      }}
+                                      type="button"
+                                    >
+                                      Previous page
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      disabled={!(providerProvenanceSchedulerAlertHistory?.has_more ?? false)}
+                                      onClick={() => {
+                                        if (typeof providerProvenanceSchedulerAlertHistory?.next_offset === "number") {
+                                          setProviderProvenanceSchedulerAlertHistoryOffset(
+                                            providerProvenanceSchedulerAlertHistory.next_offset,
+                                          );
+                                        }
+                                      }}
+                                      type="button"
+                                    >
+                                      Next page
+                                    </button>
+                                    <span className="run-lineage-symbol-copy">
+                                      {providerProvenanceSchedulerAlertHistory
+                                        ? `${providerProvenanceSchedulerAlertHistory.query.offset + 1}-${providerProvenanceSchedulerAlertHistory.query.offset + providerProvenanceSchedulerAlertHistory.returned} of ${providerProvenanceSchedulerAlertHistory.total}`
+                                        : "Page 1"}
+                                    </span>
+                                  </div>
+                                  {providerProvenanceSchedulerAlertHistoryLoading && !providerProvenanceSchedulerAlertTimelineItems.length ? (
+                                    <p className="empty-state">Loading scheduler alert timeline…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerAlertHistoryError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduler alert timeline failed: {providerProvenanceSchedulerAlertHistoryError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerAlertTimelineItems.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Occurrence</th>
+                                          <th>Window</th>
+                                          <th>Summary</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceSchedulerAlertTimelineItems.map((alert) => {
+                                          const timelineSummary = formatProviderProvenanceSchedulerTimelineSummary(alert);
+                                          return (
+                                            <tr key={`provider-scheduler-alert-timeline-${getOperatorAlertOccurrenceKey(alert)}`}>
+                                              <td>
+                                                <strong>{formatWorkflowToken(alert.category)}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(alert.status)} · {alert.severity}
+                                                </p>
+                                                {timelineSummary ? (
+                                                  <p className="run-lineage-symbol-copy">{timelineSummary}</p>
+                                                ) : null}
+                                              </td>
+                                              <td>
+                                                <strong>{formatTimestamp(alert.detected_at)}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  Resolved {formatTimestamp(alert.resolved_at ?? null)}
+                                                </p>
+                                                {alert.occurrence_id ? (
+                                                  <p className="run-lineage-symbol-copy">{alert.occurrence_id}</p>
+                                                ) : null}
+                                              </td>
+                                              <td>
+                                                <strong>{alert.summary}</strong>
+                                                <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
+                                                </p>
+                                                <div className="market-data-provenance-history-actions">
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void triggerProviderProvenanceSchedulerAlertExportWorkflow(alert, {
+                                                        sourceLabel: `${alert.summary} scheduler timeline row`,
+                                                      });
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {alert.status === "resolved" ? "Reconstruct export" : "Start current workflow"}
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void triggerProviderProvenanceSchedulerAlertExportWorkflow(alert, {
+                                                        escalate: true,
+                                                        sourceLabel: `${alert.summary} scheduler timeline row`,
+                                                      });
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {alert.status === "resolved"
+                                                      ? "Escalate reconstructed export"
+                                                      : "Escalate current snapshot"}
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No scheduler alert occurrences match the selected filters.</p>
                                   )}
                                   <div className="market-data-provenance-history-head">
                                     <strong>Shared scheduler exports</strong>

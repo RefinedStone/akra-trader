@@ -26699,6 +26699,28 @@ class TradingApplication:
       return normalized
     return None
 
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_alert_history_status(
+    status: str | None,
+  ) -> str | None:
+    if not isinstance(status, str):
+      return None
+    normalized = status.strip().lower()
+    if normalized in {"active", "resolved"}:
+      return normalized
+    return None
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_alert_history_category(
+    category: str | None,
+  ) -> str | None:
+    if not isinstance(category, str):
+      return None
+    normalized = category.strip().lower()
+    if normalized in {"scheduler_lag", "scheduler_failure"}:
+      return normalized
+    return None
+
   def list_provider_provenance_scheduler_health_history(
     self,
     *,
@@ -26750,6 +26772,93 @@ class TradingApplication:
         "status": normalized_status,
         "limit": normalized_limit,
         "offset": normalized_offset,
+      },
+      "items": tuple(items),
+      "total": total,
+      "returned": len(items),
+      "has_more": next_offset is not None,
+      "next_offset": next_offset,
+      "previous_offset": previous_offset,
+    }
+
+  def get_provider_provenance_scheduler_alert_history_page(
+    self,
+    *,
+    category: str | None = None,
+    status: str | None = None,
+    limit: int = 25,
+    offset: int = 0,
+  ) -> dict[str, Any]:
+    current_time = self._clock()
+    history = self._build_provider_provenance_scheduler_alert_history(
+      current_time=current_time,
+    )
+    normalized_category = self._normalize_provider_provenance_scheduler_alert_history_category(category)
+    normalized_status = self._normalize_provider_provenance_scheduler_alert_history_status(status)
+    normalized_limit = max(1, min(limit, 200))
+    normalized_offset = max(offset, 0)
+    filtered_history = [
+      alert
+      for alert in history
+      if (normalized_category is None or alert.category == normalized_category)
+      and (normalized_status is None or alert.status == normalized_status)
+    ]
+    total = len(filtered_history)
+    items = filtered_history[normalized_offset:normalized_offset + normalized_limit]
+    next_offset = (
+      normalized_offset + len(items)
+      if normalized_offset + len(items) < total
+      else None
+    )
+    previous_offset = (
+      max(normalized_offset - normalized_limit, 0)
+      if normalized_offset > 0 and total > 0
+      else None
+    )
+    categories = tuple(
+      category_key
+      for category_key in ("scheduler_lag", "scheduler_failure")
+      if any(alert.category == category_key for alert in history)
+    ) or ("scheduler_lag", "scheduler_failure")
+    statuses = tuple(
+      status_key
+      for status_key in ("active", "resolved")
+      if any(alert.status == status_key for alert in history)
+    ) or ("active", "resolved")
+    summary_by_category = tuple(
+      {
+        "category": category_key,
+        "total": sum(1 for alert in history if alert.category == category_key),
+        "active_count": sum(
+          1
+          for alert in history
+          if alert.category == category_key and alert.status == "active"
+        ),
+        "resolved_count": sum(
+          1
+          for alert in history
+          if alert.category == category_key and alert.status == "resolved"
+        ),
+      }
+      for category_key in categories
+    )
+    return {
+      "generated_at": current_time,
+      "query": {
+        "category": normalized_category,
+        "status": normalized_status,
+        "limit": normalized_limit,
+        "offset": normalized_offset,
+      },
+      "available_filters": {
+        "categories": categories,
+        "statuses": statuses,
+      },
+      "summary": {
+        "total_occurrences": len(history),
+        "active_count": sum(1 for alert in history if alert.status == "active"),
+        "resolved_count": sum(1 for alert in history if alert.status == "resolved"),
+        "by_category": summary_by_category,
       },
       "items": tuple(items),
       "total": total,
@@ -29076,6 +29185,84 @@ def serialize_provider_provenance_scheduler_health_history(
     "items": [
       serialize_provider_provenance_scheduler_health_record(record)
       for record in items
+    ],
+    "total": int(payload.get("total", 0)),
+    "returned": int(payload.get("returned", 0)),
+    "has_more": bool(payload.get("has_more", False)),
+    "next_offset": payload.get("next_offset"),
+    "previous_offset": payload.get("previous_offset"),
+  }
+
+
+def serialize_operator_alert(
+  alert: OperatorAlert,
+) -> dict[str, Any]:
+  return {
+    "alert_id": alert.alert_id,
+    "severity": alert.severity,
+    "category": alert.category,
+    "summary": alert.summary,
+    "detail": alert.detail,
+    "detected_at": alert.detected_at.isoformat(),
+    "run_id": alert.run_id,
+    "session_id": alert.session_id,
+    "symbol": alert.symbol,
+    "symbols": list(alert.symbols),
+    "timeframe": alert.timeframe,
+    "primary_focus": TradingApplication._serialize_operator_alert_primary_focus_payload(
+      alert.primary_focus,
+    ),
+    "occurrence_id": alert.occurrence_id,
+    "timeline_key": alert.timeline_key,
+    "timeline_position": alert.timeline_position,
+    "timeline_total": alert.timeline_total,
+    "status": alert.status,
+    "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at is not None else None,
+    "source": alert.source,
+    "delivery_targets": list(alert.delivery_targets),
+  }
+
+
+def serialize_provider_provenance_scheduler_alert_history(
+  payload: dict[str, Any],
+) -> dict[str, Any]:
+  items = payload.get("items", ())
+  query = payload.get("query", {})
+  summary = payload.get("summary", {})
+  generated_at = payload.get("generated_at")
+  return {
+    "generated_at": (
+      generated_at.isoformat()
+      if isinstance(generated_at, datetime)
+      else datetime.now(tz=UTC).isoformat()
+    ),
+    "query": {
+      "category": query.get("category"),
+      "status": query.get("status"),
+      "limit": int(query.get("limit", 25)),
+      "offset": int(query.get("offset", 0)),
+    },
+    "available_filters": {
+      "categories": list(payload.get("available_filters", {}).get("categories", ())),
+      "statuses": list(payload.get("available_filters", {}).get("statuses", ())),
+    },
+    "summary": {
+      "total_occurrences": int(summary.get("total_occurrences", 0)),
+      "active_count": int(summary.get("active_count", 0)),
+      "resolved_count": int(summary.get("resolved_count", 0)),
+      "by_category": [
+        {
+          "category": entry.get("category"),
+          "total": int(entry.get("total", 0)),
+          "active_count": int(entry.get("active_count", 0)),
+          "resolved_count": int(entry.get("resolved_count", 0)),
+        }
+        for entry in summary.get("by_category", ())
+      ],
+    },
+    "items": [
+      serialize_operator_alert(alert)
+      for alert in items
     ],
     "total": int(payload.get("total", 0)),
     "returned": int(payload.get("returned", 0)),

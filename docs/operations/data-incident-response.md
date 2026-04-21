@@ -67,6 +67,9 @@ unclear dataset lineage.
 - repeated lag/failure cycles now stay visible as separate scheduler alert occurrences with
   per-category timeline position in alert history, so resolved review can pick the exact closed
   window instead of losing older occurrences behind the latest row
+- the scheduler automation workspace now has its own paginated alert-occurrence table with
+  category/status filters, so teams can review or reconstruct scheduler incidents without paging
+  through unrelated operator alerts
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

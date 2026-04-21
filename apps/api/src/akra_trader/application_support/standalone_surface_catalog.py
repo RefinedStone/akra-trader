@@ -1656,6 +1656,61 @@ def build_standalone_surface_runtime_bindings(
       ),
     ),
   )
+  operator_provider_provenance_scheduler_alert_history_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_alert_history",
+    route_path="/operator/provider-provenance-analytics/scheduler-alerts",
+    route_name="list_operator_provider_provenance_scheduler_alert_history",
+    response_title="Provider provenance scheduler alert history",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_alert_history",
+    filter_keys=("category", "status", "limit", "offset"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "category",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Category",
+          description="Filter scheduler alert history by occurrence category.",
+          examples=("scheduler_lag",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "status",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Status",
+          description="Filter scheduler alert history by occurrence state.",
+          examples=("resolved",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=25,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler alert occurrences to return.",
+          examples=(25,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "offset",
+        int,
+        default=0,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0, le=10_000),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Offset",
+          description="Pagination offset into matching scheduler alert occurrences.",
+          examples=(25,),
+        ),
+      ),
+    ),
+  )
   operator_provider_provenance_scheduler_health_analytics_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_health_analytics",
     route_path="/operator/provider-provenance-analytics/scheduler-health/analytics",
@@ -3084,6 +3139,7 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduled_report_run_due_binding,
     operator_provider_provenance_scheduled_report_history_binding,
     operator_provider_provenance_scheduler_health_history_binding,
+    operator_provider_provenance_scheduler_alert_history_binding,
     operator_provider_provenance_scheduler_health_analytics_binding,
     operator_provider_provenance_scheduler_health_export_binding,
     guarded_live_status_binding,
