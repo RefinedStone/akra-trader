@@ -1585,6 +1585,10 @@ class OperatorAlert:
   symbols: tuple[str, ...] = ()
   timeframe: str | None = None
   primary_focus: OperatorAlertPrimaryFocus | None = None
+  occurrence_id: str | None = None
+  timeline_key: str | None = None
+  timeline_position: int | None = None
+  timeline_total: int | None = None
   status: str = "active"
   resolved_at: datetime | None = None
   source: str = "runtime"

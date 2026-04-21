@@ -113,6 +113,9 @@ creation.
 - resolved scheduler alert history can now reconstruct historical scheduler exports from persisted
   scheduler-health records, so post-incident review is no longer forced to export only the current
   automation snapshot after the alert has cleared
+- scheduler alert history now keeps per-category lag/failure occurrence timelines instead of only
+  the latest scheduler row, so resolved review can address older closed occurrences with stable
+  occurrence ids and timeline context
   handoff
 
 ### Remaining work

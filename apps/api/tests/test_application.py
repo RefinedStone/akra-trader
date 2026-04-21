@@ -1474,17 +1474,50 @@ def test_resolved_scheduler_alert_row_reconstructs_historical_export(
     source_tab_id="system:provider-provenance-scheduler",
     source_tab_label="Background scheduler",
   )
+  clock.advance(timedelta(minutes=1))
+  for record in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(record, next_run_at=clock.current - timedelta(minutes=10))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  clock.advance(timedelta(minutes=1))
+  for record in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(record, next_run_at=clock.current + timedelta(days=7))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
   resolved_visibility = app.get_operator_visibility()
-  resolved_alert = next(
+  resolved_alerts = [
     alert
     for alert in resolved_visibility.alert_history
     if alert.category == "scheduler_lag" and alert.status == "resolved"
+  ]
+  assert len(resolved_alerts) == 2
+  assert len({alert.occurrence_id for alert in resolved_alerts}) == 2
+  oldest_resolved_alert = min(
+    resolved_alerts,
+    key=lambda alert: alert.detected_at,
   )
+  newest_resolved_alert = max(
+    resolved_alerts,
+    key=lambda alert: alert.detected_at,
+  )
+  assert oldest_resolved_alert.timeline_key == "scheduler_lag"
+  assert oldest_resolved_alert.timeline_position == 1
+  assert newest_resolved_alert.timeline_position == 2
+  assert oldest_resolved_alert.timeline_total == 2
+  assert newest_resolved_alert.timeline_total == 2
 
   export_payload = app.reconstruct_provider_provenance_scheduler_health_export(
-    alert_category=resolved_alert.category,
-    detected_at=resolved_alert.detected_at,
-    resolved_at=resolved_alert.resolved_at,
+    alert_category=oldest_resolved_alert.category,
+    detected_at=oldest_resolved_alert.detected_at,
+    resolved_at=oldest_resolved_alert.resolved_at,
     export_format="json",
     history_limit=8,
     drilldown_history_limit=12,
@@ -1502,9 +1535,66 @@ def test_resolved_scheduler_alert_row_reconstructs_historical_export(
   assert reconstructed["current"]["status"] == "lagging"
   assert reconstructed["history_page"]["total"] >= 1
   assert reconstructed["analytics"]["query"]["reconstruction_mode"] == "resolved_alert_row"
-  assert reconstructed["analytics"]["query"]["alert_resolved_at"] == resolved_alert.resolved_at.isoformat()
+  assert reconstructed["analytics"]["query"]["alert_resolved_at"] == oldest_resolved_alert.resolved_at.isoformat()
+  assert reconstructed["analytics"]["query"]["alert_detected_at"] == oldest_resolved_alert.detected_at.isoformat()
   assert shared_export.export_scope == "provider_provenance_scheduler_health"
   assert "resolved alert reconstruction" in (shared_export.filter_summary or "")
+
+
+def test_scheduler_alert_history_tracks_multiple_resolved_occurrences_per_category(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 13, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+
+  for name in ("Timeline watch A", "Timeline watch B"):
+    report = app.create_provider_provenance_scheduled_report(name=name)
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report, next_run_at=clock.current - timedelta(minutes=10))
+    )
+
+  for should_be_overdue in (False, True, False):
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    clock.advance(timedelta(minutes=1))
+    next_run_at = (
+      clock.current - timedelta(minutes=10)
+      if should_be_overdue
+      else clock.current + timedelta(days=7)
+    )
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=next_run_at)
+      )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+
+  visibility = app.get_operator_visibility()
+  resolved_alerts = [
+    alert
+    for alert in visibility.alert_history
+    if alert.category == "scheduler_lag" and alert.status == "resolved"
+  ]
+
+  assert len(resolved_alerts) == 2
+  assert [alert.timeline_position for alert in sorted(resolved_alerts, key=lambda alert: alert.detected_at)] == [1, 2]
+  assert all(alert.timeline_total == 2 for alert in resolved_alerts)
+  assert len({alert.occurrence_id for alert in resolved_alerts}) == 2
 
 
 def test_provider_provenance_scheduler_history_and_analytics_persist(

@@ -27616,57 +27616,65 @@ class TradingApplication:
     current_health = self.get_provider_provenance_scheduler_health()
     history_rows: list[OperatorAlert] = []
     for target_status in ("lagging", "failed"):
-      latest_index = next(
-        (index for index in range(len(records) - 1, -1, -1) if records[index].status == target_status),
-        None,
-      )
-      if latest_index is None:
-        continue
-      start_index = latest_index
-      while start_index > 0 and records[start_index - 1].status == target_status:
-        start_index -= 1
-      latest_record = records[latest_index]
-      latest_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(latest_record)
-      alert = self._build_provider_provenance_scheduler_operator_alert(
-        health=latest_snapshot,
-        current_time=current_time,
-      )
-      if alert is None:
-        continue
-      first_record = records[start_index]
-      first_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(first_record)
-      detected_at = (
-        first_snapshot.oldest_due_at or first_snapshot.generated_at
-        if target_status == "lagging"
-        else (
-          first_snapshot.last_failure_at
-          or first_snapshot.last_cycle_finished_at
-          or first_snapshot.last_cycle_started_at
-          or first_snapshot.generated_at
+      status_occurrences: list[OperatorAlert] = []
+      index = 0
+      while index < len(records):
+        if records[index].status != target_status:
+          index += 1
+          continue
+        start_index = index
+        end_index = index
+        while end_index + 1 < len(records) and records[end_index + 1].status == target_status:
+          end_index += 1
+        latest_record = records[end_index]
+        latest_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(latest_record)
+        alert = self._build_provider_provenance_scheduler_operator_alert(
+          health=latest_snapshot,
+          current_time=current_time,
         )
-      )
-      if current_health.status == target_status:
-        history_rows.append(
-          replace(
-            alert,
-            detected_at=detected_at,
-            status="active",
-            resolved_at=None,
+        if alert is not None:
+          first_record = records[start_index]
+          first_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(first_record)
+          detected_at = (
+            first_snapshot.oldest_due_at or first_snapshot.generated_at
+            if target_status == "lagging"
+            else (
+              first_snapshot.last_failure_at
+              or first_snapshot.last_cycle_finished_at
+              or first_snapshot.last_cycle_started_at
+              or first_snapshot.generated_at
+            )
           )
-        )
-        continue
-      resolved_at = (
-        records[latest_index + 1].recorded_at
-        if latest_index + 1 < len(records)
-        else current_time
-      )
-      history_rows.append(
-        replace(
-          alert,
-          detected_at=detected_at,
-          status="resolved",
-          resolved_at=resolved_at,
-        )
+          is_active_occurrence = end_index == len(records) - 1 and current_health.status == target_status
+          resolved_at = (
+            None
+            if is_active_occurrence
+            else (
+              records[end_index + 1].recorded_at
+              if end_index + 1 < len(records)
+              else current_time
+            )
+          )
+          status_occurrences.append(
+            replace(
+              alert,
+              detected_at=detected_at,
+              occurrence_id=self._build_operator_alert_occurrence_id(
+                alert_id=alert.alert_id,
+                detected_at=detected_at,
+                resolved_at=resolved_at,
+              ),
+              timeline_key=alert.category,
+              timeline_position=len(status_occurrences) + 1,
+              status="active" if is_active_occurrence else "resolved",
+              resolved_at=resolved_at,
+            )
+          )
+        index = end_index + 1
+      total_occurrences = len(status_occurrences)
+      history_rows.extend(
+        replace(alert, timeline_total=total_occurrences)
+        for alert in status_occurrences
       )
     return tuple(
       sorted(
@@ -27675,6 +27683,16 @@ class TradingApplication:
         reverse=True,
       )
     )
+
+  @staticmethod
+  def _build_operator_alert_occurrence_id(
+    *,
+    alert_id: str,
+    detected_at: datetime,
+    resolved_at: datetime | None,
+  ) -> str:
+    resolved_marker = resolved_at.isoformat() if resolved_at is not None else "active"
+    return f"{alert_id}:{detected_at.isoformat()}:{resolved_marker}"
 
   def _collect_provider_provenance_scheduler_operator_visibility(
     self,

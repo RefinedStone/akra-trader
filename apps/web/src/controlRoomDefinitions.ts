@@ -1590,44 +1590,33 @@ export type OperatorAlertPrimaryFocus = {
   reason?: string | null;
 };
 
+export type OperatorAlertEntry = {
+  alert_id: string;
+  severity: string;
+  category: string;
+  summary: string;
+  detail: string;
+  detected_at: string;
+  run_id?: string | null;
+  session_id?: string | null;
+  symbol?: string | null;
+  symbols: string[];
+  timeframe?: string | null;
+  primary_focus?: OperatorAlertPrimaryFocus | null;
+  occurrence_id?: string | null;
+  timeline_key?: string | null;
+  timeline_position?: number | null;
+  timeline_total?: number | null;
+  status: string;
+  resolved_at?: string | null;
+  source: string;
+  delivery_targets: string[];
+};
+
 export type OperatorVisibility = {
   generated_at: string;
-  alerts: {
-    alert_id: string;
-    severity: string;
-    category: string;
-    summary: string;
-    detail: string;
-    detected_at: string;
-    run_id?: string | null;
-    session_id?: string | null;
-    symbol?: string | null;
-    symbols: string[];
-    timeframe?: string | null;
-    primary_focus?: OperatorAlertPrimaryFocus | null;
-    status: string;
-    resolved_at?: string | null;
-    source: string;
-    delivery_targets: string[];
-  }[];
-  alert_history: {
-    alert_id: string;
-    severity: string;
-    category: string;
-    summary: string;
-    detail: string;
-    detected_at: string;
-    run_id?: string | null;
-    session_id?: string | null;
-    symbol?: string | null;
-    symbols: string[];
-    timeframe?: string | null;
-    primary_focus?: OperatorAlertPrimaryFocus | null;
-    status: string;
-    resolved_at?: string | null;
-    source: string;
-    delivery_targets: string[];
-  }[];
+  alerts: OperatorAlertEntry[];
+  alert_history: OperatorAlertEntry[];
   incident_events: {
     event_id: string;
     alert_id: string;
@@ -2651,42 +2640,8 @@ export type GuardedLiveStatus = {
   generated_at: string;
   candidacy_status: string;
   blockers: string[];
-  active_alerts: {
-    alert_id: string;
-    severity: string;
-    category: string;
-    summary: string;
-    detail: string;
-    detected_at: string;
-    run_id?: string | null;
-    session_id?: string | null;
-    symbol?: string | null;
-    symbols: string[];
-    timeframe?: string | null;
-    primary_focus?: OperatorAlertPrimaryFocus | null;
-    status: string;
-    resolved_at?: string | null;
-    source: string;
-    delivery_targets: string[];
-  }[];
-  alert_history: {
-    alert_id: string;
-    severity: string;
-    category: string;
-    summary: string;
-    detail: string;
-    detected_at: string;
-    run_id?: string | null;
-    session_id?: string | null;
-    symbol?: string | null;
-    symbols: string[];
-    timeframe?: string | null;
-    primary_focus?: OperatorAlertPrimaryFocus | null;
-    status: string;
-    resolved_at?: string | null;
-    source: string;
-    delivery_targets: string[];
-  }[];
+  active_alerts: OperatorAlertEntry[];
+  alert_history: OperatorAlertEntry[];
   incident_events: {
     event_id: string;
     alert_id: string;

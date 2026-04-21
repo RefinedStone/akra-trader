@@ -435,6 +435,31 @@ function isProviderProvenanceSchedulerAlertCategory(category?: string | null) {
   return category === "scheduler_lag" || category === "scheduler_failure";
 }
 
+function getOperatorAlertOccurrenceKey(
+  alert: Pick<
+    OperatorVisibilityAlertEntry,
+    "occurrence_id" | "alert_id" | "status" | "detected_at" | "resolved_at"
+  >,
+) {
+  return alert.occurrence_id ?? `${alert.alert_id}:${alert.status}:${alert.detected_at}:${alert.resolved_at ?? "active"}`;
+}
+
+function formatProviderProvenanceSchedulerTimelineSummary(
+  alert: Pick<
+    OperatorVisibilityAlertEntry,
+    "category" | "status" | "timeline_position" | "timeline_total"
+  >,
+) {
+  if (!isProviderProvenanceSchedulerAlertCategory(alert.category) || !alert.timeline_total) {
+    return null;
+  }
+  const occurrenceLabel = `Occurrence ${alert.timeline_position ?? 1} of ${alert.timeline_total}`;
+  const categoryLabel = formatWorkflowToken(alert.category);
+  return alert.status === "resolved"
+    ? `${occurrenceLabel} in the ${categoryLabel} timeline.`
+    : `${occurrenceLabel} is the current ${categoryLabel} occurrence.`;
+}
+
 function buildProviderProvenanceSchedulerAlertWorkflowReason(
   alert: OperatorVisibilityAlertEntry,
   mode: "workflow" | "escalation",
@@ -4214,7 +4239,9 @@ export default function App() {
       return alertMap;
     }
     operatorVisibility.alert_history.forEach((alert) => {
-      alertMap.set(alert.alert_id, alert);
+      if (!alertMap.has(alert.alert_id)) {
+        alertMap.set(alert.alert_id, alert);
+      }
     });
     operatorVisibility.alerts.forEach((alert) => {
       alertMap.set(alert.alert_id, alert);
@@ -4289,10 +4316,36 @@ export default function App() {
     [linkedOperatorAlerts],
   );
 
-  const linkedOperatorAlertHistoryById = useMemo(
-    () => new Map(linkedOperatorAlertHistory.map((entry) => [entry.alert.alert_id, entry.link])),
+  const linkedOperatorAlertHistoryByOccurrenceId = useMemo(
+    () =>
+      new Map(
+        linkedOperatorAlertHistory.map((entry) => [
+          getOperatorAlertOccurrenceKey(entry.alert),
+          entry.link,
+        ]),
+      ),
     [linkedOperatorAlertHistory],
   );
+
+  const providerProvenanceSchedulerAlertHistoryTimelineByCategory = useMemo(() => {
+    const timelineMap = new Map<
+      string,
+      {
+        alert: OperatorVisibility["alert_history"][number];
+        link: ReturnType<typeof resolveMarketDataInstrumentLink>;
+      }[]
+    >();
+    linkedOperatorAlertHistory.forEach((entry) => {
+      if (!isProviderProvenanceSchedulerAlertCategory(entry.alert.category)) {
+        return;
+      }
+      const existing = timelineMap.get(entry.alert.category) ?? [];
+      existing.push(entry);
+      existing.sort((left, right) => left.alert.detected_at.localeCompare(right.alert.detected_at));
+      timelineMap.set(entry.alert.category, existing);
+    });
+    return timelineMap;
+  }, [linkedOperatorAlertHistory]);
 
   const linkedOperatorIncidentEventById = useMemo(
     () => new Map(linkedOperatorIncidentEvents.map((entry) => [entry.event.event_id, entry.link])),
@@ -4459,7 +4512,7 @@ export default function App() {
     focusedLinkedOperatorAlertHistory.forEach(({ alert, link }) => {
       const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(link);
       entries.push({
-        entryId: `alert-history:${alert.alert_id}:${alert.status}`,
+        entryId: `alert-history:${getOperatorAlertOccurrenceKey(alert)}`,
         occurredAt: alert.resolved_at ?? alert.detected_at,
         sourceLabel: alert.status === "resolved" ? "Resolved alert" : "Alert history",
         statusLabel: `${formatWorkflowToken(alert.status)} / ${formatWorkflowToken(alert.category)}`,
@@ -4779,11 +4832,15 @@ export default function App() {
       })),
       alert_history: focusedLinkedOperatorAlertHistory.map(({ alert, link }) => ({
         alert_id: alert.alert_id,
+        occurrence_id: alert.occurrence_id ?? null,
         severity: alert.severity,
         category: alert.category,
         summary: alert.summary,
         detail: alert.detail,
         detected_at: alert.detected_at,
+        timeline_key: alert.timeline_key ?? null,
+        timeline_position: alert.timeline_position ?? null,
+        timeline_total: alert.timeline_total ?? null,
         resolved_at: alert.resolved_at ?? null,
         status: alert.status,
         source: alert.source,
@@ -9961,10 +10018,23 @@ export default function App() {
                     </thead>
                     <tbody>
                       {operatorVisibility.alert_history.slice(0, 8).map((alert) => {
-                        const linkedInstrument = linkedOperatorAlertHistoryById.get(alert.alert_id) ?? null;
+                        const occurrenceKey = getOperatorAlertOccurrenceKey(alert);
+                        const linkedInstrument =
+                          linkedOperatorAlertHistoryByOccurrenceId.get(occurrenceKey) ?? null;
                         const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(linkedInstrument);
+                        const timelineSummary = formatProviderProvenanceSchedulerTimelineSummary(alert);
+                        const categoryTimeline =
+                          providerProvenanceSchedulerAlertHistoryTimelineByCategory.get(alert.category) ?? [];
+                        const timelinePreview = categoryTimeline
+                          .map((entry) => {
+                            const isCurrent = getOperatorAlertOccurrenceKey(entry.alert) === occurrenceKey;
+                            const marker = `#${entry.alert.timeline_position ?? 1}${isCurrent ? "*" : ""}`;
+                            const windowEnd = entry.alert.resolved_at ?? "active";
+                            return `${marker} ${formatTimestamp(entry.alert.detected_at)} → ${formatTimestamp(windowEnd)}`;
+                          })
+                          .join(" · ");
                         return (
-                          <tr key={`history-${alert.alert_id}`}>
+                          <tr key={`history-${occurrenceKey}`}>
                             <td>{alert.status}</td>
                             <td>{alert.severity}</td>
                             <td>
@@ -9973,6 +10043,16 @@ export default function App() {
                               <p className="run-lineage-symbol-copy">
                                 Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
                               </p>
+                              {timelineSummary ? (
+                                <p className="market-data-inline-focus-note">{timelineSummary}</p>
+                              ) : null}
+                              {alert.status === "resolved"
+                              && isProviderProvenanceSchedulerAlertCategory(alert.category)
+                              && categoryTimeline.length > 1 ? (
+                                <p className="market-data-inline-focus-note">
+                                  Timeline: {timelinePreview}
+                                </p>
+                              ) : null}
                               {isProviderProvenanceSchedulerAlertCategory(alert.category) ? (
                                 <div className="market-data-provenance-history-actions">
                                   <button

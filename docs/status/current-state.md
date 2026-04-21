@@ -166,6 +166,9 @@ It is not yet a finished live trading product:
 - resolved scheduler alert history rows can now reconstruct historical scheduler-health exports
   from the matching persisted health records instead of always snapshotting the current scheduler
   state, so post-incident handoff can follow the actual alert window that already closed
+- scheduler alert history now preserves every lag/failure occurrence per category with occurrence
+  ids and timeline position metadata, and the control-room history rows surface that timeline for
+  resolved entries instead of collapsing to only the latest scheduler occurrence
 
 ### Operator discipline baseline
 

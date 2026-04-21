@@ -64,6 +64,9 @@ unclear dataset lineage.
 - when that scheduler alert has already resolved, the alert-history row can now reconstruct a
   historical scheduler export from the persisted health-cycle records for the same detected /
   resolved window instead of exporting the current scheduler snapshot
+- repeated lag/failure cycles now stay visible as separate scheduler alert occurrences with
+  per-category timeline position in alert history, so resolved review can pick the exact closed
+  window instead of losing older occurrences behind the latest row
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

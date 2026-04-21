@@ -3399,12 +3399,39 @@ def test_operator_visibility_endpoint_reconstructs_historical_scheduler_export_f
       source_tab_id="system:provider-provenance-scheduler",
       source_tab_label="Background scheduler",
     )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time - timedelta(minutes=10))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time + timedelta(days=7))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
 
     visibility_response = client.get("/api/operator/visibility")
-    resolved_alert = next(
+    resolved_alerts = [
       alert
       for alert in visibility_response.json()["alert_history"]
       if alert["category"] == "scheduler_lag" and alert["status"] == "resolved"
+    ]
+    assert len(resolved_alerts) == 2
+    assert len({alert["occurrence_id"] for alert in resolved_alerts}) == 2
+    assert [alert["timeline_position"] for alert in sorted(resolved_alerts, key=lambda alert: alert["detected_at"])] == [1, 2]
+    resolved_alert = min(
+      resolved_alerts,
+      key=lambda alert: alert["detected_at"],
     )
     reconstruct_response = client.post(
       "/api/operator/provider-provenance-analytics/scheduler-health/reconstruct-export",
@@ -3429,6 +3456,9 @@ def test_operator_visibility_endpoint_reconstructs_historical_scheduler_export_f
   assert reconstructed["current"]["status"] == "lagging"
   assert reconstructed["history_page"]["total"] >= 1
   assert reconstructed["analytics"]["query"]["reconstruction_mode"] == "resolved_alert_row"
+  assert datetime.fromisoformat(
+    reconstructed["analytics"]["query"]["alert_detected_at"]
+  ) == datetime.fromisoformat(resolved_alert["detected_at"].replace("Z", "+00:00"))
 
 
 def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trends(
