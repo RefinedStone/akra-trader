@@ -75,20 +75,20 @@
     {
       "id": "task-b1-lineage-history-retention-pagination",
       "direction_id": "data-trust-and-lineage",
-      "title": "Add pagination, filtering, and export to lineage incident history",
-      "description": "Extend the shipped lineage incident history surface with pagination, richer filtering, and export support so operators can work larger incident timelines without scanning an unbounded merged panel.",
+      "title": "Add multi-symbol filtering and export to lineage incident history",
+      "description": "Extend the merged lineage incident history with multi-symbol-aware filtering, candidate-symbol inspection, and export support so operators can isolate and hand off incidents that span multiple symbols without scanning the full timeline.",
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 12,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:38:00+09:00",
+      "updated_at": "2026-04-21T22:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-lineage-query-surfaces"
       ],
-      "direction_relation_note": "The latest main-session reply narrowed this follow-up from broad retention guidance to a concrete lineage-incident-history product slice: pagination, richer filtering, and export on top of the newly merged control-room history panel.",
-      "priority_reason": "This is clearly executable follow-up work, but it stays proposed behind the alert-payload normalization slice so the queue keeps one deterministic next task."
+      "direction_relation_note": "The latest main-session reply narrows this follow-up to multi-symbol incidents specifically: separate filtering and export remain missing even after the primary-focus policy and inline candidate-order rationale shipped.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind the backend metadata contract so the queue keeps one deterministic next task while the new multi-symbol behavior stabilizes."
     },
     {
       "id": "task-b1-alert-lineage-correlation",
@@ -132,54 +132,54 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Define primary-focus policy for multi-symbol alerts in the control room",
       "description": "Turn the new normalized alert payload contract into deterministic control-room behavior by choosing and surfacing a primary instrument focus when alerts carry multiple symbols and a shared timeframe.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 83,
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:49:00+09:00",
+      "updated_at": "2026-04-21T22:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-alert-payload-normalization"
       ],
-      "direction_relation_note": "The latest main-session reply says multi-symbol alerts now emit symbols[] and timeframe, but the consumer still lacks a defined primary-focus policy, making this the clearest next operator-facing hardening slice.",
-      "priority_reason": "This is the new queue head because the normalized payload contract has shipped and the next executable gap is deterministic UI and triage behavior for multi-symbol alerts."
+      "direction_relation_note": "Completed on main in commit a49b966 with a shared primary-focus helper in App.tsx that deterministically orders candidate instruments by risk -> live -> payload order -> lexical, then reuses that policy for alert linking, auto-linked triage focus, and merged lineage incident history while surfacing the chosen focus and candidate order inline for operators.",
+      "priority_reason": "Closed after control-room policy, operator-visible rationale, docs updates, typecheck, build, commit, and push all landed, so queue selection should move to the remaining backend metadata contract and multi-symbol workflow follow-ups."
     },
     {
       "id": "task-b1-external-incident-market-context",
       "direction_id": "runtime-ops",
-      "title": "Extend external incident provider payloads with normalized market context",
-      "description": "Propagate normalized symbol, symbols, and timeframe fields into external incident provider payloads so downstream consumers and integrations receive the same market context contract as the internal control room.",
-      "status": "proposed",
-      "base_priority": 81,
-      "dynamic_priority_delta": 14,
+      "title": "Embed explicit primary-focus metadata in backend multi-symbol alert payloads",
+      "description": "Extend backend alert payloads to emit explicit primary_symbol and timeframe or equivalent policy metadata for multi-symbol incidents so control-room consumers can stop relying on frontend-only ordering heuristics and share one durable focus contract.",
+      "status": "ready",
+      "base_priority": 85,
+      "dynamic_priority_delta": 17,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:49:00+09:00",
+      "updated_at": "2026-04-21T22:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-alert-payload-normalization"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly identifies external incident provider payload expansion as still undone after the normalized alert payload contract shipped internally.",
-      "priority_reason": "This is executable follow-up work, but it stays proposed behind the control-room consumer policy so the queue keeps one deterministic next task."
+      "direction_relation_note": "The latest main-session reply says the new primary-focus policy is still computed in the frontend and explicitly calls out backend payload support for primary_symbol/timeframe or policy metadata as the next way to reduce heuristics.",
+      "priority_reason": "This becomes the queue head because the operator-visible heuristic has shipped and the next executable hardening step is to move the primary-focus contract into backend alert payloads."
     },
     {
       "id": "task-b1-triage-operator-actions",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Open ack, escalation, and remediation flows from the triage panel",
-      "description": "Connect the control-room triage panel to operator actions so ack, escalation, and remediation workflows can be launched directly from the alert and lineage context instead of requiring a separate surface or manual workflow handoff.",
+      "title": "Add operator action workflow for multi-symbol triage incidents",
+      "description": "Connect the control-room triage panel to operator actions for multi-symbol alerts and incidents so ack, escalation, and remediation workflows can launch from the chosen primary focus while preserving visibility into the remaining candidate symbols.",
       "status": "proposed",
       "base_priority": 79,
       "dynamic_priority_delta": 10,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:38:00+09:00",
+      "updated_at": "2026-04-21T22:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-alert-lineage-correlation"
+        "task-b1-multi-symbol-alert-primary-focus"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly calls out triage-panel operator actions as remaining work now that alert correlation and merged lineage history are present.",
-      "priority_reason": "This is executable follow-up work, but it remains proposed so the queue stays focused on the backend contract that stabilizes the newly shipped alert-linking behavior first."
+      "direction_relation_note": "The latest main-session reply explicitly calls out missing operator action workflow after the multi-symbol primary-focus policy shipped, so this proposal now targets action handling on top of the chosen focus and candidate-order context.",
+      "priority_reason": "This is executable follow-up work, but it remains proposed behind backend payload metadata and filtering/export so the queue advances through the remaining hardening sequence without splitting focus."
     },
     {
       "id": "task-b1-lineage-category-ui",
