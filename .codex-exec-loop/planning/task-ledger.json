@@ -294,36 +294,90 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Productize provider provenance export with filters, sort, and persisted history",
       "description": "Turn the new clipboard-only provider provenance triage export into an operator-grade workflow by adding provider-provenance-specific filter and sort controls plus persisted export history so handoffs and repeat incident reviews do not depend on one-off copy actions.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T23:55:00+09:00",
+      "updated_at": "2026-04-21T23:59:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-analytics-export"
       ],
-      "direction_relation_note": "The latest main-session reply says the shipped export is still only a clipboard JSON surface and explicitly calls out missing provider provenance filter/sort and persisted export history, making this the clearest immediate continuation.",
-      "priority_reason": "Builtin next-task needs one executable continuation, and this is the most concrete productization gap left after commit c4cbf69 before broader analytics or dashboard aggregation work."
+      "direction_relation_note": "Completed on main in commit 4b18617 with a dedicated provider provenance workbench in the control-room triage panel, provider and vendor-field filters, free-text search, newest/oldest/provider/severity sort, filtered export payloads, and browser-local persisted export history with Copy export and Load filters actions.",
+      "priority_reason": "Closed after App.tsx, controlRoomDefinitions.ts, styles.css, and operator docs updates landed with typecheck and build verification; the next direct continuation is moving from browser-local export history to a team-shared registry and audit trail."
+    },
+    {
+      "id": "task-b1-provider-market-context-export-registry-audit",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add team-shared provider provenance export registry and audit trail",
+      "description": "Replace the browser-local-only provider provenance export history with a team-shared registry and server-side audit trail so export handoffs, replayed filter sets, and provenance incident reviews persist across operators and machines.",
+      "status": "done",
+      "base_priority": 79,
+      "dynamic_priority_delta": 19,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T00:20:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-export-productization"
+      ],
+      "direction_relation_note": "Completed on main in commit 21d11f6 with shared provider-provenance export job, artifact, and audit records added across the backend surfaces plus control-room shared export list and history consumers, replacing the browser-local-only gap called out in the prior queue head.",
+      "priority_reason": "Closed after backend registry and audit storage, control-room integration, targeted pytest and build verification, commit, and push all landed; the next queue head should move to the three explicit follow-ups listed in the latest main-session reply."
     },
     {
       "id": "task-b1-provider-market-context-analytics-aggregation",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Add provider provenance analytics and dashboard aggregation",
-      "description": "Build analytics and dashboard rollups for provider-returned market_context provenance so operators can see recurring vendor-native source-path patterns, provenance quality drift, and export volume trends beyond per-incident drill-down views.",
-      "status": "proposed",
+      "title": "Add provider provenance analytics, dashboard rollups, and cross-focus querying",
+      "description": "Build analytics, dashboard rollups, and cross-focus query surfaces for provider-returned market_context provenance so operators can see recurring vendor-native source-path patterns, provenance quality drift, export activity, and related incident clusters beyond per-incident drill-down views.",
+      "status": "ready",
       "base_priority": 76,
-      "dynamic_priority_delta": 13,
+      "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T23:55:00+09:00",
+      "updated_at": "2026-04-22T00:21:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-analytics-export"
+        "task-b1-provider-market-context-export-registry-audit"
       ],
-      "direction_relation_note": "The latest main-session reply lists analytics/dashboard aggregation as still missing, but it is broader than the immediate export productization slice and can remain proposed while the operator workflow hardens.",
-      "priority_reason": "This is real follow-up work, but it stays proposed behind the more immediate filter, sort, and persisted export workflow so the queue keeps one deterministic next task."
+      "direction_relation_note": "The latest main-session reply lists cross-focus search and analytics surfaces as the first explicit remaining gap now that shared export registry data and audit history are durable and pushed on main.",
+      "priority_reason": "Builtin next-task needs one deterministic continuation, and analytics plus cross-focus querying is the clearest immediately executable follow-up because it directly consumes the newly landed shared registry and audit data without waiting on further operator policy decisions."
+    },
+    {
+      "id": "task-b1-provider-market-context-export-retention-controls",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add operator-facing retention and prune controls for shared provenance exports",
+      "description": "Expose retention policy, prune actions, and related operator-visible safeguards for the new shared provider provenance export registry so server-side export jobs, artifacts, and audit history can be managed without shell-only cleanup workflows.",
+      "status": "proposed",
+      "base_priority": 72,
+      "dynamic_priority_delta": 12,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T00:22:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-export-registry-audit"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly calls out the absence of operator-facing prune or retention control UI after the shared registry and audit-trail slice shipped.",
+      "priority_reason": "This is executable follow-up work, but it remains proposed behind the analytics slice so the queue advances through one immediate consumer of the new registry before shifting into operator policy and lifecycle controls."
+    },
+    {
+      "id": "task-b1-provider-market-context-local-history-promotion",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Let browser-local provenance history entries promote into the shared registry",
+      "description": "Add a dedicated action that promotes existing browser-local provider provenance history entries into the shared export registry so older local handoffs can be preserved server-side without rerunning the original copy flow.",
+      "status": "proposed",
+      "base_priority": 70,
+      "dynamic_priority_delta": 11,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T00:23:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-export-registry-audit"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly notes that browser-local history entries still lack a separate action to be promoted into the new shared registry after the first shared export flow shipped.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind the analytics queue head so the next task keeps building broad shared-registry visibility before adding migration ergonomics for legacy local entries."
     },
     {
       "id": "task-b1-multi-symbol-risk-scoring-expansion",
