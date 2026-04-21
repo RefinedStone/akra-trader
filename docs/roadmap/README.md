@@ -49,6 +49,7 @@ Documentation and operator discipline remain cross-cutting across every wave.
 - [Product Roadmap](product-roadmap.md)
 - [Technical Roadmap](technical-roadmap.md)
 - [Epic Backlog](epic-backlog.md)
+- [Directions Execution Board](directions-execution-board.md)
 - [Next Wave Plan](next-wave-plan.md)
 - [Blueprint](../blueprint/README.md)
 - [Architecture](../architecture.md)

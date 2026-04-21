@@ -13,14 +13,15 @@ longer-horizon blueprint.
 2. [Status: Product Position](status/product-position.md)
 3. [Roadmap Overview](roadmap/README.md)
 4. [Roadmap: Next Wave Plan](roadmap/next-wave-plan.md)
-5. [Architecture](architecture.md)
-6. [LLM Sensitivity](architecture-llm-sensitivity.md)
-7. [Backend Architecture Target](architecture-backend-target.md)
-8. [Frontend Architecture Target](architecture-frontend-target.md)
-9. [Architecture Refactor Stages](architecture-refactor-stages.md)
-10. [Blueprint](blueprint/README.md)
-11. [Operations: Runbooks Overview](operations/runbooks-overview.md)
-12. [ADR Index](adr/README.md)
+5. [Roadmap: Directions Execution Board](roadmap/directions-execution-board.md)
+6. [Architecture](architecture.md)
+7. [LLM Sensitivity](architecture-llm-sensitivity.md)
+8. [Backend Architecture Target](architecture-backend-target.md)
+9. [Frontend Architecture Target](architecture-frontend-target.md)
+10. [Architecture Refactor Stages](architecture-refactor-stages.md)
+11. [Blueprint](blueprint/README.md)
+12. [Operations: Runbooks Overview](operations/runbooks-overview.md)
+13. [ADR Index](adr/README.md)
 
 ## Document Roles
 
@@ -36,6 +37,8 @@ longer-horizon blueprint.
 - `roadmap/*`
   - remaining work after the current-state baseline
   - near-term delivery waves, epics, and technical priorities
+  - `roadmap/directions-execution-board.md` is the execution-oriented view that turns roadmap and
+    internal directions into one ordered delivery board
 
 ### Architecture
 
