@@ -5,6 +5,7 @@ from datetime import UTC
 from datetime import datetime
 
 from akra_trader.adapters.operator_delivery import OperatorAlertDeliveryAdapter
+from akra_trader.domain.models import OperatorAlertPrimaryFocus
 from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryVerification
@@ -106,6 +107,95 @@ def test_operator_alert_delivery_adapter_resolves_pagerduty_incident_resolution(
   payload = json.loads(requests[0].decode("utf-8"))
   assert payload["event_action"] == "resolve"
   assert payload["payload"]["severity"] == "warning"
+
+
+def test_operator_alert_delivery_adapter_carries_primary_focus_market_context_to_webhook_and_provider_payloads() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data or b"", dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("webhook", "rootly"),
+    webhook_url="https://ops.example.com/alert",
+    rootly_api_token="rootly-token",
+    rootly_api_url="https://api.rootly.example",
+    webhook_timeout_seconds=9,
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-market-context-1",
+    alert_id="guarded-live:market-data:multi-symbol",
+    timestamp=datetime(2025, 1, 3, 13, 45, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live market-data freshness degraded across focused symbols.",
+    detail="market-data freshness degraded",
+    run_id="run-ops-1",
+    session_id="session-ops-1",
+    symbols=("BTC/USDT", "ETH/USDT"),
+    timeframe="5m",
+    primary_focus=OperatorAlertPrimaryFocus(
+      symbol="BTC/USDT",
+      timeframe="5m",
+      candidate_symbols=("BTC/USDT", "ETH/USDT"),
+      candidate_count=2,
+      policy="market_data_risk_order",
+      reason="Selected BTC/USDT as the highest-risk market-data candidate from 2 symbols.",
+    ),
+    remediation=OperatorIncidentRemediation(
+      state="requested",
+      kind="recent_sync",
+      owner="provider",
+      provider="rootly",
+      summary="Refresh the live timeframe sync window and verify freshness thresholds.",
+      runbook="market_data.sync_recent",
+      provider_recovery=OperatorIncidentProviderRecoveryState(
+        lifecycle_state="recovering",
+        provider="rootly",
+        job_id="rt-job-market-context-1",
+        channels=("depth", "kline"),
+        symbols=("BTC/USDT", "ETH/USDT"),
+        timeframe="5m",
+        verification=OperatorIncidentProviderRecoveryVerification(state="pending"),
+      ),
+    ),
+  )
+
+  records = adapter.deliver(incident=incident)
+
+  assert [record.target for record in records] == ["operator_webhook", "rootly_incidents"]
+
+  webhook_request = next(item for item in requests if item[0] == "https://ops.example.com/alert")
+  rootly_request = next(
+    item for item in requests if item[0] == "https://api.rootly.example/v1/incidents"
+  )
+
+  webhook_payload = json.loads(webhook_request[2].decode("utf-8"))
+  assert webhook_payload["symbol"] == "BTC/USDT"
+  assert webhook_payload["symbols"] == ["BTC/USDT", "ETH/USDT"]
+  assert webhook_payload["timeframe"] == "5m"
+  assert webhook_payload["primary_focus"] == {
+    "symbol": "BTC/USDT",
+    "timeframe": "5m",
+    "candidate_symbols": ["BTC/USDT", "ETH/USDT"],
+    "candidate_count": 2,
+    "policy": "market_data_risk_order",
+    "reason": "Selected BTC/USDT as the highest-risk market-data candidate from 2 symbols.",
+  }
+  assert webhook_payload["remediation"]["provider_recovery"]["symbol"] == "BTC/USDT"
+  assert (
+    webhook_payload["remediation"]["provider_recovery"]["primary_focus"]
+    == webhook_payload["primary_focus"]
+  )
+
+  rootly_payload = json.loads(rootly_request[2].decode("utf-8"))
+  provider_recovery = rootly_payload["incident"]["metadata"]["remediation_provider_recovery"]
+  assert provider_recovery["symbol"] == "BTC/USDT"
+  assert provider_recovery["symbols"] == ["BTC/USDT", "ETH/USDT"]
+  assert provider_recovery["timeframe"] == "5m"
+  assert provider_recovery["primary_focus"] == webhook_payload["primary_focus"]
 
 
 def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> None:

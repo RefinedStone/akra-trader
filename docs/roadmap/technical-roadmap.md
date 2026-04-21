@@ -77,6 +77,8 @@ creation.
   instrument risk, live-session relevance, payload order, and stable fallback
 - backend operator payloads now expose explicit `primary_focus` metadata so consumers can use the
   selected symbol/timeframe directly instead of rebuilding that choice from raw symbol lists
+- external webhook delivery and provider remediation payload builders now pass through that same
+  normalized market context for downstream incident tooling
 
 ### Remaining work
 

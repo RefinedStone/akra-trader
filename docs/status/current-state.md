@@ -126,6 +126,8 @@ It is not yet a finished live trading product:
 - backend operator alert and incident payloads now embed explicit `primary_focus` metadata for
   multi-symbol contexts so the control room does not have to infer the lead symbol only from
   heuristic parsing
+- external operator webhook payloads and provider remediation payloads now carry the same
+  normalized `symbol`/`symbols`/`timeframe` plus `primary_focus` context for downstream routing
 
 ### Operator discipline baseline
 

@@ -17,6 +17,7 @@ from akra_trader.adapters.operator_delivery_registry import normalize_workflow_p
 from akra_trader.adapters.operator_delivery_registry import resolve_delivery_handler
 from akra_trader.adapters.operator_delivery_registry import resolve_workflow_pull_handler
 from akra_trader.adapters.operator_delivery_registry import resolve_workflow_sync_handler
+from akra_trader.domain.models import OperatorAlertPrimaryFocus
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
@@ -20504,6 +20505,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
   @staticmethod
   def _build_provider_recovery_payload(incident: OperatorIncidentEvent) -> dict[str, Any]:
     provider_recovery = incident.remediation.provider_recovery
+    market_context = OperatorAlertDeliveryAdapter._build_incident_market_context_payload(incident)
     return {
       "lifecycle_state": provider_recovery.lifecycle_state,
       "provider": provider_recovery.provider,
@@ -20513,8 +20515,10 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       "summary": provider_recovery.summary,
       "detail": provider_recovery.detail,
       "channels": provider_recovery.channels,
+      "symbol": market_context["symbol"],
       "symbols": provider_recovery.symbols,
       "timeframe": provider_recovery.timeframe,
+      "primary_focus": market_context["primary_focus"],
       "updated_at": (
         provider_recovery.updated_at.isoformat()
         if provider_recovery.updated_at is not None
@@ -21859,7 +21863,55 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     }
 
   @staticmethod
+  def _build_primary_focus_payload(
+    primary_focus: OperatorAlertPrimaryFocus | None,
+  ) -> dict[str, Any] | None:
+    if primary_focus is None:
+      return None
+    return {
+      "symbol": primary_focus.symbol,
+      "timeframe": primary_focus.timeframe,
+      "candidate_symbols": primary_focus.candidate_symbols,
+      "candidate_count": primary_focus.candidate_count,
+      "policy": primary_focus.policy,
+      "reason": primary_focus.reason,
+    }
+
+  @classmethod
+  def _build_incident_market_context_payload(
+    cls,
+    incident: OperatorIncidentEvent,
+  ) -> dict[str, Any]:
+    candidate_symbols = (
+      incident.symbols
+      or (
+        incident.primary_focus.candidate_symbols
+        if incident.primary_focus is not None
+        else ()
+      )
+    )
+    symbol = incident.symbol or (
+      incident.primary_focus.symbol
+      if incident.primary_focus is not None
+      else None
+    )
+    if symbol is None and len(candidate_symbols) == 1:
+      symbol = candidate_symbols[0]
+    timeframe = incident.timeframe or (
+      incident.primary_focus.timeframe
+      if incident.primary_focus is not None
+      else None
+    )
+    return {
+      "symbol": symbol,
+      "symbols": candidate_symbols,
+      "timeframe": timeframe,
+      "primary_focus": cls._build_primary_focus_payload(incident.primary_focus),
+    }
+
+  @staticmethod
   def _build_generic_webhook_payload(*, incident: OperatorIncidentEvent) -> bytes:
+    market_context = OperatorAlertDeliveryAdapter._build_incident_market_context_payload(incident)
     return json.dumps(
       {
         "event_id": incident.event_id,
@@ -21872,6 +21924,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
         "run_id": incident.run_id,
         "session_id": incident.session_id,
         "source": incident.source,
+        **market_context,
         "remediation": {
           "state": incident.remediation.state,
           "kind": incident.remediation.kind,

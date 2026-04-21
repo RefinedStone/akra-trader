@@ -23,6 +23,8 @@ unclear dataset lineage.
   selected symbol/timeframe and candidate set
 - operator and guarded-live alert payloads now carry normalized symbol/timeframe context when the
   runtime knows it
+- external webhook and provider remediation payloads now carry the same normalized market context
+  so downstream incident systems do not need to reconstruct the lead symbol from free-form text
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance
