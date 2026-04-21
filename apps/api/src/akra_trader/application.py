@@ -61,6 +61,8 @@ from akra_trader.domain.models import OrderSide
 from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import OperatorAlert
+from akra_trader.domain.models import OperatorAlertMarketContextFieldProvenance
+from akra_trader.domain.models import OperatorAlertMarketContextProvenance
 from akra_trader.domain.models import OperatorAlertPrimaryFocus
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
@@ -11970,6 +11972,71 @@ class TradingApplication:
       primary_focus=primary_focus or existing_primary_focus,
     )
 
+  def _extract_operator_alert_market_context_provenance_from_workflow_payload(
+    self,
+    *,
+    payload: dict[str, Any],
+    existing: OperatorAlertMarketContextProvenance | None = None,
+  ) -> OperatorAlertMarketContextProvenance | None:
+    provider_recovery_payload = self._merge_payload_mappings(
+      payload.get("remediation_provider_recovery"),
+      payload.get("provider_recovery"),
+      payload.get("recovery"),
+    )
+    provenance_payload = self._merge_payload_mappings(
+      payload.get("market_context_provenance"),
+      provider_recovery_payload.get("market_context_provenance"),
+    )
+    if not provenance_payload:
+      return existing
+
+    def _build_field_provenance(value: Any) -> OperatorAlertMarketContextFieldProvenance | None:
+      mapping = self._extract_payload_mapping(value)
+      scope = self._first_non_empty_string(mapping.get("scope"))
+      path = self._first_non_empty_string(mapping.get("path"))
+      if scope is None and path is None:
+        return None
+      return OperatorAlertMarketContextFieldProvenance(
+        scope=scope,
+        path=path,
+      )
+
+    field_provenance = {
+      "symbol": _build_field_provenance(provenance_payload.get("symbol")),
+      "symbols": _build_field_provenance(provenance_payload.get("symbols")),
+      "timeframe": _build_field_provenance(provenance_payload.get("timeframe")),
+      "primary_focus": _build_field_provenance(provenance_payload.get("primary_focus")),
+    }
+    if (
+      self._first_non_empty_string(
+        provenance_payload.get("provider"),
+        existing.provider if existing is not None else None,
+      ) is None
+      and self._first_non_empty_string(
+        provenance_payload.get("vendor_field"),
+        existing.vendor_field if existing is not None else None,
+      ) is None
+      and all(value is None for value in field_provenance.values())
+    ):
+      return existing
+    return OperatorAlertMarketContextProvenance(
+      provider=self._first_non_empty_string(
+        provenance_payload.get("provider"),
+        existing.provider if existing is not None else None,
+      ),
+      vendor_field=self._first_non_empty_string(
+        provenance_payload.get("vendor_field"),
+        existing.vendor_field if existing is not None else None,
+      ),
+      symbol=field_provenance["symbol"] or (existing.symbol if existing is not None else None),
+      symbols=field_provenance["symbols"] or (existing.symbols if existing is not None else None),
+      timeframe=field_provenance["timeframe"] or (existing.timeframe if existing is not None else None),
+      primary_focus=(
+        field_provenance["primary_focus"]
+        or (existing.primary_focus if existing is not None else None)
+      ),
+    )
+
   def _build_provider_recovery_state(
     self,
     *,
@@ -11988,6 +12055,10 @@ class TradingApplication:
       existing_symbols=existing.symbols,
       existing_timeframe=existing.timeframe,
       existing_primary_focus=existing.primary_focus,
+    )
+    market_context_provenance = self._extract_operator_alert_market_context_provenance_from_workflow_payload(
+      payload=payload,
+      existing=existing.market_context_provenance,
     )
     verification_payload = self._extract_payload_mapping(payload.get("verification"))
     target_payload = self._extract_payload_mapping(payload.get("target"))
@@ -15025,6 +15096,7 @@ class TradingApplication:
       symbols=market_context["symbols"],
       timeframe=market_context["timeframe"],
       primary_focus=market_context["primary_focus"],
+      market_context_provenance=market_context_provenance,
       verification=verification,
       telemetry=telemetry,
       status_machine=status_machine,

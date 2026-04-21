@@ -15115,6 +15115,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       provider_recovery.get("telemetry"),
     )
     market_context = self._build_provider_pull_market_context_payload(
+      provider=provider,
       remediation_payload=remediation_payload,
       provider_payload=provider_payload,
       provider_recovery=provider_recovery,
@@ -20588,6 +20589,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       "symbols": market_context["symbols"],
       "timeframe": market_context["timeframe"],
       "primary_focus": market_context["primary_focus"],
+      "market_context_provenance": market_context["market_context_provenance"],
       "targets": {
         "symbol": market_context["symbol"],
         "symbols": market_context["symbols"],
@@ -22163,6 +22165,78 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     }
 
   @classmethod
+  def _build_primary_focus_payload_with_provenance_from_sources(
+    cls,
+    *candidates: tuple[Any, str | None, str | None],
+  ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    for candidate, scope, path in candidates:
+      payload = cls._build_primary_focus_payload_from_sources(candidate)
+      if payload is None:
+        continue
+      return payload, cls._build_market_context_field_provenance_payload(
+        scope=scope,
+        path=path,
+      )
+    return None, None
+
+  @staticmethod
+  def _build_market_context_field_provenance_payload(
+    *,
+    scope: str | None,
+    path: str | None,
+  ) -> dict[str, Any] | None:
+    if scope is None and path is None:
+      return None
+    return {
+      "scope": scope,
+      "path": path,
+    }
+
+  @staticmethod
+  def _join_market_context_path(
+    root: str | None,
+    suffix: str,
+  ) -> str | None:
+    if not suffix:
+      return root
+    if root is None or not root.strip():
+      return suffix
+    return f"{root}.{suffix}"
+
+  @classmethod
+  def _resolve_provider_pull_market_context_root_path(
+    cls,
+    *,
+    provider: str,
+    source_scope: str,
+  ) -> tuple[str | None, str | None]:
+    normalized_provider = provider.strip().lower().replace(" ", "_")
+    vendor_field = (
+      cls._resolve_workflow_market_context_vendor_field(normalized_provider)
+      if normalized_provider
+      else None
+    )
+    if source_scope == "provider_payload":
+      return vendor_field, vendor_field
+    if source_scope == "provider_recovery":
+      return vendor_field, (
+        f"{vendor_field}.remediation_provider_recovery"
+        if vendor_field is not None
+        else "remediation_provider_recovery"
+      )
+    if source_scope == "remediation_payload":
+      return vendor_field, (
+        f"{vendor_field}.remediation_provider_payload"
+        if vendor_field is not None
+        else "remediation_provider_payload"
+      )
+    if source_scope == "targets":
+      return None, "targets"
+    if source_scope == "target":
+      return None, "target"
+    return vendor_field, None
+
+  @classmethod
   def _extract_market_context_mapping_from_sources(
     cls,
     *candidates: Any,
@@ -22182,17 +22256,107 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     return {}
 
   @classmethod
-  def _build_provider_pull_market_context_payload(
+  def _extract_provider_pull_market_context_mapping_with_scope(
     cls,
     *,
     remediation_payload: dict[str, Any],
     provider_payload: dict[str, Any],
     provider_recovery: dict[str, Any],
+  ) -> tuple[dict[str, Any], str | None]:
+    for scope, payload in (
+      ("provider_recovery", provider_recovery),
+      ("provider_payload", provider_payload),
+      ("remediation_payload", remediation_payload),
+    ):
+      market_context = cls._extract_market_context_mapping_from_sources(payload)
+      if market_context:
+        return market_context, scope
+    return {}, None
+
+  @classmethod
+  def _resolve_market_context_symbol_with_provenance(
+    cls,
+    *candidates: tuple[Any, str | None, str | None],
+  ) -> tuple[str | None, dict[str, Any] | None]:
+    for value, scope, path in candidates:
+      normalized = cls._normalize_market_context_symbol(value)
+      if normalized is None:
+        continue
+      return normalized, cls._build_market_context_field_provenance_payload(
+        scope=scope,
+        path=path,
+      )
+    return None, None
+
+  @classmethod
+  def _resolve_market_context_symbols_provenance(
+    cls,
+    *candidates: tuple[Any, str | None, str | None],
+  ) -> dict[str, Any] | None:
+    for value, scope, path in candidates:
+      normalized = cls._normalize_market_context_symbols(value)
+      if not normalized:
+        continue
+      return cls._build_market_context_field_provenance_payload(
+        scope=scope,
+        path=path,
+      )
+    return None
+
+  @classmethod
+  def _resolve_market_context_timeframe_with_provenance(
+    cls,
+    *candidates: tuple[Any, str | None, str | None],
+  ) -> tuple[str | None, dict[str, Any] | None]:
+    for value, scope, path in candidates:
+      normalized = cls._normalize_market_context_timeframe(value)
+      if normalized is None:
+        continue
+      return normalized, cls._build_market_context_field_provenance_payload(
+        scope=scope,
+        path=path,
+      )
+    return None, None
+
+  @classmethod
+  def _build_provider_pull_market_context_payload(
+    cls,
+    *,
+    provider: str,
+    remediation_payload: dict[str, Any],
+    provider_payload: dict[str, Any],
+    provider_recovery: dict[str, Any],
   ) -> dict[str, Any]:
-    vendor_market_context = cls._extract_market_context_mapping_from_sources(
-      provider_recovery,
-      provider_payload,
-      remediation_payload,
+    vendor_market_context, vendor_market_context_scope = (
+      cls._extract_provider_pull_market_context_mapping_with_scope(
+        remediation_payload=remediation_payload,
+        provider_payload=provider_payload,
+        provider_recovery=provider_recovery,
+      )
+    )
+    normalized_provider = provider.strip().lower().replace(" ", "_") or None
+    vendor_field, provider_recovery_root = cls._resolve_provider_pull_market_context_root_path(
+      provider=provider,
+      source_scope="provider_recovery",
+    )
+    _, provider_payload_root = cls._resolve_provider_pull_market_context_root_path(
+      provider=provider,
+      source_scope="provider_payload",
+    )
+    _, remediation_payload_root = cls._resolve_provider_pull_market_context_root_path(
+      provider=provider,
+      source_scope="remediation_payload",
+    )
+    vendor_market_context_root = (
+      cls._join_market_context_path(
+        cls._resolve_provider_pull_market_context_root_path(
+          provider=provider,
+          source_scope=vendor_market_context_scope or "",
+        )[1],
+        "market_context",
+      )
+      if vendor_market_context_scope is not None
+      else None
     )
     targets_payload = cls._extract_mapping(
       remediation_payload.get("targets"),
@@ -22204,12 +22368,32 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       provider_payload.get("target"),
       provider_recovery.get("target"),
     )
-    primary_focus = cls._build_primary_focus_payload_from_sources(
-      provider_recovery.get("primary_focus"),
-      provider_payload.get("primary_focus"),
-      vendor_market_context.get("primary_focus"),
-      targets_payload.get("primary_focus"),
-      target_payload.get("primary_focus"),
+    primary_focus, primary_focus_provenance = cls._build_primary_focus_payload_with_provenance_from_sources(
+      (
+        provider_recovery.get("primary_focus"),
+        "provider_recovery",
+        cls._join_market_context_path(provider_recovery_root, "primary_focus"),
+      ),
+      (
+        provider_payload.get("primary_focus"),
+        "provider_payload",
+        cls._join_market_context_path(provider_payload_root, "primary_focus"),
+      ),
+      (
+        vendor_market_context.get("primary_focus"),
+        vendor_market_context_scope,
+        cls._join_market_context_path(vendor_market_context_root, "primary_focus"),
+      ),
+      (
+        targets_payload.get("primary_focus"),
+        "targets",
+        "targets.primary_focus",
+      ),
+      (
+        target_payload.get("primary_focus"),
+        "target",
+        "target.primary_focus",
+      ),
     )
     symbols = cls._normalize_market_context_symbols(
       provider_recovery.get("symbols"),
@@ -22227,31 +22411,180 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       primary_focus.get("candidate_symbols") if primary_focus is not None else (),
       primary_focus.get("symbol") if primary_focus is not None else None,
     )
-    symbol = cls._normalize_market_context_symbol(
-      cls._first_non_empty_string(
+    symbols_provenance = cls._resolve_market_context_symbols_provenance(
+      (
+        provider_recovery.get("symbols"),
+        "provider_recovery",
+        cls._join_market_context_path(provider_recovery_root, "symbols"),
+      ),
+      (
         provider_recovery.get("symbol"),
+        "provider_recovery",
+        cls._join_market_context_path(provider_recovery_root, "symbol"),
+      ),
+      (
+        provider_payload.get("symbols"),
+        "provider_payload",
+        cls._join_market_context_path(provider_payload_root, "symbols"),
+      ),
+      (
         provider_payload.get("symbol"),
+        "provider_payload",
+        cls._join_market_context_path(provider_payload_root, "symbol"),
+      ),
+      (
+        vendor_market_context.get("symbols"),
+        vendor_market_context_scope,
+        cls._join_market_context_path(vendor_market_context_root, "symbols"),
+      ),
+      (
         vendor_market_context.get("symbol"),
+        vendor_market_context_scope,
+        cls._join_market_context_path(vendor_market_context_root, "symbol"),
+      ),
+      (
+        remediation_payload.get("symbols"),
+        "remediation_payload",
+        cls._join_market_context_path(remediation_payload_root, "symbols"),
+      ),
+      (
         remediation_payload.get("symbol"),
+        "remediation_payload",
+        cls._join_market_context_path(remediation_payload_root, "symbol"),
+      ),
+      (
+        targets_payload.get("symbols"),
+        "targets",
+        "targets.symbols",
+      ),
+      (
         targets_payload.get("symbol"),
+        "targets",
+        "targets.symbol",
+      ),
+      (
+        target_payload.get("symbols"),
+        "target",
+        "target.symbols",
+      ),
+      (
         target_payload.get("symbol"),
+        "target",
+        "target.symbol",
+      ),
+      (
+        primary_focus.get("candidate_symbols") if primary_focus is not None else (),
+        primary_focus_provenance.get("scope") if primary_focus_provenance is not None else None,
+        (
+          cls._join_market_context_path(primary_focus_provenance.get("path"), "candidate_symbols")
+          if primary_focus_provenance is not None
+          else None
+        ),
+      ),
+      (
         primary_focus.get("symbol") if primary_focus is not None else None,
-      )
+        primary_focus_provenance.get("scope") if primary_focus_provenance is not None else None,
+        (
+          cls._join_market_context_path(primary_focus_provenance.get("path"), "symbol")
+          if primary_focus_provenance is not None
+          else None
+        ),
+      ),
+    )
+    symbol, symbol_provenance = cls._resolve_market_context_symbol_with_provenance(
+      (
+        provider_recovery.get("symbol"),
+        "provider_recovery",
+        cls._join_market_context_path(provider_recovery_root, "symbol"),
+      ),
+      (
+        provider_payload.get("symbol"),
+        "provider_payload",
+        cls._join_market_context_path(provider_payload_root, "symbol"),
+      ),
+      (
+        vendor_market_context.get("symbol"),
+        vendor_market_context_scope,
+        cls._join_market_context_path(vendor_market_context_root, "symbol"),
+      ),
+      (
+        remediation_payload.get("symbol"),
+        "remediation_payload",
+        cls._join_market_context_path(remediation_payload_root, "symbol"),
+      ),
+      (
+        targets_payload.get("symbol"),
+        "targets",
+        "targets.symbol",
+      ),
+      (
+        target_payload.get("symbol"),
+        "target",
+        "target.symbol",
+      ),
+      (
+        primary_focus.get("symbol") if primary_focus is not None else None,
+        primary_focus_provenance.get("scope") if primary_focus_provenance is not None else None,
+        (
+          cls._join_market_context_path(primary_focus_provenance.get("path"), "symbol")
+          if primary_focus_provenance is not None
+          else None
+        ),
+      ),
     )
     if symbol is None and len(symbols) == 1:
       symbol = symbols[0]
-    timeframe = cls._normalize_market_context_timeframe(
-      cls._first_non_empty_string(
+      symbol_provenance = symbol_provenance or symbols_provenance
+    timeframe, timeframe_provenance = cls._resolve_market_context_timeframe_with_provenance(
+      (
         provider_recovery.get("timeframe"),
+        "provider_recovery",
+        cls._join_market_context_path(provider_recovery_root, "timeframe"),
+      ),
+      (
         provider_payload.get("timeframe"),
+        "provider_payload",
+        cls._join_market_context_path(provider_payload_root, "timeframe"),
+      ),
+      (
         provider_payload.get("target_timeframe"),
+        "provider_payload",
+        cls._join_market_context_path(provider_payload_root, "target_timeframe"),
+      ),
+      (
         vendor_market_context.get("timeframe"),
+        vendor_market_context_scope,
+        cls._join_market_context_path(vendor_market_context_root, "timeframe"),
+      ),
+      (
         remediation_payload.get("timeframe"),
+        "remediation_payload",
+        cls._join_market_context_path(remediation_payload_root, "timeframe"),
+      ),
+      (
         remediation_payload.get("target_timeframe"),
+        "remediation_payload",
+        cls._join_market_context_path(remediation_payload_root, "target_timeframe"),
+      ),
+      (
         targets_payload.get("timeframe"),
+        "targets",
+        "targets.timeframe",
+      ),
+      (
         target_payload.get("timeframe"),
+        "target",
+        "target.timeframe",
+      ),
+      (
         primary_focus.get("timeframe") if primary_focus is not None else None,
-      )
+        primary_focus_provenance.get("scope") if primary_focus_provenance is not None else None,
+        (
+          cls._join_market_context_path(primary_focus_provenance.get("path"), "timeframe")
+          if primary_focus_provenance is not None
+          else None
+        ),
+      ),
     )
     if primary_focus is None and (symbol is not None or timeframe is not None or symbols):
       primary_focus = cls._build_primary_focus_payload_from_sources(
@@ -22261,11 +22594,30 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
           "candidate_symbols": symbols,
         }
       )
+    market_context_provenance = None
+    if any(
+      provenance is not None
+      for provenance in (
+        symbol_provenance,
+        symbols_provenance,
+        timeframe_provenance,
+        primary_focus_provenance,
+      )
+    ):
+      market_context_provenance = {
+        "provider": normalized_provider,
+        "vendor_field": vendor_field,
+        "symbol": symbol_provenance,
+        "symbols": symbols_provenance,
+        "timeframe": timeframe_provenance,
+        "primary_focus": primary_focus_provenance,
+      }
     return {
       "symbol": symbol,
       "symbols": symbols,
       "timeframe": timeframe,
       "primary_focus": primary_focus,
+      "market_context_provenance": market_context_provenance,
     }
 
   @staticmethod

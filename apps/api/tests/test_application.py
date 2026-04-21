@@ -2370,6 +2370,26 @@ def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_inc
           "policy": "single_symbol_context",
           "reason": "Alert context resolved to one market-data instrument.",
         },
+        "market_context_provenance": {
+          "provider": "pagerduty",
+          "vendor_field": "custom_details",
+          "symbol": {
+            "scope": "provider_payload",
+            "path": "custom_details.market_context.symbol",
+          },
+          "symbols": {
+            "scope": "provider_payload",
+            "path": "custom_details.market_context.symbols",
+          },
+          "timeframe": {
+            "scope": "provider_payload",
+            "path": "custom_details.market_context.timeframe",
+          },
+          "primary_focus": {
+            "scope": "provider_payload",
+            "path": "custom_details.market_context.primary_focus",
+          },
+        },
         "targets": {
           "symbol": "ETH/USDT",
           "symbols": ["ETH/USDT"],
@@ -2427,6 +2447,17 @@ def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_inc
   assert updated_incident.primary_focus.symbol == "ETH/USDT"
   assert updated_incident.primary_focus.timeframe == "5m"
   assert updated_incident.remediation.provider_recovery.primary_focus == updated_incident.primary_focus
+  assert updated_incident.remediation.provider_recovery.market_context_provenance is not None
+  assert updated_incident.remediation.provider_recovery.market_context_provenance.provider == "pagerduty"
+  assert updated_incident.remediation.provider_recovery.market_context_provenance.vendor_field == "custom_details"
+  assert (
+    updated_incident.remediation.provider_recovery.market_context_provenance.symbol.path
+    == "custom_details.market_context.symbol"
+  )
+  assert (
+    updated_incident.remediation.provider_recovery.market_context_provenance.primary_focus.path
+    == "custom_details.market_context.primary_focus"
+  )
   assert updated_incident.remediation.provider_recovery.telemetry.state == "completed"
   assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 100
   assert updated_incident.remediation.provider_recovery.telemetry.attempt_count == 2

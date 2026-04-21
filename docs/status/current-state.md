@@ -136,6 +136,9 @@ It is not yet a finished live trading product:
 - provider workflow pull normalization now reads that same vendor-native `market_context` back from
   `custom_details`, `details`, or `metadata` so normalized provenance survives round-trips through
   third-party incident systems
+- restored provider market context now also preserves provider-specific source provenance for the
+  normalized `symbol`, `symbols`, `timeframe`, and `primary_focus` fields carried in provider
+  recovery state
 
 ### Operator discipline baseline
 

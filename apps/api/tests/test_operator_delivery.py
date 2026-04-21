@@ -280,6 +280,26 @@ def test_operator_alert_delivery_adapter_restores_primary_focus_market_context_f
   assert snapshot.payload["targets"]["symbols"] == ["BTC/USDT", "ETH/USDT"]
   assert snapshot.payload["targets"]["timeframe"] == "5m"
   assert snapshot.payload["targets"]["primary_focus"] == snapshot.payload["primary_focus"]
+  assert snapshot.payload["market_context_provenance"] == {
+    "provider": "pagerduty",
+    "vendor_field": "custom_details",
+    "symbol": {
+      "scope": "provider_recovery",
+      "path": "custom_details.remediation_provider_recovery.symbol",
+    },
+    "symbols": {
+      "scope": "provider_recovery",
+      "path": "custom_details.remediation_provider_recovery.symbols",
+    },
+    "timeframe": {
+      "scope": "provider_recovery",
+      "path": "custom_details.remediation_provider_recovery.timeframe",
+    },
+    "primary_focus": {
+      "scope": "provider_recovery",
+      "path": "custom_details.remediation_provider_recovery.primary_focus",
+    },
+  }
   assert requests[0][2]["From"] == "akra-ops@example.com"
 
 
@@ -518,6 +538,26 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
   assert snapshot.payload["symbol"] == "ETH/USDT"
   assert snapshot.payload["symbols"] == ["ETH/USDT"]
   assert snapshot.payload["timeframe"] == "5m"
+  assert snapshot.payload["market_context_provenance"] == {
+    "provider": "pagerduty",
+    "vendor_field": "custom_details",
+    "symbol": {
+      "scope": "provider_payload",
+      "path": "custom_details.market_context.symbol",
+    },
+    "symbols": {
+      "scope": "provider_payload",
+      "path": "custom_details.market_context.symbols",
+    },
+    "timeframe": {
+      "scope": "provider_payload",
+      "path": "custom_details.market_context.timeframe",
+    },
+    "primary_focus": {
+      "scope": "provider_payload",
+      "path": "custom_details.market_context.primary_focus",
+    },
+  }
   assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
   assert snapshot.payload["primary_focus"]["symbol"] == "ETH/USDT"
   assert snapshot.payload["primary_focus"]["policy"] == "single_symbol_context"
@@ -13652,6 +13692,26 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
   assert snapshot.payload["symbol"] == "ETH/USDT"
   assert snapshot.payload["symbols"] == ["ETH/USDT"]
   assert snapshot.payload["timeframe"] == "5m"
+  assert snapshot.payload["market_context_provenance"] == {
+    "provider": "opsgenie",
+    "vendor_field": "details",
+    "symbol": {
+      "scope": "provider_payload",
+      "path": "details.market_context.symbol",
+    },
+    "symbols": {
+      "scope": "provider_payload",
+      "path": "details.market_context.symbols",
+    },
+    "timeframe": {
+      "scope": "provider_payload",
+      "path": "details.market_context.timeframe",
+    },
+    "primary_focus": {
+      "scope": "provider_payload",
+      "path": "details.market_context.primary_focus",
+    },
+  }
   assert snapshot.payload["primary_focus"]["policy"] == "single_symbol_context"
   assert snapshot.payload["status_machine"]["job_state"] == "requested"
   assert snapshot.payload["provider_schema"]["kind"] == "opsgenie"
@@ -13966,6 +14026,26 @@ def test_operator_alert_delivery_adapter_pulls_incidentio_provider_state() -> No
   assert snapshot.payload["symbol"] == "ETH/USDT"
   assert snapshot.payload["symbols"] == ["ETH/USDT"]
   assert snapshot.payload["timeframe"] == "5m"
+  assert snapshot.payload["market_context_provenance"] == {
+    "provider": "incidentio",
+    "vendor_field": "metadata",
+    "symbol": {
+      "scope": "provider_payload",
+      "path": "metadata.market_context.symbol",
+    },
+    "symbols": {
+      "scope": "provider_payload",
+      "path": "metadata.market_context.symbols",
+    },
+    "timeframe": {
+      "scope": "provider_payload",
+      "path": "metadata.market_context.timeframe",
+    },
+    "primary_focus": {
+      "scope": "provider_payload",
+      "path": "metadata.market_context.primary_focus",
+    },
+  }
   assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
   assert snapshot.payload["primary_focus"]["policy"] == "single_symbol_context"
   assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"

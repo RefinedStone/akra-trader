@@ -1340,6 +1340,22 @@ class OperatorAlertPrimaryFocus:
 
 
 @dataclass(frozen=True)
+class OperatorAlertMarketContextFieldProvenance:
+  scope: str | None = None
+  path: str | None = None
+
+
+@dataclass(frozen=True)
+class OperatorAlertMarketContextProvenance:
+  provider: str | None = None
+  vendor_field: str | None = None
+  symbol: OperatorAlertMarketContextFieldProvenance | None = None
+  symbols: OperatorAlertMarketContextFieldProvenance | None = None
+  timeframe: OperatorAlertMarketContextFieldProvenance | None = None
+  primary_focus: OperatorAlertMarketContextFieldProvenance | None = None
+
+
+@dataclass(frozen=True)
 class OperatorAlert:
   alert_id: str
   severity: str
@@ -2673,6 +2689,7 @@ class OperatorIncidentProviderRecoveryState:
   symbols: tuple[str, ...] = ()
   timeframe: str | None = None
   primary_focus: OperatorAlertPrimaryFocus | None = None
+  market_context_provenance: OperatorAlertMarketContextProvenance | None = None
   verification: OperatorIncidentProviderRecoveryVerification = field(
     default_factory=OperatorIncidentProviderRecoveryVerification
   )

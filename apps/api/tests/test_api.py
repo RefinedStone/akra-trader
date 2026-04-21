@@ -4426,6 +4426,18 @@ def test_guarded_live_endpoint_pull_syncs_provider_authoritative_recovery_state(
           "job_id": "pd-job-api-1",
           "channels": ["kline", "depth"],
           "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+          "market_context_provenance": {
+            "provider": "pagerduty",
+            "vendor_field": "custom_details",
+            "symbols": {
+              "scope": "provider_payload",
+              "path": "custom_details.market_context.symbols",
+            },
+            "timeframe": {
+              "scope": "provider_payload",
+              "path": "custom_details.market_context.timeframe",
+            },
+          },
           "verification": {"state": "passed"},
           "status_machine": {
             "state": "provider_running",
@@ -4535,6 +4547,11 @@ def test_guarded_live_endpoint_pull_syncs_provider_authoritative_recovery_state(
     assert opened_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_status"] == "acknowledged"
     assert opened_incident["remediation"]["provider_recovery"]["status_machine"]["workflow_state"] == "acknowledged"
     assert opened_incident["remediation"]["provider_recovery"]["status_machine"]["sync_state"] == "bidirectional_synced"
+    assert opened_incident["remediation"]["provider_recovery"]["market_context_provenance"]["provider"] == "pagerduty"
+    assert (
+      opened_incident["remediation"]["provider_recovery"]["market_context_provenance"]["symbols"]["path"]
+      == "custom_details.market_context.symbols"
+    )
     assert any(
       event["kind"] == "incident_resolved" and event["alert_id"] == "guarded-live:market-data:5m"
       for event in guarded_live_response.json()["incident_events"]

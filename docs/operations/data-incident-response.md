@@ -33,6 +33,8 @@ unclear dataset lineage.
 - provider pull normalization now reads those same vendor-native structured fields back so
   recovered incidents keep the same selected symbol/timeframe and `primary_focus` after external
   round-trips
+- the normalized provider recovery state now keeps provider-specific source provenance for restored
+  market-context fields so operators can see which vendor payload path last supplied that focus
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

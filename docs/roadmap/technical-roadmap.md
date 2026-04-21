@@ -86,6 +86,8 @@ creation.
   block human-readable in downstream timelines
 - provider workflow pull normalization now reads that vendor-native `market_context` back into the
   normalized pull snapshot instead of relying only on top-level provider recovery fields
+- normalized provider recovery state now preserves provider-specific source provenance for restored
+  market-context fields so downstream audit and export surfaces can distinguish vendor paths
 
 ### Remaining work
 
