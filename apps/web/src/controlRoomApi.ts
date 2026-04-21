@@ -2,6 +2,7 @@ import { apiBase } from "./controlRoomDefinitions";
 import type {
   MarketDataIngestionJobRecord,
   MarketDataLineageHistoryRecord,
+  ProviderProvenanceExportAnalyticsPayload,
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobHistoryPayload,
   ProviderProvenanceExportJobListPayload,
@@ -114,12 +115,15 @@ export async function createProviderProvenanceExportJob(params: {
 export async function listProviderProvenanceExportJobs(params: {
   focusKey?: string;
   limit?: number;
+  marketDataProvider?: string;
   providerLabel?: string;
   requestedByTabId?: string;
   search?: string;
   status?: string;
   symbol?: string;
   timeframe?: string;
+  vendorField?: string;
+  venue?: string;
 } = {}) {
   const searchParams = new URLSearchParams();
   if (params.focusKey?.trim()) {
@@ -133,6 +137,15 @@ export async function listProviderProvenanceExportJobs(params: {
   }
   if (params.providerLabel?.trim()) {
     searchParams.set("provider_label", params.providerLabel.trim());
+  }
+  if (params.vendorField?.trim()) {
+    searchParams.set("vendor_field", params.vendorField.trim());
+  }
+  if (params.marketDataProvider?.trim()) {
+    searchParams.set("market_data_provider", params.marketDataProvider.trim());
+  }
+  if (params.venue?.trim()) {
+    searchParams.set("venue", params.venue.trim());
   }
   if (params.requestedByTabId?.trim()) {
     searchParams.set("requested_by_tab_id", params.requestedByTabId.trim());
@@ -149,6 +162,59 @@ export async function listProviderProvenanceExportJobs(params: {
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceExportJobListPayload>(
     `/operator/provider-provenance-exports${suffix}`,
+  );
+}
+
+export async function getProviderProvenanceExportAnalytics(params: {
+  focusKey?: string;
+  marketDataProvider?: string;
+  providerLabel?: string;
+  requestedByTabId?: string;
+  resultLimit?: number;
+  search?: string;
+  status?: string;
+  symbol?: string;
+  timeframe?: string;
+  vendorField?: string;
+  venue?: string;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.focusKey?.trim()) {
+    searchParams.set("focus_key", params.focusKey.trim());
+  }
+  if (params.symbol?.trim()) {
+    searchParams.set("symbol", params.symbol.trim());
+  }
+  if (params.timeframe?.trim()) {
+    searchParams.set("timeframe", params.timeframe.trim());
+  }
+  if (params.providerLabel?.trim()) {
+    searchParams.set("provider_label", params.providerLabel.trim());
+  }
+  if (params.vendorField?.trim()) {
+    searchParams.set("vendor_field", params.vendorField.trim());
+  }
+  if (params.marketDataProvider?.trim()) {
+    searchParams.set("market_data_provider", params.marketDataProvider.trim());
+  }
+  if (params.venue?.trim()) {
+    searchParams.set("venue", params.venue.trim());
+  }
+  if (params.requestedByTabId?.trim()) {
+    searchParams.set("requested_by_tab_id", params.requestedByTabId.trim());
+  }
+  if (params.status?.trim()) {
+    searchParams.set("status", params.status.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.resultLimit === "number" && Number.isFinite(params.resultLimit)) {
+    searchParams.set("result_limit", `${Math.max(1, Math.min(Math.round(params.resultLimit), 50))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceExportAnalyticsPayload>(
+    `/operator/provider-provenance-exports/analytics${suffix}`,
   );
 }
 

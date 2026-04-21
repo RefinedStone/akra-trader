@@ -58,6 +58,7 @@ import {
   downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   fetchJson,
+  getProviderProvenanceExportAnalytics,
   getProviderProvenanceExportJobHistory,
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
   listMarketDataIngestionJobs,
@@ -258,6 +259,7 @@ import type {
   PresetStructuredDiffDeltaValue,
   PresetStructuredDiffGroup,
   PresetStructuredDiffRow,
+  ProviderProvenanceExportAnalyticsPayload,
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobHistoryPayload,
   ProvenanceArtifactLineDetailView,
@@ -337,6 +339,26 @@ const defaultMarketDataProvenanceExportFilterState: MarketDataProvenanceExportFi
   vendor_field: ALL_FILTER_VALUE,
   search_query: "",
   sort: "newest",
+};
+
+type ProviderProvenanceAnalyticsScope = "current_focus" | "all_focuses";
+
+type ProviderProvenanceAnalyticsQueryState = {
+  scope: ProviderProvenanceAnalyticsScope;
+  provider_label: string;
+  vendor_field: string;
+  market_data_provider: string;
+  requested_by_tab_id: string;
+  search_query: string;
+};
+
+const defaultProviderProvenanceAnalyticsQueryState: ProviderProvenanceAnalyticsQueryState = {
+  scope: "current_focus",
+  provider_label: ALL_FILTER_VALUE,
+  vendor_field: ALL_FILTER_VALUE,
+  market_data_provider: ALL_FILTER_VALUE,
+  requested_by_tab_id: ALL_FILTER_VALUE,
+  search_query: "",
 };
 
 function buildPresetFormFromPreset(preset: ExperimentPreset) {
@@ -2045,6 +2067,20 @@ function formatMarketDataProvenanceExportFilterSummary(
   return parts.length ? parts.join(" / ") : "All providers · newest first";
 }
 
+function formatProviderProvenanceAnalyticsQuerySummary(
+  query: ProviderProvenanceAnalyticsQueryState,
+) {
+  const parts = [
+    query.scope === "all_focuses" ? "all focuses" : "current focus",
+    query.provider_label !== ALL_FILTER_VALUE ? `provider ${query.provider_label}` : null,
+    query.vendor_field !== ALL_FILTER_VALUE ? `vendor field ${query.vendor_field}` : null,
+    query.market_data_provider !== ALL_FILTER_VALUE ? `market data ${query.market_data_provider}` : null,
+    query.requested_by_tab_id !== ALL_FILTER_VALUE ? `requester ${query.requested_by_tab_id}` : null,
+    query.search_query.trim() ? `search ${query.search_query.trim()}` : null,
+  ].filter((value): value is string => Boolean(value));
+  return parts.join(" / ");
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2617,6 +2653,12 @@ export default function App() {
     useState(false);
   const [sharedProviderProvenanceExportHistoryError, setSharedProviderProvenanceExportHistoryError] =
     useState<string | null>(null);
+  const [providerProvenanceAnalyticsQuery, setProviderProvenanceAnalyticsQuery] =
+    useState<ProviderProvenanceAnalyticsQueryState>(defaultProviderProvenanceAnalyticsQueryState);
+  const [providerProvenanceAnalytics, setProviderProvenanceAnalytics] =
+    useState<ProviderProvenanceExportAnalyticsPayload | null>(null);
+  const [providerProvenanceAnalyticsLoading, setProviderProvenanceAnalyticsLoading] = useState(false);
+  const [providerProvenanceAnalyticsError, setProviderProvenanceAnalyticsError] = useState<string | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -2769,6 +2811,7 @@ export default function App() {
   const comparisonHistoryUrlRef = useRef<string | null>(null);
   const skipNextControlRoomUiPersistRef = useRef(false);
   const marketDataWorkflowRequestIdRef = useRef(0);
+  const providerProvenanceAnalyticsRequestIdRef = useRef(0);
   const comparisonSelection = useMemo(
     () =>
       normalizeControlRoomComparisonSelection({
@@ -4017,6 +4060,10 @@ export default function App() {
     ],
   );
 
+  useEffect(() => {
+    void loadProviderProvenanceAnalytics(activeMarketInstrument);
+  }, [activeMarketInstrument, marketStatus, providerProvenanceAnalyticsQuery]);
+
   const focusedMarketIncidentHistory = useMemo(() => {
     if (!activeMarketInstrument) {
       return [] as MarketDataIncidentHistoryEntry[];
@@ -4594,6 +4641,62 @@ export default function App() {
     });
   }
 
+  async function loadProviderProvenanceAnalytics(
+    instrument: MarketDataStatus["instruments"][number] | null,
+  ) {
+    const requestId = providerProvenanceAnalyticsRequestIdRef.current + 1;
+    providerProvenanceAnalyticsRequestIdRef.current = requestId;
+    if (!marketStatus || (providerProvenanceAnalyticsQuery.scope === "current_focus" && !instrument)) {
+      setProviderProvenanceAnalytics(null);
+      setProviderProvenanceAnalyticsLoading(false);
+      setProviderProvenanceAnalyticsError(null);
+      return;
+    }
+    setProviderProvenanceAnalyticsLoading(true);
+    setProviderProvenanceAnalyticsError(null);
+    try {
+      const analyticsPayload = await getProviderProvenanceExportAnalytics({
+        ...(providerProvenanceAnalyticsQuery.scope === "current_focus" && instrument
+          ? {
+              focusKey: buildMarketDataInstrumentFocusKey(instrument),
+              symbol: resolveMarketDataSymbol(instrument.instrument_id),
+              timeframe: instrument.timeframe,
+            }
+          : {}),
+        ...(providerProvenanceAnalyticsQuery.provider_label !== ALL_FILTER_VALUE
+          ? { providerLabel: providerProvenanceAnalyticsQuery.provider_label }
+          : {}),
+        ...(providerProvenanceAnalyticsQuery.vendor_field !== ALL_FILTER_VALUE
+          ? { vendorField: providerProvenanceAnalyticsQuery.vendor_field }
+          : {}),
+        ...(providerProvenanceAnalyticsQuery.market_data_provider !== ALL_FILTER_VALUE
+          ? { marketDataProvider: providerProvenanceAnalyticsQuery.market_data_provider }
+          : {}),
+        ...(providerProvenanceAnalyticsQuery.requested_by_tab_id !== ALL_FILTER_VALUE
+          ? { requestedByTabId: providerProvenanceAnalyticsQuery.requested_by_tab_id }
+          : {}),
+        ...(providerProvenanceAnalyticsQuery.search_query.trim()
+          ? { search: providerProvenanceAnalyticsQuery.search_query.trim() }
+          : {}),
+        resultLimit: 12,
+      });
+      if (providerProvenanceAnalyticsRequestIdRef.current !== requestId) {
+        return;
+      }
+      setProviderProvenanceAnalytics(analyticsPayload);
+    } catch (error) {
+      if (providerProvenanceAnalyticsRequestIdRef.current !== requestId) {
+        return;
+      }
+      setProviderProvenanceAnalytics(null);
+      setProviderProvenanceAnalyticsError((error as Error).message);
+    } finally {
+      if (providerProvenanceAnalyticsRequestIdRef.current === requestId) {
+        setProviderProvenanceAnalyticsLoading(false);
+      }
+    }
+  }
+
   async function loadMarketDataWorkflow(
     instrument: MarketDataStatus["instruments"][number] | null,
   ) {
@@ -4686,6 +4789,28 @@ export default function App() {
     setActiveMarketInstrumentKey(buildMarketDataInstrumentFocusKey(instrument));
     setMarketDataWorkflowExportFeedback(null);
     await loadMarketDataWorkflow(instrument);
+  }
+
+  async function focusMarketInstrumentFromProviderExport(
+    entry: Pick<ProviderProvenanceExportJobEntry, "focus_key" | "focus_label">,
+  ) {
+    if (!marketStatus || !entry.focus_key) {
+      setMarketDataWorkflowExportFeedback("Focus jump is unavailable because the market-data catalog is not loaded.");
+      return;
+    }
+    const instrument = marketStatus.instruments.find(
+      (candidate) => buildMarketDataInstrumentFocusKey(candidate) === entry.focus_key,
+    );
+    if (!instrument) {
+      setMarketDataWorkflowExportFeedback(
+        `Focus ${entry.focus_label ?? entry.focus_key} is not present in the current market-data catalog.`,
+      );
+      return;
+    }
+    await handleMarketInstrumentFocus(instrument);
+    setMarketDataWorkflowExportFeedback(
+      `Focused triage on ${entry.focus_label ?? entry.focus_key} from the shared provider provenance query.`,
+    );
   }
 
   async function copyFocusedMarketWorkflowExport() {
@@ -6450,6 +6575,404 @@ export default function App() {
                                 </tbody>
                               </table>
                             ) : null}
+                            <div className="market-data-provenance-shared-history">
+                              <div className="market-data-provenance-history-head">
+                                <strong>Analytics and cross-focus query</strong>
+                                <p>
+                                  Query the shared provider provenance registry across focuses and roll the results up
+                                  into provider, vendor-field, and focus hotspots.
+                                </p>
+                              </div>
+                              <div className="filter-bar">
+                                <label>
+                                  <span>Scope</span>
+                                  <select
+                                    onChange={(event) =>
+                                      setProviderProvenanceAnalyticsQuery((current) => ({
+                                        ...current,
+                                        scope: event.target.value === "all_focuses" ? "all_focuses" : "current_focus",
+                                      }))
+                                    }
+                                    value={providerProvenanceAnalyticsQuery.scope}
+                                  >
+                                    <option value="current_focus">Current focus</option>
+                                    <option value="all_focuses">All focuses</option>
+                                  </select>
+                                </label>
+                                <label>
+                                  <span>Provider</span>
+                                  <select
+                                    onChange={(event) =>
+                                      setProviderProvenanceAnalyticsQuery((current) => ({
+                                        ...current,
+                                        provider_label: event.target.value,
+                                      }))
+                                    }
+                                    value={providerProvenanceAnalyticsQuery.provider_label}
+                                  >
+                                    <option value={ALL_FILTER_VALUE}>All providers</option>
+                                    {(providerProvenanceAnalytics?.available_filters.provider_labels ?? []).map((provider) => (
+                                      <option key={provider} value={provider}>
+                                        {provider}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label>
+                                  <span>Vendor field</span>
+                                  <select
+                                    onChange={(event) =>
+                                      setProviderProvenanceAnalyticsQuery((current) => ({
+                                        ...current,
+                                        vendor_field: event.target.value,
+                                      }))
+                                    }
+                                    value={providerProvenanceAnalyticsQuery.vendor_field}
+                                  >
+                                    <option value={ALL_FILTER_VALUE}>All vendor fields</option>
+                                    {(providerProvenanceAnalytics?.available_filters.vendor_fields ?? []).map((fieldName) => (
+                                      <option key={fieldName} value={fieldName}>
+                                        {fieldName}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label>
+                                  <span>Market data</span>
+                                  <select
+                                    onChange={(event) =>
+                                      setProviderProvenanceAnalyticsQuery((current) => ({
+                                        ...current,
+                                        market_data_provider: event.target.value,
+                                      }))
+                                    }
+                                    value={providerProvenanceAnalyticsQuery.market_data_provider}
+                                  >
+                                    <option value={ALL_FILTER_VALUE}>All market-data providers</option>
+                                    {(providerProvenanceAnalytics?.available_filters.market_data_providers ?? []).map((provider) => (
+                                      <option key={provider} value={provider}>
+                                        {provider}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label>
+                                  <span>Requester</span>
+                                  <select
+                                    onChange={(event) =>
+                                      setProviderProvenanceAnalyticsQuery((current) => ({
+                                        ...current,
+                                        requested_by_tab_id: event.target.value,
+                                      }))
+                                    }
+                                    value={providerProvenanceAnalyticsQuery.requested_by_tab_id}
+                                  >
+                                    <option value={ALL_FILTER_VALUE}>All requesters</option>
+                                    {(providerProvenanceAnalytics?.available_filters.requested_by_tab_ids ?? []).map((requester) => (
+                                      <option key={requester} value={requester}>
+                                        {requester}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label>
+                                  <span>Search</span>
+                                  <input
+                                    onChange={(event) =>
+                                      setProviderProvenanceAnalyticsQuery((current) => ({
+                                        ...current,
+                                        search_query: event.target.value,
+                                      }))
+                                    }
+                                    placeholder="focus, requester, provider"
+                                    type="search"
+                                    value={providerProvenanceAnalyticsQuery.search_query}
+                                  />
+                                </label>
+                              </div>
+                              <div className="run-filter-summary-chip-row">
+                                <span className="run-filter-summary-chip">
+                                  {formatProviderProvenanceAnalyticsQuerySummary(providerProvenanceAnalyticsQuery)}
+                                </span>
+                                <span className="run-filter-summary-chip">
+                                  {providerProvenanceAnalytics
+                                    ? `${providerProvenanceAnalytics.totals.export_count} matched export(s)`
+                                    : "Analytics pending"}
+                                </span>
+                                <span className="run-filter-summary-chip">
+                                  {providerProvenanceAnalytics
+                                    ? `${providerProvenanceAnalytics.totals.unique_focus_count} focus anchor(s)`
+                                    : "Waiting for rollups"}
+                                </span>
+                              </div>
+                              {providerProvenanceAnalyticsLoading ? (
+                                <p className="empty-state">Loading provider provenance analytics…</p>
+                              ) : null}
+                              {providerProvenanceAnalyticsError ? (
+                                <p className="market-data-workflow-feedback">
+                                  Provider provenance analytics failed: {providerProvenanceAnalyticsError}
+                                </p>
+                              ) : null}
+                              {providerProvenanceAnalytics ? (
+                                <>
+                                  <div className="status-grid">
+                                    <div className="metric-tile">
+                                      <span>Matched exports</span>
+                                      <strong>{providerProvenanceAnalytics.totals.export_count}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Result count</span>
+                                      <strong>{providerProvenanceAnalytics.totals.result_count}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Provenance incidents</span>
+                                      <strong>{providerProvenanceAnalytics.totals.provider_provenance_count}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Download audits</span>
+                                      <strong>{providerProvenanceAnalytics.totals.download_count}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Providers</span>
+                                      <strong>{providerProvenanceAnalytics.totals.provider_label_count}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Vendor fields</span>
+                                      <strong>{providerProvenanceAnalytics.totals.vendor_field_count}</strong>
+                                    </div>
+                                  </div>
+                                  <div className="status-grid-two-column">
+                                    <div>
+                                      <h3>Provider rollup</h3>
+                                      {providerProvenanceAnalytics.rollups.providers.length ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Provider</th>
+                                              <th>Exports</th>
+                                              <th>Signal</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {providerProvenanceAnalytics.rollups.providers.map((rollup) => (
+                                              <tr key={`provider-rollup-${rollup.key}`}>
+                                                <td>
+                                                  <strong>{rollup.label}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {rollup.focus_count} focus anchor(s)
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{rollup.export_count}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {rollup.provider_provenance_count} provenance incidents
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{rollup.download_count} downloads</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Last export: {formatTimestamp(rollup.last_exported_at)}
+                                                  </p>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : (
+                                        <p className="empty-state">No provider rollups match the current query.</p>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <h3>Focus hotspots</h3>
+                                      {providerProvenanceAnalytics.rollups.focuses.length ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Focus</th>
+                                              <th>Exports</th>
+                                              <th>Action</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {providerProvenanceAnalytics.rollups.focuses.map((rollup) => (
+                                              <tr key={`focus-rollup-${rollup.key}`}>
+                                                <td>
+                                                  <strong>{rollup.label}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {rollup.market_data_provider ?? "n/a"} / {rollup.venue ?? "n/a"} / {rollup.symbol ?? "n/a"} · {rollup.timeframe ?? "n/a"}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{rollup.export_count}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {rollup.download_count} downloads
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void focusMarketInstrumentFromProviderExport({
+                                                        focus_key: rollup.key,
+                                                        focus_label: rollup.label,
+                                                      });
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Focus triage
+                                                  </button>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : (
+                                        <p className="empty-state">No focus hotspots match the current query.</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="status-grid-two-column">
+                                    <div>
+                                      <h3>Vendor-field rollup</h3>
+                                      {providerProvenanceAnalytics.rollups.vendor_fields.length ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Vendor field</th>
+                                              <th>Exports</th>
+                                              <th>Signal</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {providerProvenanceAnalytics.rollups.vendor_fields.map((rollup) => (
+                                              <tr key={`vendor-rollup-${rollup.key}`}>
+                                                <td><strong>{rollup.label}</strong></td>
+                                                <td>
+                                                  <strong>{rollup.export_count}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {rollup.provider_provenance_count} provenance incidents
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{rollup.focus_count} focus anchor(s)</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {rollup.download_count} downloads
+                                                  </p>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : (
+                                        <p className="empty-state">No vendor-field rollups match the current query.</p>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <h3>Requester rollup</h3>
+                                      {providerProvenanceAnalytics.rollups.requesters.length ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Requester</th>
+                                              <th>Exports</th>
+                                              <th>Signal</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {providerProvenanceAnalytics.rollups.requesters.map((rollup) => (
+                                              <tr key={`requester-rollup-${rollup.key}`}>
+                                                <td><strong>{rollup.label}</strong></td>
+                                                <td>
+                                                  <strong>{rollup.export_count}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {rollup.focus_count} focus anchor(s)
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{rollup.download_count} downloads</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Last export: {formatTimestamp(rollup.last_exported_at)}
+                                                  </p>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : (
+                                        <p className="empty-state">No requester rollups match the current query.</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <h3>Cross-focus results</h3>
+                                    {providerProvenanceAnalytics.recent_exports.length ? (
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Exported</th>
+                                            <th>Focus</th>
+                                            <th>Providers</th>
+                                            <th>Action</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceAnalytics.recent_exports.map((entry) => (
+                                            <tr key={`cross-focus-${entry.job_id}`}>
+                                              <td>{formatTimestamp(entry.exported_at ?? entry.created_at)}</td>
+                                              <td>
+                                                <strong>{entry.focus_label ?? "Unknown focus"}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.market_data_provider ?? "n/a"} / {entry.symbol ?? "n/a"} · {entry.timeframe ?? "n/a"}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <strong>{entry.provider_labels.join(", ") || "n/a"}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.vendor_fields.join(", ") || "n/a"}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <div className="market-data-provenance-history-actions">
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void copySharedProviderProvenanceExport(entry);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Copy export
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void focusMarketInstrumentFromProviderExport(entry);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Focus triage
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void loadSharedProviderProvenanceExportHistory(entry.job_id);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    View history
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : (
+                                      <p className="empty-state">No shared provider provenance exports match the current analytics query.</p>
+                                    )}
+                                  </div>
+                                </>
+                              ) : null}
+                            </div>
                             {selectedSharedProviderProvenanceExportJobId ? (
                               <div className="market-data-provenance-shared-history">
                                 <div className="market-data-provenance-history-head">

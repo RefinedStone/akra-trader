@@ -141,8 +141,9 @@ It is not yet a finished live trading product:
   recovery state, and the control-room incident drill-down plus triage export now surface that
   provenance directly to operators
 - provider provenance export in the control room now has operator-facing provider/vendor-field
-  filters, sort modes, persisted local export history, and a team-shared server registry with
-  download audit trail instead of a one-off clipboard action
+  filters, sort modes, persisted local export history, a team-shared server registry with
+  download audit trail, and analytics/cross-focus dashboard rollups instead of a one-off
+  clipboard action
 
 ### Operator discipline baseline
 

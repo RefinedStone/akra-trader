@@ -426,11 +426,28 @@ def execute_standalone_surface_binding(
         symbol=resolved_filters.get("symbol"),
         timeframe=resolved_filters.get("timeframe"),
         provider_label=resolved_filters.get("provider_label"),
+        vendor_field=resolved_filters.get("vendor_field"),
+        market_data_provider=resolved_filters.get("market_data_provider"),
+        venue=resolved_filters.get("venue"),
         requested_by_tab_id=resolved_filters.get("requested_by_tab_id"),
         status=resolved_filters.get("status"),
         search=resolved_filters.get("search"),
         limit=resolved_filters.get("limit", 100),
       )
+    )
+  if binding.binding_kind == "operator_provider_provenance_export_analytics":
+    return app.get_provider_provenance_export_analytics(
+      focus_key=resolved_filters.get("focus_key"),
+      symbol=resolved_filters.get("symbol"),
+      timeframe=resolved_filters.get("timeframe"),
+      provider_label=resolved_filters.get("provider_label"),
+      vendor_field=resolved_filters.get("vendor_field"),
+      market_data_provider=resolved_filters.get("market_data_provider"),
+      venue=resolved_filters.get("venue"),
+      requested_by_tab_id=resolved_filters.get("requested_by_tab_id"),
+      status=resolved_filters.get("status"),
+      search=resolved_filters.get("search"),
+      result_limit=resolved_filters.get("result_limit", 12),
     )
   if binding.binding_kind == "operator_provider_provenance_export_job_download":
     return app.download_provider_provenance_export_job(

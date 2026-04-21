@@ -513,10 +513,29 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "symbol",
     "timeframe",
     "provider_label",
+    "vendor_field",
+    "market_data_provider",
+    "venue",
     "requested_by_tab_id",
     "status",
     "search",
     "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["get_operator_provider_provenance_export_analytics"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "focus_key",
+    "symbol",
+    "timeframe",
+    "provider_label",
+    "vendor_field",
+    "market_data_provider",
+    "venue",
+    "requested_by_tab_id",
+    "status",
+    "search",
+    "result_limit",
     "app",
   )
   assert tuple(inspect.signature(routes["download_operator_provider_provenance_export_job"].endpoint).parameters) == (
@@ -1025,7 +1044,11 @@ def test_operator_provider_provenance_export_job_endpoints_round_trip(tmp_path: 
 
   list_response = client.get(
     "/api/operator/provider-provenance-exports",
-    params={"focus_key": "binance:BTC/USDT|5m", "limit": 10},
+    params={
+      "focus_key": "binance:BTC/USDT|5m",
+      "vendor_field": "custom_details.market_context",
+      "limit": 10,
+    },
   )
   assert list_response.status_code == 200
   list_payload = list_response.json()
@@ -1039,6 +1062,22 @@ def test_operator_provider_provenance_export_job_endpoints_round_trip(tmp_path: 
   assert download_response.status_code == 200
   download_payload = download_response.json()
   assert download_payload["content"] == export_content
+
+  analytics_response = client.get(
+    "/api/operator/provider-provenance-exports/analytics",
+    params={
+      "focus_key": "binance:BTC/USDT|5m",
+      "provider_label": "pagerduty",
+      "vendor_field": "custom_details.market_context",
+      "result_limit": 10,
+    },
+  )
+  assert analytics_response.status_code == 200
+  analytics_payload = analytics_response.json()
+  assert analytics_payload["totals"]["export_count"] == 1
+  assert analytics_payload["totals"]["download_count"] == 1
+  assert analytics_payload["rollups"]["providers"][0]["key"] == "pagerduty"
+  assert analytics_payload["recent_exports"][0]["job_id"] == created_job["job_id"]
 
   history_response = client.get(
     f"/api/operator/provider-provenance-exports/{created_job['job_id']}/history",

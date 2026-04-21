@@ -2131,21 +2131,20 @@ class TradingApplication:
     )
     return any(needle in value.lower() for value in haystacks if value)
 
-  def list_provider_provenance_export_jobs(
+  def _filter_provider_provenance_export_job_records(
     self,
     *,
     focus_key: str | None = None,
     symbol: str | None = None,
     timeframe: str | None = None,
     provider_label: str | None = None,
+    vendor_field: str | None = None,
+    market_data_provider: str | None = None,
+    venue: str | None = None,
     requested_by_tab_id: str | None = None,
     status: str | None = None,
     search: str | None = None,
-    limit: int = 100,
   ) -> tuple[ProviderProvenanceExportJobRecord, ...]:
-    self._prune_provider_provenance_export_artifact_records()
-    self._prune_provider_provenance_export_job_records()
-    self._prune_provider_provenance_export_job_audit_records()
     normalized_focus_key = focus_key.strip() if isinstance(focus_key, str) and focus_key.strip() else None
     normalized_symbol = symbol.strip() if isinstance(symbol, str) and symbol.strip() else None
     normalized_timeframe = timeframe.strip() if isinstance(timeframe, str) and timeframe.strip() else None
@@ -2154,13 +2153,23 @@ class TradingApplication:
       if isinstance(provider_label, str) and provider_label.strip()
       else None
     )
+    normalized_vendor_field = (
+      vendor_field.strip()
+      if isinstance(vendor_field, str) and vendor_field.strip()
+      else None
+    )
+    normalized_market_data_provider = (
+      market_data_provider.strip()
+      if isinstance(market_data_provider, str) and market_data_provider.strip()
+      else None
+    )
+    normalized_venue = venue.strip() if isinstance(venue, str) and venue.strip() else None
     normalized_requested_by_tab_id = (
       requested_by_tab_id.strip()
       if isinstance(requested_by_tab_id, str) and requested_by_tab_id.strip()
       else None
     )
     normalized_status = status.strip().lower() if isinstance(status, str) and status.strip() else None
-    normalized_limit = max(1, min(limit, 500))
     search_value = search.strip().lower() if isinstance(search, str) and search.strip() else None
     filtered = [
       record
@@ -2169,6 +2178,12 @@ class TradingApplication:
       and (normalized_symbol is None or record.symbol == normalized_symbol)
       and (normalized_timeframe is None or record.timeframe == normalized_timeframe)
       and (normalized_provider_label is None or normalized_provider_label in record.provider_labels)
+      and (normalized_vendor_field is None or normalized_vendor_field in record.vendor_fields)
+      and (
+        normalized_market_data_provider is None
+        or record.market_data_provider == normalized_market_data_provider
+      )
+      and (normalized_venue is None or record.venue == normalized_venue)
       and (
         normalized_requested_by_tab_id is None
         or record.requested_by_tab_id == normalized_requested_by_tab_id
@@ -2176,7 +2191,302 @@ class TradingApplication:
       and (normalized_status is None or record.status == normalized_status)
       and self._matches_provider_provenance_export_job_search(record, search_value)
     ]
+    return tuple(filtered)
+
+  def list_provider_provenance_export_jobs(
+    self,
+    *,
+    focus_key: str | None = None,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    provider_label: str | None = None,
+    vendor_field: str | None = None,
+    market_data_provider: str | None = None,
+    venue: str | None = None,
+    requested_by_tab_id: str | None = None,
+    status: str | None = None,
+    search: str | None = None,
+    limit: int = 100,
+  ) -> tuple[ProviderProvenanceExportJobRecord, ...]:
+    self._prune_provider_provenance_export_artifact_records()
+    self._prune_provider_provenance_export_job_records()
+    self._prune_provider_provenance_export_job_audit_records()
+    normalized_limit = max(1, min(limit, 500))
+    filtered = self._filter_provider_provenance_export_job_records(
+      focus_key=focus_key,
+      symbol=symbol,
+      timeframe=timeframe,
+      provider_label=provider_label,
+      vendor_field=vendor_field,
+      market_data_provider=market_data_provider,
+      venue=venue,
+      requested_by_tab_id=requested_by_tab_id,
+      status=status,
+      search=search,
+    )
     return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_export_analytics(
+    self,
+    *,
+    focus_key: str | None = None,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    provider_label: str | None = None,
+    vendor_field: str | None = None,
+    market_data_provider: str | None = None,
+    venue: str | None = None,
+    requested_by_tab_id: str | None = None,
+    status: str | None = None,
+    search: str | None = None,
+    result_limit: int = 12,
+  ) -> dict[str, Any]:
+    self._prune_provider_provenance_export_artifact_records()
+    self._prune_provider_provenance_export_job_records()
+    self._prune_provider_provenance_export_job_audit_records()
+    records = self._filter_provider_provenance_export_job_records(
+      focus_key=focus_key,
+      symbol=symbol,
+      timeframe=timeframe,
+      provider_label=provider_label,
+      vendor_field=vendor_field,
+      market_data_provider=market_data_provider,
+      venue=venue,
+      requested_by_tab_id=requested_by_tab_id,
+      status=status,
+      search=search,
+    )
+    normalized_result_limit = max(1, min(result_limit, 50))
+    matching_job_ids = {record.job_id for record in records}
+    audit_records = tuple(
+      audit_record
+      for audit_record in self._list_provider_provenance_export_job_audit_records()
+      if audit_record.job_id in matching_job_ids
+    )
+    download_stats_by_job: dict[str, dict[str, Any]] = {}
+    for audit_record in audit_records:
+      if audit_record.action != "downloaded":
+        continue
+      job_stats = download_stats_by_job.setdefault(
+        audit_record.job_id,
+        {"download_count": 0, "last_downloaded_at": None},
+      )
+      job_stats["download_count"] += 1
+      last_downloaded_at = job_stats["last_downloaded_at"]
+      if (
+        last_downloaded_at is None
+        or audit_record.recorded_at > last_downloaded_at
+      ):
+        job_stats["last_downloaded_at"] = audit_record.recorded_at
+
+    def build_rollup_entry(
+      *,
+      key: str,
+      label: str,
+      records_for_rollup: list[ProviderProvenanceExportJobRecord],
+      extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+      download_count = sum(
+        int(download_stats_by_job.get(record.job_id, {}).get("download_count", 0))
+        for record in records_for_rollup
+      )
+      download_timestamps = [
+        download_stats_by_job[record.job_id]["last_downloaded_at"]
+        for record in records_for_rollup
+        if record.job_id in download_stats_by_job
+        and download_stats_by_job[record.job_id].get("last_downloaded_at") is not None
+      ]
+      exported_timestamps = [
+        record.exported_at or record.created_at
+        for record in records_for_rollup
+      ]
+      provider_labels_for_rollup = self._normalize_provider_provenance_export_strings(
+        provider
+        for record in records_for_rollup
+        for provider in record.provider_labels
+      )
+      vendor_fields_for_rollup = self._normalize_provider_provenance_export_strings(
+        field
+        for record in records_for_rollup
+        for field in record.vendor_fields
+      )
+      payload = {
+        "key": key,
+        "label": label,
+        "export_count": len(records_for_rollup),
+        "result_count": sum(record.result_count for record in records_for_rollup),
+        "provider_provenance_count": sum(
+          record.provider_provenance_count
+          for record in records_for_rollup
+        ),
+        "download_count": download_count,
+        "focus_count": len({
+          record.focus_key
+          for record in records_for_rollup
+          if isinstance(record.focus_key, str) and record.focus_key
+        }),
+        "requested_by_tab_count": len({
+          record.requested_by_tab_id
+          for record in records_for_rollup
+          if isinstance(record.requested_by_tab_id, str) and record.requested_by_tab_id
+        }),
+        "provider_labels": list(provider_labels_for_rollup),
+        "vendor_fields": list(vendor_fields_for_rollup),
+        "last_exported_at": max(exported_timestamps).isoformat() if exported_timestamps else None,
+        "last_downloaded_at": max(download_timestamps).isoformat() if download_timestamps else None,
+      }
+      if extra:
+        payload.update(extra)
+      return payload
+
+    provider_rollups: dict[str, list[ProviderProvenanceExportJobRecord]] = {}
+    vendor_field_rollups: dict[str, list[ProviderProvenanceExportJobRecord]] = {}
+    focus_rollups: dict[str, list[ProviderProvenanceExportJobRecord]] = {}
+    requester_rollups: dict[str, list[ProviderProvenanceExportJobRecord]] = {}
+    for record in records:
+      for provider in record.provider_labels:
+        provider_rollups.setdefault(provider, []).append(record)
+      for field_name in record.vendor_fields:
+        vendor_field_rollups.setdefault(field_name, []).append(record)
+      focus_rollups.setdefault(record.focus_key or "unknown_focus", []).append(record)
+      requester_rollups.setdefault(
+        record.requested_by_tab_id or "unknown_requester",
+        [],
+      ).append(record)
+
+    focus_items = [
+      build_rollup_entry(
+        key=focus_key_value,
+        label=records_for_rollup[0].focus_label or focus_key_value,
+        records_for_rollup=records_for_rollup,
+        extra={
+          "symbol": records_for_rollup[0].symbol,
+          "timeframe": records_for_rollup[0].timeframe,
+          "market_data_provider": records_for_rollup[0].market_data_provider,
+          "venue": records_for_rollup[0].venue,
+        },
+      )
+      for focus_key_value, records_for_rollup in focus_rollups.items()
+    ]
+    provider_items = [
+      build_rollup_entry(
+        key=provider_value,
+        label=provider_value,
+        records_for_rollup=records_for_rollup,
+      )
+      for provider_value, records_for_rollup in provider_rollups.items()
+    ]
+    vendor_field_items = [
+      build_rollup_entry(
+        key=field_value,
+        label=field_value,
+        records_for_rollup=records_for_rollup,
+      )
+      for field_value, records_for_rollup in vendor_field_rollups.items()
+    ]
+    requester_items = [
+      build_rollup_entry(
+        key=requester_value,
+        label=(
+          records_for_rollup[0].requested_by_tab_label
+          or records_for_rollup[0].requested_by_tab_id
+          or requester_value
+        ),
+        records_for_rollup=records_for_rollup,
+      )
+      for requester_value, records_for_rollup in requester_rollups.items()
+    ]
+
+    def sort_rollup_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+      return sorted(
+        items,
+        key=lambda item: (
+          int(item["provider_provenance_count"]),
+          int(item["export_count"]),
+          item["label"],
+        ),
+        reverse=True,
+      )
+
+    all_provider_labels = self._normalize_provider_provenance_export_strings(
+      provider
+      for record in records
+      for provider in record.provider_labels
+    )
+    all_vendor_fields = self._normalize_provider_provenance_export_strings(
+      field
+      for record in records
+      for field in record.vendor_fields
+    )
+    all_market_data_providers = self._normalize_provider_provenance_export_strings(
+      record.market_data_provider
+      for record in records
+    )
+    all_venues = self._normalize_provider_provenance_export_strings(record.venue for record in records)
+    all_timeframes = self._normalize_provider_provenance_export_strings(record.timeframe for record in records)
+    all_requested_by_tab_ids = self._normalize_provider_provenance_export_strings(
+      record.requested_by_tab_id
+      for record in records
+    )
+    all_statuses = self._normalize_provider_provenance_export_strings(record.status for record in records)
+
+    recent_exports = list(records[:normalized_result_limit])
+    return {
+      "generated_at": self._clock().isoformat(),
+      "query": {
+        "focus_key": focus_key,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "provider_label": provider_label,
+        "vendor_field": vendor_field,
+        "market_data_provider": market_data_provider,
+        "venue": venue,
+        "requested_by_tab_id": requested_by_tab_id,
+        "status": status,
+        "search": search,
+        "result_limit": normalized_result_limit,
+      },
+      "totals": {
+        "export_count": len(records),
+        "result_count": sum(record.result_count for record in records),
+        "provider_provenance_count": sum(
+          record.provider_provenance_count
+          for record in records
+        ),
+        "download_count": sum(
+          int(job_stats.get("download_count", 0))
+          for job_stats in download_stats_by_job.values()
+        ),
+        "unique_focus_count": len({
+          record.focus_key
+          for record in records
+          if isinstance(record.focus_key, str) and record.focus_key
+        }),
+        "provider_label_count": len(all_provider_labels),
+        "vendor_field_count": len(all_vendor_fields),
+        "market_data_provider_count": len(all_market_data_providers),
+        "requester_count": len(all_requested_by_tab_ids),
+      },
+      "available_filters": {
+        "provider_labels": list(all_provider_labels),
+        "vendor_fields": list(all_vendor_fields),
+        "market_data_providers": list(all_market_data_providers),
+        "venues": list(all_venues),
+        "timeframes": list(all_timeframes),
+        "requested_by_tab_ids": list(all_requested_by_tab_ids),
+        "statuses": list(all_statuses),
+      },
+      "rollups": {
+        "providers": sort_rollup_items(provider_items)[:5],
+        "vendor_fields": sort_rollup_items(vendor_field_items)[:5],
+        "focuses": sort_rollup_items(focus_items)[:6],
+        "requesters": sort_rollup_items(requester_items)[:5],
+      },
+      "recent_exports": [
+        serialize_provider_provenance_export_job_record(record)
+        for record in recent_exports
+      ],
+    }
 
   def get_provider_provenance_export_job(
     self,

@@ -1077,6 +1077,69 @@ export type ProviderProvenanceExportJobHistoryPayload = {
   history: ProviderProvenanceExportJobAuditRecord[];
 };
 
+export type ProviderProvenanceExportAnalyticsRollupEntry = {
+  key: string;
+  label: string;
+  export_count: number;
+  result_count: number;
+  provider_provenance_count: number;
+  download_count: number;
+  focus_count: number;
+  requested_by_tab_count: number;
+  provider_labels: string[];
+  vendor_fields: string[];
+  last_exported_at?: string | null;
+  last_downloaded_at?: string | null;
+  symbol?: string | null;
+  timeframe?: string | null;
+  market_data_provider?: string | null;
+  venue?: string | null;
+};
+
+export type ProviderProvenanceExportAnalyticsPayload = {
+  generated_at: string;
+  query: {
+    focus_key?: string | null;
+    symbol?: string | null;
+    timeframe?: string | null;
+    provider_label?: string | null;
+    vendor_field?: string | null;
+    market_data_provider?: string | null;
+    venue?: string | null;
+    requested_by_tab_id?: string | null;
+    status?: string | null;
+    search?: string | null;
+    result_limit: number;
+  };
+  totals: {
+    export_count: number;
+    result_count: number;
+    provider_provenance_count: number;
+    download_count: number;
+    unique_focus_count: number;
+    provider_label_count: number;
+    vendor_field_count: number;
+    market_data_provider_count: number;
+    requester_count: number;
+  };
+  available_filters: {
+    provider_labels: string[];
+    vendor_fields: string[];
+    market_data_providers: string[];
+    venues: string[];
+    timeframes: string[];
+    requested_by_tab_ids: string[];
+    statuses: string[];
+  };
+  rollups: {
+    providers: ProviderProvenanceExportAnalyticsRollupEntry[];
+    vendor_fields: ProviderProvenanceExportAnalyticsRollupEntry[];
+    focuses: ProviderProvenanceExportAnalyticsRollupEntry[];
+    requesters: ProviderProvenanceExportAnalyticsRollupEntry[];
+  };
+  recent_exports: ProviderProvenanceExportJobEntry[];
+};
+
 export type OperatorAlertMarketContextFieldProvenance = {
   scope?: string | null;
   path?: string | null;

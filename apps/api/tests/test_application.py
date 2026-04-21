@@ -14326,6 +14326,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_visibility",
     "operator_provider_provenance_export_job_create",
     "operator_provider_provenance_export_job_list",
+    "operator_provider_provenance_export_analytics",
     "operator_provider_provenance_export_job_download",
     "operator_provider_provenance_export_job_history",
     "guarded_live_status",
@@ -14415,6 +14416,11 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "/operator/provider-provenance-exports"
   )
   assert bindings_by_key["operator_provider_provenance_export_job_list"].filter_param_specs[0].key == "focus_key"
+  assert bindings_by_key["operator_provider_provenance_export_job_list"].filter_param_specs[4].key == "vendor_field"
+  assert bindings_by_key["operator_provider_provenance_export_analytics"].route_path == (
+    "/operator/provider-provenance-exports/analytics"
+  )
+  assert bindings_by_key["operator_provider_provenance_export_analytics"].filter_param_specs[-1].key == "result_limit"
   assert bindings_by_key["operator_provider_provenance_export_job_download"].path_param_keys == ("job_id",)
   assert bindings_by_key["operator_provider_provenance_export_job_download"].filter_param_specs[0].key == "source_tab_id"
   assert bindings_by_key["operator_provider_provenance_export_job_history"].route_path == (
@@ -15237,6 +15243,22 @@ def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: P
     filters={"source_tab_id": "tab_review", "source_tab_label": "Review tab"},
   )
   assert downloaded_payload["content"] == export_content
+
+  analytics_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_analytics"],
+    app=app,
+    filters={
+      "focus_key": "binance:BTC/USDT|5m",
+      "provider_label": "pagerduty",
+      "vendor_field": "custom_details.market_context",
+      "result_limit": 10,
+    },
+  )
+  assert analytics_payload["totals"]["export_count"] == 1
+  assert analytics_payload["totals"]["download_count"] == 1
+  assert analytics_payload["rollups"]["providers"][0]["key"] == "pagerduty"
+  assert analytics_payload["rollups"]["focuses"][0]["key"] == "binance:BTC/USDT|5m"
+  assert analytics_payload["recent_exports"][0]["job_id"] == created_payload["job_id"]
 
   history_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_export_job_history"],
