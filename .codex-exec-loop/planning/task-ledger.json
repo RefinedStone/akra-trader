@@ -168,18 +168,54 @@
       "direction_id": "runtime-ops",
       "title": "Carry primary-focus market context into external webhook and provider payload builders",
       "description": "Extend external webhook and provider delivery payload builders to emit the new primary_focus market-context metadata so downstream incident consumers outside the control room receive the same durable multi-symbol focus contract as the first-party API.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 84,
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T22:15:00+09:00",
+      "updated_at": "2026-04-21T22:42:08+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-external-incident-market-context"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says external webhook/provider delivery payload builders still do not carry the new primary_focus metadata even after the backend API and control room now rely on it.",
-      "priority_reason": "This is the clearest next executable task because the backend contract now exists and the remaining hardening gap is propagating that same contract to external delivery surfaces without introducing a second payload policy."
+      "direction_relation_note": "Completed on main in commit 7ae6a04 with shared operator-delivery serializers that emit symbol, symbols, timeframe, and primary_focus for generic webhooks and remediation_provider_recovery payloads, plus webhook and rootly round-trip coverage.",
+      "priority_reason": "Closed after backend delivery propagation, targeted pytest coverage, compileall verification, docs updates, commit, and push all landed, so queue selection should move to the outbound follow-up gaps explicitly called out in the latest main-session reply."
+    },
+    {
+      "id": "task-b1-provider-primary-focus-pull-normalization",
+      "direction_id": "runtime-ops",
+      "title": "Restore provider-returned primary-focus market context into normalized incident fields",
+      "description": "Extend provider pull-normalization so third-party incident payloads that now echo primary_focus market context are restored into first-class normalized symbol, symbols, timeframe, and primary_focus fields instead of remaining nested provider payload details.",
+      "status": "ready",
+      "base_priority": 85,
+      "dynamic_priority_delta": 19,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T22:42:08+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-external-provider-primary-focus-delivery"
+      ],
+      "direction_relation_note": "The latest main-session reply says outbound delivery is finished, but provider pull-normalization still does not restore third-party primary_focus into first-class normalized fields after providers send it back.",
+      "priority_reason": "This is the clearest next executable task because the outbound contract now exists and builtin next-task should harden the return path before more provider-facing workflow formatting work adds another layer of payload interpretation."
+    },
+    {
+      "id": "task-b1-provider-workflow-market-context-structure",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Structure provider workflow note and action payloads around market context",
+      "description": "Replace free-text-heavy provider workflow note and action payloads with an explicit market-context block so downstream operator workflows and provider-side remediation steps can carry primary_focus, candidate symbols, and timeframe without depending on prose parsing.",
+      "status": "proposed",
+      "base_priority": 81,
+      "dynamic_priority_delta": 14,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T22:42:08+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-primary-focus-pull-normalization"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly calls out provider workflow note/action payloads as still relying on free text rather than a structured market-context block even after outbound delivery now includes primary_focus.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind pull-normalization so the queue first closes the symmetric send/receive contract before redesigning provider workflow formatting."
     },
     {
       "id": "task-b1-multi-symbol-risk-scoring-expansion",
