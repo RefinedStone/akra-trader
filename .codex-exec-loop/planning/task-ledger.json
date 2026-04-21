@@ -730,18 +730,18 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add edit, delete, versioning, and team audit workflows for governance policy templates",
       "description": "Deepen the newly shipped governance policy-template layer by adding template edit/delete/version operations plus team-wide governance audit surfaces so operators can safely evolve reusable approval policies and inspect who changed them, when, and for which scheduler narrative plans.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 32,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T17:32:00+09:00",
+      "updated_at": "2026-04-22T17:45:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-narrative-governance-queue-policy"
       ],
-      "direction_relation_note": "The latest main-session reply says commit 4a0785c shipped governance approval queues and reusable policy templates, but policy templates are still create/list/reuse only and still lack edit/delete/versioning plus a team-wide governance audit trail.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task and this is the first explicit remaining executable follow-up named in the latest main-session reply after the approval-queue and policy-template slice shipped."
+      "direction_relation_note": "Completed on main in commit d50cad4 with durable governance policy-template records gaining active or deleted lifecycle state, current revision tracking, revision restore or list surfaces, and shared team audit records across backend APIs and the control-room template editor.",
+      "priority_reason": "Closed after backend lifecycle and audit plumbing, control-room edit or delete or version flows, targeted pytest coverage, compileall verification, web typecheck and build, docs alignment, commit, and push all landed; the latest main-session reply now leaves multi-plan governance catalog work and stitched multi-occurrence narrative work as the direct follow-ups."
     },
     {
       "id": "task-b1-provider-market-context-cross-incident-narrative-reporting",
@@ -753,7 +753,7 @@
       "dynamic_priority_delta": 25,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T17:20:00+09:00",
+      "updated_at": "2026-04-22T18:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-mixed-status-narrative-artifact",
@@ -761,26 +761,44 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-management",
         "task-b1-provider-market-context-scheduler-narrative-governance-bulk-ops"
       ],
-      "direction_relation_note": "The latest main-session reply says scheduler narrative review is still occurrence or facet driven even after commit ac727d5 shipped plan-level preview, approval, apply, and rollback governance, so stitched multi-occurrence artifacts and longer cross-incident reporting remain missing.",
-      "priority_reason": "This stays proposed as the second explicit executable follow-up from the latest main-session reply, behind the newly promoted approval-queue and governance-policy queue head so builtin next-task advances through the first listed governance continuation before deeper narrative stitching."
+      "direction_relation_note": "The latest main-session reply says scheduler narrative review remains occurrence or facet centered even after commit a865cbf added multi-plan batch approval or apply and higher-level policy catalog workflows, so stitched multi-occurrence artifacts and cross-incident reporting are still missing from the operator narrative lane.",
+      "priority_reason": "This remains an explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted policy-catalog management queue head so builtin next-task finishes the direct governance continuation before deeper narrative stitching."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
       "direction_id": "operator-trust-and-discipline",
       "title": "Add multi-plan batch approval/apply and higher-level governance policy catalog workflows",
       "description": "Build the next layer above plan-level approval queues by adding multi-plan batch approval or apply actions plus a higher-level governance policy catalog that can organize and roll out reusable scheduler narrative governance rules beyond one-off policy-template selection.",
-      "status": "proposed",
+      "status": "done",
       "base_priority": 74,
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T17:32:00+09:00",
+      "updated_at": "2026-04-22T18:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-narrative-governance-queue-policy"
       ],
-      "direction_relation_note": "The latest main-session reply says commit 4a0785c added approval-queue review and reusable policy-template selection, but multi-plan batch approval or apply flows and a higher-level governance policy catalog above per-plan templates are still missing.",
-      "priority_reason": "This is the second explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted policy-template lifecycle and audit slice so builtin next-task advances through the first listed governance continuation before wider catalog and batch rollout workflows."
+      "direction_relation_note": "Completed on main in commit a865cbf with governance plan batch approval or apply actions plus durable policy catalog create or list or apply surfaces and control-room catalog reuse across approval queues and governance defaults.",
+      "priority_reason": "Closed after backend governance-batch and policy-catalog contracts, control-room multi-select approval or apply flows, docs alignment, targeted pytest, compileall, web typecheck or build, commit, and push all landed; the latest main-session reply now leaves catalog lifecycle or audit or bulk-governance management plus deeper narrative review as the direct follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-policy-catalog-management",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add lifecycle, audit, and bulk governance workflows for policy catalogs",
+      "description": "Deepen the newly shipped higher-level governance policy catalog layer by adding catalog edit or delete or versioning flows, team audit visibility, and bulk governance actions so reusable scheduler governance presets can be maintained safely after create or list or apply is in place.",
+      "status": "ready",
+      "base_priority": 75,
+      "dynamic_priority_delta": 26,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T18:05:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-policy-catalog-templates"
+      ],
+      "direction_relation_note": "The latest main-session reply says commit a865cbf added policy catalog create or list or apply plus multi-plan batch approval or apply, but catalog edit or delete or versioning, team audit, and bulk governance workflows are still missing from the scheduler governance lane.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task and this is the most direct remaining governance continuation explicitly listed in the latest main-session reply before returning to broader narrative stitching or deeper search work."
     },
     {
       "id": "task-b1-provider-market-context-dashboard-board",
@@ -846,15 +864,15 @@
       "dynamic_priority_delta": 19,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T17:20:00+09:00",
+      "updated_at": "2026-04-22T18:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
         "task-b1-provider-market-context-scheduler-narrative-saved-view-surface",
         "task-b1-provider-market-context-scheduler-narrative-registry-templates"
       ],
-      "direction_relation_note": "The latest main-session reply says deeper server-side narrative search across scheduler occurrence timelines is still not built, even after reusable templates or registries and commit ac727d5's plan-level governance preview, approval, apply, and rollback flow landed.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the new approval-queue and governance-policy hardening step and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
+      "direction_relation_note": "The latest main-session reply still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after commit a865cbf extended governance queues with batch actions and policy catalog reuse.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the promoted policy-catalog management slice and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
