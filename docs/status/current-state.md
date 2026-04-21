@@ -159,9 +159,10 @@ It is not yet a finished live trading product:
 - those shared scheduler exports now also persist per-export routing and approval policy, so
   chatops-only review, paging routes, and manual approval gates are all visible and enforceable
   before escalation is sent
-- scheduler lag and failure alerts can now trigger that scheduler-export workflow directly, creating
-  a fresh shared snapshot from the alert surface and optionally sending it immediately when the
-  saved routing policy allows delivery without additional approval
+- scheduler lag and failure alerts now also auto-open that scheduler-export workflow in backend
+  automation, creating one shared snapshot per active alert condition and auto-escalating it when
+  the saved routing and approval policy already allow delivery; the alert surface can still jump
+  into that same workflow for review or follow-up approval
 
 ### Operator discipline baseline
 

@@ -967,6 +967,11 @@ class ProviderProvenanceSchedulerHealth:
   due_report_count: int = 0
   oldest_due_at: datetime | None = None
   max_due_lag_seconds: int = 0
+  active_alert_key: str | None = None
+  alert_workflow_job_id: str | None = None
+  alert_workflow_triggered_at: datetime | None = None
+  alert_workflow_state: str | None = None
+  alert_workflow_summary: str | None = None
   issues: tuple[str, ...] = ()
 
 
@@ -995,6 +1000,11 @@ class ProviderProvenanceSchedulerHealthRecord:
   due_report_count: int = 0
   oldest_due_at: datetime | None = None
   max_due_lag_seconds: int = 0
+  active_alert_key: str | None = None
+  alert_workflow_job_id: str | None = None
+  alert_workflow_triggered_at: datetime | None = None
+  alert_workflow_state: str | None = None
+  alert_workflow_summary: str | None = None
   source_tab_id: str | None = None
   source_tab_label: str | None = None
   issues: tuple[str, ...] = ()

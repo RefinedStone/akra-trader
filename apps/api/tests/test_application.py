@@ -1123,6 +1123,127 @@ def test_operator_visibility_surfaces_provider_provenance_scheduler_lag(tmp_path
   )
 
 
+def test_provider_provenance_scheduler_lag_auto_runs_export_workflow_once(
+  tmp_path: Path,
+) -> None:
+  class FakeSchedulerExportDeliveryAdapter:
+    def __init__(self) -> None:
+      self.deliveries: list[tuple[str, tuple[str, ...], str]] = []
+
+    def list_targets(self) -> tuple[str, ...]:
+      return ("slack_webhook", "pagerduty_events")
+
+    def list_supported_workflow_providers(self) -> tuple[str, ...]:
+      return ("pagerduty",)
+
+    def deliver(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      targets: tuple[str, ...] | None = None,
+      attempt_number: int = 1,
+      phase: str = "initial",
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      resolved_targets = tuple(targets or ())
+      self.deliveries.append((incident.alert_id, resolved_targets, phase))
+      attempted_at = incident.timestamp
+      return tuple(
+        OperatorIncidentDelivery(
+          delivery_id=f"{target}:{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=target,
+          status="delivered",
+          attempted_at=attempted_at,
+          detail=f"Delivered to {target}",
+          attempt_number=attempt_number,
+          phase=phase,
+          source=incident.source,
+        )
+        for target in resolved_targets
+      )
+
+    def sync_incident_workflow(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+      action: str,
+      actor: str,
+      detail: str,
+      payload: dict[str, Any] | None = None,
+      attempt_number: int = 1,
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      return ()
+
+    def pull_incident_workflow_state(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+    ) -> OperatorIncidentProviderPullSync | None:
+      return None
+
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 11, 0, tzinfo=UTC))
+  delivery = FakeSchedulerExportDeliveryAdapter()
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+
+  overdue_at = clock.current - timedelta(minutes=10)
+  for name in ("Drift watch A", "Drift watch B", "Drift watch C"):
+    report = app.create_provider_provenance_scheduled_report(name=name)
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report, next_run_at=overdue_at)
+    )
+
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  first_visibility = app.get_operator_visibility()
+  first_exports = app.list_provider_provenance_export_jobs(
+    export_scope="provider_provenance_scheduler_health",
+    requested_by_tab_id="system:provider-provenance-scheduler-alerts",
+    limit=10,
+  )
+
+  assert len(first_exports) == 1
+  assert first_exports[0].routing_policy_id == "default_critical"
+  assert first_exports[0].escalation_count == 1
+  assert first_exports[0].last_escalation_reason == "scheduler_lag_auto_export"
+  assert first_exports[0].last_delivery_status == "delivered"
+  assert first_visibility.provider_provenance_scheduler is not None
+  assert first_visibility.provider_provenance_scheduler.alert_workflow_job_id == first_exports[0].job_id
+  assert first_visibility.provider_provenance_scheduler.alert_workflow_state == "escalated_delivered"
+
+  clock.advance(timedelta(minutes=1))
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  second_exports = app.list_provider_provenance_export_jobs(
+    export_scope="provider_provenance_scheduler_health",
+    requested_by_tab_id="system:provider-provenance-scheduler-alerts",
+    limit=10,
+  )
+
+  assert len(second_exports) == 1
+  assert second_exports[0].job_id == first_exports[0].job_id
+  assert len(delivery.deliveries) == 1
+
+
 def test_operator_visibility_surfaces_worker_failure_and_operator_stop_audit(
   monkeypatch,
   tmp_path: Path,
@@ -1208,6 +1329,112 @@ def test_operator_visibility_surfaces_provider_provenance_scheduler_failure(
     event.kind == "provider_provenance_scheduler_failed"
     for event in visibility.audit_events
   )
+
+
+def test_provider_provenance_scheduler_failure_auto_runs_export_workflow(
+  monkeypatch,
+  tmp_path: Path,
+) -> None:
+  class FakeSchedulerExportDeliveryAdapter:
+    def __init__(self) -> None:
+      self.deliveries: list[tuple[str, tuple[str, ...], str]] = []
+
+    def list_targets(self) -> tuple[str, ...]:
+      return ("slack_webhook", "pagerduty_events")
+
+    def list_supported_workflow_providers(self) -> tuple[str, ...]:
+      return ("pagerduty",)
+
+    def deliver(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      targets: tuple[str, ...] | None = None,
+      attempt_number: int = 1,
+      phase: str = "initial",
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      resolved_targets = tuple(targets or ())
+      self.deliveries.append((incident.alert_id, resolved_targets, phase))
+      attempted_at = incident.timestamp
+      return tuple(
+        OperatorIncidentDelivery(
+          delivery_id=f"{target}:{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=target,
+          status="delivered",
+          attempted_at=attempted_at,
+          detail=f"Delivered to {target}",
+          attempt_number=attempt_number,
+          phase=phase,
+          source=incident.source,
+        )
+        for target in resolved_targets
+      )
+
+    def sync_incident_workflow(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+      action: str,
+      actor: str,
+      detail: str,
+      payload: dict[str, Any] | None = None,
+      attempt_number: int = 1,
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      return ()
+
+    def pull_incident_workflow_state(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+    ) -> OperatorIncidentProviderPullSync | None:
+      return None
+
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 12, 0, tzinfo=UTC))
+  delivery = FakeSchedulerExportDeliveryAdapter()
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    provider_provenance_report_scheduler_interval_seconds=60,
+  )
+
+  def fail_scheduler(*args, **kwargs):
+    raise RuntimeError("scheduler crash")
+
+  monkeypatch.setattr(app, "run_due_provider_provenance_scheduled_reports", fail_scheduler)
+  with pytest.raises(RuntimeError, match="scheduler crash"):
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+
+  visibility = app.get_operator_visibility()
+  exports = app.list_provider_provenance_export_jobs(
+    export_scope="provider_provenance_scheduler_health",
+    requested_by_tab_id="system:provider-provenance-scheduler-alerts",
+    limit=10,
+  )
+
+  assert len(exports) == 1
+  assert exports[0].routing_policy_id == "default_critical"
+  assert exports[0].escalation_count == 1
+  assert exports[0].last_escalation_reason == "scheduler_failure_auto_export"
+  assert exports[0].last_delivery_status == "delivered"
+  assert visibility.provider_provenance_scheduler is not None
+  assert visibility.provider_provenance_scheduler.alert_workflow_job_id == exports[0].job_id
+  assert visibility.provider_provenance_scheduler.alert_workflow_state == "escalated_delivered"
+  assert len(delivery.deliveries) == 1
 
 
 def test_provider_provenance_scheduler_history_and_analytics_persist(
@@ -15836,8 +16063,11 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     app=app,
     filters={"export_scope": "provider_provenance_scheduler_health", "limit": 10},
   )
-  assert listed_scheduler_exports_payload["total"] == 1
-  assert listed_scheduler_exports_payload["items"][0]["job_id"] == shared_scheduler_export_payload["job_id"]
+  assert listed_scheduler_exports_payload["total"] >= 1
+  assert any(
+    item["job_id"] == shared_scheduler_export_payload["job_id"]
+    for item in listed_scheduler_exports_payload["items"]
+  )
 
   updated_scheduler_policy_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_export_job_policy"],

@@ -106,8 +106,10 @@ creation.
   operator handoff artifact
 - per-export routing and approval policy now sits on top of that scheduler export workflow, so
   escalation targets and approval gates can be chosen and audited at the export artifact level
-- runtime alert review can now trigger scheduler-export workflow creation and escalation directly
-  from lag/failure alerts, tightening the loop between automation fault detection and operator
+- runtime alert review now sits on top of backend auto-created scheduler-export workflows for
+  lag/failure conditions, so automation faults open one shared handoff artifact automatically and
+  can escalate it immediately when policy allows, tightening the loop between automation detection
+  and operator
   handoff
 
 ### Remaining work

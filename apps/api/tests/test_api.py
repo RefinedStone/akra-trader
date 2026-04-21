@@ -3222,11 +3222,71 @@ def test_operator_visibility_endpoint_reports_worker_failures(tmp_path: Path) ->
 def test_operator_visibility_endpoint_reports_provider_provenance_scheduler_lag(
   tmp_path: Path,
 ) -> None:
+  class FakeSchedulerExportDeliveryAdapter:
+    def __init__(self) -> None:
+      self.deliveries: list[tuple[str, tuple[str, ...], str]] = []
+
+    def list_targets(self) -> tuple[str, ...]:
+      return ("slack_webhook", "pagerduty_events")
+
+    def list_supported_workflow_providers(self) -> tuple[str, ...]:
+      return ("pagerduty",)
+
+    def deliver(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      targets: tuple[str, ...] | None = None,
+      attempt_number: int = 1,
+      phase: str = "initial",
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      resolved_targets = tuple(targets or ())
+      self.deliveries.append((incident.alert_id, resolved_targets, phase))
+      attempted_at = incident.timestamp
+      return tuple(
+        OperatorIncidentDelivery(
+          delivery_id=f"{target}:{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=target,
+          status="delivered",
+          attempted_at=attempted_at,
+          detail=f"Delivered to {target}",
+          attempt_number=attempt_number,
+          phase=phase,
+          source=incident.source,
+        )
+        for target in resolved_targets
+      )
+
+    def sync_incident_workflow(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+      action: str,
+      actor: str,
+      detail: str,
+      payload: dict[str, Any] | None = None,
+      attempt_number: int = 1,
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      return ()
+
+    def pull_incident_workflow_state(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+    ) -> OperatorIncidentProviderPullSync | None:
+      return None
+
   with build_client(
     tmp_path / "runs.sqlite3",
     provider_provenance_report_scheduler_enabled=False,
   ) as client:
     app = client.app.state.container.app
+    app._operator_alert_delivery = FakeSchedulerExportDeliveryAdapter()
     fixed_time = datetime(2026, 4, 22, 10, 0, tzinfo=UTC)
     app._clock = lambda: fixed_time
     app._provider_provenance_report_scheduler_interval_seconds = 60
@@ -3256,11 +3316,21 @@ def test_operator_visibility_endpoint_reports_provider_provenance_scheduler_lag(
     )
 
     response = client.get("/api/operator/visibility")
+    shared_exports_response = client.get(
+      "/api/operator/provider-provenance-exports",
+      params={
+        "export_scope": "provider_provenance_scheduler_health",
+        "requested_by_tab_id": "system:provider-provenance-scheduler-alerts",
+        "limit": 10,
+      },
+    )
 
   assert response.status_code == 200
   payload = response.json()
   assert payload["provider_provenance_scheduler"]["status"] == "lagging"
   assert payload["provider_provenance_scheduler"]["due_report_count"] == 1
+  assert payload["provider_provenance_scheduler"]["alert_workflow_state"] == "escalated_delivered"
+  assert payload["provider_provenance_scheduler"]["alert_workflow_job_id"] is not None
   lag_alert = next(
     alert for alert in payload["alerts"]
     if alert["category"] == "scheduler_lag"
@@ -3270,6 +3340,13 @@ def test_operator_visibility_endpoint_reports_provider_provenance_scheduler_lag(
     event["kind"] == "provider_provenance_scheduler_lagging"
     for event in payload["audit_events"]
   )
+  assert shared_exports_response.status_code == 200
+  shared_exports_payload = shared_exports_response.json()
+  assert shared_exports_payload["total"] == 1
+  assert shared_exports_payload["items"][0]["job_id"] == (
+    payload["provider_provenance_scheduler"]["alert_workflow_job_id"]
+  )
+  assert shared_exports_payload["items"][0]["last_escalation_reason"] == "scheduler_lag_auto_export"
 
 
 def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trends(
@@ -3500,8 +3577,11 @@ def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trend
 
   assert shared_export_list_response.status_code == 200
   shared_export_list_payload = shared_export_list_response.json()
-  assert shared_export_list_payload["total"] == 1
-  assert shared_export_list_payload["items"][0]["job_id"] == shared_export_payload["job_id"]
+  assert shared_export_list_payload["total"] >= 1
+  assert any(
+    item["job_id"] == shared_export_payload["job_id"]
+    for item in shared_export_list_payload["items"]
+  )
 
   assert shared_export_policy_response.status_code == 200
   shared_export_policy_payload = shared_export_policy_response.json()

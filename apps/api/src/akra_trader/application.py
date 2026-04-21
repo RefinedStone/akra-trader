@@ -264,6 +264,13 @@ from akra_trader.runtime import RunSupervisor
 from akra_trader.runtime import StateCache
 from akra_trader.runtime import candles_to_frame
 
+PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_ID = (
+  "system:provider-provenance-scheduler-alerts"
+)
+PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_LABEL = (
+  "Scheduler alert automation"
+)
+
 class TradingApplication:
   _sandbox_worker_kind = "sandbox_native_worker"
   _guarded_live_worker_kind = "guarded_live_native_worker"
@@ -1773,6 +1780,11 @@ class TradingApplication:
       due_report_count=snapshot.due_report_count,
       oldest_due_at=snapshot.oldest_due_at,
       max_due_lag_seconds=snapshot.max_due_lag_seconds,
+      active_alert_key=snapshot.active_alert_key,
+      alert_workflow_job_id=snapshot.alert_workflow_job_id,
+      alert_workflow_triggered_at=snapshot.alert_workflow_triggered_at,
+      alert_workflow_state=snapshot.alert_workflow_state,
+      alert_workflow_summary=snapshot.alert_workflow_summary,
       source_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
       source_tab_label=(
         source_tab_label.strip()
@@ -1782,6 +1794,220 @@ class TradingApplication:
       issues=tuple(snapshot.issues),
     )
     return self._save_provider_provenance_scheduler_health_record(record)
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_alert_workflow_reason(status: str) -> str:
+    if status == "failed":
+      return "scheduler_failure_auto_export"
+    return "scheduler_lag_auto_export"
+
+  def _build_provider_provenance_scheduler_alert_key(
+    self,
+    *,
+    current: ProviderProvenanceSchedulerHealth,
+    previous: ProviderProvenanceSchedulerHealth | None = None,
+  ) -> str | None:
+    if current.status not in {"lagging", "failed"}:
+      return None
+    if (
+      previous is not None
+      and previous.status == current.status
+      and isinstance(previous.active_alert_key, str)
+      and previous.active_alert_key.strip()
+    ):
+      return previous.active_alert_key
+    if current.status == "failed":
+      anchor = (
+        current.last_success_at
+        or current.last_failure_at
+        or current.last_cycle_started_at
+        or current.generated_at
+      )
+    else:
+      anchor = current.oldest_due_at or current.last_success_at or current.generated_at
+    return f"{current.status}:{anchor.isoformat()}"
+
+  def _get_provider_provenance_export_job_content(
+    self,
+    record: ProviderProvenanceExportJobRecord,
+  ) -> str:
+    if record.artifact_id:
+      artifact_record = self.get_provider_provenance_export_artifact(record.artifact_id)
+      return artifact_record.content
+    return record.content
+
+  def _find_provider_provenance_scheduler_alert_export_job(
+    self,
+    *,
+    alert_key: str,
+  ) -> ProviderProvenanceExportJobRecord | None:
+    if not isinstance(alert_key, str) or not alert_key.strip():
+      return None
+    for record in self.list_provider_provenance_export_jobs(
+      export_scope="provider_provenance_scheduler_health",
+      requested_by_tab_id=PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_ID,
+      limit=200,
+    ):
+      try:
+        payload = json.loads(self._get_provider_provenance_export_job_content(record))
+      except (TypeError, ValueError, json.JSONDecodeError):
+        continue
+      if not isinstance(payload, dict):
+        continue
+      automation_payload = payload.get("automation")
+      if not isinstance(automation_payload, dict):
+        continue
+      candidate_alert_key = automation_payload.get("alert_key")
+      if isinstance(candidate_alert_key, str) and candidate_alert_key.strip() == alert_key:
+        return record
+    return None
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_alert_workflow_state(
+    record: ProviderProvenanceExportJobRecord,
+  ) -> tuple[str, str]:
+    if record.escalation_count > 0:
+      delivery_status = record.last_delivery_status or "delivered"
+      return (
+        f"escalated_{delivery_status}",
+        record.last_delivery_summary or "Scheduler alert export workflow escalated.",
+      )
+    if not record.routing_targets:
+      return (
+        "route_unconfigured",
+        "Scheduler alert export was created but routing targets are not configured.",
+      )
+    if record.approval_required and record.approval_state != "approved":
+      return (
+        "approval_pending",
+        record.approval_summary
+        or "Scheduler alert export workflow is waiting for operator approval.",
+      )
+    return (
+      "created",
+      record.routing_policy_summary
+      or "Scheduler alert export workflow was created and is ready for delivery.",
+    )
+
+  def _run_provider_provenance_scheduler_alert_workflow(
+    self,
+    *,
+    snapshot: ProviderProvenanceSchedulerHealth,
+    previous_snapshot: ProviderProvenanceSchedulerHealth | None = None,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerHealth:
+    alert_key = self._build_provider_provenance_scheduler_alert_key(
+      current=snapshot,
+      previous=previous_snapshot,
+    )
+    if alert_key is None:
+      return replace(
+        snapshot,
+        active_alert_key=None,
+        alert_workflow_job_id=None,
+        alert_workflow_triggered_at=None,
+        alert_workflow_state=None,
+        alert_workflow_summary=None,
+      )
+    existing_job = self._find_provider_provenance_scheduler_alert_export_job(alert_key=alert_key)
+    reason = self._build_provider_provenance_scheduler_alert_workflow_reason(snapshot.status)
+    try:
+      job = existing_job
+      if job is None:
+        export_payload = self.export_provider_provenance_scheduler_health(
+          export_format="json",
+          status=snapshot.status,
+          window_days=14,
+          history_limit=12,
+          limit=25,
+          offset=0,
+        )
+        content_payload = json.loads(export_payload["content"])
+        if not isinstance(content_payload, dict):
+          raise ValueError("Scheduler alert export content must be a JSON object.")
+        content_payload["automation"] = {
+          "kind": "scheduler_alert_workflow",
+          "alert_key": alert_key,
+          "alert_status": snapshot.status,
+          "trigger": "automatic",
+          "reason": reason,
+          "generated_at": snapshot.generated_at.isoformat(),
+          "detected_at": (
+            snapshot.last_failure_at.isoformat()
+            if snapshot.status == "failed" and snapshot.last_failure_at is not None
+            else (
+              snapshot.oldest_due_at.isoformat()
+              if snapshot.status == "lagging" and snapshot.oldest_due_at is not None
+              else snapshot.generated_at.isoformat()
+            )
+          ),
+        }
+        job = self.create_provider_provenance_export_job(
+          content=json.dumps(content_payload, indent=2, sort_keys=True),
+          requested_by_tab_id=PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_ID,
+          requested_by_tab_label=PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_LABEL,
+        )
+        self._record_provider_provenance_export_job_event(
+          record=job,
+          action="automation_triggered",
+          source_tab_id=source_tab_id or PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_ID,
+          source_tab_label=source_tab_label or PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_LABEL,
+          detail=(
+            f"Scheduler {snapshot.status} alert opened automatic export workflow "
+            f"for alert key {alert_key}."
+          ),
+          routing_policy_id=job.routing_policy_id,
+          routing_targets=job.routing_targets,
+          approval_policy_id=job.approval_policy_id,
+          approval_required=job.approval_required,
+          approval_state=job.approval_state,
+          approval_summary=job.approval_summary,
+          approved_by=job.approved_by,
+        )
+      if (
+        job.escalation_count == 0
+        and job.routing_targets
+        and (not job.approval_required or job.approval_state == "approved")
+      ):
+        escalation_result = self.escalate_provider_provenance_export_job(
+          job.job_id,
+          actor="system",
+          reason=reason,
+          source_tab_id=source_tab_id or PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_ID,
+          source_tab_label=(
+            source_tab_label or PROVIDER_PROVENANCE_SCHEDULER_ALERT_AUTOMATION_TAB_LABEL
+          ),
+        )
+        job = escalation_result["export_job"]
+      workflow_state, workflow_summary = (
+        self._build_provider_provenance_scheduler_alert_workflow_state(job)
+      )
+      return replace(
+        snapshot,
+        active_alert_key=alert_key,
+        alert_workflow_job_id=job.job_id,
+        alert_workflow_triggered_at=job.created_at,
+        alert_workflow_state=workflow_state,
+        alert_workflow_summary=workflow_summary,
+      )
+    except Exception as exc:
+      return replace(
+        snapshot,
+        active_alert_key=alert_key,
+        alert_workflow_job_id=(
+          existing_job.job_id if existing_job is not None else snapshot.alert_workflow_job_id
+        ),
+        alert_workflow_triggered_at=(
+          existing_job.created_at
+          if existing_job is not None
+          else snapshot.alert_workflow_triggered_at
+        ),
+        alert_workflow_state="automation_failed",
+        alert_workflow_summary=(
+          f"Scheduler {snapshot.status} alert automation failed: {exc}"
+        ),
+      )
 
   def _record_provider_provenance_scheduled_report_event(
     self,
@@ -4085,6 +4311,14 @@ class TradingApplication:
           issues=("Scheduler cycle raised an exception before due reports completed.",),
         )
         self._provider_provenance_scheduler_health = updated_snapshot
+      updated_snapshot = self._run_provider_provenance_scheduler_alert_workflow(
+        snapshot=updated_snapshot,
+        previous_snapshot=snapshot,
+        source_tab_id=source_tab_id,
+        source_tab_label=source_tab_label,
+      )
+      with self._provider_provenance_scheduler_health_lock:
+        self._provider_provenance_scheduler_health = updated_snapshot
       self._record_provider_provenance_scheduler_health(
         snapshot=updated_snapshot,
         source_tab_id=source_tab_id,
@@ -4130,6 +4364,14 @@ class TradingApplication:
         max_due_lag_seconds=max_due_lag_seconds,
         issues=tuple(issues),
       )
+      self._provider_provenance_scheduler_health = updated_snapshot
+    updated_snapshot = self._run_provider_provenance_scheduler_alert_workflow(
+      snapshot=updated_snapshot,
+      previous_snapshot=snapshot,
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+    )
+    with self._provider_provenance_scheduler_health_lock:
       self._provider_provenance_scheduler_health = updated_snapshot
     self._record_provider_provenance_scheduler_health(
       snapshot=updated_snapshot,
@@ -28344,6 +28586,15 @@ def serialize_provider_provenance_scheduler_health(
     "due_report_count": record.due_report_count,
     "oldest_due_at": record.oldest_due_at.isoformat() if record.oldest_due_at is not None else None,
     "max_due_lag_seconds": record.max_due_lag_seconds,
+    "active_alert_key": record.active_alert_key,
+    "alert_workflow_job_id": record.alert_workflow_job_id,
+    "alert_workflow_triggered_at": (
+      record.alert_workflow_triggered_at.isoformat()
+      if record.alert_workflow_triggered_at is not None
+      else None
+    ),
+    "alert_workflow_state": record.alert_workflow_state,
+    "alert_workflow_summary": record.alert_workflow_summary,
     "issues": list(record.issues),
   }
 
@@ -28383,6 +28634,15 @@ def serialize_provider_provenance_scheduler_health_record(
     "due_report_count": record.due_report_count,
     "oldest_due_at": record.oldest_due_at.isoformat() if record.oldest_due_at is not None else None,
     "max_due_lag_seconds": record.max_due_lag_seconds,
+    "active_alert_key": record.active_alert_key,
+    "alert_workflow_job_id": record.alert_workflow_job_id,
+    "alert_workflow_triggered_at": (
+      record.alert_workflow_triggered_at.isoformat()
+      if record.alert_workflow_triggered_at is not None
+      else None
+    ),
+    "alert_workflow_state": record.alert_workflow_state,
+    "alert_workflow_summary": record.alert_workflow_summary,
     "source_tab_id": record.source_tab_id,
     "source_tab_label": record.source_tab_label,
     "issues": list(record.issues),

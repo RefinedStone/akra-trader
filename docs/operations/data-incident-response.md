@@ -57,9 +57,10 @@ unclear dataset lineage.
 - each shared scheduler export now also carries its own routing and approval policy, so operators
   can hold a snapshot in chatops review, switch it to paging delivery, and require explicit
   approval before sending higher-noise escalation routes
-- active scheduler lag/failure alerts now also expose direct controls to start that export workflow
-  or escalate the current scheduler snapshot immediately, so the operator does not have to leave
-  the alert review loop to create the handoff artifact first
+- active scheduler lag/failure alerts now also auto-start one shared export workflow per active
+  alert condition in backend automation, and that workflow auto-escalates when its saved routing
+  and approval policy already permit delivery; the alert surface still exposes direct controls to
+  inspect, approve, or re-escalate that same handoff artifact without leaving alert review
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance
