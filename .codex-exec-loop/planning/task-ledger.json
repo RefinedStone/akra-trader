@@ -114,18 +114,54 @@
       "direction_id": "runtime-ops",
       "title": "Embed normalized symbol and timeframe in alert payloads",
       "description": "Push normalized symbol and timeframe fields into runtime alert payloads so control-room triage linking can rely on durable backend contracts instead of frontend-side heuristics around run metadata and alert text.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 84,
       "dynamic_priority_delta": 15,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:38:00+09:00",
+      "updated_at": "2026-04-21T21:49:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-alert-lineage-correlation"
       ],
-      "direction_relation_note": "The latest main-session reply lists normalized symbol/timeframe in alert payloads as the first remaining item so the just-shipped control-room alert linkage stops depending on frontend heuristics.",
-      "priority_reason": "This becomes the single ready queue head because it is the clearest immediate hardening step after the linked-alert workflow shipped and it directly improves operator trust in alert-driven triage."
+      "direction_relation_note": "Completed on main in commit f16d2c5 with normalized symbol, symbols, and timeframe propagated through operator alerts and incidents plus control-room consumers preferring the backend contract over text parsing heuristics.",
+      "priority_reason": "Closed after backend, UI, tests, docs, commit, and push landed; the remaining follow-up is now consumer policy for multi-symbol alerts and provider payload expansion."
+    },
+    {
+      "id": "task-b1-multi-symbol-alert-primary-focus",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Define primary-focus policy for multi-symbol alerts in the control room",
+      "description": "Turn the new normalized alert payload contract into deterministic control-room behavior by choosing and surfacing a primary instrument focus when alerts carry multiple symbols and a shared timeframe.",
+      "status": "ready",
+      "base_priority": 83,
+      "dynamic_priority_delta": 18,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T21:49:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-alert-payload-normalization"
+      ],
+      "direction_relation_note": "The latest main-session reply says multi-symbol alerts now emit symbols[] and timeframe, but the consumer still lacks a defined primary-focus policy, making this the clearest next operator-facing hardening slice.",
+      "priority_reason": "This is the new queue head because the normalized payload contract has shipped and the next executable gap is deterministic UI and triage behavior for multi-symbol alerts."
+    },
+    {
+      "id": "task-b1-external-incident-market-context",
+      "direction_id": "runtime-ops",
+      "title": "Extend external incident provider payloads with normalized market context",
+      "description": "Propagate normalized symbol, symbols, and timeframe fields into external incident provider payloads so downstream consumers and integrations receive the same market context contract as the internal control room.",
+      "status": "proposed",
+      "base_priority": 81,
+      "dynamic_priority_delta": 14,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T21:49:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-alert-payload-normalization"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly identifies external incident provider payload expansion as still undone after the normalized alert payload contract shipped internally.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind the control-room consumer policy so the queue keeps one deterministic next task."
     },
     {
       "id": "task-b1-triage-operator-actions",
