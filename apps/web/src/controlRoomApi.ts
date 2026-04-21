@@ -8,6 +8,7 @@ import type {
   ProviderProvenanceDashboardViewEntry,
   ProviderProvenanceDashboardViewListPayload,
   ProviderProvenanceExportAnalyticsPayload,
+  ProviderProvenanceExportJobEscalationResult,
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobHistoryPayload,
   ProviderProvenanceExportJobListPayload,
@@ -126,6 +127,7 @@ export async function createProviderProvenanceExportJob(params: {
 }
 
 export async function listProviderProvenanceExportJobs(params: {
+  exportScope?: string;
   focusKey?: string;
   limit?: number;
   marketDataProvider?: string;
@@ -139,6 +141,9 @@ export async function listProviderProvenanceExportJobs(params: {
   venue?: string;
 } = {}) {
   const searchParams = new URLSearchParams();
+  if (params.exportScope?.trim()) {
+    searchParams.set("export_scope", params.exportScope.trim());
+  }
   if (params.focusKey?.trim()) {
     searchParams.set("focus_key", params.focusKey.trim());
   }
@@ -175,6 +180,29 @@ export async function listProviderProvenanceExportJobs(params: {
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceExportJobListPayload>(
     `/operator/provider-provenance-exports${suffix}`,
+  );
+}
+
+export async function escalateProviderProvenanceExportJob(params: {
+  jobId: string;
+  actor?: string;
+  reason?: string;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+  deliveryTargets?: string[];
+}) {
+  return fetchJson<ProviderProvenanceExportJobEscalationResult>(
+    `/operator/provider-provenance-exports/${encodeURIComponent(params.jobId)}/escalate`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actor?.trim() ? { actor: params.actor.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.sourceTabId?.trim() ? { source_tab_id: params.sourceTabId.trim() } : {}),
+        ...(params.sourceTabLabel?.trim() ? { source_tab_label: params.sourceTabLabel.trim() } : {}),
+        ...(params.deliveryTargets?.length ? { delivery_targets: params.deliveryTargets } : {}),
+      }),
+    },
   );
 }
 

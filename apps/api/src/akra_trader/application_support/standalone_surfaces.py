@@ -93,6 +93,10 @@ def serialize_provider_provenance_export_job_history(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_export_job_history')(*args, **kwargs)
 
 
+def serialize_provider_provenance_export_job_escalation_result(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_export_job_escalation_result')(*args, **kwargs)
+
+
 def serialize_provider_provenance_analytics_preset_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_analytics_preset_record')(*args, **kwargs)
 
@@ -462,6 +466,7 @@ def execute_standalone_surface_binding(
   if binding.binding_kind == "operator_provider_provenance_export_job_list":
     return serialize_provider_provenance_export_job_list(
       app.list_provider_provenance_export_jobs(
+        export_scope=resolved_filters.get("export_scope"),
         focus_key=resolved_filters.get("focus_key"),
         symbol=resolved_filters.get("symbol"),
         timeframe=resolved_filters.get("timeframe"),
@@ -501,6 +506,20 @@ def execute_standalone_surface_binding(
     return serialize_provider_provenance_export_job_history(
       export_job,
       app.list_provider_provenance_export_job_history(resolved_path_params["job_id"]),
+    )
+  if binding.binding_kind == "operator_provider_provenance_export_job_escalate":
+    escalation_result = app.escalate_provider_provenance_export_job(
+      resolved_path_params["job_id"],
+      actor=resolved_payload.get("actor", "operator"),
+      reason=resolved_payload.get("reason", "scheduler_health_review"),
+      source_tab_id=resolved_payload.get("source_tab_id"),
+      source_tab_label=resolved_payload.get("source_tab_label"),
+      delivery_targets=resolved_payload.get("delivery_targets"),
+    )
+    return serialize_provider_provenance_export_job_escalation_result(
+      escalation_result["export_job"],
+      escalation_result["audit_record"],
+      escalation_result["delivery_history"],
     )
   if binding.binding_kind == "operator_provider_provenance_analytics_preset_create":
     return serialize_provider_provenance_analytics_preset_record(

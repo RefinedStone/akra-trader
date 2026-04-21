@@ -941,6 +941,7 @@ def build_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="operator_provider_provenance_export_job_list",
     filter_keys=(
+      "export_scope",
       "focus_key",
       "symbol",
       "timeframe",
@@ -954,6 +955,17 @@ def build_standalone_surface_runtime_bindings(
       "limit",
     ),
     filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "export_scope",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Export scope",
+          description="Filter provider provenance export jobs by export scope.",
+          examples=("provider_provenance_scheduler_health",),
+        ),
+      ),
       StandaloneSurfaceFilterParamSpec(
         "focus_key",
         str | None,
@@ -1275,6 +1287,17 @@ def build_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="operator_provider_provenance_export_job_history",
     path_param_keys=("job_id",),
+  )
+  operator_provider_provenance_export_job_escalate_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_export_job_escalate",
+    route_path="/operator/provider-provenance-exports/{job_id}/escalate",
+    route_name="escalate_operator_provider_provenance_export_job",
+    response_title="Escalate provider provenance export job",
+    scope="app",
+    binding_kind="operator_provider_provenance_export_job_escalate",
+    methods=("POST",),
+    path_param_keys=("job_id",),
+    request_payload_kind="operator_provider_provenance_export_job_escalate",
   )
   operator_provider_provenance_analytics_preset_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_analytics_preset_create",
@@ -3026,6 +3049,7 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_export_analytics_binding,
     operator_provider_provenance_export_job_download_binding,
     operator_provider_provenance_export_job_history_binding,
+    operator_provider_provenance_export_job_escalate_binding,
     operator_provider_provenance_analytics_preset_create_binding,
     operator_provider_provenance_analytics_preset_list_binding,
     operator_provider_provenance_dashboard_view_create_binding,

@@ -101,6 +101,9 @@ creation.
 - provider provenance automation now also keeps durable scheduler health history and exposes
   paginated history, export, and daily-to-hourly health / lag drill-down surfaces in the control
   room, closing the gap between transient scheduler alerts and reviewable operations history
+- scheduler-health export now also plugs into the shared export registry with audit trail and
+  delivery-backed escalation workflow, so provenance automation review can promote directly into an
+  operator handoff artifact
 
 ### Remaining work
 

@@ -512,6 +512,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
   assert tuple(inspect.signature(routes["list_operator_provider_provenance_export_jobs"].endpoint).parameters) == (
     "request",
     "filter_expr",
+    "export_scope",
     "focus_key",
     "symbol",
     "timeframe",
@@ -523,6 +524,11 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "status",
     "search",
     "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["escalate_operator_provider_provenance_export_job"].endpoint).parameters) == (
+    "job_id",
+    "request",
     "app",
   )
   assert tuple(inspect.signature(routes["get_operator_provider_provenance_export_analytics"].endpoint).parameters) == (
@@ -3260,11 +3266,51 @@ def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trend
   monkeypatch,
   tmp_path: Path,
 ) -> None:
+  class FakeSchedulerExportDeliveryAdapter:
+    def __init__(self) -> None:
+      self.deliveries: list[tuple[str, tuple[str, ...], str]] = []
+
+    def list_targets(self) -> tuple[str, ...]:
+      return ("slack_webhook", "pagerduty_events")
+
+    def list_supported_workflow_providers(self) -> tuple[str, ...]:
+      return ("pagerduty",)
+
+    def deliver(self, *, incident, targets=None, attempt_number: int = 1, phase: str = "initial"):
+      resolved_targets = tuple(targets or self.list_targets())
+      self.deliveries.append((incident.alert_id, resolved_targets, phase))
+      return tuple(
+        OperatorIncidentDelivery(
+          delivery_id=f"{incident.event_id}:{target}:attempt-{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=target,
+          status="delivered",
+          attempted_at=incident.timestamp,
+          detail=f"fake_delivery:{target}",
+          attempt_number=attempt_number,
+          phase=phase,
+          external_provider="pagerduty" if target == "pagerduty_events" else None,
+          external_reference=incident.external_reference,
+          source=incident.source,
+        )
+        for target in resolved_targets
+      )
+
+    def sync_incident_workflow(self, **kwargs):
+      return ()
+
+    def pull_incident_workflow_state(self, **kwargs):
+      return None
+
   with build_client(
     tmp_path / "runs.sqlite3",
     provider_provenance_report_scheduler_enabled=False,
   ) as client:
     app = client.app.state.container.app
+    delivery = FakeSchedulerExportDeliveryAdapter()
+    app._operator_alert_delivery = delivery
     fixed_time = datetime(2026, 4, 22, 10, 0, tzinfo=UTC)
     app._clock = lambda: fixed_time
     app._provider_provenance_report_scheduler_interval_seconds = 60
@@ -3345,6 +3391,30 @@ def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trend
       "/api/operator/provider-provenance-analytics/scheduler-health/export",
       params={"limit": 2, "offset": 1, "format": "csv"},
     )
+    shared_export_create_response = client.post(
+      "/api/operator/provider-provenance-exports",
+      json={
+        "content": export_response.json()["content"],
+        "requested_by_tab_id": "tab_scheduler",
+        "requested_by_tab_label": "Scheduler panel",
+      },
+    )
+    shared_export_list_response = client.get(
+      "/api/operator/provider-provenance-exports",
+      params={"export_scope": "provider_provenance_scheduler_health", "limit": 10},
+    )
+    shared_export_escalate_response = client.post(
+      f"/api/operator/provider-provenance-exports/{shared_export_create_response.json()['job_id']}/escalate",
+      json={
+        "actor": "operator",
+        "reason": "scheduler_health_export_review",
+        "source_tab_id": "tab_scheduler",
+        "source_tab_label": "Scheduler panel",
+      },
+    )
+    shared_export_history_response = client.get(
+      f"/api/operator/provider-provenance-exports/{shared_export_create_response.json()['job_id']}/history",
+    )
 
   assert history_response.status_code == 200
   history_payload = history_response.json()
@@ -3380,6 +3450,36 @@ def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trend
   assert csv_export_payload["record_count"] == 2
   assert csv_export_payload["total_count"] == 3
   assert "record_id,recorded_at,status,summary" in csv_export_payload["content"]
+
+  assert shared_export_create_response.status_code == 200
+  shared_export_payload = shared_export_create_response.json()
+  assert shared_export_payload["export_scope"] == "provider_provenance_scheduler_health"
+  assert shared_export_payload["focus_key"] == "provider-provenance-scheduler-health"
+  assert shared_export_payload["result_count"] == 3
+
+  assert shared_export_list_response.status_code == 200
+  shared_export_list_payload = shared_export_list_response.json()
+  assert shared_export_list_payload["total"] == 1
+  assert shared_export_list_payload["items"][0]["job_id"] == shared_export_payload["job_id"]
+
+  assert shared_export_escalate_response.status_code == 200
+  shared_export_escalation_payload = shared_export_escalate_response.json()
+  assert shared_export_escalation_payload["export_job"]["escalation_count"] == 1
+  assert shared_export_escalation_payload["export_job"]["last_delivery_status"] == "delivered"
+  assert shared_export_escalation_payload["audit_record"]["action"] == "escalated"
+  assert shared_export_escalation_payload["audit_record"]["delivery_targets"] == [
+    "slack_webhook",
+    "pagerduty_events",
+  ]
+  assert len(shared_export_escalation_payload["delivery_history"]) == 2
+  assert delivery.deliveries[0][2] == "scheduler_export_escalation"
+
+  assert shared_export_history_response.status_code == 200
+  shared_export_history_payload = shared_export_history_response.json()
+  assert [record["action"] for record in shared_export_history_payload["history"]] == [
+    "escalated",
+    "created",
+  ]
 
 
 def test_operator_visibility_endpoint_persists_guarded_live_alert_history(tmp_path: Path) -> None:

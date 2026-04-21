@@ -1042,6 +1042,13 @@ export type ProviderProvenanceExportJobEntry = {
   filters: Record<string, unknown>;
   requested_by_tab_id?: string | null;
   requested_by_tab_label?: string | null;
+  escalation_count: number;
+  last_escalated_at?: string | null;
+  last_escalated_by?: string | null;
+  last_escalation_reason?: string | null;
+  last_delivery_targets: string[];
+  last_delivery_status?: string | null;
+  last_delivery_summary?: string | null;
   artifact_id?: string | null;
   content_length: number;
   content?: string;
@@ -1064,6 +1071,9 @@ export type ProviderProvenanceExportJobAuditRecord = {
   requested_by_tab_label?: string | null;
   source_tab_id?: string | null;
   source_tab_label?: string | null;
+  delivery_targets: string[];
+  delivery_status?: string | null;
+  delivery_summary?: string | null;
   detail: string;
 };
 
@@ -1075,6 +1085,28 @@ export type ProviderProvenanceExportJobListPayload = {
 export type ProviderProvenanceExportJobHistoryPayload = {
   job: ProviderProvenanceExportJobEntry;
   history: ProviderProvenanceExportJobAuditRecord[];
+};
+
+export type ProviderProvenanceExportJobEscalationResult = {
+  export_job: ProviderProvenanceExportJobEntry;
+  audit_record: ProviderProvenanceExportJobAuditRecord;
+  delivery_history: {
+    delivery_id: string;
+    incident_event_id: string;
+    alert_id: string;
+    incident_kind: string;
+    target: string;
+    status: string;
+    attempted_at: string;
+    detail: string;
+    attempt_number: number;
+    next_retry_at?: string | null;
+    phase: string;
+    provider_action?: string | null;
+    external_provider?: string | null;
+    external_reference?: string | null;
+    source: string;
+  }[];
 };
 
 export type ProviderProvenanceExportAnalyticsRollupEntry = {

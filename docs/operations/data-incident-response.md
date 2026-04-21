@@ -51,6 +51,9 @@ unclear dataset lineage.
 - the provenance analytics workspace now also shows paginated scheduler-cycle history, scheduler
   health export, and daily-to-hourly health / lag drill-down tables, so operators can distinguish
   one-off lag from sustained automation regression before escalating
+- scheduler health export can now be shared into the team registry, leaves delivery/download /
+  escalation audit records, and can be escalated directly to configured operator delivery targets
+  when automation drift needs a cross-shift handoff
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

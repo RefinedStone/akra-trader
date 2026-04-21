@@ -14507,6 +14507,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_export_analytics",
     "operator_provider_provenance_export_job_download",
     "operator_provider_provenance_export_job_history",
+    "operator_provider_provenance_export_job_escalate",
     "operator_provider_provenance_analytics_preset_create",
     "operator_provider_provenance_analytics_preset_list",
     "operator_provider_provenance_dashboard_view_create",
@@ -14605,8 +14606,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_export_job_list"].route_path == (
     "/operator/provider-provenance-exports"
   )
-  assert bindings_by_key["operator_provider_provenance_export_job_list"].filter_param_specs[0].key == "focus_key"
-  assert bindings_by_key["operator_provider_provenance_export_job_list"].filter_param_specs[4].key == "vendor_field"
+  assert bindings_by_key["operator_provider_provenance_export_job_list"].filter_param_specs[0].key == "export_scope"
+  assert bindings_by_key["operator_provider_provenance_export_job_list"].filter_param_specs[5].key == "vendor_field"
   assert bindings_by_key["operator_provider_provenance_export_analytics"].route_path == (
     "/operator/provider-provenance-exports/analytics"
   )
@@ -14616,6 +14617,10 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_export_job_download"].filter_param_specs[0].key == "source_tab_id"
   assert bindings_by_key["operator_provider_provenance_export_job_history"].route_path == (
     "/operator/provider-provenance-exports/{job_id}/history"
+  )
+  assert bindings_by_key["operator_provider_provenance_export_job_escalate"].methods == ("POST",)
+  assert bindings_by_key["operator_provider_provenance_export_job_escalate"].request_payload_kind == (
+    "operator_provider_provenance_export_job_escalate"
   )
   assert bindings_by_key["operator_provider_provenance_analytics_preset_create"].methods == ("POST",)
   assert (
@@ -15581,12 +15586,17 @@ def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: P
 
 def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Path) -> None:
   clock = MutableClock(datetime(2026, 4, 22, 9, 0, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("slack_webhook", "pagerduty_events"),
+    clock=clock,
+  )
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
     references=build_references(),
     runs=build_runs_repository(tmp_path),
     clock=clock,
+    operator_alert_delivery=delivery,
   )
   bindings_by_key = {
     binding.surface_key: binding
@@ -15790,6 +15800,65 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert "record_id,recorded_at,status,summary" in scheduler_csv_export_payload["content"]
   assert scheduler_csv_export_payload["record_count"] == 1
   assert scheduler_csv_export_payload["total_count"] == 1
+
+  shared_scheduler_export_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_create"],
+    app=app,
+    request_payload={
+      "content": scheduler_export_payload["content"],
+      "requested_by_tab_id": "tab_scheduler",
+      "requested_by_tab_label": "Scheduler panel",
+    },
+  )
+  assert shared_scheduler_export_payload["export_scope"] == "provider_provenance_scheduler_health"
+  assert shared_scheduler_export_payload["focus_key"] == "provider-provenance-scheduler-health"
+  assert shared_scheduler_export_payload["result_count"] == 1
+
+  listed_scheduler_exports_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_list"],
+    app=app,
+    filters={"export_scope": "provider_provenance_scheduler_health", "limit": 10},
+  )
+  assert listed_scheduler_exports_payload["total"] == 1
+  assert listed_scheduler_exports_payload["items"][0]["job_id"] == shared_scheduler_export_payload["job_id"]
+
+  escalated_scheduler_export_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_escalate"],
+    app=app,
+    path_params={"job_id": shared_scheduler_export_payload["job_id"]},
+    request_payload={
+      "actor": "operator",
+      "reason": "scheduler_health_export_review",
+      "source_tab_id": "tab_scheduler",
+      "source_tab_label": "Scheduler panel",
+    },
+  )
+  assert escalated_scheduler_export_payload["export_job"]["escalation_count"] == 1
+  assert escalated_scheduler_export_payload["export_job"]["last_delivery_status"] == "delivered"
+  assert escalated_scheduler_export_payload["audit_record"]["action"] == "escalated"
+  assert escalated_scheduler_export_payload["audit_record"]["delivery_targets"] == [
+    "slack_webhook",
+    "pagerduty_events",
+  ]
+  assert len(escalated_scheduler_export_payload["delivery_history"]) == 2
+  assert {record["target"] for record in escalated_scheduler_export_payload["delivery_history"]} == {
+    "slack_webhook",
+    "pagerduty_events",
+  }
+  assert any(
+    delivered_incident.alert_id.startswith("provider-provenance:scheduler-export:")
+    for delivered_incident in delivery.delivered_incidents
+  )
+
+  shared_scheduler_export_history_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_history"],
+    app=app,
+    path_params={"job_id": shared_scheduler_export_payload["job_id"]},
+  )
+  assert [record["action"] for record in shared_scheduler_export_history_payload["history"]] == [
+    "escalated",
+    "created",
+  ]
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

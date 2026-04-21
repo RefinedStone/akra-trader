@@ -198,6 +198,14 @@ class OperatorProviderProvenanceExportJobCreateRequest(BaseModel):
   requested_by_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceExportJobEscalateRequest(BaseModel):
+  actor: str = "operator"
+  reason: str = "scheduler_health_review"
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+  delivery_targets: list[str] = Field(default_factory=list)
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -248,6 +256,7 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_audit_export_job_create": (ReplayLinkAliasAuditExportJobCreateRequest, {}),
   "replay_link_audit_export_job_prune": (ReplayLinkAliasAuditExportJobPruneRequest, {}),
   "operator_provider_provenance_export_job_create": (OperatorProviderProvenanceExportJobCreateRequest, {}),
+  "operator_provider_provenance_export_job_escalate": (OperatorProviderProvenanceExportJobEscalateRequest, {}),
   "operator_provider_provenance_analytics_preset_create": (OperatorProviderProvenanceAnalyticsPresetCreateRequest, {}),
   "operator_provider_provenance_dashboard_view_create": (OperatorProviderProvenanceDashboardViewCreateRequest, {}),
   "operator_provider_provenance_scheduled_report_create": (OperatorProviderProvenanceScheduledReportCreateRequest, {}),

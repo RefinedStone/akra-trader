@@ -820,6 +820,13 @@ class ProviderProvenanceExportJobRecord:
   filters: dict[str, Any] = field(default_factory=dict)
   requested_by_tab_id: str | None = None
   requested_by_tab_label: str | None = None
+  escalation_count: int = 0
+  last_escalated_at: datetime | None = None
+  last_escalated_by: str | None = None
+  last_escalation_reason: str | None = None
+  last_delivery_targets: tuple[str, ...] = ()
+  last_delivery_status: str | None = None
+  last_delivery_summary: str | None = None
   artifact_id: str | None = None
   content_length: int = 0
   content: str = ""
@@ -855,6 +862,9 @@ class ProviderProvenanceExportJobAuditRecord:
   requested_by_tab_label: str | None = None
   source_tab_id: str | None = None
   source_tab_label: str | None = None
+  delivery_targets: tuple[str, ...] = ()
+  delivery_status: str | None = None
+  delivery_summary: str | None = None
   detail: str = ""
 
 

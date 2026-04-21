@@ -153,6 +153,9 @@ It is not yet a finished live trading product:
   paginated cycle history, JSON/CSV export, and daily-to-hourly health/lag drill-down surfaces in
   the control room, so provenance automation can be reviewed as an operational timeline instead of
   only a point-in-time alert snapshot
+- scheduler-health exports can now also be shared into the same server-side registry with delivery
+  and download audit trail plus direct escalation workflow, so automation snapshots can move from
+  review into operator handoff without leaving the control room
 
 ### Operator discipline baseline
 

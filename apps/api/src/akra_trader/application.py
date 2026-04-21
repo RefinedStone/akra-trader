@@ -1463,9 +1463,22 @@ class TradingApplication:
     action: str,
     source_tab_id: str | None = None,
     source_tab_label: str | None = None,
+    detail: str | None = None,
+    delivery_targets: tuple[str, ...] = (),
+    delivery_status: str | None = None,
+    delivery_summary: str | None = None,
   ) -> ProviderProvenanceExportJobAuditRecord:
     self._prune_provider_provenance_export_job_audit_records()
     recorded_at = self._clock()
+    latest_recorded_at = next(
+      (
+        existing.recorded_at
+        for existing in self._list_provider_provenance_export_job_audit_records(record.job_id)
+      ),
+      None,
+    )
+    if latest_recorded_at is not None and latest_recorded_at >= recorded_at:
+      recorded_at = latest_recorded_at + timedelta(microseconds=1)
     audit_record = ProviderProvenanceExportJobAuditRecord(
       audit_id=uuid4().hex[:12],
       job_id=record.job_id,
@@ -1490,10 +1503,25 @@ class TradingApplication:
         if isinstance(source_tab_label, str) and source_tab_label.strip()
         else None
       ),
+      delivery_targets=tuple(delivery_targets),
+      delivery_status=delivery_status.strip() if isinstance(delivery_status, str) and delivery_status.strip() else None,
+      delivery_summary=(
+        delivery_summary.strip()
+        if isinstance(delivery_summary, str) and delivery_summary.strip()
+        else None
+      ),
       detail=(
-        "Provider provenance export created."
-        if action == "created"
-        else "Provider provenance export downloaded."
+        detail.strip()
+        if isinstance(detail, str) and detail.strip()
+        else (
+          "Provider provenance export created."
+          if action == "created"
+          else (
+            "Provider provenance export downloaded."
+            if action == "downloaded"
+            else "Provider provenance export updated."
+          )
+        )
       ),
     )
     return self._save_provider_provenance_export_job_audit_record(audit_record)
@@ -1793,11 +1821,15 @@ class TradingApplication:
   @staticmethod
   def _build_provider_provenance_export_filename(
     *,
+    export_scope: str,
     symbol: str | None,
     timeframe: str | None,
     exported_at: datetime | None,
     fallback_time: datetime,
   ) -> str:
+    if export_scope == "provider_provenance_scheduler_health":
+      timestamp = (exported_at or fallback_time).astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+      return f"provider-provenance-scheduler-health-{timestamp}.json"
     safe_symbol = re.sub(r"[^a-z0-9]+", "-", (symbol or "market").lower()).strip("-") or "market"
     safe_timeframe = re.sub(r"[^a-z0-9]+", "-", (timeframe or "window").lower()).strip("-") or "window"
     timestamp = (exported_at or fallback_time).astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -1835,6 +1867,64 @@ class TradingApplication:
     focus_key = f"{instrument_id}|{timeframe}" if instrument_id and timeframe else None
     focus_label = f"{symbol} · {timeframe}" if symbol and timeframe else symbol or timeframe
     export_filters = deepcopy(payload.get("export_filter")) if isinstance(payload.get("export_filter"), dict) else {}
+    if export_scope == "provider_provenance_scheduler_health":
+      query_payload = payload.get("query") if isinstance(payload.get("query"), dict) else {}
+      current_payload = payload.get("current") if isinstance(payload.get("current"), dict) else {}
+      history_payload = payload.get("history_page") if isinstance(payload.get("history_page"), dict) else {}
+      result_count = (
+        int(history_payload["total"])
+        if isinstance(history_payload.get("total"), Number)
+        else (
+          int(payload["total_count"])
+          if isinstance(payload.get("total_count"), Number)
+          else 0
+        )
+      )
+      window_days = (
+        int(query_payload["window_days"])
+        if isinstance(query_payload.get("window_days"), Number)
+        else None
+      )
+      filter_tokens: list[str] = []
+      if isinstance(query_payload.get("status"), str) and query_payload.get("status").strip():
+        filter_tokens.append(f"status {query_payload['status'].strip()}")
+      else:
+        filter_tokens.append("all statuses")
+      if window_days is not None:
+        filter_tokens.append(f"{window_days}d window")
+      if isinstance(query_payload.get("drilldown_bucket_key"), str) and query_payload.get("drilldown_bucket_key").strip():
+        filter_tokens.append(f"hour drill-down {query_payload['drilldown_bucket_key'].strip()}")
+      filter_summary = " / ".join(filter_tokens)
+      if not export_filters:
+        export_filters = {
+          key: value
+          for key, value in query_payload.items()
+          if value is not None and value != ""
+        }
+      return {
+        "export_scope": export_scope,
+        "exported_at": cls._parse_optional_iso_datetime(payload.get("exported_at")),
+        "focus_key": "provider-provenance-scheduler-health",
+        "focus_label": "Scheduler automation",
+        "market_data_provider": "provider_provenance_scheduler",
+        "venue": None,
+        "symbol": None,
+        "timeframe": None,
+        "result_count": max(result_count, 0),
+        "provider_provenance_count": 0,
+        "provider_labels": (),
+        "vendor_fields": (),
+        "filter_summary": (
+          filter_summary
+          if filter_summary
+          else (
+            current_payload.get("summary").strip()
+            if isinstance(current_payload.get("summary"), str) and current_payload.get("summary").strip()
+            else None
+          )
+        ),
+        "filters": export_filters,
+      }
     if export_scope == "provider_provenance_analytics_report":
       analytics_payload = payload.get("analytics") if isinstance(payload.get("analytics"), dict) else {}
       totals_payload = analytics_payload.get("totals") if isinstance(analytics_payload.get("totals"), dict) else {}
@@ -1940,6 +2030,7 @@ class TradingApplication:
     if metadata["export_scope"] not in {
       "provider_market_context_provenance",
       "provider_provenance_analytics_report",
+      "provider_provenance_scheduler_health",
     }:
       raise ValueError("Unsupported provider provenance export scope.")
     if (
@@ -2387,6 +2478,7 @@ class TradingApplication:
       artifact_id=artifact_id,
       job_id=job_id,
       filename=self._build_provider_provenance_export_filename(
+        export_scope=metadata["export_scope"],
         symbol=metadata["symbol"],
         timeframe=metadata["timeframe"],
         exported_at=metadata["exported_at"],
@@ -2438,6 +2530,7 @@ class TradingApplication:
         if isinstance(requested_by_tab_label, str) and requested_by_tab_label.strip()
         else None
       ),
+      escalation_count=0,
       artifact_id=saved_artifact.artifact_id,
       content_length=saved_artifact.byte_length,
     )
@@ -2481,6 +2574,7 @@ class TradingApplication:
   def _filter_provider_provenance_export_job_records(
     self,
     *,
+    export_scope: str | None = None,
     focus_key: str | None = None,
     symbol: str | None = None,
     timeframe: str | None = None,
@@ -2492,6 +2586,11 @@ class TradingApplication:
     status: str | None = None,
     search: str | None = None,
   ) -> tuple[ProviderProvenanceExportJobRecord, ...]:
+    normalized_export_scope = (
+      export_scope.strip()
+      if isinstance(export_scope, str) and export_scope.strip()
+      else "provider_market_context_provenance"
+    )
     normalized_focus_key = focus_key.strip() if isinstance(focus_key, str) and focus_key.strip() else None
     normalized_symbol = symbol.strip() if isinstance(symbol, str) and symbol.strip() else None
     normalized_timeframe = timeframe.strip() if isinstance(timeframe, str) and timeframe.strip() else None
@@ -2521,7 +2620,7 @@ class TradingApplication:
     filtered = [
       record
       for record in self._list_provider_provenance_export_job_records()
-      if record.export_scope == "provider_market_context_provenance"
+      if record.export_scope == normalized_export_scope
       and (normalized_focus_key is None or record.focus_key == normalized_focus_key)
       and (normalized_symbol is None or record.symbol == normalized_symbol)
       and (normalized_timeframe is None or record.timeframe == normalized_timeframe)
@@ -2544,6 +2643,7 @@ class TradingApplication:
   def list_provider_provenance_export_jobs(
     self,
     *,
+    export_scope: str | None = None,
     focus_key: str | None = None,
     symbol: str | None = None,
     timeframe: str | None = None,
@@ -2561,6 +2661,7 @@ class TradingApplication:
     self._prune_provider_provenance_export_job_audit_records()
     normalized_limit = max(1, min(limit, 500))
     filtered = self._filter_provider_provenance_export_job_records(
+      export_scope=export_scope,
       focus_key=focus_key,
       symbol=symbol,
       timeframe=timeframe,
@@ -4031,6 +4132,186 @@ class TradingApplication:
     record = self.get_provider_provenance_export_job(job_id)
     self._prune_provider_provenance_export_job_audit_records()
     return self._list_provider_provenance_export_job_audit_records(record.job_id)
+
+  def _resolve_provider_provenance_export_delivery_targets(
+    self,
+    *,
+    delivery_targets: Iterable[str] | None = None,
+  ) -> tuple[str, ...]:
+    available_targets = tuple(
+      target.strip()
+      for target in self._operator_alert_delivery.list_targets()
+      if isinstance(target, str) and target.strip()
+    )
+    if delivery_targets is None:
+      if not available_targets:
+        raise RuntimeError("No operator delivery targets are configured for provider provenance export escalation.")
+      return available_targets
+    provided_targets = tuple(delivery_targets)
+    normalized_targets: list[str] = []
+    invalid_targets: list[str] = []
+    available_target_set = set(available_targets)
+    for target in provided_targets:
+      if not isinstance(target, str) or not target.strip():
+        continue
+      candidate = target.strip()
+      if candidate not in available_target_set:
+        invalid_targets.append(candidate)
+        continue
+      if candidate not in normalized_targets:
+        normalized_targets.append(candidate)
+    if invalid_targets:
+      raise ValueError(f"Unsupported provider provenance export delivery targets: {', '.join(sorted(set(invalid_targets)))}")
+    if not normalized_targets:
+      if available_targets:
+        return available_targets
+      raise RuntimeError("No operator delivery targets are configured for provider provenance export escalation.")
+    return tuple(normalized_targets)
+
+  def _build_provider_provenance_scheduler_export_incident(
+    self,
+    *,
+    record: ProviderProvenanceExportJobRecord,
+    content: str,
+    actor: str,
+    reason: str,
+    current_time: datetime,
+    delivery_targets: tuple[str, ...],
+  ) -> OperatorIncidentEvent:
+    payload: dict[str, Any] = {}
+    try:
+      decoded = json.loads(content)
+    except json.JSONDecodeError:
+      decoded = {}
+    if isinstance(decoded, dict):
+      payload = decoded
+    current_payload = payload.get("current") if isinstance(payload.get("current"), dict) else {}
+    history_payload = payload.get("history_page") if isinstance(payload.get("history_page"), dict) else {}
+    scheduler_status = (
+      current_payload.get("status").strip()
+      if isinstance(current_payload.get("status"), str) and current_payload.get("status").strip()
+      else "unknown"
+    )
+    summary_text = (
+      current_payload.get("summary").strip()
+      if isinstance(current_payload.get("summary"), str) and current_payload.get("summary").strip()
+      else (
+        record.filter_summary.strip()
+        if isinstance(record.filter_summary, str) and record.filter_summary.strip()
+        else "Scheduler health export requires operator review."
+      )
+    )
+    max_due_lag_seconds = (
+      int(current_payload["max_due_lag_seconds"])
+      if isinstance(current_payload.get("max_due_lag_seconds"), Number)
+      else 0
+    )
+    due_report_count = (
+      int(current_payload["due_report_count"])
+      if isinstance(current_payload.get("due_report_count"), Number)
+      else 0
+    )
+    history_total = (
+      int(history_payload["total"])
+      if isinstance(history_payload.get("total"), Number)
+      else record.result_count
+    )
+    severity = (
+      "critical"
+      if scheduler_status == "failed" or max_due_lag_seconds >= self._provider_provenance_scheduler_critical_lag_seconds()
+      else "warning"
+    )
+    return OperatorIncidentEvent(
+      event_id=f"provider-provenance-scheduler-export:{record.job_id}:{current_time.isoformat()}",
+      alert_id=f"provider-provenance:scheduler-export:{record.job_id}",
+      timestamp=current_time,
+      kind="incident_opened",
+      severity=severity,
+      summary=f"Provider provenance scheduler {scheduler_status.replace('_', ' ')} export escalated.",
+      detail=(
+        f"{summary_text} Escalation reason: {reason}. "
+        f"Captured {history_total} scheduler record(s) with {due_report_count} due report(s) "
+        f"and {max_due_lag_seconds}s peak lag. Requested by {actor}."
+      ),
+      source="runtime",
+      delivery_targets=delivery_targets,
+      escalation_targets=delivery_targets,
+      external_reference=record.job_id,
+    )
+
+  def escalate_provider_provenance_export_job(
+    self,
+    job_id: str,
+    *,
+    actor: str = "operator",
+    reason: str = "scheduler_health_review",
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+    delivery_targets: Iterable[str] | None = None,
+  ) -> dict[str, Any]:
+    record = self.get_provider_provenance_export_job(job_id)
+    if record.export_scope != "provider_provenance_scheduler_health":
+      raise ValueError("Only scheduler health export jobs support escalation.")
+    actor_value = actor.strip() if isinstance(actor, str) and actor.strip() else "operator"
+    reason_value = reason.strip() if isinstance(reason, str) and reason.strip() else "scheduler_health_review"
+    resolved_targets = self._resolve_provider_provenance_export_delivery_targets(
+      delivery_targets=delivery_targets,
+    )
+    artifact_content = record.content
+    if record.artifact_id:
+      artifact_content = self.get_provider_provenance_export_artifact(record.artifact_id).content
+    current_time = self._clock()
+    incident = self._build_provider_provenance_scheduler_export_incident(
+      record=record,
+      content=artifact_content,
+      actor=actor_value,
+      reason=reason_value,
+      current_time=current_time,
+      delivery_targets=resolved_targets,
+    )
+    delivery_history = self._operator_alert_delivery.deliver(
+      incident=incident,
+      targets=resolved_targets,
+      phase="scheduler_export_escalation",
+    )
+    delivered_count = sum(1 for delivery in delivery_history if delivery.status == "delivered")
+    failed_count = sum(1 for delivery in delivery_history if delivery.status != "delivered")
+    delivery_status = (
+      "delivered"
+      if delivered_count and failed_count == 0
+      else ("failed" if delivered_count == 0 else "partial_failure")
+    )
+    delivery_summary = (
+      f"Scheduler health export escalated to {', '.join(resolved_targets)} "
+      f"({delivered_count} delivered, {failed_count} failed)."
+    )
+    updated_record = self._save_provider_provenance_export_job_record(
+      replace(
+        record,
+        escalation_count=record.escalation_count + 1,
+        last_escalated_at=current_time,
+        last_escalated_by=actor_value,
+        last_escalation_reason=reason_value,
+        last_delivery_targets=resolved_targets,
+        last_delivery_status=delivery_status,
+        last_delivery_summary=delivery_summary,
+      )
+    )
+    audit_record = self._record_provider_provenance_export_job_event(
+      record=updated_record,
+      action="escalated",
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+      detail=delivery_summary,
+      delivery_targets=resolved_targets,
+      delivery_status=delivery_status,
+      delivery_summary=delivery_summary,
+    )
+    return {
+      "export_job": updated_record,
+      "audit_record": audit_record,
+      "delivery_history": delivery_history,
+    }
 
   def prune_replay_intent_alias_audits(
     self,
@@ -27337,6 +27618,13 @@ def serialize_provider_provenance_export_job_record(
     "filters": deepcopy(record.filters),
     "requested_by_tab_id": record.requested_by_tab_id,
     "requested_by_tab_label": record.requested_by_tab_label,
+    "escalation_count": record.escalation_count,
+    "last_escalated_at": record.last_escalated_at.isoformat() if record.last_escalated_at is not None else None,
+    "last_escalated_by": record.last_escalated_by,
+    "last_escalation_reason": record.last_escalation_reason,
+    "last_delivery_targets": list(record.last_delivery_targets),
+    "last_delivery_status": record.last_delivery_status,
+    "last_delivery_summary": record.last_delivery_summary,
     "artifact_id": record.artifact_id,
     "content_length": record.content_length,
   }
@@ -27365,7 +27653,47 @@ def serialize_provider_provenance_export_job_audit_record(
     "requested_by_tab_label": record.requested_by_tab_label,
     "source_tab_id": record.source_tab_id,
     "source_tab_label": record.source_tab_label,
+    "delivery_targets": list(record.delivery_targets),
+    "delivery_status": record.delivery_status,
+    "delivery_summary": record.delivery_summary,
     "detail": record.detail,
+  }
+
+
+def serialize_operator_incident_delivery_record(
+  record: OperatorIncidentDelivery,
+) -> dict[str, Any]:
+  return {
+    "delivery_id": record.delivery_id,
+    "incident_event_id": record.incident_event_id,
+    "alert_id": record.alert_id,
+    "incident_kind": record.incident_kind,
+    "target": record.target,
+    "status": record.status,
+    "attempted_at": record.attempted_at.isoformat(),
+    "detail": record.detail,
+    "attempt_number": record.attempt_number,
+    "next_retry_at": record.next_retry_at.isoformat() if record.next_retry_at is not None else None,
+    "phase": record.phase,
+    "provider_action": record.provider_action,
+    "external_provider": record.external_provider,
+    "external_reference": record.external_reference,
+    "source": record.source,
+  }
+
+
+def serialize_provider_provenance_export_job_escalation_result(
+  record: ProviderProvenanceExportJobRecord,
+  audit_record: ProviderProvenanceExportJobAuditRecord,
+  delivery_history: tuple[OperatorIncidentDelivery, ...],
+) -> dict[str, Any]:
+  return {
+    "export_job": serialize_provider_provenance_export_job_record(record),
+    "audit_record": serialize_provider_provenance_export_job_audit_record(audit_record),
+    "delivery_history": [
+      serialize_operator_incident_delivery_record(delivery_record)
+      for delivery_record in delivery_history
+    ],
   }
 
 

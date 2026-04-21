@@ -59,6 +59,7 @@ import {
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   downloadProviderProvenanceExportJob,
   downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
+  escalateProviderProvenanceExportJob,
   exportProviderProvenanceSchedulerHealth,
   exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   fetchJson,
@@ -276,6 +277,7 @@ import type {
   ProviderProvenanceDashboardViewEntry,
   ProviderProvenanceExportAnalyticsPayload,
   ProviderProvenanceExportJobEntry,
+  ProviderProvenanceExportJobEscalationResult,
   ProviderProvenanceExportJobHistoryPayload,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
@@ -2867,6 +2869,20 @@ export default function App() {
     useState(0);
   const [providerProvenanceSchedulerDrilldownBucketKey, setProviderProvenanceSchedulerDrilldownBucketKey] =
     useState<string | null>(null);
+  const [providerProvenanceSchedulerExports, setProviderProvenanceSchedulerExports] =
+    useState<ProviderProvenanceExportJobEntry[]>([]);
+  const [providerProvenanceSchedulerExportsLoading, setProviderProvenanceSchedulerExportsLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerExportsError, setProviderProvenanceSchedulerExportsError] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerExportJobId, setSelectedProviderProvenanceSchedulerExportJobId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerExportHistory, setSelectedProviderProvenanceSchedulerExportHistory] =
+    useState<ProviderProvenanceExportJobHistoryPayload | null>(null);
+  const [providerProvenanceSchedulerExportHistoryLoading, setProviderProvenanceSchedulerExportHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerExportHistoryError, setProviderProvenanceSchedulerExportHistoryError] =
+    useState<string | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -3022,6 +3038,7 @@ export default function App() {
   const providerProvenanceAnalyticsRequestIdRef = useRef(0);
   const providerProvenanceSchedulerAnalyticsRequestIdRef = useRef(0);
   const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
   const comparisonSelection = useMemo(
     () =>
       normalizeControlRoomComparisonSelection({
@@ -4974,12 +4991,16 @@ export default function App() {
     providerProvenanceSchedulerAnalyticsRequestIdRef.current = analyticsRequestId;
     const historyRequestId = providerProvenanceSchedulerHistoryRequestIdRef.current + 1;
     providerProvenanceSchedulerHistoryRequestIdRef.current = historyRequestId;
+    const exportRequestId = providerProvenanceSchedulerExportRequestIdRef.current + 1;
+    providerProvenanceSchedulerExportRequestIdRef.current = exportRequestId;
     setProviderProvenanceSchedulerAnalyticsLoading(true);
     setProviderProvenanceSchedulerHistoryLoading(true);
+    setProviderProvenanceSchedulerExportsLoading(true);
     setProviderProvenanceSchedulerAnalyticsError(null);
     setProviderProvenanceSchedulerHistoryError(null);
+    setProviderProvenanceSchedulerExportsError(null);
     try {
-      const [analyticsPayload, historyPayload] = await Promise.all([
+      const [analyticsPayload, historyPayload, exportListPayload] = await Promise.all([
         getProviderProvenanceSchedulerHealthAnalytics({
           windowDays: providerProvenanceAnalyticsQuery.window_days,
           historyLimit: schedulerHistoryLimit,
@@ -4990,12 +5011,19 @@ export default function App() {
           limit: schedulerHistoryLimit,
           offset: providerProvenanceSchedulerHistoryOffset,
         }),
+        listProviderProvenanceExportJobs({
+          exportScope: "provider_provenance_scheduler_health",
+          limit: schedulerHistoryLimit,
+        }),
       ]);
       if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
         setProviderProvenanceSchedulerAnalytics(analyticsPayload);
       }
       if (providerProvenanceSchedulerHistoryRequestIdRef.current === historyRequestId) {
         setProviderProvenanceSchedulerHistory(historyPayload);
+      }
+      if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
+        setProviderProvenanceSchedulerExports(exportListPayload.items);
       }
     } catch (error) {
       const message = (error as Error).message;
@@ -5007,12 +5035,19 @@ export default function App() {
         setProviderProvenanceSchedulerHistory(null);
         setProviderProvenanceSchedulerHistoryError(message);
       }
+      if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
+        setProviderProvenanceSchedulerExports([]);
+        setProviderProvenanceSchedulerExportsError(message);
+      }
     } finally {
       if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
         setProviderProvenanceSchedulerAnalyticsLoading(false);
       }
       if (providerProvenanceSchedulerHistoryRequestIdRef.current === historyRequestId) {
         setProviderProvenanceSchedulerHistoryLoading(false);
+      }
+      if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
+        setProviderProvenanceSchedulerExportsLoading(false);
       }
     }
   }
@@ -5061,6 +5096,123 @@ export default function App() {
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
         `Scheduler health CSV export failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function shareProviderProvenanceSchedulerHealthExport() {
+    try {
+      const exportPayload = await exportProviderProvenanceSchedulerHealth({
+        format: "json",
+        windowDays: providerProvenanceAnalyticsQuery.window_days,
+        historyLimit: 8,
+        drilldownBucketKey: providerProvenanceSchedulerDrilldownBucketKey ?? undefined,
+        drilldownHistoryLimit: 12,
+        offset: providerProvenanceSchedulerHistoryOffset,
+        limit: 8,
+      });
+      const sharedEntry = await createProviderProvenanceExportJob({
+        content: exportPayload.content,
+        requestedByTabId: comparisonHistoryTabIdentity.tabId,
+        requestedByTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceSchedulerExports((current) => [
+        sharedEntry,
+        ...current.filter((entry) => entry.job_id !== sharedEntry.job_id),
+      ].slice(0, 8));
+      setProviderProvenanceSchedulerExportsError(null);
+      setProviderProvenanceWorkspaceFeedback(
+        `Shared scheduler health export ${shortenIdentifier(sharedEntry.job_id, 10)} with ${sharedEntry.result_count} recorded cycle(s).`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler health share failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function loadProviderProvenanceSchedulerExportHistory(jobId: string) {
+    if (!jobId.trim()) {
+      return;
+    }
+    if (
+      selectedProviderProvenanceSchedulerExportJobId === jobId
+      && selectedProviderProvenanceSchedulerExportHistory
+    ) {
+      setSelectedProviderProvenanceSchedulerExportJobId(null);
+      setSelectedProviderProvenanceSchedulerExportHistory(null);
+      setProviderProvenanceSchedulerExportHistoryError(null);
+      return;
+    }
+    setSelectedProviderProvenanceSchedulerExportJobId(jobId);
+    setSelectedProviderProvenanceSchedulerExportHistory(null);
+    setProviderProvenanceSchedulerExportHistoryLoading(true);
+    setProviderProvenanceSchedulerExportHistoryError(null);
+    try {
+      const historyPayload = await getProviderProvenanceExportJobHistory(jobId);
+      setSelectedProviderProvenanceSchedulerExportHistory(historyPayload);
+    } catch (error) {
+      setProviderProvenanceSchedulerExportHistoryError((error as Error).message);
+    } finally {
+      setProviderProvenanceSchedulerExportHistoryLoading(false);
+    }
+  }
+
+  async function copySharedProviderProvenanceSchedulerExport(
+    entry: ProviderProvenanceExportJobEntry,
+  ) {
+    if (!navigator.clipboard?.writeText) {
+      setProviderProvenanceWorkspaceFeedback("Clipboard is unavailable for shared scheduler exports.");
+      return;
+    }
+    try {
+      const downloadPayload = await downloadProviderProvenanceExportJob({
+        jobId: entry.job_id,
+        sourceTabId: comparisonHistoryTabIdentity.tabId,
+        sourceTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      await navigator.clipboard.writeText(downloadPayload.content);
+      setProviderProvenanceWorkspaceFeedback(
+        `Copied shared scheduler export ${shortenIdentifier(entry.job_id, 10)}.`,
+      );
+      if (selectedProviderProvenanceSchedulerExportJobId === entry.job_id) {
+        const historyPayload = await getProviderProvenanceExportJobHistory(entry.job_id);
+        setSelectedProviderProvenanceSchedulerExportHistory(historyPayload);
+        setProviderProvenanceSchedulerExportHistoryError(null);
+      }
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Shared scheduler export copy failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function escalateSharedProviderProvenanceSchedulerExport(
+    entry: ProviderProvenanceExportJobEntry,
+  ) {
+    try {
+      const result: ProviderProvenanceExportJobEscalationResult = await escalateProviderProvenanceExportJob({
+        jobId: entry.job_id,
+        actor: "operator",
+        reason: "scheduler_health_export_review",
+        sourceTabId: comparisonHistoryTabIdentity.tabId,
+        sourceTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceSchedulerExports((current) => current.map((candidate) => (
+        candidate.job_id === result.export_job.job_id ? result.export_job : candidate
+      )));
+      if (selectedProviderProvenanceSchedulerExportJobId === entry.job_id) {
+        const historyPayload = await getProviderProvenanceExportJobHistory(entry.job_id);
+        setSelectedProviderProvenanceSchedulerExportHistory(historyPayload);
+        setProviderProvenanceSchedulerExportHistoryError(null);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        result.audit_record.delivery_summary
+          ?? `Escalated shared scheduler export ${shortenIdentifier(entry.job_id, 10)}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Shared scheduler export escalation failed: ${(error as Error).message}`,
       );
     }
   }
@@ -7992,6 +8144,15 @@ export default function App() {
                                     <button
                                       className="ghost-button"
                                       onClick={() => {
+                                        void shareProviderProvenanceSchedulerHealthExport();
+                                      }}
+                                      type="button"
+                                    >
+                                      Share export
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => {
                                         void downloadProviderProvenanceSchedulerHealthCsv();
                                       }}
                                       type="button"
@@ -8431,6 +8592,162 @@ export default function App() {
                                   ) : (
                                     <p className="empty-state">No scheduler cycle history recorded yet.</p>
                                   )}
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Shared scheduler exports</strong>
+                                    <p>
+                                      {providerProvenanceSchedulerExports.length
+                                        ? `${providerProvenanceSchedulerExports.length} server-side scheduler export snapshot(s) are available.`
+                                        : "No shared scheduler exports have been recorded yet."}
+                                    </p>
+                                  </div>
+                                  {providerProvenanceSchedulerExportsLoading ? (
+                                    <p className="empty-state">Loading shared scheduler export registry…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerExportsError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Shared scheduler export registry failed: {providerProvenanceSchedulerExportsError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerExports.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Exported</th>
+                                          <th>Status</th>
+                                          <th>Delivery</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceSchedulerExports.map((entry) => (
+                                          <tr key={`provider-scheduler-export-${entry.job_id}`}>
+                                            <td>
+                                              <strong>{formatTimestamp(entry.exported_at ?? entry.created_at)}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.filter_summary ?? "No scheduler export filter summary recorded."}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                Requested by {entry.requested_by_tab_label ?? entry.requested_by_tab_id ?? "unknown tab"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{entry.result_count} cycle record(s)</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                Scope {formatWorkflowToken(entry.export_scope)}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                Escalations {entry.escalation_count}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{formatWorkflowToken(entry.last_delivery_status ?? "not_escalated")}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.last_delivery_summary ?? "Not escalated yet."}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.last_escalated_at
+                                                  ? `Last escalated ${formatTimestamp(entry.last_escalated_at)} by ${entry.last_escalated_by ?? "operator"}`
+                                                  : "No escalation recorded."}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <div className="market-data-provenance-history-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void copySharedProviderProvenanceSchedulerExport(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Copy export
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void loadProviderProvenanceSchedulerExportHistory(entry.job_id);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  View history
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void escalateSharedProviderProvenanceSchedulerExport(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Escalate
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : null}
+                                  {selectedProviderProvenanceSchedulerExportJobId ? (
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Scheduler export audit trail</strong>
+                                        <p>{shortenIdentifier(selectedProviderProvenanceSchedulerExportJobId, 10)}</p>
+                                      </div>
+                                      {providerProvenanceSchedulerExportHistoryLoading ? (
+                                        <p className="empty-state">Loading scheduler export audit trail…</p>
+                                      ) : null}
+                                      {providerProvenanceSchedulerExportHistoryError ? (
+                                        <p className="market-data-workflow-feedback">
+                                          Scheduler export audit failed: {providerProvenanceSchedulerExportHistoryError}
+                                        </p>
+                                      ) : null}
+                                      {selectedProviderProvenanceSchedulerExportHistory?.history.length ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>When</th>
+                                              <th>Action</th>
+                                              <th>Actor</th>
+                                              <th>Detail</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {selectedProviderProvenanceSchedulerExportHistory.history.map((record) => (
+                                              <tr key={`provider-scheduler-export-audit-${record.audit_id}`}>
+                                                <td>{formatTimestamp(record.recorded_at)}</td>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(record.action)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {record.delivery_status
+                                                      ? formatWorkflowToken(record.delivery_status)
+                                                      : "No delivery state recorded."}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{record.source_tab_label ?? record.requested_by_tab_label ?? "unknown tab"}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {record.source_tab_id ?? record.requested_by_tab_id ?? "No tab id recorded."}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{record.detail}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {record.delivery_targets.length
+                                                      ? `Targets: ${record.delivery_targets.join(", ")}`
+                                                      : "No delivery targets recorded."}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {record.delivery_summary ?? "No delivery summary recorded."}
+                                                  </p>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : selectedProviderProvenanceSchedulerExportHistory && !providerProvenanceSchedulerExportHistoryLoading ? (
+                                        <p className="empty-state">No scheduler export audit events recorded yet.</p>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
                                 </div>
                               ) : null}
                               {providerProvenanceAnalyticsLoading ? (
