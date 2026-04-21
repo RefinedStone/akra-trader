@@ -384,18 +384,72 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add server-side saved analytics presets, shared dashboard views, and scheduled provenance reports",
       "description": "Productize the new provenance analytics by persisting server-side query presets and shared dashboard views, then using them to drive scheduled or exported recurring provenance reports without browser-local-only state.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 73,
       "dynamic_priority_delta": 20,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T00:48:38+09:00",
+      "updated_at": "2026-04-22T01:23:01+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-timeseries-analytics"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly lists server-side saved dashboard presets, shared views, and scheduled analytics reports as the first remaining productization gap after commit 7dbcd30 shipped the daily time-series dashboards.",
-      "priority_reason": "Promoted to ready as the deterministic next task because it directly matches the explicit remaining checklist from the latest main-session reply and can build on the just-shipped time-series windows without waiting for further operator judgment."
+      "direction_relation_note": "Completed on main in commit 0cd0caa with durable server-side preset, dashboard-view, and scheduled-report records plus report audit history, new standalone surfaces for create/list/run/history flows, and control-room consumers for saving, applying, and auditing provenance analytics workspaces.",
+      "priority_reason": "Closed after backend persistence, control-room integration, targeted pytest coverage, compileall verification, web typecheck/build, docs updates, commit, and push all landed; the latest main-session reply says the next immediate gap is automating scheduled report execution with a background scheduler."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduled-report-scheduler",
+      "direction_id": "runtime-ops",
+      "title": "Add background scheduler execution for due provenance reports",
+      "description": "Move scheduled provenance reports off manual operator-only run and run-due triggers by adding a background scheduler loop or worker integration that reliably executes due reports, records audit outcomes, and preserves the existing export artifact contract.",
+      "status": "done",
+      "base_priority": 76,
+      "dynamic_priority_delta": 21,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T01:35:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-saved-views-reporting"
+      ],
+      "direction_relation_note": "Completed on main in commit e01cff8 with a provider provenance background scheduler wired through API bootstrap and config so overdue scheduled reports execute once at startup and then on a fixed interval with scheduler-origin audit metadata and configurable batch limits.",
+      "priority_reason": "Closed after targeted scheduler/config/bootstrap and provenance regression pytest coverage, compileall verification, docs updates, commit, and push all landed; the next explicit gap is operator-visible scheduler health, lag, and failure surfacing around the new background automation."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-health-alerting",
+      "direction_id": "runtime-ops",
+      "title": "Expose scheduler health, lag, and failure alerts for provenance report automation",
+      "description": "Add operator-visible health, lag, and failure surfacing for the new provenance report background scheduler so missed runs, backlog growth, and repeated execution failures are visible without inspecting background logs.",
+      "status": "ready",
+      "base_priority": 77,
+      "dynamic_priority_delta": 22,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T01:35:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduled-report-scheduler"
+      ],
+      "direction_relation_note": "The latest main-session reply says background execution is now live but there is still no separate operator surface or alerting for scheduler health, lag, and failure, making this the clearest next runtime-ops slice after the scheduler landed.",
+      "priority_reason": "Promoted to ready because it is the most explicit executable follow-up from the latest reply, hardens the just-shipped automation with operator visibility, and should land before broader dashboard-collection organization work."
+    },
+    {
+      "id": "task-b1-provider-market-context-dashboard-board",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add shared provenance dashboard boards above presets, views, and reports",
+      "description": "Introduce a higher-level shared analytics board or dashboard collection that groups presets, saved views, and scheduled reports into operator-ready provenance workspaces instead of leaving them as separate flat records.",
+      "status": "proposed",
+      "base_priority": 72,
+      "dynamic_priority_delta": 18,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T01:35:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-saved-views-reporting"
+      ],
+      "direction_relation_note": "The latest main-session reply still calls out the absence of a higher-level team dashboard collection above presets, views, and reports even after scheduled report background execution landed.",
+      "priority_reason": "This remains a clear executable follow-up, but it stays proposed behind the newly explicit scheduler health and alerting gap so builtin next-task advances through operational visibility before higher-order dashboard grouping."
     },
     {
       "id": "task-b1-provider-market-context-drift-threshold-alerting",
