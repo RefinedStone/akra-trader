@@ -1865,6 +1865,44 @@ class TradingApplication:
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
     return self._market_data.get_status(timeframe)
 
+  def list_market_data_lineage_history(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    sync_status: str | None = None,
+    validation_claim: str | None = None,
+    limit: int | None = None,
+  ):
+    return list(
+      self._market_data.list_lineage_history(
+        timeframe=timeframe,
+        symbol=symbol,
+        sync_status=sync_status,
+        validation_claim=validation_claim,
+        limit=limit,
+      )
+    )
+
+  def list_market_data_ingestion_jobs(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    operation: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+  ):
+    return list(
+      self._market_data.list_ingestion_jobs(
+        timeframe=timeframe,
+        symbol=symbol,
+        operation=operation,
+        status=status,
+        limit=limit,
+      )
+    )
+
   def get_operator_visibility(self) -> OperatorVisibility:
     current_time = self._clock()
     sandbox_alerts, sandbox_audit_events = self._collect_sandbox_operator_visibility(

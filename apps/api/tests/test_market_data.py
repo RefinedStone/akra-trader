@@ -343,6 +343,50 @@ def test_binance_adapter_status_exposes_checkpoint_and_recent_failure_history(tm
   assert "binance_upstream_fault" in degraded_instrument.issues
 
 
+def test_binance_adapter_records_lineage_history_and_ingestion_jobs(tmp_path: Path) -> None:
+  now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
+  rows = build_ohlcv_rows(
+    start_at=now - timedelta(minutes=25),
+    count=6,
+  )
+  database_url = f"sqlite:///{tmp_path / 'market-data.sqlite3'}"
+  healthy_adapter = BinanceMarketDataAdapter(
+    database_url=database_url,
+    tracked_symbols=("BTC/USDT",),
+    exchange=FakeExchange({("BTC/USDT", "5m"): rows}),
+    default_candle_limit=6,
+    historical_candle_limit=6,
+    clock=lambda: now,
+  )
+  healthy_adapter.sync_tracked("5m")
+
+  degraded_adapter = BinanceMarketDataAdapter(
+    database_url=database_url,
+    tracked_symbols=("BTC/USDT",),
+    exchange=BrokenExchange(),
+    default_candle_limit=6,
+    historical_candle_limit=6,
+    clock=lambda: now + timedelta(minutes=5),
+  )
+  degraded_adapter.sync_tracked("5m")
+
+  lineage_history = degraded_adapter.list_lineage_history(timeframe="5m")
+  ingestion_jobs = degraded_adapter.list_ingestion_jobs(timeframe="5m")
+
+  assert [record.sync_status for record in lineage_history[:2]] == ["error", "synced"]
+  assert lineage_history[0].validation_claim == "checkpoint_window"
+  assert lineage_history[0].checkpoint_id is not None
+  assert lineage_history[0].boundary_id == lineage_history[0].dataset_boundary.boundary_id
+  assert lineage_history[0].failure_count_24h == 1
+  assert "last_sync_failed" in lineage_history[0].issues
+  assert [record.operation for record in ingestion_jobs[:2]] == ["sync_recent", "sync_range"]
+  assert ingestion_jobs[0].status == "failed"
+  assert ingestion_jobs[0].lineage_history_id == lineage_history[0].history_id
+  assert ingestion_jobs[0].last_error == "upstream fetch failed for BTC/USDT 5m"
+  assert ingestion_jobs[1].status == "succeeded"
+  assert ingestion_jobs[1].fetched_candle_count == 6
+
+
 def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path) -> None:
   now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
   rows = build_ohlcv_rows(

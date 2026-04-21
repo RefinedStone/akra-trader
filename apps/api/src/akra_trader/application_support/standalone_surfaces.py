@@ -11,6 +11,8 @@ from typing import get_origin
 
 from akra_trader.application_support.standalone_surface_catalog import build_standalone_surface_runtime_bindings
 from akra_trader.application_support.runtime_queries import _apply_runtime_query_to_comparison
+from akra_trader.application_support.runtime_queries import _apply_runtime_query_to_market_data_ingestion_jobs
+from akra_trader.application_support.runtime_queries import _apply_runtime_query_to_market_data_lineage_history
 from akra_trader.application_support.runtime_queries import _apply_runtime_query_to_presets
 from akra_trader.application_support.runtime_queries import _apply_runtime_query_to_runs
 from akra_trader.application_support.runtime_queries import _apply_runtime_query_to_strategies
@@ -367,6 +369,34 @@ def execute_standalone_surface_binding(
     )
   if binding.binding_kind == "market_data_status":
     return asdict(app.get_market_data_status(resolved_filters.get("timeframe") or "5m"))
+  if binding.binding_kind == "market_data_lineage_history":
+    return [
+      asdict(record)
+      for record in _apply_runtime_query_to_market_data_lineage_history(
+        app.list_market_data_lineage_history(
+          timeframe=resolved_filters.get("timeframe"),
+          symbol=resolved_filters.get("symbol"),
+          sync_status=resolved_filters.get("sync_status"),
+          validation_claim=resolved_filters.get("validation_claim"),
+        ),
+        resolved_filters,
+        binding=binding,
+      )
+    ]
+  if binding.binding_kind == "market_data_ingestion_job_history":
+    return [
+      asdict(record)
+      for record in _apply_runtime_query_to_market_data_ingestion_jobs(
+        app.list_market_data_ingestion_jobs(
+          timeframe=resolved_filters.get("timeframe"),
+          symbol=resolved_filters.get("symbol"),
+          operation=resolved_filters.get("operation"),
+          status=resolved_filters.get("status"),
+        ),
+        resolved_filters,
+        binding=binding,
+      )
+    ]
   if binding.binding_kind == "operator_visibility":
     return asdict(app.get_operator_visibility())
   if binding.binding_kind == "guarded_live_status":

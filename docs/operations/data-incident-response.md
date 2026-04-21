@@ -13,6 +13,7 @@ unclear dataset lineage.
 ## Product Surfaces
 
 - market-data health and sync status surfaces
+- normalized market-data lineage history and ingestion-job history query surfaces
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

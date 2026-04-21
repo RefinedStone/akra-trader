@@ -11,11 +11,14 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.config import Settings
+from akra_trader.domain.models import DatasetBoundaryContract
 from akra_trader.domain.models import GapWindow
 from akra_trader.domain.models import GuardedLiveBookTickerChannelSnapshot
 from akra_trader.domain.models import GuardedLiveKlineChannelSnapshot
 from akra_trader.domain.models import GuardedLiveOrderBookLevel
 from akra_trader.domain.models import InstrumentStatus
+from akra_trader.domain.models import MarketDataIngestionJobRecord
+from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataLineage
@@ -135,6 +138,8 @@ class StatusOverrideSeededMarketDataAdapter(SeededMarketDataAdapter):
     super().__init__()
     self._status_by_timeframe: dict[str, MarketDataStatus] = {}
     self._remediation_status_by_key: dict[tuple[str, str], MarketDataStatus] = {}
+    self._lineage_history: tuple[MarketDataLineageHistoryRecord, ...] = ()
+    self._ingestion_jobs: tuple[MarketDataIngestionJobRecord, ...] = ()
 
   def set_status(self, *, timeframe: str, status: MarketDataStatus) -> None:
     self._status_by_timeframe[timeframe] = status
@@ -148,11 +153,79 @@ class StatusOverrideSeededMarketDataAdapter(SeededMarketDataAdapter):
   ) -> None:
     self._remediation_status_by_key[(kind, timeframe)] = status
 
+  def set_lineage_history(
+    self,
+    records: tuple[MarketDataLineageHistoryRecord, ...],
+  ) -> None:
+    self._lineage_history = records
+
+  def set_ingestion_jobs(
+    self,
+    records: tuple[MarketDataIngestionJobRecord, ...],
+  ) -> None:
+    self._ingestion_jobs = records
+
   def get_status(self, timeframe: str) -> MarketDataStatus:
     status = self._status_by_timeframe.get(timeframe)
     if status is not None:
       return status
     return super().get_status(timeframe)
+
+  def list_lineage_history(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    sync_status: str | None = None,
+    validation_claim: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataLineageHistoryRecord, ...]:
+    records = self._lineage_history or super().list_lineage_history(
+      timeframe=timeframe,
+      symbol=symbol,
+      sync_status=sync_status,
+      validation_claim=validation_claim,
+      limit=limit,
+    )
+    filtered = [
+      record
+      for record in records
+      if (timeframe is None or record.timeframe == timeframe)
+      and (symbol is None or record.symbol == symbol)
+      and (sync_status is None or record.sync_status == sync_status)
+      and (validation_claim is None or record.validation_claim == validation_claim)
+    ]
+    if limit is not None:
+      filtered = filtered[:limit]
+    return tuple(filtered)
+
+  def list_ingestion_jobs(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    operation: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataIngestionJobRecord, ...]:
+    records = self._ingestion_jobs or super().list_ingestion_jobs(
+      timeframe=timeframe,
+      symbol=symbol,
+      operation=operation,
+      status=status,
+      limit=limit,
+    )
+    filtered = [
+      record
+      for record in records
+      if (timeframe is None or record.timeframe == timeframe)
+      and (symbol is None or record.symbol == symbol)
+      and (operation is None or record.operation == operation)
+      and (status is None or record.status == status)
+    ]
+    if limit is not None:
+      filtered = filtered[:limit]
+    return tuple(filtered)
 
   def remediate(
     self,
@@ -315,6 +388,41 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "request",
     "filter_expr",
     "timeframe",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_market_data_lineage_history"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "symbol",
+    "timeframe",
+    "sync_status",
+    "validation_claim",
+    "boundary_id",
+    "checkpoint_id",
+    "recorded_at",
+    "last_sync_at",
+    "candle_count",
+    "failure_count_24h",
+    "lag_seconds",
+    "issue",
+    "sort",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_market_data_ingestion_jobs"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "symbol",
+    "timeframe",
+    "operation",
+    "status",
+    "validation_claim",
+    "checkpoint_id",
+    "started_at",
+    "finished_at",
+    "fetched_candle_count",
+    "duration_ms",
+    "last_error",
+    "sort",
     "app",
   )
   assert tuple(inspect.signature(routes["create_replay_link_alias"].endpoint).parameters) == ("request", "app")
@@ -1008,6 +1116,30 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   )
   assert market_data_params["timeframe"]["schema"]["minLength"] == 2
   assert openapi["paths"]["/api/market-data/status"]["get"]["x-akra-query-schema"]["filters"][0]["operators"][0]["key"] == "eq"
+
+  lineage_history_params = {
+    param["name"]: param
+    for param in openapi["paths"]["/api/market-data/lineage-history"]["get"]["parameters"]
+  }
+  assert lineage_history_params["validation_claim"]["description"] == (
+    "Filter lineage history by normalized dataset-boundary claim."
+  )
+  assert lineage_history_params["issue"]["schema"]["type"] == "array"
+  assert openapi["paths"]["/api/market-data/lineage-history"]["get"]["x-akra-query-schema"]["sort_fields"][0]["key"] == (
+    "recorded_at"
+  )
+
+  ingestion_job_params = {
+    param["name"]: param
+    for param in openapi["paths"]["/api/market-data/ingestion-jobs"]["get"]["parameters"]
+  }
+  assert ingestion_job_params["operation"]["description"] == (
+    "Filter ingestion jobs by sync operation kind."
+  )
+  assert ingestion_job_params["duration_ms"]["schema"]["title"] == "Duration ms"
+  assert openapi["paths"]["/api/market-data/ingestion-jobs"]["get"]["x-akra-query-schema"]["sort_fields"][0]["key"] == (
+    "started_at"
+  )
 
 
 def test_strategy_query_contract_applies_prefix_filter_and_sort(tmp_path: Path) -> None:
@@ -2485,6 +2617,167 @@ def test_market_data_status_endpoint_includes_gap_window_ids(tmp_path: Path) -> 
   assert response.status_code == 200
   payload = response.json()
   assert payload["instruments"][0]["backfill_gap_windows"][0]["gap_window_id"].startswith("gw|0|")
+
+
+def test_market_data_lineage_history_endpoint_returns_normalized_records(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    market_data.set_lineage_history(
+      (
+        MarketDataLineageHistoryRecord(
+          history_id="lineage-2",
+          source_job_id="job-2",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          recorded_at=datetime(2025, 1, 3, 10, 0, tzinfo=UTC),
+          sync_status="error",
+          validation_claim="checkpoint_window",
+          reproducibility_state="range_only",
+          boundary_id="checkpoint-v1:binance:BTC/USDT:5m:2025-01-03T09:55:00+00:00",
+          checkpoint_id="checkpoint-v1:binance:BTC/USDT:5m:2025-01-03T09:55:00+00:00",
+          dataset_boundary=DatasetBoundaryContract(
+            provider="binance",
+            venue="binance",
+            symbols=("BTC/USDT",),
+            timeframe="5m",
+            reproducibility_state="range_only",
+            validation_claim="checkpoint_window",
+            boundary_id="checkpoint-v1:binance:BTC/USDT:5m:2025-01-03T09:55:00+00:00",
+            sync_checkpoint_id="checkpoint-v1:binance:BTC/USDT:5m:2025-01-03T09:55:00+00:00",
+            effective_start_at=datetime(2025, 1, 3, 0, 0, tzinfo=UTC),
+            effective_end_at=datetime(2025, 1, 3, 9, 55, tzinfo=UTC),
+            candle_count=120,
+          ),
+          first_timestamp=datetime(2025, 1, 3, 0, 0, tzinfo=UTC),
+          last_timestamp=datetime(2025, 1, 3, 9, 55, tzinfo=UTC),
+          candle_count=120,
+          lag_seconds=300,
+          last_sync_at=datetime(2025, 1, 3, 10, 0, tzinfo=UTC),
+          failure_count_24h=2,
+          contiguous_missing_candles=2,
+          gap_window_count=1,
+          last_error="upstream fetch failed",
+          issues=("last_sync_failed", "gap_windows:1"),
+        ),
+        MarketDataLineageHistoryRecord(
+          history_id="lineage-1",
+          source_job_id="job-1",
+          provider="binance",
+          venue="binance",
+          symbol="ETH/USDT",
+          timeframe="5m",
+          recorded_at=datetime(2025, 1, 3, 9, 0, tzinfo=UTC),
+          sync_status="synced",
+          validation_claim="checkpoint_window",
+          reproducibility_state="range_only",
+          boundary_id="checkpoint-v1:binance:ETH/USDT:5m:2025-01-03T08:55:00+00:00",
+          checkpoint_id="checkpoint-v1:binance:ETH/USDT:5m:2025-01-03T08:55:00+00:00",
+          dataset_boundary=DatasetBoundaryContract(
+            provider="binance",
+            venue="binance",
+            symbols=("ETH/USDT",),
+            timeframe="5m",
+            reproducibility_state="range_only",
+            validation_claim="checkpoint_window",
+            boundary_id="checkpoint-v1:binance:ETH/USDT:5m:2025-01-03T08:55:00+00:00",
+            sync_checkpoint_id="checkpoint-v1:binance:ETH/USDT:5m:2025-01-03T08:55:00+00:00",
+            effective_start_at=datetime(2025, 1, 3, 0, 0, tzinfo=UTC),
+            effective_end_at=datetime(2025, 1, 3, 8, 55, tzinfo=UTC),
+            candle_count=108,
+          ),
+          first_timestamp=datetime(2025, 1, 3, 0, 0, tzinfo=UTC),
+          last_timestamp=datetime(2025, 1, 3, 8, 55, tzinfo=UTC),
+          candle_count=108,
+          lag_seconds=0,
+          last_sync_at=datetime(2025, 1, 3, 9, 0, tzinfo=UTC),
+          failure_count_24h=0,
+          contiguous_missing_candles=0,
+          gap_window_count=0,
+          last_error=None,
+          issues=(),
+        ),
+      )
+    )
+    app._market_data = market_data
+
+    response = client.get(
+      "/api/market-data/lineage-history?timeframe=5m&sync_status=error&sort=recorded_at:desc"
+    )
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert len(payload) == 1
+  assert payload[0]["history_id"] == "lineage-2"
+  assert payload[0]["dataset_boundary"]["validation_claim"] == "checkpoint_window"
+  assert payload[0]["failure_count_24h"] == 2
+  assert payload[0]["issues"] == ["last_sync_failed", "gap_windows:1"]
+
+
+def test_market_data_ingestion_jobs_endpoint_filters_failed_jobs(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    market_data.set_ingestion_jobs(
+      (
+        MarketDataIngestionJobRecord(
+          job_id="job-2",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          operation="sync_recent",
+          status="failed",
+          started_at=datetime(2025, 1, 3, 10, 0, tzinfo=UTC),
+          finished_at=datetime(2025, 1, 3, 10, 0, 1, tzinfo=UTC),
+          duration_ms=1000,
+          fetched_candle_count=0,
+          validation_claim="checkpoint_window",
+          boundary_id="checkpoint-v1:binance:BTC/USDT:5m:2025-01-03T09:55:00+00:00",
+          checkpoint_id="checkpoint-v1:binance:BTC/USDT:5m:2025-01-03T09:55:00+00:00",
+          lineage_history_id="lineage-2",
+          requested_start_at=datetime(2025, 1, 3, 10, 0, tzinfo=UTC),
+          requested_end_at=None,
+          requested_limit=500,
+          last_error="upstream fetch failed",
+        ),
+        MarketDataIngestionJobRecord(
+          job_id="job-1",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          operation="backfill_history",
+          status="succeeded",
+          started_at=datetime(2025, 1, 3, 9, 0, tzinfo=UTC),
+          finished_at=datetime(2025, 1, 3, 9, 0, 2, tzinfo=UTC),
+          duration_ms=2000,
+          fetched_candle_count=96,
+          validation_claim="checkpoint_window",
+          boundary_id="checkpoint-v1:binance:BTC/USDT:5m:2025-01-03T08:55:00+00:00",
+          checkpoint_id="checkpoint-v1:binance:BTC/USDT:5m:2025-01-03T08:55:00+00:00",
+          lineage_history_id="lineage-1",
+          requested_start_at=datetime(2025, 1, 3, 1, 0, tzinfo=UTC),
+          requested_end_at=datetime(2025, 1, 3, 8, 55, tzinfo=UTC),
+          requested_limit=96,
+          last_error=None,
+        ),
+      )
+    )
+    app._market_data = market_data
+
+    response = client.get("/api/market-data/ingestion-jobs?status=failed&sort=started_at:desc")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert len(payload) == 1
+  assert payload[0]["job_id"] == "job-2"
+  assert payload[0]["operation"] == "sync_recent"
+  assert payload[0]["status"] == "failed"
+  assert payload[0]["lineage_history_id"] == "lineage-2"
+  assert payload[0]["last_error"] == "upstream fetch failed"
 
 
 def test_operator_visibility_endpoint_reports_stale_runtime_alerts(tmp_path: Path) -> None:

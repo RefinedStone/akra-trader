@@ -15,7 +15,9 @@ from akra_trader.domain.models import Candle
 from akra_trader.domain.models import ExperimentPreset
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import InstrumentStatus
+from akra_trader.domain.models import MarketDataIngestionJobRecord
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
@@ -34,6 +36,7 @@ from akra_trader.ports import ExperimentPresetCatalogPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
 from akra_trader.lineage import build_candle_dataset_identity
+from akra_trader.lineage import build_dataset_boundary_contract
 from akra_trader.strategies.base import Strategy
 from akra_trader.strategies.examples import MovingAverageCrossStrategy
 from akra_trader.strategies.reference import build_reference_strategies
@@ -122,6 +125,79 @@ class SeededMarketDataAdapter(MarketDataPort):
         )
       )
     return MarketDataStatus(provider="seeded", venue=self._venue, instruments=instruments)
+
+  def list_lineage_history(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    sync_status: str | None = None,
+    validation_claim: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataLineageHistoryRecord, ...]:
+    resolved_timeframe = timeframe or "5m"
+    records: list[MarketDataLineageHistoryRecord] = []
+    status = self.get_status(resolved_timeframe)
+    for instrument in status.instruments:
+      resolved_symbol = instrument.instrument_id.split(":", 1)[-1]
+      if symbol is not None and resolved_symbol != symbol:
+        continue
+      candles = self.get_candles(symbol=resolved_symbol, timeframe=resolved_timeframe)
+      lineage = self.describe_lineage(
+        symbol=resolved_symbol,
+        timeframe=resolved_timeframe,
+        candles=candles,
+      )
+      dataset_boundary = build_dataset_boundary_contract(lineage=lineage)
+      claim = dataset_boundary.validation_claim if dataset_boundary is not None else "window_only"
+      if sync_status is not None and lineage.sync_status != sync_status:
+        continue
+      if validation_claim is not None and claim != validation_claim:
+        continue
+      recorded_at = candles[-1].timestamp if candles else datetime.now(UTC)
+      records.append(
+        MarketDataLineageHistoryRecord(
+          history_id=f"seeded-lineage:{self._venue}:{resolved_symbol}:{resolved_timeframe}",
+          source_job_id=None,
+          provider="seeded",
+          venue=self._venue,
+          symbol=resolved_symbol,
+          timeframe=resolved_timeframe,
+          recorded_at=recorded_at,
+          sync_status=lineage.sync_status,
+          validation_claim=claim,
+          reproducibility_state=lineage.reproducibility_state,
+          boundary_id=dataset_boundary.boundary_id if dataset_boundary is not None else None,
+          checkpoint_id=lineage.sync_checkpoint_id,
+          dataset_boundary=dataset_boundary,
+          first_timestamp=lineage.effective_start_at,
+          last_timestamp=lineage.effective_end_at,
+          candle_count=lineage.candle_count,
+          lag_seconds=0 if candles else None,
+          last_sync_at=recorded_at if candles else None,
+          failure_count_24h=0,
+          contiguous_missing_candles=0 if candles else None,
+          gap_window_count=0,
+          last_error=None,
+          issues=lineage.issues,
+        )
+      )
+    records.sort(key=lambda record: (record.recorded_at, record.history_id), reverse=True)
+    if limit is not None:
+      records = records[:limit]
+    return tuple(records)
+
+  def list_ingestion_jobs(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    operation: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataIngestionJobRecord, ...]:
+    del timeframe, symbol, operation, status, limit
+    return ()
 
   def describe_lineage(
     self,

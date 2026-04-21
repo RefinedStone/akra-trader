@@ -9,6 +9,8 @@ from typing import Any
 from typing import Callable
 
 from akra_trader.domain.models import ExperimentPreset
+from akra_trader.domain.models import MarketDataIngestionJobRecord
+from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import RunComparison
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
@@ -778,6 +780,34 @@ def _apply_runtime_query_to_comparison(
   return replace(comparison, narratives=tuple(narratives))
 
 
+def _apply_runtime_query_to_market_data_lineage_history(
+  records: list[MarketDataLineageHistoryRecord],
+  filters: dict[str, Any] | None,
+  *,
+  binding: StandaloneSurfaceRuntimeBinding,
+) -> list[MarketDataLineageHistoryRecord]:
+  return _apply_runtime_query_contract(
+    records,
+    filters=filters,
+    filter_specs=binding.filter_param_specs,
+    sort_specs=binding.sort_field_specs,
+  )
+
+
+def _apply_runtime_query_to_market_data_ingestion_jobs(
+  records: list[MarketDataIngestionJobRecord],
+  filters: dict[str, Any] | None,
+  *,
+  binding: StandaloneSurfaceRuntimeBinding,
+) -> list[MarketDataIngestionJobRecord]:
+  return _apply_runtime_query_contract(
+    records,
+    filters=filters,
+    filter_specs=binding.filter_param_specs,
+    sort_specs=binding.sort_field_specs,
+  )
+
+
 __all__ = [
   "RunSubresourceContract",
   "RunSubresourceRuntimeBinding",
@@ -793,6 +823,8 @@ __all__ = [
   "StandaloneSurfaceSortFieldSpec",
   "StandaloneSurfaceSortTerm",
   "_apply_runtime_query_to_comparison",
+  "_apply_runtime_query_to_market_data_ingestion_jobs",
+  "_apply_runtime_query_to_market_data_lineage_history",
   "_apply_runtime_query_to_presets",
   "_apply_runtime_query_to_runs",
   "_apply_runtime_query_to_strategies",

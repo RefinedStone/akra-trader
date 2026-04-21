@@ -1280,6 +1280,56 @@ class MarketDataStatus:
 
 
 @dataclass(frozen=True)
+class MarketDataLineageHistoryRecord:
+  history_id: str
+  source_job_id: str | None
+  provider: str
+  venue: str
+  symbol: str
+  timeframe: str
+  recorded_at: datetime
+  sync_status: str
+  validation_claim: str
+  reproducibility_state: str = "range_only"
+  boundary_id: str | None = None
+  checkpoint_id: str | None = None
+  dataset_boundary: DatasetBoundaryContract | None = None
+  first_timestamp: datetime | None = None
+  last_timestamp: datetime | None = None
+  candle_count: int = 0
+  lag_seconds: int | None = None
+  last_sync_at: datetime | None = None
+  failure_count_24h: int = 0
+  contiguous_missing_candles: int | None = None
+  gap_window_count: int = 0
+  last_error: str | None = None
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class MarketDataIngestionJobRecord:
+  job_id: str
+  provider: str
+  venue: str
+  symbol: str
+  timeframe: str
+  operation: str
+  status: str
+  started_at: datetime
+  finished_at: datetime
+  duration_ms: int
+  fetched_candle_count: int = 0
+  validation_claim: str | None = None
+  boundary_id: str | None = None
+  checkpoint_id: str | None = None
+  lineage_history_id: str | None = None
+  requested_start_at: datetime | None = None
+  requested_end_at: datetime | None = None
+  requested_limit: int | None = None
+  last_error: str | None = None
+
+
+@dataclass(frozen=True)
 class OperatorAlert:
   alert_id: str
   severity: str

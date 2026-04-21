@@ -34,12 +34,15 @@ creation.
 - canonical dataset-boundary contracts and claim-aware rerun validation categories now exist in run
   provenance
 - market-data status already exposes checkpoints, gap windows, backfill, lag, and failure history
+- normalized lineage-history and ingestion-job query surfaces now exist for symbol/timeframe
+  inspection
 
 ### Remaining work
 
 - clearer lineage mismatch reporting when rerun guarantees cannot be made
-- normalized lineage queries and ingestion-job history surfaces
-- stronger operator-facing summaries around data-boundary health and mismatch interpretation
+- stronger operator-facing workflows around data-boundary health, ingestion history, and mismatch
+  interpretation
+- retention, drill, and escalation policy for lineage-history and ingestion-job review paths
 
 ## Track B: Experiment OS And Persistence
 

@@ -55,6 +55,8 @@ It is not yet a finished live trading product:
   and provenance
 - native market-data lineage with dataset identity fingerprints, sync-checkpoint links, canonical
   dataset-boundary contracts, and rerun boundaries
+- normalized market-data lineage history and ingestion-job query surfaces for symbol/timeframe
+  inspection
 - reference-runtime delegation for NostalgiaForInfinity backtests with stored benchmark provenance
 
 ### Experiment OS baseline
@@ -129,8 +131,9 @@ It is not yet a finished live trading product:
 
 - custom strategy registration exists, but registration metadata is still process-local rather than a
   durable strategy registry
-- dataset-boundary contracts, rerun validation categories, and operator-visible lineage summaries now
-  exist, but normalized lineage history and ingestion-job surfaces are still missing
+- dataset-boundary contracts, rerun validation categories, operator-visible lineage summaries, and
+  normalized lineage or ingestion history surfaces now exist, but operator-first workflow and alert
+  correlation on top of those surfaces are still thin
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to

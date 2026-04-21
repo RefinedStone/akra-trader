@@ -31,6 +31,7 @@ from akra_trader.application import serialize_run_subresource_response
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import DatasetBoundaryContract
 from akra_trader.domain.models import GapWindow
 from akra_trader.domain.models import GuardedLiveBookTickerChannelSnapshot
 from akra_trader.domain.models import GuardedLiveKlineChannelSnapshot
@@ -40,6 +41,8 @@ from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import InstrumentStatus
+from akra_trader.domain.models import MarketDataIngestionJobRecord
+from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import OperatorIncidentDelivery
@@ -141,6 +144,8 @@ class StatusOverrideSeededMarketDataAdapter(MutableSeededMarketDataAdapter):
     super().__init__()
     self._status_by_timeframe: dict[str, MarketDataStatus] = {}
     self._remediation_status_by_key: dict[tuple[str, str], MarketDataStatus] = {}
+    self._lineage_history: tuple[MarketDataLineageHistoryRecord, ...] = ()
+    self._ingestion_jobs: tuple[MarketDataIngestionJobRecord, ...] = ()
     self.remediation_calls: list[tuple[str, str, str]] = []
 
   def set_status(self, *, timeframe: str, status: MarketDataStatus) -> None:
@@ -155,11 +160,79 @@ class StatusOverrideSeededMarketDataAdapter(MutableSeededMarketDataAdapter):
   ) -> None:
     self._remediation_status_by_key[(kind, timeframe)] = status
 
+  def set_lineage_history(
+    self,
+    records: tuple[MarketDataLineageHistoryRecord, ...],
+  ) -> None:
+    self._lineage_history = records
+
+  def set_ingestion_jobs(
+    self,
+    records: tuple[MarketDataIngestionJobRecord, ...],
+  ) -> None:
+    self._ingestion_jobs = records
+
   def get_status(self, timeframe: str) -> MarketDataStatus:
     status = self._status_by_timeframe.get(timeframe)
     if status is not None:
       return status
     return super().get_status(timeframe)
+
+  def list_lineage_history(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    sync_status: str | None = None,
+    validation_claim: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataLineageHistoryRecord, ...]:
+    records = self._lineage_history or super().list_lineage_history(
+      timeframe=timeframe,
+      symbol=symbol,
+      sync_status=sync_status,
+      validation_claim=validation_claim,
+      limit=limit,
+    )
+    filtered = [
+      record
+      for record in records
+      if (timeframe is None or record.timeframe == timeframe)
+      and (symbol is None or record.symbol == symbol)
+      and (sync_status is None or record.sync_status == sync_status)
+      and (validation_claim is None or record.validation_claim == validation_claim)
+    ]
+    if limit is not None:
+      filtered = filtered[:limit]
+    return tuple(filtered)
+
+  def list_ingestion_jobs(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    operation: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataIngestionJobRecord, ...]:
+    records = self._ingestion_jobs or super().list_ingestion_jobs(
+      timeframe=timeframe,
+      symbol=symbol,
+      operation=operation,
+      status=status,
+      limit=limit,
+    )
+    filtered = [
+      record
+      for record in records
+      if (timeframe is None or record.timeframe == timeframe)
+      and (symbol is None or record.symbol == symbol)
+      and (operation is None or record.operation == operation)
+      and (status is None or record.status == status)
+    ]
+    if limit is not None:
+      filtered = filtered[:limit]
+    return tuple(filtered)
 
   def remediate(
     self,
@@ -14008,6 +14081,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "replay_link_audit_prune",
     "replay_link_alias_revoke",
     "market_data_status",
+    "market_data_lineage_history",
+    "market_data_ingestion_job_history",
     "operator_visibility",
     "guarded_live_status",
     "strategy_catalog_discovery",
@@ -14076,6 +14151,16 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["market_data_status"].filter_param_specs[0].constraints.min_length == 2
   assert bindings_by_key["market_data_status"].filter_param_specs[0].openapi.title == "Timeframe"
   assert bindings_by_key["market_data_status"].filter_param_specs[0].operators[0].key == "eq"
+  assert bindings_by_key["market_data_lineage_history"].route_path == "/market-data/lineage-history"
+  assert bindings_by_key["market_data_lineage_history"].filter_param_specs[0].key == "symbol"
+  assert bindings_by_key["market_data_lineage_history"].filter_param_specs[3].key == "validation_claim"
+  assert bindings_by_key["market_data_lineage_history"].sort_field_specs[0].key == "recorded_at"
+  assert bindings_by_key["market_data_lineage_history"].sort_field_specs[-1].key == "lag_seconds"
+  assert bindings_by_key["market_data_ingestion_job_history"].route_path == "/market-data/ingestion-jobs"
+  assert bindings_by_key["market_data_ingestion_job_history"].filter_param_specs[2].key == "operation"
+  assert bindings_by_key["market_data_ingestion_job_history"].filter_param_specs[-1].key == "last_error"
+  assert bindings_by_key["market_data_ingestion_job_history"].sort_field_specs[0].key == "started_at"
+  assert bindings_by_key["market_data_ingestion_job_history"].sort_field_specs[-1].key == "fetched_candle_count"
   assert bindings_by_key["operator_visibility"].route_path == "/operator/visibility"
   assert bindings_by_key["guarded_live_status"].route_path == "/guarded-live"
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
@@ -14312,6 +14397,16 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     app=app,
     filters={"timeframe": "5m"},
   )
+  lineage_history_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["market_data_lineage_history"],
+    app=app,
+    filters={"timeframe": "5m"},
+  )
+  ingestion_job_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["market_data_ingestion_job_history"],
+    app=app,
+    filters={"timeframe": "5m"},
+  )
   operator_visibility_payload = serialize_standalone_surface_response(
     binding=bindings_by_key["operator_visibility"],
     app=app,
@@ -14370,6 +14465,10 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert market_data_payload["provider"] == "seeded"
   assert market_data_payload["venue"] == "binance"
   assert market_data_payload["instruments"]
+  assert lineage_history_payload
+  assert all(item["dataset_boundary"]["validation_claim"] == "exact_dataset" for item in lineage_history_payload)
+  assert {item["symbol"] for item in lineage_history_payload} >= {"BTC/USDT", "ETH/USDT", "SOL/USDT"}
+  assert ingestion_job_payload == []
   assert operator_visibility_payload["generated_at"]
   assert "alerts" in operator_visibility_payload
   assert guarded_live_payload["generated_at"]

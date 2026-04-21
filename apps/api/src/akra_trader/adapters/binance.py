@@ -4,9 +4,11 @@ from dataclasses import dataclass
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
+import json
 from pathlib import Path
 from typing import Callable
 from typing import Protocol
+from uuid import uuid4
 
 import ccxt
 from sqlalchemy import Column
@@ -32,13 +34,16 @@ from akra_trader.domain.models import Candle
 from akra_trader.domain.models import GapWindow
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import InstrumentStatus
+from akra_trader.domain.models import MarketDataIngestionJobRecord
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.domain.models import SyncCheckpoint
 from akra_trader.domain.models import SyncFailure
 from akra_trader.lineage import build_candle_dataset_identity
+from akra_trader.lineage import build_dataset_boundary_contract
 from akra_trader.lineage import build_sync_checkpoint_identity
 from akra_trader.ports import MarketDataPort
 
@@ -84,6 +89,55 @@ market_sync_failures = Table(
   Column("operation", String, nullable=False),
   Column("failed_at", DateTime(timezone=True), nullable=False),
   Column("error", Text, nullable=False),
+)
+market_lineage_history = Table(
+  "market_lineage_history",
+  metadata,
+  Column("history_id", String, primary_key=True),
+  Column("source_job_id", String, nullable=True),
+  Column("provider", String, nullable=False),
+  Column("venue", String, nullable=False),
+  Column("symbol", String, nullable=False),
+  Column("timeframe", String, nullable=False),
+  Column("recorded_at", DateTime(timezone=True), nullable=False),
+  Column("sync_status", String, nullable=False),
+  Column("validation_claim", String, nullable=False),
+  Column("reproducibility_state", String, nullable=False),
+  Column("boundary_id", String, nullable=True),
+  Column("checkpoint_id", String, nullable=True),
+  Column("first_timestamp", DateTime(timezone=True), nullable=True),
+  Column("last_timestamp", DateTime(timezone=True), nullable=True),
+  Column("candle_count", Integer, nullable=False),
+  Column("lag_seconds", Integer, nullable=True),
+  Column("last_sync_at", DateTime(timezone=True), nullable=True),
+  Column("failure_count_24h", Integer, nullable=False),
+  Column("contiguous_missing_candles", Integer, nullable=True),
+  Column("gap_window_count", Integer, nullable=False),
+  Column("last_error", Text, nullable=True),
+  Column("issues_json", Text, nullable=False),
+)
+market_ingestion_jobs = Table(
+  "market_ingestion_jobs",
+  metadata,
+  Column("job_id", String, primary_key=True),
+  Column("provider", String, nullable=False),
+  Column("venue", String, nullable=False),
+  Column("symbol", String, nullable=False),
+  Column("timeframe", String, nullable=False),
+  Column("operation", String, nullable=False),
+  Column("status", String, nullable=False),
+  Column("started_at", DateTime(timezone=True), nullable=False),
+  Column("finished_at", DateTime(timezone=True), nullable=False),
+  Column("duration_ms", Integer, nullable=False),
+  Column("fetched_candle_count", Integer, nullable=False),
+  Column("validation_claim", String, nullable=True),
+  Column("boundary_id", String, nullable=True),
+  Column("checkpoint_id", String, nullable=True),
+  Column("lineage_history_id", String, nullable=True),
+  Column("requested_start_at", DateTime(timezone=True), nullable=True),
+  Column("requested_end_at", DateTime(timezone=True), nullable=True),
+  Column("requested_limit", Integer, nullable=True),
+  Column("last_error", Text, nullable=True),
 )
 
 _TIMEFRAME_SECONDS = {
@@ -281,6 +335,62 @@ class CcxtMarketDataAdapter(MarketDataPort):
       )
     return MarketDataStatus(provider=self._provider, venue=self._venue, instruments=instruments)
 
+  def list_lineage_history(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    sync_status: str | None = None,
+    validation_claim: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataLineageHistoryRecord, ...]:
+    statement = select(market_lineage_history).where(market_lineage_history.c.venue == self._venue)
+    if timeframe is not None:
+      statement = statement.where(market_lineage_history.c.timeframe == timeframe)
+    if symbol is not None:
+      statement = statement.where(market_lineage_history.c.symbol == symbol)
+    if sync_status is not None:
+      statement = statement.where(market_lineage_history.c.sync_status == sync_status)
+    if validation_claim is not None:
+      statement = statement.where(market_lineage_history.c.validation_claim == validation_claim)
+    statement = statement.order_by(
+      market_lineage_history.c.recorded_at.desc(),
+      market_lineage_history.c.history_id.desc(),
+    )
+    if limit is not None:
+      statement = statement.limit(limit)
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(self._row_to_lineage_history_record(row) for row in rows)
+
+  def list_ingestion_jobs(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    operation: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataIngestionJobRecord, ...]:
+    statement = select(market_ingestion_jobs).where(market_ingestion_jobs.c.venue == self._venue)
+    if timeframe is not None:
+      statement = statement.where(market_ingestion_jobs.c.timeframe == timeframe)
+    if symbol is not None:
+      statement = statement.where(market_ingestion_jobs.c.symbol == symbol)
+    if operation is not None:
+      statement = statement.where(market_ingestion_jobs.c.operation == operation)
+    if status is not None:
+      statement = statement.where(market_ingestion_jobs.c.status == status)
+    statement = statement.order_by(
+      market_ingestion_jobs.c.started_at.desc(),
+      market_ingestion_jobs.c.job_id.desc(),
+    )
+    if limit is not None:
+      statement = statement.limit(limit)
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(self._row_to_ingestion_job_record(row) for row in rows)
+
   def sync_tracked(self, timeframe: str) -> None:
     for symbol in self._tracked_symbols:
       if not self._sync_recent(symbol=symbol, timeframe=timeframe):
@@ -450,17 +560,19 @@ class CcxtMarketDataAdapter(MarketDataPort):
     coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
     timeframe_delta = self._timeframe_delta(timeframe)
     requested_count = required_count or self._default_candle_limit
+    if coverage.last_timestamp is None or coverage.candle_count < requested_count:
+      lookback_count = max(requested_count, self._default_candle_limit)
+      start_at = self._clock() - (timeframe_delta * max(lookback_count - 1, 1))
+      return self._sync_range(
+        symbol=symbol,
+        timeframe=timeframe,
+        start_at=start_at,
+        end_at=None,
+        limit=lookback_count,
+      )
+    started_at = self._clock()
+    job_id = self._new_ingestion_job_id()
     try:
-      if coverage.last_timestamp is None or coverage.candle_count < requested_count:
-        lookback_count = max(requested_count, self._default_candle_limit)
-        start_at = self._clock() - (timeframe_delta * max(lookback_count - 1, 1))
-        return self._sync_range(
-          symbol=symbol,
-          timeframe=timeframe,
-          start_at=start_at,
-          end_at=None,
-          limit=lookback_count,
-        )
       raw = self._exchange.fetch_ohlcv(
         symbol=symbol,
         timeframe=timeframe,
@@ -476,6 +588,20 @@ class CcxtMarketDataAdapter(MarketDataPort):
         sync_status="synced",
         last_error=None,
       )
+      self._finalize_ingestion_job(
+        job_id=job_id,
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="sync_recent",
+        status="succeeded",
+        started_at=started_at,
+        finished_at=self._clock(),
+        requested_start_at=coverage.last_timestamp + timeframe_delta,
+        requested_end_at=None,
+        requested_limit=self._exchange_batch_limit,
+        fetched_candle_count=len(candles),
+        last_error=None,
+      )
       return True
     except Exception as exc:
       self._record_sync_state(
@@ -489,6 +615,20 @@ class CcxtMarketDataAdapter(MarketDataPort):
         timeframe=timeframe,
         operation="sync_recent",
         error=str(exc),
+      )
+      self._finalize_ingestion_job(
+        job_id=job_id,
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="sync_recent",
+        status="failed",
+        started_at=started_at,
+        finished_at=self._clock(),
+        requested_start_at=coverage.last_timestamp + timeframe_delta,
+        requested_end_at=None,
+        requested_limit=self._exchange_batch_limit,
+        fetched_candle_count=0,
+        last_error=str(exc),
       )
       return False
 
@@ -511,6 +651,9 @@ class CcxtMarketDataAdapter(MarketDataPort):
       timeframe=timeframe,
     )
     cursor = start_at
+    started_at = self._clock()
+    job_id = self._new_ingestion_job_id()
+    fetched_candle_count = 0
     try:
       while cursor <= end_boundary and remaining > 0:
         batch_limit = min(max(remaining, 1), self._exchange_batch_limit)
@@ -527,6 +670,7 @@ class CcxtMarketDataAdapter(MarketDataPort):
         ]
         if not candles:
           break
+        fetched_candle_count += len(candles)
         self._upsert_candles(symbol=symbol, timeframe=timeframe, candles=candles)
         next_cursor = candles[-1].timestamp + timeframe_delta
         remaining -= len(candles)
@@ -539,6 +683,20 @@ class CcxtMarketDataAdapter(MarketDataPort):
         symbol=symbol,
         timeframe=timeframe,
         sync_status="synced",
+        last_error=None,
+      )
+      self._finalize_ingestion_job(
+        job_id=job_id,
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="sync_range",
+        status="succeeded",
+        started_at=started_at,
+        finished_at=self._clock(),
+        requested_start_at=start_at,
+        requested_end_at=end_boundary,
+        requested_limit=limit,
+        fetched_candle_count=fetched_candle_count,
         last_error=None,
       )
       return True
@@ -555,6 +713,20 @@ class CcxtMarketDataAdapter(MarketDataPort):
         operation="sync_range",
         error=str(exc),
       )
+      self._finalize_ingestion_job(
+        job_id=job_id,
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="sync_range",
+        status="failed",
+        started_at=started_at,
+        finished_at=self._clock(),
+        requested_start_at=start_at,
+        requested_end_at=end_boundary,
+        requested_limit=limit,
+        fetched_candle_count=fetched_candle_count,
+        last_error=str(exc),
+      )
       return False
 
   def _backfill_history(
@@ -569,6 +741,10 @@ class CcxtMarketDataAdapter(MarketDataPort):
       return True
 
     timeframe_delta = self._timeframe_delta(timeframe)
+    started_at = self._clock()
+    job_id = self._new_ingestion_job_id()
+    fetched_candle_count = 0
+    requested_end_at = coverage.first_timestamp - timeframe_delta if coverage.first_timestamp is not None else None
     try:
       while coverage.first_timestamp is not None and coverage.candle_count < target_candle_count:
         remaining = target_candle_count - coverage.candle_count
@@ -587,6 +763,7 @@ class CcxtMarketDataAdapter(MarketDataPort):
         ]
         if not candles:
           break
+        fetched_candle_count += len(candles)
         previous_coverage = coverage
         self._upsert_candles(symbol=symbol, timeframe=timeframe, candles=candles)
         coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
@@ -598,6 +775,20 @@ class CcxtMarketDataAdapter(MarketDataPort):
         symbol=symbol,
         timeframe=timeframe,
         sync_status="synced",
+        last_error=None,
+      )
+      self._finalize_ingestion_job(
+        job_id=job_id,
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="backfill_history",
+        status="succeeded",
+        started_at=started_at,
+        finished_at=self._clock(),
+        requested_start_at=coverage.first_timestamp,
+        requested_end_at=requested_end_at,
+        requested_limit=target_candle_count,
+        fetched_candle_count=fetched_candle_count,
         last_error=None,
       )
       return True
@@ -613,6 +804,20 @@ class CcxtMarketDataAdapter(MarketDataPort):
         timeframe=timeframe,
         operation="backfill_history",
         error=str(exc),
+      )
+      self._finalize_ingestion_job(
+        job_id=job_id,
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="backfill_history",
+        status="failed",
+        started_at=started_at,
+        finished_at=self._clock(),
+        requested_start_at=coverage.first_timestamp,
+        requested_end_at=requested_end_at,
+        requested_limit=target_candle_count,
+        fetched_candle_count=fetched_candle_count,
+        last_error=str(exc),
       )
       return False
 
@@ -771,6 +976,214 @@ class CcxtMarketDataAdapter(MarketDataPort):
         )
       )
 
+  def _new_ingestion_job_id(self) -> str:
+    return f"ingest|{uuid4().hex}"
+
+  def _new_lineage_history_id(self) -> str:
+    return f"lineage|{uuid4().hex}"
+
+  def _finalize_ingestion_job(
+    self,
+    *,
+    job_id: str,
+    symbol: str,
+    timeframe: str,
+    operation: str,
+    status: str,
+    started_at: datetime,
+    finished_at: datetime,
+    requested_start_at: datetime | None,
+    requested_end_at: datetime | None,
+    requested_limit: int | None,
+    fetched_candle_count: int,
+    last_error: str | None,
+  ) -> None:
+    lineage_record = self._record_lineage_history(
+      symbol=symbol,
+      timeframe=timeframe,
+      recorded_at=finished_at,
+      source_job_id=job_id,
+    )
+    self._record_ingestion_job(
+      job_id=job_id,
+      symbol=symbol,
+      timeframe=timeframe,
+      operation=operation,
+      status=status,
+      started_at=started_at,
+      finished_at=finished_at,
+      requested_start_at=requested_start_at,
+      requested_end_at=requested_end_at,
+      requested_limit=requested_limit,
+      fetched_candle_count=fetched_candle_count,
+      last_error=last_error,
+      lineage_record=lineage_record,
+    )
+
+  def _record_lineage_history(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    recorded_at: datetime,
+    source_job_id: str | None,
+  ) -> MarketDataLineageHistoryRecord:
+    record = self._build_lineage_history_record(
+      symbol=symbol,
+      timeframe=timeframe,
+      recorded_at=recorded_at,
+      source_job_id=source_job_id,
+    )
+    with self._engine.begin() as connection:
+      connection.execute(
+        insert(market_lineage_history).values(
+          history_id=record.history_id,
+          source_job_id=record.source_job_id,
+          provider=record.provider,
+          venue=record.venue,
+          symbol=record.symbol,
+          timeframe=record.timeframe,
+          recorded_at=record.recorded_at,
+          sync_status=record.sync_status,
+          validation_claim=record.validation_claim,
+          reproducibility_state=record.reproducibility_state,
+          boundary_id=record.boundary_id,
+          checkpoint_id=record.checkpoint_id,
+          first_timestamp=record.first_timestamp,
+          last_timestamp=record.last_timestamp,
+          candle_count=record.candle_count,
+          lag_seconds=record.lag_seconds,
+          last_sync_at=record.last_sync_at,
+          failure_count_24h=record.failure_count_24h,
+          contiguous_missing_candles=record.contiguous_missing_candles,
+          gap_window_count=record.gap_window_count,
+          last_error=record.last_error,
+          issues_json=json.dumps(list(record.issues)),
+        )
+      )
+    return record
+
+  def _build_lineage_history_record(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    recorded_at: datetime,
+    source_job_id: str | None,
+  ) -> MarketDataLineageHistoryRecord:
+    quality = self._build_quality_snapshot(symbol=symbol, timeframe=timeframe)
+    backfill = self._build_backfill_snapshot(
+      symbol=symbol,
+      timeframe=timeframe,
+      coverage=quality.coverage,
+    )
+    recent_failures = self._read_recent_failures(symbol=symbol, timeframe=timeframe)
+    failure_count_24h = self._count_failures_since(
+      symbol=symbol,
+      timeframe=timeframe,
+      since=self._clock() - timedelta(hours=24),
+    )
+    sync_checkpoint = quality.sync_state.checkpoint if quality.sync_state is not None else None
+    if sync_checkpoint is None and quality.coverage.candle_count > 0:
+      sync_checkpoint = self._build_sync_checkpoint(
+        symbol=symbol,
+        timeframe=timeframe,
+        coverage=quality.coverage,
+        contiguous_missing_candles=backfill.contiguous_missing_candles,
+        recorded_at=quality.coverage.latest_ingested_at or recorded_at,
+      )
+    issues = self._build_status_issues(
+      timeframe=timeframe,
+      quality=quality,
+      backfill=backfill,
+      recent_failures=recent_failures,
+      failure_count_24h=failure_count_24h,
+    )
+    lineage = MarketDataLineage(
+      provider=self._provider,
+      venue=self._venue,
+      symbols=(symbol,),
+      timeframe=timeframe,
+      dataset_identity=None,
+      sync_checkpoint_id=sync_checkpoint.checkpoint_id if sync_checkpoint is not None else None,
+      reproducibility_state="range_only",
+      effective_start_at=quality.coverage.first_timestamp,
+      effective_end_at=quality.coverage.last_timestamp,
+      candle_count=quality.coverage.candle_count,
+      sync_status=quality.sync_status,
+      last_sync_at=quality.sync_state.last_sync_at if quality.sync_state is not None else None,
+      issues=issues,
+    )
+    dataset_boundary = build_dataset_boundary_contract(lineage=lineage)
+    return MarketDataLineageHistoryRecord(
+      history_id=self._new_lineage_history_id(),
+      source_job_id=source_job_id,
+      provider=self._provider,
+      venue=self._venue,
+      symbol=symbol,
+      timeframe=timeframe,
+      recorded_at=recorded_at,
+      sync_status=quality.sync_status,
+      validation_claim=dataset_boundary.validation_claim if dataset_boundary is not None else "window_only",
+      reproducibility_state=lineage.reproducibility_state,
+      boundary_id=dataset_boundary.boundary_id if dataset_boundary is not None else None,
+      checkpoint_id=sync_checkpoint.checkpoint_id if sync_checkpoint is not None else None,
+      dataset_boundary=dataset_boundary,
+      first_timestamp=quality.coverage.first_timestamp,
+      last_timestamp=quality.coverage.last_timestamp,
+      candle_count=quality.coverage.candle_count,
+      lag_seconds=quality.lag_seconds,
+      last_sync_at=quality.sync_state.last_sync_at if quality.sync_state is not None else None,
+      failure_count_24h=failure_count_24h,
+      contiguous_missing_candles=backfill.contiguous_missing_candles,
+      gap_window_count=len(backfill.gap_windows),
+      last_error=quality.sync_state.last_error if quality.sync_state is not None else None,
+      issues=issues,
+    )
+
+  def _record_ingestion_job(
+    self,
+    *,
+    job_id: str,
+    symbol: str,
+    timeframe: str,
+    operation: str,
+    status: str,
+    started_at: datetime,
+    finished_at: datetime,
+    requested_start_at: datetime | None,
+    requested_end_at: datetime | None,
+    requested_limit: int | None,
+    fetched_candle_count: int,
+    last_error: str | None,
+    lineage_record: MarketDataLineageHistoryRecord,
+  ) -> None:
+    duration_ms = max(int((finished_at - started_at).total_seconds() * 1000), 0)
+    with self._engine.begin() as connection:
+      connection.execute(
+        insert(market_ingestion_jobs).values(
+          job_id=job_id,
+          provider=self._provider,
+          venue=self._venue,
+          symbol=symbol,
+          timeframe=timeframe,
+          operation=operation,
+          status=status,
+          started_at=started_at,
+          finished_at=finished_at,
+          duration_ms=duration_ms,
+          fetched_candle_count=fetched_candle_count,
+          validation_claim=lineage_record.validation_claim,
+          boundary_id=lineage_record.boundary_id,
+          checkpoint_id=lineage_record.checkpoint_id,
+          lineage_history_id=lineage_record.history_id,
+          requested_start_at=requested_start_at,
+          requested_end_at=requested_end_at,
+          requested_limit=requested_limit,
+          last_error=last_error,
+        )
+      )
+
   def _read_recent_failures(
     self,
     *,
@@ -818,6 +1231,80 @@ class CcxtMarketDataAdapter(MarketDataPort):
     )
     with self._engine.connect() as connection:
       return int(connection.execute(statement).scalar_one())
+
+  def _row_to_lineage_history_record(self, row: dict) -> MarketDataLineageHistoryRecord:
+    issues = tuple(json.loads(row["issues_json"])) if row["issues_json"] else ()
+    dataset_boundary = None
+    if row["boundary_id"] is not None or row["checkpoint_id"] is not None or row["candle_count"]:
+      dataset_boundary = build_dataset_boundary_contract(
+        lineage=MarketDataLineage(
+          provider=row["provider"],
+          venue=row["venue"],
+          symbols=(row["symbol"],),
+          timeframe=row["timeframe"],
+          dataset_identity=None,
+          sync_checkpoint_id=row["checkpoint_id"],
+          reproducibility_state=row["reproducibility_state"] or "range_only",
+          effective_start_at=self._ensure_utc(row["first_timestamp"]),
+          effective_end_at=self._ensure_utc(row["last_timestamp"]),
+          candle_count=int(row["candle_count"] or 0),
+          sync_status=row["sync_status"],
+          last_sync_at=self._ensure_utc(row["last_sync_at"]),
+          issues=issues,
+        )
+      )
+    return MarketDataLineageHistoryRecord(
+      history_id=row["history_id"],
+      source_job_id=row["source_job_id"],
+      provider=row["provider"],
+      venue=row["venue"],
+      symbol=row["symbol"],
+      timeframe=row["timeframe"],
+      recorded_at=self._ensure_utc(row["recorded_at"]) or datetime.now(UTC),
+      sync_status=row["sync_status"],
+      validation_claim=row["validation_claim"],
+      reproducibility_state=row["reproducibility_state"] or "range_only",
+      boundary_id=row["boundary_id"],
+      checkpoint_id=row["checkpoint_id"],
+      dataset_boundary=dataset_boundary,
+      first_timestamp=self._ensure_utc(row["first_timestamp"]),
+      last_timestamp=self._ensure_utc(row["last_timestamp"]),
+      candle_count=int(row["candle_count"] or 0),
+      lag_seconds=int(row["lag_seconds"]) if row["lag_seconds"] is not None else None,
+      last_sync_at=self._ensure_utc(row["last_sync_at"]),
+      failure_count_24h=int(row["failure_count_24h"] or 0),
+      contiguous_missing_candles=(
+        int(row["contiguous_missing_candles"])
+        if row["contiguous_missing_candles"] is not None
+        else None
+      ),
+      gap_window_count=int(row["gap_window_count"] or 0),
+      last_error=row["last_error"],
+      issues=issues,
+    )
+
+  def _row_to_ingestion_job_record(self, row: dict) -> MarketDataIngestionJobRecord:
+    return MarketDataIngestionJobRecord(
+      job_id=row["job_id"],
+      provider=row["provider"],
+      venue=row["venue"],
+      symbol=row["symbol"],
+      timeframe=row["timeframe"],
+      operation=row["operation"],
+      status=row["status"],
+      started_at=self._ensure_utc(row["started_at"]) or datetime.now(UTC),
+      finished_at=self._ensure_utc(row["finished_at"]) or datetime.now(UTC),
+      duration_ms=int(row["duration_ms"] or 0),
+      fetched_candle_count=int(row["fetched_candle_count"] or 0),
+      validation_claim=row["validation_claim"],
+      boundary_id=row["boundary_id"],
+      checkpoint_id=row["checkpoint_id"],
+      lineage_history_id=row["lineage_history_id"],
+      requested_start_at=self._ensure_utc(row["requested_start_at"]),
+      requested_end_at=self._ensure_utc(row["requested_end_at"]),
+      requested_limit=int(row["requested_limit"]) if row["requested_limit"] is not None else None,
+      last_error=row["last_error"],
+    )
 
   def _build_sync_checkpoint(
     self,

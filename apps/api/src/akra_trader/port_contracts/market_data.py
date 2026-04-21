@@ -5,7 +5,9 @@ from typing import Protocol
 
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import Instrument
+from akra_trader.domain.models import MarketDataIngestionJobRecord
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 
@@ -35,6 +37,26 @@ class MarketDataPort(Protocol):
   ) -> MarketDataLineage: ...
 
   def get_status(self, timeframe: str) -> MarketDataStatus: ...
+
+  def list_lineage_history(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    sync_status: str | None = None,
+    validation_claim: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataLineageHistoryRecord, ...]: ...
+
+  def list_ingestion_jobs(
+    self,
+    *,
+    timeframe: str | None = None,
+    symbol: str | None = None,
+    operation: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+  ) -> tuple[MarketDataIngestionJobRecord, ...]: ...
 
   def remediate(
     self,
