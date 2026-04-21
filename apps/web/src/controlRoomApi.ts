@@ -17,6 +17,10 @@ import type {
   ProviderProvenanceSchedulerAlertHistoryPayload,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerNarrativeRegistryEntry,
+  ProviderProvenanceSchedulerNarrativeRegistryListPayload,
+  ProviderProvenanceSchedulerNarrativeTemplateEntry,
+  ProviderProvenanceSchedulerNarrativeTemplateListPayload,
   ProviderProvenanceScheduledReportEntry,
   ProviderProvenanceScheduledReportHistoryPayload,
   ProviderProvenanceScheduledReportListPayload,
@@ -587,6 +591,124 @@ export async function listProviderProvenanceDashboardViews(params: {
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceDashboardViewListPayload>(
     `/operator/provider-provenance-analytics/views${suffix}`,
+  );
+}
+
+export async function createProviderProvenanceSchedulerNarrativeTemplate(params: {
+  name: string;
+  description?: string;
+  query: Record<string, unknown>;
+  createdByTabId?: string;
+  createdByTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeTemplateEntry>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: params.name,
+        description: params.description ?? "",
+        query: params.query,
+        ...(params.createdByTabId?.trim() ? { created_by_tab_id: params.createdByTabId.trim() } : {}),
+        ...(params.createdByTabLabel?.trim() ? { created_by_tab_label: params.createdByTabLabel.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeTemplates(params: {
+  createdByTabId?: string;
+  focusScope?: "current_focus" | "all_focuses";
+  category?: string;
+  narrativeFacet?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.createdByTabId?.trim()) {
+    searchParams.set("created_by_tab_id", params.createdByTabId.trim());
+  }
+  if (params.focusScope?.trim()) {
+    searchParams.set("focus_scope", params.focusScope.trim());
+  }
+  if (params.category?.trim()) {
+    searchParams.set("category", params.category.trim());
+  }
+  if (params.narrativeFacet?.trim()) {
+    searchParams.set("narrative_facet", params.narrativeFacet.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeTemplateListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-templates${suffix}`,
+  );
+}
+
+export async function createProviderProvenanceSchedulerNarrativeRegistryEntry(params: {
+  name: string;
+  description?: string;
+  query: Record<string, unknown>;
+  layout?: ProviderProvenanceDashboardLayout;
+  templateId?: string;
+  createdByTabId?: string;
+  createdByTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeRegistryEntry>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: params.name,
+        description: params.description ?? "",
+        query: params.query,
+        ...(params.layout ? { layout: params.layout } : {}),
+        ...(params.templateId?.trim() ? { template_id: params.templateId.trim() } : {}),
+        ...(params.createdByTabId?.trim() ? { created_by_tab_id: params.createdByTabId.trim() } : {}),
+        ...(params.createdByTabLabel?.trim() ? { created_by_tab_label: params.createdByTabLabel.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeRegistryEntries(params: {
+  templateId?: string;
+  createdByTabId?: string;
+  focusScope?: "current_focus" | "all_focuses";
+  category?: string;
+  narrativeFacet?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.templateId?.trim()) {
+    searchParams.set("template_id", params.templateId.trim());
+  }
+  if (params.createdByTabId?.trim()) {
+    searchParams.set("created_by_tab_id", params.createdByTabId.trim());
+  }
+  if (params.focusScope?.trim()) {
+    searchParams.set("focus_scope", params.focusScope.trim());
+  }
+  if (params.category?.trim()) {
+    searchParams.set("category", params.category.trim());
+  }
+  if (params.narrativeFacet?.trim()) {
+    searchParams.set("narrative_facet", params.narrativeFacet.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeRegistryListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-registry${suffix}`,
   );
 }
 

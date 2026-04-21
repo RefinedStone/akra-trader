@@ -32,6 +32,8 @@ from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunRecord
@@ -281,6 +283,14 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_analytics_presets: OrderedDict[str, ProviderProvenanceAnalyticsPresetRecord] = OrderedDict()
     self._provider_provenance_dashboard_views: OrderedDict[str, ProviderProvenanceDashboardViewRecord] = OrderedDict()
     self._provider_provenance_scheduled_reports: OrderedDict[str, ProviderProvenanceScheduledReportRecord] = OrderedDict()
+    self._provider_provenance_scheduler_narrative_templates: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeTemplateRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_narrative_registry: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeRegistryRecord,
+    ] = OrderedDict()
     self._provider_provenance_scheduled_report_audit_records: OrderedDict[str, ProviderProvenanceScheduledReportAuditRecord] = OrderedDict()
     self._provider_provenance_scheduler_health_records: OrderedDict[str, ProviderProvenanceSchedulerHealthRecord] = OrderedDict()
     self._replay_intent_alias_signing_secret: str | None = None
@@ -710,6 +720,54 @@ class InMemoryRunRepository(RunRepositoryPort):
     report_id: str,
   ) -> ProviderProvenanceScheduledReportRecord | None:
     return self._provider_provenance_scheduled_reports.get(report_id)
+
+  def save_provider_provenance_scheduler_narrative_template(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeTemplateRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord:
+    self._provider_provenance_scheduler_narrative_templates[record.template_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_narrative_templates(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeTemplateRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_templates.values(),
+        key=lambda record: (record.updated_at, record.template_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_narrative_template(
+    self,
+    template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord | None:
+    return self._provider_provenance_scheduler_narrative_templates.get(template_id)
+
+  def save_provider_provenance_scheduler_narrative_registry_entry(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord:
+    self._provider_provenance_scheduler_narrative_registry[record.registry_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_narrative_registry_entries(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeRegistryRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_registry.values(),
+        key=lambda record: (record.updated_at, record.registry_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_narrative_registry_entry(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord | None:
+    return self._provider_provenance_scheduler_narrative_registry.get(registry_id)
 
   def save_provider_provenance_scheduled_report_audit_record(
     self,

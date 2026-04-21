@@ -933,6 +933,32 @@ class ProviderProvenanceScheduledReportRecord:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeTemplateRecord:
+  template_id: str
+  name: str
+  description: str = ""
+  query: dict[str, Any] = field(default_factory=dict)
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeRegistryRecord:
+  registry_id: str
+  name: str
+  description: str = ""
+  query: dict[str, Any] = field(default_factory=dict)
+  layout: dict[str, Any] = field(default_factory=dict)
+  template_id: str | None = None
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceScheduledReportAuditRecord:
   audit_id: str
   report_id: str

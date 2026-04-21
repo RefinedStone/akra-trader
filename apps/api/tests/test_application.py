@@ -15142,6 +15142,10 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_analytics_preset_list",
     "operator_provider_provenance_dashboard_view_create",
     "operator_provider_provenance_dashboard_view_list",
+    "operator_provider_provenance_scheduler_narrative_template_create",
+    "operator_provider_provenance_scheduler_narrative_template_list",
+    "operator_provider_provenance_scheduler_narrative_registry_create",
+    "operator_provider_provenance_scheduler_narrative_registry_list",
     "operator_provider_provenance_scheduled_report_create",
     "operator_provider_provenance_scheduled_report_list",
     "operator_provider_provenance_scheduled_report_run",
@@ -15272,6 +15276,16 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_dashboard_view_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_dashboard_view_list"].filter_param_specs[3].key == (
     "highlight_panel"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"].methods == ("POST",)
+  assert (
+    bindings_by_key["operator_provider_provenance_scheduler_narrative_template_list"].filter_param_specs[3].key
+    == "narrative_facet"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_create"].methods == ("POST",)
+  assert (
+    bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_list"].filter_param_specs[0].key
+    == "template_id"
   )
   assert bindings_by_key["operator_provider_provenance_scheduled_report_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduled_report_list"].filter_param_specs[1].key == (
@@ -16318,6 +16332,78 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert view_list_payload["total"] == 1
   assert view_list_payload["items"][0]["view_id"] == view_payload["view_id"]
+
+  template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"],
+    app=app,
+    request_payload={
+      "name": "Lag recovery narrative",
+      "description": "Post-resolution lag recovery lens.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "post_resolution_recovery",
+        "window_days": 30,
+        "result_limit": 12,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert template_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
+
+  template_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_list"],
+    app=app,
+    filters={"category": "scheduler_lag", "narrative_facet": "post_resolution_recovery", "limit": 10},
+  )
+  assert template_list_payload["total"] == 1
+  assert template_list_payload["items"][0]["template_id"] == template_payload["template_id"]
+
+  registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_create"],
+    app=app,
+    request_payload={
+      "name": "Lag recovery board",
+      "description": "Shared scheduler narrative board.",
+      "template_id": template_payload["template_id"],
+      "query": {
+        "focus_scope": "current_focus",
+        "focus_key": "binance:BTC/USDT|5m",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "post_resolution_recovery",
+        "window_days": 14,
+        "result_limit": 12,
+      },
+      "layout": {
+        "highlight_panel": "overview",
+        "show_rollups": False,
+        "show_time_series": True,
+        "show_recent_exports": False,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert registry_payload["template_id"] == template_payload["template_id"]
+  assert registry_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+
+  registry_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_list"],
+    app=app,
+    filters={
+      "template_id": template_payload["template_id"],
+      "category": "scheduler_lag",
+      "narrative_facet": "post_resolution_recovery",
+      "limit": 10,
+    },
+  )
+  assert registry_list_payload["total"] == 1
+  assert registry_list_payload["items"][0]["registry_id"] == registry_payload["registry_id"]
 
   report_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduled_report_create"],

@@ -54,6 +54,8 @@ import {
   createProviderProvenanceAnalyticsPreset,
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
+  createProviderProvenanceSchedulerNarrativeRegistryEntry,
+  createProviderProvenanceSchedulerNarrativeTemplate,
   createProviderProvenanceScheduledReport,
   approveProviderProvenanceExportJob,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
@@ -72,6 +74,8 @@ import {
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
   listProviderProvenanceAnalyticsPresets,
   listProviderProvenanceDashboardViews,
+  listProviderProvenanceSchedulerNarrativeRegistryEntries,
+  listProviderProvenanceSchedulerNarrativeTemplates,
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
   listProviderProvenanceExportJobs,
@@ -288,6 +292,8 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerNarrativeRegistryEntry,
+  ProviderProvenanceSchedulerNarrativeTemplateEntry,
   ProviderProvenanceScheduledReportEntry,
   ProviderProvenanceScheduledReportHistoryPayload,
   ProvenanceArtifactLineDetailView,
@@ -495,6 +501,18 @@ const defaultProviderProvenanceDashboardLayout: ProviderProvenanceDashboardLayou
 const defaultProviderProvenanceWorkspaceDraft = {
   name: "",
   description: "",
+};
+
+type ProviderProvenanceSchedulerNarrativeRegistryDraftState = {
+  name: string;
+  description: string;
+  template_id: string;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeRegistryDraft: ProviderProvenanceSchedulerNarrativeRegistryDraftState = {
+  name: "",
+  description: "",
+  template_id: "",
 };
 
 type ProviderProvenanceReportDraftState = {
@@ -2298,6 +2316,8 @@ function buildProviderProvenanceAnalyticsWorkspaceQuery(
 function buildProviderProvenanceAnalyticsQueryStateFromWorkspaceQuery(
   query: ProviderProvenanceAnalyticsPresetEntry["query"]
     | ProviderProvenanceDashboardViewEntry["query"]
+    | ProviderProvenanceSchedulerNarrativeTemplateEntry["query"]
+    | ProviderProvenanceSchedulerNarrativeRegistryEntry["query"]
     | ProviderProvenanceScheduledReportEntry["query"],
 ): ProviderProvenanceAnalyticsQueryState {
   return {
@@ -2966,6 +2986,12 @@ export default function App() {
   const [providerProvenancePresetDraft, setProviderProvenancePresetDraft] = useState(
     defaultProviderProvenanceWorkspaceDraft,
   );
+  const [providerProvenanceSchedulerNarrativeTemplateDraft, setProviderProvenanceSchedulerNarrativeTemplateDraft] =
+    useState(defaultProviderProvenanceWorkspaceDraft);
+  const [providerProvenanceSchedulerNarrativeRegistryDraft, setProviderProvenanceSchedulerNarrativeRegistryDraft] =
+    useState<ProviderProvenanceSchedulerNarrativeRegistryDraftState>(
+      defaultProviderProvenanceSchedulerNarrativeRegistryDraft,
+    );
   const [providerProvenanceViewDraft, setProviderProvenanceViewDraft] = useState(() => ({
     ...defaultProviderProvenanceWorkspaceDraft,
     preset_id: "",
@@ -2983,6 +3009,18 @@ export default function App() {
   const [providerProvenanceDashboardViewsLoading, setProviderProvenanceDashboardViewsLoading] =
     useState(false);
   const [providerProvenanceDashboardViewsError, setProviderProvenanceDashboardViewsError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerNarrativeTemplates, setProviderProvenanceSchedulerNarrativeTemplates] =
+    useState<ProviderProvenanceSchedulerNarrativeTemplateEntry[]>([]);
+  const [providerProvenanceSchedulerNarrativeTemplatesLoading, setProviderProvenanceSchedulerNarrativeTemplatesLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeTemplatesError, setProviderProvenanceSchedulerNarrativeTemplatesError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerNarrativeRegistryEntries, setProviderProvenanceSchedulerNarrativeRegistryEntries] =
+    useState<ProviderProvenanceSchedulerNarrativeRegistryEntry[]>([]);
+  const [providerProvenanceSchedulerNarrativeRegistryEntriesLoading, setProviderProvenanceSchedulerNarrativeRegistryEntriesLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeRegistryEntriesError, setProviderProvenanceSchedulerNarrativeRegistryEntriesError] =
     useState<string | null>(null);
   const [providerProvenanceScheduledReports, setProviderProvenanceScheduledReports] =
     useState<ProviderProvenanceScheduledReportEntry[]>([]);
@@ -3198,6 +3236,13 @@ export default function App() {
   const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
   const providerProvenanceSchedulerAutomationRef = useRef<HTMLDivElement | null>(null);
+  const providerProvenanceSchedulerNarrativeTemplateNameMap = useMemo(
+    () =>
+      new Map(
+        providerProvenanceSchedulerNarrativeTemplates.map((entry) => [entry.template_id, entry.name]),
+      ),
+    [providerProvenanceSchedulerNarrativeTemplates],
+  );
   const selectedProviderProvenanceSchedulerExportEntry = useMemo(
     () =>
       selectedProviderProvenanceSchedulerExportHistory?.job
@@ -5654,19 +5699,36 @@ export default function App() {
   async function loadProviderProvenanceWorkspaceRegistry() {
     setProviderProvenanceAnalyticsPresetsLoading(true);
     setProviderProvenanceDashboardViewsLoading(true);
+    setProviderProvenanceSchedulerNarrativeTemplatesLoading(true);
+    setProviderProvenanceSchedulerNarrativeRegistryEntriesLoading(true);
     setProviderProvenanceScheduledReportsLoading(true);
     setProviderProvenanceAnalyticsPresetsError(null);
     setProviderProvenanceDashboardViewsError(null);
+    setProviderProvenanceSchedulerNarrativeTemplatesError(null);
+    setProviderProvenanceSchedulerNarrativeRegistryEntriesError(null);
     setProviderProvenanceScheduledReportsError(null);
     try {
-      const [presetPayload, viewPayload, reportPayload] = await Promise.all([
+      const [presetPayload, viewPayload, templatePayload, narrativeRegistryPayload, reportPayload] = await Promise.all([
         listProviderProvenanceAnalyticsPresets({ limit: 24 }),
         listProviderProvenanceDashboardViews({ limit: 24 }),
+        listProviderProvenanceSchedulerNarrativeTemplates({ limit: 24 }),
+        listProviderProvenanceSchedulerNarrativeRegistryEntries({ limit: 24 }),
         listProviderProvenanceScheduledReports({ limit: 24 }),
       ]);
       setProviderProvenanceAnalyticsPresets(presetPayload.items);
       setProviderProvenanceDashboardViews(viewPayload.items);
+      setProviderProvenanceSchedulerNarrativeTemplates(templatePayload.items);
+      setProviderProvenanceSchedulerNarrativeRegistryEntries(narrativeRegistryPayload.items);
       setProviderProvenanceScheduledReports(reportPayload.items);
+      setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => (
+        current.template_id
+        && !templatePayload.items.some((entry) => entry.template_id === current.template_id)
+          ? {
+              ...current,
+              template_id: "",
+            }
+          : current
+      ));
       if (
         selectedProviderProvenanceScheduledReportId
         && !reportPayload.items.some((entry) => entry.report_id === selectedProviderProvenanceScheduledReportId)
@@ -5679,13 +5741,19 @@ export default function App() {
       const message = (error as Error).message;
       setProviderProvenanceAnalyticsPresets([]);
       setProviderProvenanceDashboardViews([]);
+      setProviderProvenanceSchedulerNarrativeTemplates([]);
+      setProviderProvenanceSchedulerNarrativeRegistryEntries([]);
       setProviderProvenanceScheduledReports([]);
       setProviderProvenanceAnalyticsPresetsError(message);
       setProviderProvenanceDashboardViewsError(message);
+      setProviderProvenanceSchedulerNarrativeTemplatesError(message);
+      setProviderProvenanceSchedulerNarrativeRegistryEntriesError(message);
       setProviderProvenanceScheduledReportsError(message);
     } finally {
       setProviderProvenanceAnalyticsPresetsLoading(false);
       setProviderProvenanceDashboardViewsLoading(false);
+      setProviderProvenanceSchedulerNarrativeTemplatesLoading(false);
+      setProviderProvenanceSchedulerNarrativeRegistryEntriesLoading(false);
       setProviderProvenanceScheduledReportsLoading(false);
     }
   }
@@ -5834,13 +5902,16 @@ export default function App() {
     entry:
       | ProviderProvenanceAnalyticsPresetEntry
       | ProviderProvenanceDashboardViewEntry
+      | ProviderProvenanceSchedulerNarrativeTemplateEntry
+      | ProviderProvenanceSchedulerNarrativeRegistryEntry
       | ProviderProvenanceScheduledReportEntry,
     options: {
       includeLayout: boolean;
       feedbackLabel: string;
+      forceSchedulerHighlight?: boolean;
     },
   ) {
-    const { includeLayout, feedbackLabel } = options;
+    const { includeLayout, feedbackLabel, forceSchedulerHighlight = false } = options;
     setProviderProvenanceAnalyticsQuery(
       buildProviderProvenanceAnalyticsQueryStateFromWorkspaceQuery(entry.query),
     );
@@ -5849,6 +5920,11 @@ export default function App() {
       setProviderProvenanceDashboardLayout(
         normalizeProviderProvenanceDashboardLayoutState(entry.layout),
       );
+    } else if (forceSchedulerHighlight) {
+      setProviderProvenanceDashboardLayout((current) => ({
+        ...current,
+        highlight_panel: "scheduler_alerts",
+      }));
     }
     if (entry.query.focus_scope === "current_focus" && entry.query.focus_key) {
       await focusMarketInstrumentFromProviderExport({
@@ -5860,9 +5936,10 @@ export default function App() {
       setProviderProvenanceWorkspaceFeedback(`${feedbackLabel} applied to the shared analytics workbench.`);
     }
     if (
-      includeLayout
-      && "layout" in entry
-      && entry.layout.highlight_panel === "scheduler_alerts"
+      (includeLayout
+        && "layout" in entry
+        && entry.layout.highlight_panel === "scheduler_alerts")
+      || forceSchedulerHighlight
     ) {
       requestAnimationFrame(() => {
         providerProvenanceSchedulerAutomationRef.current?.scrollIntoView({
@@ -5873,7 +5950,7 @@ export default function App() {
     }
   }
 
-  function stageProviderProvenanceSchedulerNarrativeView() {
+  function stageProviderProvenanceSchedulerNarrativeDrafts() {
     const facetLabel = formatProviderProvenanceSchedulerNarrativeFacet(
       providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet,
     );
@@ -5889,9 +5966,97 @@ export default function App() {
         ? current.description
         : `Saved scheduler occurrence view for ${facetLabel}.`,
     }));
+    setProviderProvenanceSchedulerNarrativeTemplateDraft((current) => ({
+      ...current,
+      name: current.name.trim() ? current.name : `Scheduler ${facetLabel} template`,
+      description:
+        current.description.trim()
+          ? current.description
+          : `Reusable scheduler narrative lens for ${facetLabel}.`,
+    }));
+    setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+      ...current,
+      name: current.name.trim() ? current.name : `Scheduler ${facetLabel} registry`,
+      description:
+        current.description.trim()
+          ? current.description
+          : `Shared scheduler narrative review board for ${facetLabel}.`,
+    }));
     setProviderProvenanceWorkspaceFeedback(
-      "Scheduler occurrence narrative view staged. Save view to persist the current facet and filters.",
+      "Scheduler narrative drafts staged. Save a template, narrative registry entry, or shared view to persist the current facet and filters.",
     );
+  }
+
+  async function saveCurrentProviderProvenanceSchedulerNarrativeTemplate() {
+    if (!providerProvenanceSchedulerNarrativeTemplateDraft.name.trim()) {
+      setProviderProvenanceWorkspaceFeedback("Enter a template name before saving the current scheduler narrative lens.");
+      return;
+    }
+    if (providerProvenanceAnalyticsQuery.scope === "current_focus" && !activeMarketInstrument) {
+      setProviderProvenanceWorkspaceFeedback("Select a triage focus before saving a current-focus scheduler narrative template.");
+      return;
+    }
+    try {
+      const createdTemplate = await createProviderProvenanceSchedulerNarrativeTemplate({
+        name: providerProvenanceSchedulerNarrativeTemplateDraft.name.trim(),
+        description: providerProvenanceSchedulerNarrativeTemplateDraft.description.trim(),
+        query: buildProviderProvenanceAnalyticsWorkspaceQuery(
+          providerProvenanceAnalyticsQuery,
+          activeMarketInstrument,
+        ),
+        createdByTabId: comparisonHistoryTabIdentity.tabId,
+        createdByTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceSchedulerNarrativeTemplateDraft(defaultProviderProvenanceWorkspaceDraft);
+      setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+        ...current,
+        template_id: createdTemplate.template_id,
+      }));
+      await loadProviderProvenanceWorkspaceRegistry();
+      setProviderProvenanceWorkspaceFeedback(`Saved scheduler narrative template ${createdTemplate.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler narrative template save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function saveCurrentProviderProvenanceSchedulerNarrativeRegistryEntry() {
+    if (!providerProvenanceSchedulerNarrativeRegistryDraft.name.trim()) {
+      setProviderProvenanceWorkspaceFeedback("Enter a registry name before saving the current scheduler narrative board.");
+      return;
+    }
+    if (providerProvenanceAnalyticsQuery.scope === "current_focus" && !activeMarketInstrument) {
+      setProviderProvenanceWorkspaceFeedback("Select a triage focus before saving a current-focus scheduler narrative registry.");
+      return;
+    }
+    try {
+      const createdEntry = await createProviderProvenanceSchedulerNarrativeRegistryEntry({
+        name: providerProvenanceSchedulerNarrativeRegistryDraft.name.trim(),
+        description: providerProvenanceSchedulerNarrativeRegistryDraft.description.trim(),
+        query: buildProviderProvenanceAnalyticsWorkspaceQuery(
+          providerProvenanceAnalyticsQuery,
+          activeMarketInstrument,
+        ),
+        layout: {
+          ...providerProvenanceDashboardLayout,
+          highlight_panel: "scheduler_alerts",
+        },
+        templateId: providerProvenanceSchedulerNarrativeRegistryDraft.template_id.trim() || undefined,
+        createdByTabId: comparisonHistoryTabIdentity.tabId,
+        createdByTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceSchedulerNarrativeRegistryDraft({
+        ...defaultProviderProvenanceSchedulerNarrativeRegistryDraft,
+        template_id: createdEntry.template_id ?? "",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      setProviderProvenanceWorkspaceFeedback(`Saved scheduler narrative registry ${createdEntry.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler narrative registry save failed: ${(error as Error).message}`,
+      );
+    }
   }
 
   async function saveCurrentProviderProvenancePreset() {
@@ -8302,6 +8467,245 @@ export default function App() {
                                 </div>
                                 <div className="provider-provenance-workspace-card">
                                   <div className="market-data-provenance-history-head">
+                                    <strong>Scheduler narrative templates</strong>
+                                    <p>Save reusable occurrence lenses that only carry the scheduler narrative query state.</p>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Name</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeTemplateDraft((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Resolved lag recovery"
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeTemplateDraft.name}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Description</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeTemplateDraft((current) => ({
+                                            ...current,
+                                            description: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="resolved scheduler narrative lens"
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeTemplateDraft.description}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Action</span>
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          void saveCurrentProviderProvenanceSchedulerNarrativeTemplate();
+                                        }}
+                                        type="button"
+                                      >
+                                        Save template
+                                      </button>
+                                    </label>
+                                  </div>
+                                  {providerProvenanceSchedulerNarrativeTemplatesLoading ? (
+                                    <p className="empty-state">Loading scheduler narrative templates…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeTemplatesError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduler narrative template registry load failed: {providerProvenanceSchedulerNarrativeTemplatesError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeTemplates.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Template</th>
+                                          <th>Lens</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceSchedulerNarrativeTemplates.slice(0, 6).map((entry) => (
+                                          <tr key={entry.template_id}>
+                                            <td>
+                                              <strong>{entry.name}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.focus.symbol ?? "all symbols"} · {entry.focus.timeframe ?? "all windows"}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.created_by_tab_label ?? entry.created_by_tab_id ?? "unknown tab"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{entry.filter_summary}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                Updated {formatTimestamp(entry.updated_at)}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <button
+                                                className="ghost-button"
+                                                onClick={() => {
+                                                  setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+                                                    ...current,
+                                                    template_id: entry.template_id,
+                                                  }));
+                                                  void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                    includeLayout: false,
+                                                    forceSchedulerHighlight: true,
+                                                    feedbackLabel: `Scheduler template ${entry.name}`,
+                                                  });
+                                                }}
+                                                type="button"
+                                              >
+                                                Apply
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No scheduler narrative templates saved yet.</p>
+                                  )}
+                                </div>
+                                <div className="provider-provenance-workspace-card">
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Scheduler narrative registry</strong>
+                                    <p>Store a named shared review board for occurrence narratives with an optional template link.</p>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Name</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Lag recovery board"
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeRegistryDraft.name}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Description</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+                                            ...current,
+                                            description: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="shared scheduler occurrence board"
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeRegistryDraft.description}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Template</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+                                            ...current,
+                                            template_id: event.target.value,
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeRegistryDraft.template_id}
+                                      >
+                                        <option value="">No template link</option>
+                                        {providerProvenanceSchedulerNarrativeTemplates.map((entry) => (
+                                          <option key={entry.template_id} value={entry.template_id}>
+                                            {entry.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Action</span>
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          void saveCurrentProviderProvenanceSchedulerNarrativeRegistryEntry();
+                                        }}
+                                        type="button"
+                                      >
+                                        Save registry
+                                      </button>
+                                    </label>
+                                  </div>
+                                  {providerProvenanceSchedulerNarrativeRegistryEntriesLoading ? (
+                                    <p className="empty-state">Loading scheduler narrative registry…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeRegistryEntriesError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduler narrative registry load failed: {providerProvenanceSchedulerNarrativeRegistryEntriesError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeRegistryEntries.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Registry</th>
+                                          <th>Linked lens</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceSchedulerNarrativeRegistryEntries.slice(0, 6).map((entry) => (
+                                          <tr key={entry.registry_id}>
+                                            <td>
+                                              <strong>{entry.name}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.filter_summary}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.created_by_tab_label ?? entry.created_by_tab_id ?? "unknown tab"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{providerProvenanceSchedulerNarrativeTemplateNameMap.get(entry.template_id ?? "") ?? "No template link"}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                Highlight {entry.layout.highlight_panel} · {entry.focus.symbol ?? "all symbols"} · {entry.focus.timeframe ?? "all windows"}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                Updated {formatTimestamp(entry.updated_at)}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <button
+                                                className="ghost-button"
+                                                onClick={() => {
+                                                  setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+                                                    ...current,
+                                                    template_id: entry.template_id ?? "",
+                                                  }));
+                                                  void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                    includeLayout: true,
+                                                    feedbackLabel: `Narrative registry ${entry.name}`,
+                                                  });
+                                                }}
+                                                type="button"
+                                              >
+                                                Apply
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No scheduler narrative registry entries saved yet.</p>
+                                  )}
+                                </div>
+                                <div className="provider-provenance-workspace-card">
+                                  <div className="market-data-provenance-history-head">
                                     <strong>Scheduled provenance reports</strong>
                                     <p>Persist the current analytics view as a durable report and run it on demand or when due.</p>
                                   </div>
@@ -9168,11 +9572,11 @@ export default function App() {
                                     <button
                                       className="ghost-button"
                                       onClick={() => {
-                                        stageProviderProvenanceSchedulerNarrativeView();
+                                        stageProviderProvenanceSchedulerNarrativeDrafts();
                                       }}
                                       type="button"
                                     >
-                                      Stage saved view
+                                      Stage narrative drafts
                                     </button>
                                     <button
                                       className="ghost-button"

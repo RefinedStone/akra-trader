@@ -598,6 +598,37 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "limit",
     "app",
   )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_narrative_template"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_narrative_templates"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "created_by_tab_id",
+    "focus_scope",
+    "category",
+    "narrative_facet",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_narrative_registry_entry"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_narrative_registry_entries"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "template_id",
+    "created_by_tab_id",
+    "focus_scope",
+    "category",
+    "narrative_facet",
+    "search",
+    "limit",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduled_report"].endpoint).parameters) == (
     "request",
     "app",
@@ -1284,6 +1315,82 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   list_views_payload = list_views_response.json()
   assert list_views_payload["total"] == 1
   assert list_views_payload["items"][0]["view_id"] == view_payload["view_id"]
+
+  template_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    json={
+      "name": "Lag recovery narrative",
+      "description": "Post-resolution lag recovery lens.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "post_resolution_recovery",
+        "window_days": 30,
+        "result_limit": 12,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert template_response.status_code == 200
+  template_payload = template_response.json()
+  assert template_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
+
+  list_templates_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    params={"category": "scheduler_lag", "narrative_facet": "post_resolution_recovery", "limit": 10},
+  )
+  assert list_templates_response.status_code == 200
+  list_templates_payload = list_templates_response.json()
+  assert list_templates_payload["total"] == 1
+  assert list_templates_payload["items"][0]["template_id"] == template_payload["template_id"]
+
+  registry_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    json={
+      "name": "Lag recovery board",
+      "description": "Shared scheduler narrative board.",
+      "template_id": template_payload["template_id"],
+      "query": {
+        "focus_scope": "current_focus",
+        "focus_key": "binance:BTC/USDT|5m",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "post_resolution_recovery",
+        "window_days": 14,
+        "result_limit": 12,
+      },
+      "layout": {
+        "highlight_panel": "overview",
+        "show_rollups": False,
+        "show_time_series": True,
+        "show_recent_exports": False,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert registry_response.status_code == 200
+  registry_payload = registry_response.json()
+  assert registry_payload["template_id"] == template_payload["template_id"]
+  assert registry_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+
+  list_registry_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    params={
+      "template_id": template_payload["template_id"],
+      "category": "scheduler_lag",
+      "narrative_facet": "post_resolution_recovery",
+      "limit": 10,
+    },
+  )
+  assert list_registry_response.status_code == 200
+  list_registry_payload = list_registry_response.json()
+  assert list_registry_payload["total"] == 1
+  assert list_registry_payload["items"][0]["registry_id"] == registry_payload["registry_id"]
 
   report_response = client.post(
     "/api/operator/provider-provenance-analytics/reports",

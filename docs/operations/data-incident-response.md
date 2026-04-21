@@ -72,9 +72,9 @@ unclear dataset lineage.
   through unrelated operator alerts
 - resolved scheduler exports now also support a mixed-status post-resolution narrative mode, so
   operator handoff can include the recovery path and stabilization history after the alert closed
-- the same scheduler occurrence table now also carries a narrative facet and can stage a saved
-  dashboard view, so cross-shift review can reopen the same post-resolution or recurring-occurrence
-  lens instead of rebuilding filters manually
+- the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
+  scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
+  same post-resolution or recurring-occurrence lens instead of rebuilding filters manually
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

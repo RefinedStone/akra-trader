@@ -37,6 +37,8 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
@@ -427,6 +429,14 @@ class TradingApplication:
     self._provider_provenance_analytics_presets: dict[str, ProviderProvenanceAnalyticsPresetRecord] = {}
     self._provider_provenance_dashboard_views: dict[str, ProviderProvenanceDashboardViewRecord] = {}
     self._provider_provenance_scheduled_reports: dict[str, ProviderProvenanceScheduledReportRecord] = {}
+    self._provider_provenance_scheduler_narrative_templates: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeTemplateRecord,
+    ] = {}
+    self._provider_provenance_scheduler_narrative_registry: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeRegistryRecord,
+    ] = {}
     self._provider_provenance_scheduled_report_audit_records: dict[str, ProviderProvenanceScheduledReportAuditRecord] = {}
     self._provider_provenance_scheduler_health_records: dict[str, ProviderProvenanceSchedulerHealthRecord] = {}
     self._provider_provenance_scheduler_health_lock = Lock()
@@ -1662,6 +1672,72 @@ class TradingApplication:
       sorted(
         self._provider_provenance_scheduled_reports.values(),
         key=lambda record: (record.updated_at, record.report_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_narrative_template_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeTemplateRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord:
+    save_template = getattr(self._runs, "save_provider_provenance_scheduler_narrative_template", None)
+    if callable(save_template):
+      return save_template(record)
+    self._provider_provenance_scheduler_narrative_templates[record.template_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_narrative_template_record(
+    self,
+    template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord | None:
+    get_template = getattr(self._runs, "get_provider_provenance_scheduler_narrative_template", None)
+    if callable(get_template):
+      return get_template(template_id)
+    return self._provider_provenance_scheduler_narrative_templates.get(template_id)
+
+  def _list_provider_provenance_scheduler_narrative_template_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeTemplateRecord, ...]:
+    list_templates = getattr(self._runs, "list_provider_provenance_scheduler_narrative_templates", None)
+    if callable(list_templates):
+      return tuple(list_templates())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_templates.values(),
+        key=lambda record: (record.updated_at, record.template_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_narrative_registry_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord:
+    save_registry_entry = getattr(self._runs, "save_provider_provenance_scheduler_narrative_registry_entry", None)
+    if callable(save_registry_entry):
+      return save_registry_entry(record)
+    self._provider_provenance_scheduler_narrative_registry[record.registry_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_narrative_registry_record(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord | None:
+    get_registry_entry = getattr(self._runs, "get_provider_provenance_scheduler_narrative_registry_entry", None)
+    if callable(get_registry_entry):
+      return get_registry_entry(registry_id)
+    return self._provider_provenance_scheduler_narrative_registry.get(registry_id)
+
+  def _list_provider_provenance_scheduler_narrative_registry_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeRegistryRecord, ...]:
+    list_registry = getattr(self._runs, "list_provider_provenance_scheduler_narrative_registry_entries", None)
+    if callable(list_registry):
+      return tuple(list_registry())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_registry.values(),
+        key=lambda record: (record.updated_at, record.registry_id),
         reverse=True,
       )
     )
@@ -3616,6 +3692,17 @@ class TradingApplication:
       "show_recent_exports": bool(layout.get("show_recent_exports", True)),
     }
 
+  @classmethod
+  def _normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+    cls,
+    payload: dict[str, Any] | None,
+  ) -> dict[str, Any]:
+    normalized_layout = cls._normalize_provider_provenance_dashboard_layout_payload(payload)
+    return {
+      **normalized_layout,
+      "highlight_panel": "scheduler_alerts",
+    }
+
   @staticmethod
   def _normalize_provider_provenance_scheduled_report_cadence(
     value: str | None,
@@ -4010,6 +4097,264 @@ class TradingApplication:
       record,
       query=self._normalize_provider_provenance_analytics_query_payload(record.query),
       layout=self._normalize_provider_provenance_dashboard_layout_payload(record.layout),
+    )
+
+  def create_provider_provenance_scheduler_narrative_template(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    query: dict[str, Any] | None = None,
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord:
+    now = self._clock()
+    record = ProviderProvenanceSchedulerNarrativeTemplateRecord(
+      template_id=uuid4().hex[:12],
+      name=self._normalize_provider_provenance_workspace_name(
+        name,
+        field_name="scheduler narrative template name",
+      ),
+      description=description.strip() if isinstance(description, str) else "",
+      query=self._normalize_provider_provenance_analytics_query_payload(query),
+      created_at=now,
+      updated_at=now,
+      created_by_tab_id=(
+        created_by_tab_id.strip()
+        if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+        else None
+      ),
+      created_by_tab_label=(
+        created_by_tab_label.strip()
+        if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+        else None
+      ),
+    )
+    return self._save_provider_provenance_scheduler_narrative_template_record(record)
+
+  def list_provider_provenance_scheduler_narrative_templates(
+    self,
+    *,
+    created_by_tab_id: str | None = None,
+    focus_scope: str | None = None,
+    category: str | None = None,
+    narrative_facet: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeTemplateRecord, ...]:
+    normalized_creator = (
+      created_by_tab_id.strip()
+      if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+      else None
+    )
+    normalized_focus_scope = (
+      focus_scope.strip()
+      if isinstance(focus_scope, str) and focus_scope.strip() in {"current_focus", "all_focuses"}
+      else None
+    )
+    normalized_category = self._normalize_provider_provenance_scheduler_alert_history_category(category)
+    normalized_narrative_facet = self._normalize_provider_provenance_scheduler_alert_history_narrative_facet(
+      narrative_facet
+    )
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceSchedulerNarrativeTemplateRecord] = []
+    for record in self._list_provider_provenance_scheduler_narrative_template_records():
+      normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+      if normalized_creator is not None and record.created_by_tab_id != normalized_creator:
+        continue
+      if normalized_focus_scope is not None and normalized_query["focus_scope"] != normalized_focus_scope:
+        continue
+      if (
+        normalized_category is not None
+        and normalized_query.get("scheduler_alert_category") != normalized_category
+      ):
+        continue
+      if (
+        normalized_narrative_facet is not None
+        and normalized_query.get("scheduler_alert_narrative_facet") != normalized_narrative_facet
+      ):
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.template_id,
+          record.name,
+          record.description,
+          record.created_by_tab_id,
+          record.created_by_tab_label,
+          normalized_query.get("focus_key"),
+          normalized_query.get("symbol"),
+          normalized_query.get("timeframe"),
+          normalized_query.get("scheduler_alert_category"),
+          normalized_query.get("scheduler_alert_status"),
+          normalized_query.get("scheduler_alert_narrative_facet"),
+          normalized_query.get("search"),
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(replace(record, query=normalized_query))
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_scheduler_narrative_template(
+    self,
+    template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord:
+    normalized_template_id = template_id.strip()
+    if not normalized_template_id:
+      raise LookupError("Provider provenance scheduler narrative template not found.")
+    record = self._load_provider_provenance_scheduler_narrative_template_record(normalized_template_id)
+    if record is None:
+      raise LookupError("Provider provenance scheduler narrative template not found.")
+    return replace(
+      record,
+      query=self._normalize_provider_provenance_analytics_query_payload(record.query),
+    )
+
+  def create_provider_provenance_scheduler_narrative_registry_entry(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    query: dict[str, Any] | None = None,
+    layout: dict[str, Any] | None = None,
+    template_id: str | None = None,
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord:
+    now = self._clock()
+    normalized_template_id = (
+      template_id.strip()
+      if isinstance(template_id, str) and template_id.strip()
+      else None
+    )
+    template_record = (
+      self.get_provider_provenance_scheduler_narrative_template(normalized_template_id)
+      if normalized_template_id is not None
+      else None
+    )
+    resolved_query = (
+      query
+      if isinstance(query, dict) and query
+      else template_record.query if template_record is not None
+      else None
+    )
+    record = ProviderProvenanceSchedulerNarrativeRegistryRecord(
+      registry_id=uuid4().hex[:12],
+      name=self._normalize_provider_provenance_workspace_name(
+        name,
+        field_name="scheduler narrative registry name",
+      ),
+      description=description.strip() if isinstance(description, str) else "",
+      query=self._normalize_provider_provenance_analytics_query_payload(resolved_query),
+      layout=self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(layout),
+      template_id=normalized_template_id,
+      created_at=now,
+      updated_at=now,
+      created_by_tab_id=(
+        created_by_tab_id.strip()
+        if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+        else None
+      ),
+      created_by_tab_label=(
+        created_by_tab_label.strip()
+        if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+        else None
+      ),
+    )
+    return self._save_provider_provenance_scheduler_narrative_registry_record(record)
+
+  def list_provider_provenance_scheduler_narrative_registry_entries(
+    self,
+    *,
+    template_id: str | None = None,
+    created_by_tab_id: str | None = None,
+    focus_scope: str | None = None,
+    category: str | None = None,
+    narrative_facet: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeRegistryRecord, ...]:
+    normalized_template_id = (
+      template_id.strip()
+      if isinstance(template_id, str) and template_id.strip()
+      else None
+    )
+    normalized_creator = (
+      created_by_tab_id.strip()
+      if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+      else None
+    )
+    normalized_focus_scope = (
+      focus_scope.strip()
+      if isinstance(focus_scope, str) and focus_scope.strip() in {"current_focus", "all_focuses"}
+      else None
+    )
+    normalized_category = self._normalize_provider_provenance_scheduler_alert_history_category(category)
+    normalized_narrative_facet = self._normalize_provider_provenance_scheduler_alert_history_narrative_facet(
+      narrative_facet
+    )
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceSchedulerNarrativeRegistryRecord] = []
+    for record in self._list_provider_provenance_scheduler_narrative_registry_records():
+      normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+      normalized_layout = self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+        record.layout
+      )
+      if normalized_template_id is not None and record.template_id != normalized_template_id:
+        continue
+      if normalized_creator is not None and record.created_by_tab_id != normalized_creator:
+        continue
+      if normalized_focus_scope is not None and normalized_query["focus_scope"] != normalized_focus_scope:
+        continue
+      if (
+        normalized_category is not None
+        and normalized_query.get("scheduler_alert_category") != normalized_category
+      ):
+        continue
+      if (
+        normalized_narrative_facet is not None
+        and normalized_query.get("scheduler_alert_narrative_facet") != normalized_narrative_facet
+      ):
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.registry_id,
+          record.name,
+          record.description,
+          record.template_id,
+          record.created_by_tab_id,
+          record.created_by_tab_label,
+          normalized_query.get("focus_key"),
+          normalized_query.get("symbol"),
+          normalized_query.get("timeframe"),
+          normalized_query.get("scheduler_alert_category"),
+          normalized_query.get("scheduler_alert_status"),
+          normalized_query.get("scheduler_alert_narrative_facet"),
+          normalized_query.get("search"),
+          normalized_layout.get("highlight_panel"),
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(replace(record, query=normalized_query, layout=normalized_layout))
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_scheduler_narrative_registry_entry(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord:
+    normalized_registry_id = registry_id.strip()
+    if not normalized_registry_id:
+      raise LookupError("Provider provenance scheduler narrative registry entry not found.")
+    record = self._load_provider_provenance_scheduler_narrative_registry_record(normalized_registry_id)
+    if record is None:
+      raise LookupError("Provider provenance scheduler narrative registry entry not found.")
+    return replace(
+      record,
+      query=self._normalize_provider_provenance_analytics_query_payload(record.query),
+      layout=self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+        record.layout
+      ),
     )
 
   def create_provider_provenance_scheduled_report(
@@ -29514,6 +29859,81 @@ def serialize_provider_provenance_dashboard_view_list(
   return {
     "items": [
       serialize_provider_provenance_dashboard_view_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_template_record(
+  record: ProviderProvenanceSchedulerNarrativeTemplateRecord,
+) -> dict[str, Any]:
+  normalized_query = TradingApplication._normalize_provider_provenance_analytics_query_payload(
+    record.query
+  )
+  return {
+    "template_id": record.template_id,
+    "name": record.name,
+    "description": record.description,
+    "query": deepcopy(normalized_query),
+    "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
+    "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
+      normalized_query
+    ),
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_template_list(
+  records: tuple[ProviderProvenanceSchedulerNarrativeTemplateRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduler_narrative_template_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_registry_record(
+  record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
+) -> dict[str, Any]:
+  normalized_query = TradingApplication._normalize_provider_provenance_analytics_query_payload(
+    record.query
+  )
+  normalized_layout = (
+    TradingApplication._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+      record.layout
+    )
+  )
+  return {
+    "registry_id": record.registry_id,
+    "name": record.name,
+    "description": record.description,
+    "template_id": record.template_id,
+    "query": deepcopy(normalized_query),
+    "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
+    "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
+      normalized_query
+    ),
+    "layout": deepcopy(normalized_layout),
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_registry_list(
+  records: tuple[ProviderProvenanceSchedulerNarrativeRegistryRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduler_narrative_registry_record(record)
       for record in records
     ],
     "total": len(records),

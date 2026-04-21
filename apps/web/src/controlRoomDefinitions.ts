@@ -1568,6 +1568,44 @@ export type ProviderProvenanceDashboardViewListPayload = {
   total: number;
 };
 
+export type ProviderProvenanceSchedulerNarrativeTemplateEntry = {
+  template_id: string;
+  name: string;
+  description: string;
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeTemplateListPayload = {
+  items: ProviderProvenanceSchedulerNarrativeTemplateEntry[];
+  total: number;
+};
+
+export type ProviderProvenanceSchedulerNarrativeRegistryEntry = {
+  registry_id: string;
+  name: string;
+  description: string;
+  template_id?: string | null;
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  layout: ProviderProvenanceDashboardLayout;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeRegistryListPayload = {
+  items: ProviderProvenanceSchedulerNarrativeRegistryEntry[];
+  total: number;
+};
+
 export type ProviderProvenanceScheduledReportEntry = {
   report_id: string;
   name: string;

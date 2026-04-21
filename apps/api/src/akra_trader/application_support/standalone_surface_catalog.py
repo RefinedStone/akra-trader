@@ -1473,6 +1473,191 @@ def build_standalone_surface_runtime_bindings(
       ),
     ),
   )
+  operator_provider_provenance_scheduler_narrative_template_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_template_create",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    route_name="create_operator_provider_provenance_scheduler_narrative_template",
+    response_title="Create provider provenance scheduler narrative template",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_template_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_template_create",
+  )
+  operator_provider_provenance_scheduler_narrative_template_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_template_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    route_name="list_operator_provider_provenance_scheduler_narrative_templates",
+    response_title="List provider provenance scheduler narrative templates",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_template_list",
+    filter_keys=("created_by_tab_id", "focus_scope", "category", "narrative_facet", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "created_by_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Created by tab ID",
+          description="Filter scheduler narrative templates by creating tab identity.",
+          examples=("tab_ops",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "focus_scope",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Focus scope",
+          description="Filter scheduler narrative templates by current-focus or all-focuses scope.",
+          examples=("all_focuses",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "category",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Scheduler category",
+          description="Filter scheduler narrative templates by scheduler alert category.",
+          examples=("scheduler_lag",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "narrative_facet",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Narrative facet",
+          description="Filter scheduler narrative templates by saved occurrence narrative facet.",
+          examples=("post_resolution_recovery",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search scheduler narrative templates by name, category, or facet.",
+          examples=("recovery",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler narrative templates to return.",
+          examples=(25,),
+        ),
+      ),
+    ),
+  )
+  operator_provider_provenance_scheduler_narrative_registry_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_registry_create",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    route_name="create_operator_provider_provenance_scheduler_narrative_registry_entry",
+    response_title="Create provider provenance scheduler narrative registry entry",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_registry_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_registry_create",
+  )
+  operator_provider_provenance_scheduler_narrative_registry_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_registry_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    route_name="list_operator_provider_provenance_scheduler_narrative_registry_entries",
+    response_title="List provider provenance scheduler narrative registry entries",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_registry_list",
+    filter_keys=("template_id", "created_by_tab_id", "focus_scope", "category", "narrative_facet", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "template_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Template ID",
+          description="Filter scheduler narrative registry entries by linked template.",
+          examples=("tmpl_123",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "created_by_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Created by tab ID",
+          description="Filter scheduler narrative registry entries by creating tab identity.",
+          examples=("tab_ops",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "focus_scope",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Focus scope",
+          description="Filter scheduler narrative registry entries by current-focus or all-focuses scope.",
+          examples=("current_focus",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "category",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Scheduler category",
+          description="Filter scheduler narrative registry entries by scheduler alert category.",
+          examples=("scheduler_failure",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "narrative_facet",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Narrative facet",
+          description="Filter scheduler narrative registry entries by saved occurrence narrative facet.",
+          examples=("recurring_occurrences",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search scheduler narrative registry entries by name, template, category, or facet.",
+          examples=("timeline",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler narrative registry entries to return.",
+          examples=(25,),
+        ),
+      ),
+    ),
+  )
   operator_provider_provenance_scheduled_report_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduled_report_create",
     route_path="/operator/provider-provenance-analytics/reports",
@@ -3144,6 +3329,10 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_analytics_preset_list_binding,
     operator_provider_provenance_dashboard_view_create_binding,
     operator_provider_provenance_dashboard_view_list_binding,
+    operator_provider_provenance_scheduler_narrative_template_create_binding,
+    operator_provider_provenance_scheduler_narrative_template_list_binding,
+    operator_provider_provenance_scheduler_narrative_registry_create_binding,
+    operator_provider_provenance_scheduler_narrative_registry_list_binding,
     operator_provider_provenance_scheduled_report_create_binding,
     operator_provider_provenance_scheduled_report_list_binding,
     operator_provider_provenance_scheduled_report_run_binding,

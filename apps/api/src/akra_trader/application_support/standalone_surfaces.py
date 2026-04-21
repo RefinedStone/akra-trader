@@ -117,6 +117,22 @@ def serialize_provider_provenance_dashboard_view_list(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_dashboard_view_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_narrative_template_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_narrative_template_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_list')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_narrative_registry_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_registry_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_narrative_registry_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_registry_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduled_report_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduled_report_record')(*args, **kwargs)
 
@@ -593,6 +609,51 @@ def execute_standalone_surface_binding(
         created_by_tab_id=resolved_filters.get("created_by_tab_id"),
         focus_scope=resolved_filters.get("focus_scope"),
         highlight_panel=resolved_filters.get("highlight_panel"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_create":
+    return serialize_provider_provenance_scheduler_narrative_template_record(
+      app.create_provider_provenance_scheduler_narrative_template(
+        name=resolved_payload["name"],
+        description=resolved_payload.get("description") or "",
+        query=resolved_payload.get("query"),
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_list":
+    return serialize_provider_provenance_scheduler_narrative_template_list(
+      app.list_provider_provenance_scheduler_narrative_templates(
+        created_by_tab_id=resolved_filters.get("created_by_tab_id"),
+        focus_scope=resolved_filters.get("focus_scope"),
+        category=resolved_filters.get("category"),
+        narrative_facet=resolved_filters.get("narrative_facet"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_create":
+    return serialize_provider_provenance_scheduler_narrative_registry_record(
+      app.create_provider_provenance_scheduler_narrative_registry_entry(
+        name=resolved_payload["name"],
+        description=resolved_payload.get("description") or "",
+        query=resolved_payload.get("query"),
+        layout=resolved_payload.get("layout"),
+        template_id=resolved_payload.get("template_id"),
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_list":
+    return serialize_provider_provenance_scheduler_narrative_registry_list(
+      app.list_provider_provenance_scheduler_narrative_registry_entries(
+        template_id=resolved_filters.get("template_id"),
+        created_by_tab_id=resolved_filters.get("created_by_tab_id"),
+        focus_scope=resolved_filters.get("focus_scope"),
+        category=resolved_filters.get("category"),
+        narrative_facet=resolved_filters.get("narrative_facet"),
         search=resolved_filters.get("search"),
         limit=resolved_filters.get("limit", 50),
       )
