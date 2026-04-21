@@ -59,6 +59,7 @@ import {
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   downloadProviderProvenanceExportJob,
   downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
+  exportProviderProvenanceSchedulerHealth,
   exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   fetchJson,
   getProviderProvenanceExportAnalytics,
@@ -276,6 +277,7 @@ import type {
   ProviderProvenanceExportAnalyticsPayload,
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobHistoryPayload,
+  ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceScheduledReportEntry,
@@ -2221,6 +2223,18 @@ function formatSchedulerLagSeconds(value: number) {
   return `${days.toFixed(days >= 10 ? 0 : 1)}d`;
 }
 
+function downloadTextExport(payload: ProviderProvenanceSchedulerHealthExportPayload) {
+  const blob = new Blob([payload.content], { type: payload.content_type });
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = payload.filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(objectUrl);
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2848,6 +2862,10 @@ export default function App() {
   const [providerProvenanceSchedulerHistoryLoading, setProviderProvenanceSchedulerHistoryLoading] =
     useState(false);
   const [providerProvenanceSchedulerHistoryError, setProviderProvenanceSchedulerHistoryError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerHistoryOffset, setProviderProvenanceSchedulerHistoryOffset] =
+    useState(0);
+  const [providerProvenanceSchedulerDrilldownBucketKey, setProviderProvenanceSchedulerDrilldownBucketKey] =
     useState<string | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
@@ -4258,7 +4276,7 @@ export default function App() {
 
   useEffect(() => {
     void loadProviderProvenanceSchedulerSurfaces();
-  }, [providerProvenanceAnalyticsQuery.window_days]);
+  }, [providerProvenanceAnalyticsQuery.window_days, providerProvenanceSchedulerHistoryOffset, providerProvenanceSchedulerDrilldownBucketKey]);
 
   useEffect(() => {
     void loadProviderProvenanceWorkspaceRegistry();
@@ -4313,6 +4331,8 @@ export default function App() {
         : (providerProvenanceSchedulerAnalytics?.recent_history ?? []),
     [providerProvenanceSchedulerAnalytics, providerProvenanceSchedulerHistory],
   );
+
+  const providerProvenanceSchedulerDrillDown = providerProvenanceSchedulerAnalytics?.drill_down ?? null;
 
   const focusedMarketIncidentHistory = useMemo(() => {
     if (!activeMarketInstrument) {
@@ -4949,6 +4969,7 @@ export default function App() {
   }
 
   async function loadProviderProvenanceSchedulerSurfaces() {
+    const schedulerHistoryLimit = 8;
     const analyticsRequestId = providerProvenanceSchedulerAnalyticsRequestIdRef.current + 1;
     providerProvenanceSchedulerAnalyticsRequestIdRef.current = analyticsRequestId;
     const historyRequestId = providerProvenanceSchedulerHistoryRequestIdRef.current + 1;
@@ -4961,9 +4982,14 @@ export default function App() {
       const [analyticsPayload, historyPayload] = await Promise.all([
         getProviderProvenanceSchedulerHealthAnalytics({
           windowDays: providerProvenanceAnalyticsQuery.window_days,
-          historyLimit: 8,
+          historyLimit: schedulerHistoryLimit,
+          drilldownBucketKey: providerProvenanceSchedulerDrilldownBucketKey ?? undefined,
+          drilldownHistoryLimit: 12,
         }),
-        listProviderProvenanceSchedulerHealthHistory({ limit: 8 }),
+        listProviderProvenanceSchedulerHealthHistory({
+          limit: schedulerHistoryLimit,
+          offset: providerProvenanceSchedulerHistoryOffset,
+        }),
       ]);
       if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
         setProviderProvenanceSchedulerAnalytics(analyticsPayload);
@@ -4988,6 +5014,54 @@ export default function App() {
       if (providerProvenanceSchedulerHistoryRequestIdRef.current === historyRequestId) {
         setProviderProvenanceSchedulerHistoryLoading(false);
       }
+    }
+  }
+
+  async function copyProviderProvenanceSchedulerHealthJsonExport() {
+    if (!navigator.clipboard?.writeText) {
+      setProviderProvenanceWorkspaceFeedback("Clipboard is unavailable for scheduler health export.");
+      return;
+    }
+    try {
+      const exportPayload = await exportProviderProvenanceSchedulerHealth({
+        format: "json",
+        windowDays: providerProvenanceAnalyticsQuery.window_days,
+        historyLimit: 8,
+        drilldownBucketKey: providerProvenanceSchedulerDrilldownBucketKey ?? undefined,
+        drilldownHistoryLimit: 12,
+        offset: providerProvenanceSchedulerHistoryOffset,
+        limit: 8,
+      });
+      await navigator.clipboard.writeText(exportPayload.content);
+      setProviderProvenanceWorkspaceFeedback(
+        `Copied scheduler health export ${exportPayload.filename} with ${exportPayload.record_count} history record(s).`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler health export failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function downloadProviderProvenanceSchedulerHealthCsv() {
+    try {
+      const exportPayload = await exportProviderProvenanceSchedulerHealth({
+        format: "csv",
+        windowDays: providerProvenanceAnalyticsQuery.window_days,
+        historyLimit: 8,
+        drilldownBucketKey: providerProvenanceSchedulerDrilldownBucketKey ?? undefined,
+        drilldownHistoryLimit: 12,
+        offset: providerProvenanceSchedulerHistoryOffset,
+        limit: 8,
+      });
+      downloadTextExport(exportPayload);
+      setProviderProvenanceWorkspaceFeedback(
+        `Downloaded scheduler health page export ${exportPayload.filename}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler health CSV export failed: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -7905,6 +7979,37 @@ export default function App() {
                                       automation.
                                     </p>
                                   </div>
+                                  <div className="market-data-provenance-history-actions">
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => {
+                                        void copyProviderProvenanceSchedulerHealthJsonExport();
+                                      }}
+                                      type="button"
+                                    >
+                                      Copy JSON export
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => {
+                                        void downloadProviderProvenanceSchedulerHealthCsv();
+                                      }}
+                                      type="button"
+                                    >
+                                      Download CSV page
+                                    </button>
+                                    {providerProvenanceSchedulerDrilldownBucketKey ? (
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          setProviderProvenanceSchedulerDrilldownBucketKey(null);
+                                        }}
+                                        type="button"
+                                      >
+                                        Reset drill-down
+                                      </button>
+                                    ) : null}
+                                  </div>
                                   <div className="status-grid">
                                     <div className="metric-tile">
                                       <span>Current status</span>
@@ -7984,6 +8089,7 @@ export default function App() {
                                               <th>Day</th>
                                               <th>Cycles</th>
                                               <th>Status mix</th>
+                                              <th>Action</th>
                                             </tr>
                                           </thead>
                                           <tbody>
@@ -8005,6 +8111,19 @@ export default function App() {
                                                     Healthy {bucket.healthy_count} · lagging {bucket.lagging_count} · failed {bucket.failed_count}
                                                   </p>
                                                   <p className="run-lineage-symbol-copy">{bucket.latest_summary || "No scheduler events recorded."}</p>
+                                                </td>
+                                                <td>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      setProviderProvenanceSchedulerDrilldownBucketKey(bucket.bucket_key);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {providerProvenanceSchedulerDrilldownBucketKey === bucket.bucket_key
+                                                      ? "Selected"
+                                                      : "Hour view"}
+                                                  </button>
                                                 </td>
                                               </tr>
                                             ))}
@@ -8034,6 +8153,7 @@ export default function App() {
                                               <th>Day</th>
                                               <th>Lag</th>
                                               <th>Backlog</th>
+                                              <th>Action</th>
                                             </tr>
                                           </thead>
                                           <tbody>
@@ -8066,6 +8186,21 @@ export default function App() {
                                                     Failures {bucket.failure_count} · executed {bucket.executed_report_count}
                                                   </p>
                                                 </td>
+                                                <td>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      setProviderProvenanceSchedulerDrilldownBucketKey(
+                                                        bucket.bucket_key.slice(0, 10),
+                                                      );
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {providerProvenanceSchedulerDrilldownBucketKey === bucket.bucket_key.slice(0, 10)
+                                                      ? "Selected"
+                                                      : "Hour view"}
+                                                  </button>
+                                                </td>
                                               </tr>
                                             ))}
                                           </tbody>
@@ -8073,11 +8208,185 @@ export default function App() {
                                       </div>
                                     </div>
                                   ) : null}
+                                  {providerProvenanceSchedulerDrillDown ? (
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Hourly drill-down · {providerProvenanceSchedulerDrillDown.bucket_label}</strong>
+                                        <p>
+                                          Review hour-level scheduler pressure and the raw cycle records for the
+                                          selected day bucket.
+                                        </p>
+                                      </div>
+                                      <div className="run-filter-summary-chip-row">
+                                        <span className="run-filter-summary-chip">
+                                          {providerProvenanceSchedulerDrillDown.total_record_count} recorded cycle(s)
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Peak lag {formatSchedulerLagSeconds(providerProvenanceSchedulerDrillDown.lag_trend.summary.peak_lag_seconds)}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Latest {formatWorkflowToken(providerProvenanceSchedulerDrillDown.health_status.summary.latest_status)}
+                                        </span>
+                                      </div>
+                                      <div className="status-grid-two-column market-data-provenance-time-series-grid">
+                                        <div className="market-data-provenance-time-series-panel">
+                                          <div className="market-data-provenance-history-head">
+                                            <strong>Status by hour</strong>
+                                            <p>Hour-level cycle mix for the selected day bucket.</p>
+                                          </div>
+                                          <table className="data-table">
+                                            <thead>
+                                              <tr>
+                                                <th>Hour</th>
+                                                <th>Cycles</th>
+                                                <th>Status mix</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {providerProvenanceSchedulerDrillDown.health_status.series.map((bucket) => (
+                                                <tr key={`provider-scheduler-hour-health-${bucket.bucket_key}`}>
+                                                  <td>
+                                                    <strong>{bucket.bucket_label}</strong>
+                                                    <p className="run-lineage-symbol-copy">{bucket.bucket_key}</p>
+                                                  </td>
+                                                  <td>
+                                                    <strong>{bucket.cycle_count} cycle(s)</strong>
+                                                    <p className="run-lineage-symbol-copy">
+                                                      Executed {bucket.executed_report_count} report(s)
+                                                    </p>
+                                                  </td>
+                                                  <td>
+                                                    <strong>{formatWorkflowToken(bucket.latest_status)}</strong>
+                                                    <p className="run-lineage-symbol-copy">
+                                                      Healthy {bucket.healthy_count} · lagging {bucket.lagging_count} · failed {bucket.failed_count}
+                                                    </p>
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                        <div className="market-data-provenance-time-series-panel">
+                                          <div className="market-data-provenance-history-head">
+                                            <strong>Lag by hour</strong>
+                                            <p>Peak and latest lag inside the selected scheduler day bucket.</p>
+                                          </div>
+                                          <table className="data-table">
+                                            <thead>
+                                              <tr>
+                                                <th>Hour</th>
+                                                <th>Lag</th>
+                                                <th>Backlog</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {providerProvenanceSchedulerDrillDown.lag_trend.series.map((bucket) => (
+                                                <tr key={`provider-scheduler-hour-lag-${bucket.bucket_key}`}>
+                                                  <td>
+                                                    <strong>{bucket.bucket_label}</strong>
+                                                    <p className="run-lineage-symbol-copy">{bucket.bucket_key}</p>
+                                                  </td>
+                                                  <td>
+                                                    <strong>{formatSchedulerLagSeconds(bucket.peak_lag_seconds)}</strong>
+                                                    <p className="run-lineage-symbol-copy">
+                                                      Latest {formatSchedulerLagSeconds(bucket.latest_lag_seconds)} · avg {formatSchedulerLagSeconds(bucket.average_lag_seconds)}
+                                                    </p>
+                                                  </td>
+                                                  <td>
+                                                    <strong>{bucket.peak_due_report_count} due</strong>
+                                                    <p className="run-lineage-symbol-copy">
+                                                      Failures {bucket.failure_count}
+                                                    </p>
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </div>
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Selected-day cycle records</strong>
+                                        <p>
+                                          The most recent recorded scheduler cycles inside the selected day bucket.
+                                        </p>
+                                      </div>
+                                      {providerProvenanceSchedulerDrillDown.history.length ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Recorded</th>
+                                              <th>Status</th>
+                                              <th>Detail</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {providerProvenanceSchedulerDrillDown.history.map((entry) => (
+                                              <tr key={`provider-scheduler-drill-history-${entry.record_id}`}>
+                                                <td>
+                                                  <strong>{formatTimestamp(entry.recorded_at)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.source_tab_label ?? entry.source_tab_id ?? "scheduler"}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(entry.status)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Lag {formatSchedulerLagSeconds(entry.max_due_lag_seconds)} · due {entry.due_report_count}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{entry.summary}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Executed {entry.last_executed_count} report(s) · cycle {entry.cycle_count}
+                                                  </p>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : (
+                                        <p className="empty-state">No hourly scheduler records were captured for the selected day.</p>
+                                      )}
+                                    </div>
+                                  ) : null}
                                   <div className="market-data-provenance-history-head">
                                     <strong>Recent scheduler cycles</strong>
                                     <p>
                                       Review the persisted automation history that backs the trend surfaces.
                                     </p>
+                                  </div>
+                                  <div className="market-data-provenance-history-actions">
+                                    <button
+                                      className="ghost-button"
+                                      disabled={!providerProvenanceSchedulerHistory?.previous_offset && providerProvenanceSchedulerHistoryOffset === 0}
+                                      onClick={() => {
+                                        setProviderProvenanceSchedulerHistoryOffset(
+                                          providerProvenanceSchedulerHistory?.previous_offset ?? 0,
+                                        );
+                                      }}
+                                      type="button"
+                                    >
+                                      Previous page
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      disabled={!(providerProvenanceSchedulerHistory?.has_more ?? false)}
+                                      onClick={() => {
+                                        if (typeof providerProvenanceSchedulerHistory?.next_offset === "number") {
+                                          setProviderProvenanceSchedulerHistoryOffset(
+                                            providerProvenanceSchedulerHistory.next_offset,
+                                          );
+                                        }
+                                      }}
+                                      type="button"
+                                    >
+                                      Next page
+                                    </button>
+                                    <span className="run-lineage-symbol-copy">
+                                      {providerProvenanceSchedulerHistory
+                                        ? `${providerProvenanceSchedulerHistory.query.offset + 1}-${providerProvenanceSchedulerHistory.query.offset + providerProvenanceSchedulerHistory.returned} of ${providerProvenanceSchedulerHistory.total}`
+                                        : "Page 1"}
+                                    </span>
                                   </div>
                                   {providerProvenanceSchedulerHistoryLoading && !providerProvenanceSchedulerRecentHistory.length ? (
                                     <p className="empty-state">Loading scheduler cycle history…</p>

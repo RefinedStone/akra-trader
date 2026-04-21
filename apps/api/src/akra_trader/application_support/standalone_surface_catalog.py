@@ -1574,7 +1574,7 @@ def build_standalone_surface_runtime_bindings(
     response_title="Provider provenance scheduler health history",
     scope="app",
     binding_kind="operator_provider_provenance_scheduler_health_history",
-    filter_keys=("status", "limit"),
+    filter_keys=("status", "limit", "offset"),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
         "status",
@@ -1598,6 +1598,17 @@ def build_standalone_surface_runtime_bindings(
           examples=(25,),
         ),
       ),
+      StandaloneSurfaceFilterParamSpec(
+        "offset",
+        int,
+        default=0,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0, le=10_000),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Offset",
+          description="Pagination offset into matching scheduler health records.",
+          examples=(25,),
+        ),
+      ),
     ),
   )
   operator_provider_provenance_scheduler_health_analytics_binding = StandaloneSurfaceRuntimeBinding(
@@ -1607,7 +1618,7 @@ def build_standalone_surface_runtime_bindings(
     response_title="Provider provenance scheduler health analytics",
     scope="app",
     binding_kind="operator_provider_provenance_scheduler_health_analytics",
-    filter_keys=("status", "window_days", "history_limit"),
+    filter_keys=("status", "window_days", "history_limit", "drilldown_bucket_key", "drilldown_history_limit"),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
         "status",
@@ -1640,6 +1651,136 @@ def build_standalone_surface_runtime_bindings(
           title="History limit",
           description="Maximum number of recent scheduler health records to embed in analytics.",
           examples=(12,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "drilldown_bucket_key",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=10, max_length=32),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Drill-down bucket key",
+          description="Daily bucket key to expand into hourly scheduler health drill-down.",
+          examples=("2026-04-22",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "drilldown_history_limit",
+        int,
+        default=24,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=100),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Drill-down history limit",
+          description="Maximum number of selected-bucket scheduler records to embed in drill-down.",
+          examples=(24,),
+        ),
+      ),
+    ),
+  )
+  operator_provider_provenance_scheduler_health_export_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_health_export",
+    route_path="/operator/provider-provenance-analytics/scheduler-health/export",
+    route_name="export_operator_provider_provenance_scheduler_health",
+    response_title="Export provider provenance scheduler health",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_health_export",
+    filter_keys=(
+      "status",
+      "window_days",
+      "history_limit",
+      "drilldown_bucket_key",
+      "drilldown_history_limit",
+      "offset",
+      "limit",
+      "format",
+    ),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "status",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Status",
+          description="Filter scheduler health export by status.",
+          examples=("lagging",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "window_days",
+        int,
+        default=14,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=3, le=90),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Window days",
+          description="Rolling day window for exported scheduler analytics buckets.",
+          examples=(14,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "history_limit",
+        int,
+        default=12,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=50),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="History limit",
+          description="Maximum number of recent scheduler health records to embed in analytics export.",
+          examples=(12,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "drilldown_bucket_key",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=10, max_length=32),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Drill-down bucket key",
+          description="Daily bucket key to expand into hourly scheduler health drill-down export.",
+          examples=("2026-04-22",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "drilldown_history_limit",
+        int,
+        default=24,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=100),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Drill-down history limit",
+          description="Maximum number of selected-bucket scheduler records to embed in export drill-down.",
+          examples=(24,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "offset",
+        int,
+        default=0,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0, le=10_000),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Offset",
+          description="Pagination offset for exported scheduler history page.",
+          examples=(0,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=25,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler health records to include in export history page.",
+          examples=(25,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "format",
+        str,
+        default="json",
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=3, max_length=4),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Format",
+          description="Scheduler health export format.",
+          examples=("json", "csv"),
         ),
       ),
     ),
@@ -2896,6 +3037,7 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduled_report_history_binding,
     operator_provider_provenance_scheduler_health_history_binding,
     operator_provider_provenance_scheduler_health_analytics_binding,
+    operator_provider_provenance_scheduler_health_export_binding,
     guarded_live_status_binding,
     strategy_discovery_binding,
     reference_discovery_binding,

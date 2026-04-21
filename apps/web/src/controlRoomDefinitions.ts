@@ -1215,10 +1215,15 @@ export type ProviderProvenanceSchedulerHealthHistoryPayload = {
   query: {
     status?: string | null;
     limit: number;
+    offset: number;
   };
   current: ProviderProvenanceSchedulerHealthSnapshot;
   items: ProviderProvenanceSchedulerHealthHistoryEntry[];
   total: number;
+  returned: number;
+  has_more: boolean;
+  next_offset?: number | null;
+  previous_offset?: number | null;
 };
 
 export type ProviderProvenanceSchedulerHealthStatusSeriesEntry = {
@@ -1292,6 +1297,8 @@ export type ProviderProvenanceSchedulerHealthAnalyticsPayload = {
     status?: string | null;
     window_days: number;
     history_limit: number;
+    drilldown_bucket_key?: string | null;
+    drilldown_history_limit: number;
   };
   current: ProviderProvenanceSchedulerHealthSnapshot;
   totals: {
@@ -1309,7 +1316,29 @@ export type ProviderProvenanceSchedulerHealthAnalyticsPayload = {
     statuses: string[];
   };
   time_series: ProviderProvenanceSchedulerHealthTimeSeriesPayload;
+  drill_down?: {
+    bucket_key: string;
+    bucket_label: string;
+    bucket_size: "hour";
+    window_started_at: string;
+    window_ended_at: string;
+    total_record_count: number;
+    history_limit: number;
+    history: ProviderProvenanceSchedulerHealthHistoryEntry[];
+    health_status: ProviderProvenanceSchedulerHealthTimeSeriesPayload["health_status"];
+    lag_trend: ProviderProvenanceSchedulerHealthTimeSeriesPayload["lag_trend"];
+  } | null;
   recent_history: ProviderProvenanceSchedulerHealthHistoryEntry[];
+};
+
+export type ProviderProvenanceSchedulerHealthExportPayload = {
+  content: string;
+  content_type: string;
+  exported_at: string;
+  filename: string;
+  format: "json" | "csv";
+  record_count: number;
+  total_count: number;
 };
 
 export type ProviderProvenanceExportAnalyticsPayload = {

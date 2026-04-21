@@ -150,8 +150,9 @@ It is not yet a finished live trading product:
 - operator visibility now also exposes provider-provenance scheduler health with lag/failure
   alerts and audit events, so background report automation is observable alongside runtime faults
 - provider provenance analytics now also persists scheduler health-cycle history and exposes
-  daily health/lag trend surfaces in the control room, so provenance automation can be reviewed as
-  an operational timeline rather than only a point-in-time alert snapshot
+  paginated cycle history, JSON/CSV export, and daily-to-hourly health/lag drill-down surfaces in
+  the control room, so provenance automation can be reviewed as an operational timeline instead of
+  only a point-in-time alert snapshot
 
 ### Operator discipline baseline
 

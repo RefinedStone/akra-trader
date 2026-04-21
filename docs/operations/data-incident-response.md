@@ -48,9 +48,9 @@ unclear dataset lineage.
 - operator visibility now also emits provider-provenance scheduler lag and failure alerts plus a
   scheduler-health snapshot, so automation drift shows up in the same operator review loop as
   runtime incidents
-- the provenance analytics workspace now also shows persisted scheduler-cycle history and daily
-  health / lag trend tables, so operators can distinguish one-off lag from sustained automation
-  regression before escalating
+- the provenance analytics workspace now also shows paginated scheduler-cycle history, scheduler
+  health export, and daily-to-hourly health / lag drill-down tables, so operators can distinguish
+  one-off lag from sustained automation regression before escalating
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

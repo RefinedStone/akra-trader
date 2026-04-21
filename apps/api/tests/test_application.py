@@ -14518,6 +14518,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduled_report_history",
     "operator_provider_provenance_scheduler_health_history",
     "operator_provider_provenance_scheduler_health_analytics",
+    "operator_provider_provenance_scheduler_health_export",
     "guarded_live_status",
     "strategy_catalog_discovery",
     "reference_catalog_discovery",
@@ -14643,13 +14644,22 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "/operator/provider-provenance-analytics/scheduler-health"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_health_history"].filter_param_specs[-1].key == (
-    "limit"
+    "offset"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_health_analytics"].route_path == (
     "/operator/provider-provenance-analytics/scheduler-health/analytics"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_health_analytics"].filter_param_specs[-1].key == (
-    "history_limit"
+    "drilldown_history_limit"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_health_export"].route_path == (
+    "/operator/provider-provenance-analytics/scheduler-health/export"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_health_export"].filter_param_specs[-1].key == (
+    "format"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_health_export"].filter_param_specs[-2].key == (
+    "limit"
   )
   assert bindings_by_key["guarded_live_status"].route_path == "/guarded-live"
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
@@ -15712,22 +15722,74 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   scheduler_history_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_health_history"],
     app=app,
-    filters={"limit": 10},
+    filters={"limit": 1, "offset": 1},
   )
   assert scheduler_history_payload["current"]["status"] == "healthy"
   assert scheduler_history_payload["total"] == 1
-  assert scheduler_history_payload["items"][0]["status"] == "healthy"
+  assert scheduler_history_payload["returned"] == 0
+  assert scheduler_history_payload["query"]["offset"] == 1
+  assert scheduler_history_payload["previous_offset"] == 0
+  assert scheduler_history_payload["has_more"] is False
+  assert scheduler_history_payload["items"] == []
+
+  scheduler_history_first_page_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_health_history"],
+    app=app,
+    filters={"limit": 1, "offset": 0},
+  )
+  assert scheduler_history_first_page_payload["returned"] == 1
+  assert scheduler_history_first_page_payload["next_offset"] is None
+  assert scheduler_history_first_page_payload["items"][0]["status"] == "healthy"
 
   scheduler_analytics_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_health_analytics"],
     app=app,
-    filters={"window_days": 3, "history_limit": 5},
+    filters={
+      "window_days": 3,
+      "history_limit": 5,
+      "drilldown_bucket_key": "2026-04-30",
+      "drilldown_history_limit": 2,
+    },
   )
   assert scheduler_analytics_payload["totals"]["record_count"] == 1
   assert scheduler_analytics_payload["time_series"]["health_status"]["summary"]["latest_status"] == "healthy"
-  assert scheduler_analytics_payload["recent_history"][0]["record_id"] == (
-    scheduler_history_payload["items"][0]["record_id"]
+  assert scheduler_analytics_payload["drill_down"]["bucket_key"] == "2026-04-30"
+  assert scheduler_analytics_payload["drill_down"]["bucket_size"] == "hour"
+  assert scheduler_analytics_payload["drill_down"]["history_limit"] == 2
+  assert scheduler_analytics_payload["drill_down"]["history"][0]["record_id"] == (
+    scheduler_history_first_page_payload["items"][0]["record_id"]
   )
+  assert scheduler_analytics_payload["recent_history"][0]["record_id"] == (
+    scheduler_history_first_page_payload["items"][0]["record_id"]
+  )
+
+  scheduler_export_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_health_export"],
+    app=app,
+    filters={
+      "window_days": 3,
+      "history_limit": 5,
+      "drilldown_bucket_key": "2026-04-30",
+      "drilldown_history_limit": 2,
+      "limit": 1,
+      "offset": 0,
+      "format": "json",
+    },
+  )
+  assert scheduler_export_payload["format"] == "json"
+  assert scheduler_export_payload["record_count"] == 1
+  assert scheduler_export_payload["total_count"] == 1
+  assert "\"drill_down\"" in scheduler_export_payload["content"]
+
+  scheduler_csv_export_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_health_export"],
+    app=app,
+    filters={"limit": 1, "offset": 0, "format": "csv"},
+  )
+  assert scheduler_csv_export_payload["format"] == "csv"
+  assert "record_id,recorded_at,status,summary" in scheduler_csv_export_payload["content"]
+  assert scheduler_csv_export_payload["record_count"] == 1
+  assert scheduler_csv_export_payload["total_count"] == 1
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

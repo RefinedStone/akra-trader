@@ -597,21 +597,33 @@ def execute_standalone_surface_binding(
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_health_history":
     current = app.get_provider_provenance_scheduler_health()
-    records = app.list_provider_provenance_scheduler_health_history(
+    payload = app.get_provider_provenance_scheduler_health_history_page(
       status=resolved_filters.get("status"),
       limit=resolved_filters.get("limit", 25),
+      offset=resolved_filters.get("offset", 0),
     )
     return serialize_provider_provenance_scheduler_health_history(
       current,
-      records,
-      status=resolved_filters.get("status"),
-      limit=resolved_filters.get("limit", 25),
+      payload,
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_health_analytics":
     return app.get_provider_provenance_scheduler_health_analytics(
       status=resolved_filters.get("status"),
       window_days=resolved_filters.get("window_days", 14),
       history_limit=resolved_filters.get("history_limit", 12),
+      drilldown_bucket_key=resolved_filters.get("drilldown_bucket_key"),
+      drilldown_history_limit=resolved_filters.get("drilldown_history_limit", 24),
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_health_export":
+    return app.export_provider_provenance_scheduler_health(
+      export_format=resolved_filters.get("format", "json"),
+      status=resolved_filters.get("status"),
+      window_days=resolved_filters.get("window_days", 14),
+      history_limit=resolved_filters.get("history_limit", 12),
+      drilldown_bucket_key=resolved_filters.get("drilldown_bucket_key"),
+      drilldown_history_limit=resolved_filters.get("drilldown_history_limit", 24),
+      offset=resolved_filters.get("offset", 0),
+      limit=resolved_filters.get("limit", 25),
     )
   if binding.binding_kind == "guarded_live_status":
     return asdict(app.get_guarded_live_status())

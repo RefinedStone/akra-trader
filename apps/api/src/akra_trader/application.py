@@ -25705,16 +25705,75 @@ class TradingApplication:
     *,
     status: str | None = None,
     limit: int = 25,
+    offset: int = 0,
   ) -> tuple[ProviderProvenanceSchedulerHealthRecord, ...]:
     self._prune_provider_provenance_scheduler_health_records()
     normalized_status = self._normalize_provider_provenance_scheduler_health_status(status)
     normalized_limit = max(1, min(limit, 200))
+    normalized_offset = max(offset, 0)
     records = [
       record
       for record in self._list_provider_provenance_scheduler_health_records()
       if normalized_status is None or record.status == normalized_status
     ]
-    return tuple(records[:normalized_limit])
+    return tuple(records[normalized_offset:normalized_offset + normalized_limit])
+
+  def get_provider_provenance_scheduler_health_history_page(
+    self,
+    *,
+    status: str | None = None,
+    limit: int = 25,
+    offset: int = 0,
+  ) -> dict[str, Any]:
+    self._prune_provider_provenance_scheduler_health_records()
+    normalized_status = self._normalize_provider_provenance_scheduler_health_status(status)
+    normalized_limit = max(1, min(limit, 200))
+    normalized_offset = max(offset, 0)
+    records = [
+      record
+      for record in self._list_provider_provenance_scheduler_health_records()
+      if normalized_status is None or record.status == normalized_status
+    ]
+    total = len(records)
+    items = records[normalized_offset:normalized_offset + normalized_limit]
+    next_offset = (
+      normalized_offset + len(items)
+      if normalized_offset + len(items) < total
+      else None
+    )
+    previous_offset = (
+      max(normalized_offset - normalized_limit, 0)
+      if normalized_offset > 0 and total > 0
+      else None
+    )
+    return {
+      "query": {
+        "status": normalized_status,
+        "limit": normalized_limit,
+        "offset": normalized_offset,
+      },
+      "items": tuple(items),
+      "total": total,
+      "returned": len(items),
+      "has_more": next_offset is not None,
+      "next_offset": next_offset,
+      "previous_offset": previous_offset,
+    }
+
+  @classmethod
+  def _resolve_provider_provenance_scheduler_bucket_start(
+    cls,
+    bucket_key: str | None,
+  ) -> datetime | None:
+    if not isinstance(bucket_key, str) or not bucket_key.strip():
+      return None
+    normalized = bucket_key.strip()
+    try:
+      parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+      return None
+    parsed = parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+    return parsed.replace(hour=0, minute=0, second=0, microsecond=0)
 
   @classmethod
   def _build_provider_provenance_scheduler_health_time_series(
@@ -25871,12 +25930,172 @@ class TradingApplication:
       },
     }
 
+  @classmethod
+  def _build_provider_provenance_scheduler_health_hourly_drill_down(
+    cls,
+    *,
+    records: tuple[ProviderProvenanceSchedulerHealthRecord, ...],
+    bucket_key: str | None,
+    history_limit: int,
+  ) -> dict[str, Any] | None:
+    bucket_start = cls._resolve_provider_provenance_scheduler_bucket_start(bucket_key)
+    if bucket_start is None:
+      return None
+    bucket_end = bucket_start + timedelta(days=1)
+    selected_records = tuple(
+      sorted(
+        (
+          record
+          for record in records
+          if bucket_start <= cls._normalize_provider_provenance_export_bucket_start(record.recorded_at)
+          < bucket_end
+        ),
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+    normalized_history_limit = max(1, min(history_limit, 100))
+    health_status_series: list[dict[str, Any]] = []
+    lag_trend_series: list[dict[str, Any]] = []
+
+    for hour_offset in range(24):
+      hour_start = bucket_start + timedelta(hours=hour_offset)
+      hour_end = hour_start + timedelta(hours=1)
+      hour_records = tuple(
+        sorted(
+          (
+            record
+            for record in selected_records
+            if hour_start <= (record.recorded_at.astimezone(UTC) if record.recorded_at.tzinfo is not None else record.recorded_at.replace(tzinfo=UTC))
+            < hour_end
+          ),
+          key=lambda record: (record.recorded_at, record.record_id),
+        )
+      )
+      counts_by_status = {
+        "healthy": 0,
+        "lagging": 0,
+        "failed": 0,
+        "disabled": 0,
+        "starting": 0,
+      }
+      for record in hour_records:
+        counts_by_status[record.status] = counts_by_status.get(record.status, 0) + 1
+      dominant_status, dominant_count = max(
+        counts_by_status.items(),
+        key=lambda item: (item[1], item[0]),
+      )
+      latest_record = hour_records[-1] if hour_records else None
+      lag_values = [max(record.max_due_lag_seconds, 0) for record in hour_records]
+      due_counts = [max(record.due_report_count, 0) for record in hour_records]
+      bucket_hour_key = hour_start.isoformat()
+      bucket_hour_label = hour_start.strftime("%H:00")
+      executed_report_count = sum(record.last_executed_count for record in hour_records)
+      failure_count = sum(1 for record in hour_records if record.status == "failed")
+      health_status_series.append(
+        {
+          "bucket_key": bucket_hour_key,
+          "bucket_label": bucket_hour_label,
+          "started_at": hour_start.isoformat(),
+          "ended_at": hour_end.isoformat(),
+          "cycle_count": len(hour_records),
+          "healthy_count": counts_by_status["healthy"],
+          "lagging_count": counts_by_status["lagging"],
+          "failed_count": counts_by_status["failed"],
+          "disabled_count": counts_by_status["disabled"],
+          "starting_count": counts_by_status["starting"],
+          "dominant_status": dominant_status if dominant_count > 0 else "no_data",
+          "dominant_count": dominant_count,
+          "latest_status": latest_record.status if latest_record is not None else "no_data",
+          "latest_summary": latest_record.summary if latest_record is not None else "",
+          "executed_report_count": executed_report_count,
+        }
+      )
+      lag_trend_series.append(
+        {
+          "bucket_key": bucket_hour_key,
+          "bucket_label": bucket_hour_label,
+          "started_at": hour_start.isoformat(),
+          "ended_at": hour_end.isoformat(),
+          "cycle_count": len(hour_records),
+          "peak_lag_seconds": max(lag_values) if lag_values else 0,
+          "latest_lag_seconds": lag_values[-1] if lag_values else 0,
+          "average_lag_seconds": round(sum(lag_values) / len(lag_values), 1) if lag_values else 0.0,
+          "peak_due_report_count": max(due_counts) if due_counts else 0,
+          "latest_due_report_count": due_counts[-1] if due_counts else 0,
+          "failure_count": failure_count,
+          "executed_report_count": executed_report_count,
+        }
+      )
+
+    peak_cycle_bucket = max(
+      health_status_series,
+      key=lambda item: (
+        int(item["cycle_count"]),
+        int(item["failed_count"]),
+        item["bucket_key"],
+      ),
+      default=None,
+    )
+    peak_lag_bucket = max(
+      lag_trend_series,
+      key=lambda item: (
+        int(item["peak_lag_seconds"]),
+        int(item["peak_due_report_count"]),
+        item["bucket_key"],
+      ),
+      default=None,
+    )
+    latest_health_bucket = health_status_series[-1] if health_status_series else None
+    latest_lag_bucket = lag_trend_series[-1] if lag_trend_series else None
+
+    return {
+      "bucket_key": bucket_start.date().isoformat(),
+      "bucket_label": bucket_start.strftime("%b %d"),
+      "bucket_size": "hour",
+      "window_started_at": bucket_start.isoformat(),
+      "window_ended_at": bucket_end.isoformat(),
+      "total_record_count": len(selected_records),
+      "history_limit": normalized_history_limit,
+      "history": [
+        serialize_provider_provenance_scheduler_health_record(record)
+        for record in selected_records[:normalized_history_limit]
+      ],
+      "health_status": {
+        "series": health_status_series,
+        "summary": {
+          "peak_cycle_bucket_key": peak_cycle_bucket["bucket_key"] if peak_cycle_bucket is not None else None,
+          "peak_cycle_bucket_label": peak_cycle_bucket["bucket_label"] if peak_cycle_bucket is not None else None,
+          "peak_cycle_count": int(peak_cycle_bucket["cycle_count"]) if peak_cycle_bucket is not None else 0,
+          "latest_bucket_key": latest_health_bucket["bucket_key"] if latest_health_bucket is not None else None,
+          "latest_bucket_label": latest_health_bucket["bucket_label"] if latest_health_bucket is not None else None,
+          "latest_status": latest_health_bucket["latest_status"] if latest_health_bucket is not None else "no_data",
+          "latest_cycle_count": int(latest_health_bucket["cycle_count"]) if latest_health_bucket is not None else 0,
+        },
+      },
+      "lag_trend": {
+        "series": lag_trend_series,
+        "summary": {
+          "peak_lag_bucket_key": peak_lag_bucket["bucket_key"] if peak_lag_bucket is not None else None,
+          "peak_lag_bucket_label": peak_lag_bucket["bucket_label"] if peak_lag_bucket is not None else None,
+          "peak_lag_seconds": int(peak_lag_bucket["peak_lag_seconds"]) if peak_lag_bucket is not None else 0,
+          "latest_bucket_key": latest_lag_bucket["bucket_key"] if latest_lag_bucket is not None else None,
+          "latest_bucket_label": latest_lag_bucket["bucket_label"] if latest_lag_bucket is not None else None,
+          "latest_lag_seconds": int(latest_lag_bucket["latest_lag_seconds"]) if latest_lag_bucket is not None else 0,
+          "latest_due_report_count": int(latest_lag_bucket["latest_due_report_count"]) if latest_lag_bucket is not None else 0,
+          "latest_failure_count": int(latest_lag_bucket["failure_count"]) if latest_lag_bucket is not None else 0,
+        },
+      },
+    }
+
   def get_provider_provenance_scheduler_health_analytics(
     self,
     *,
     status: str | None = None,
     window_days: int = 14,
     history_limit: int = 12,
+    drilldown_bucket_key: str | None = None,
+    drilldown_history_limit: int = 24,
   ) -> dict[str, Any]:
     self._prune_provider_provenance_scheduler_health_records()
     normalized_status = self._normalize_provider_provenance_scheduler_health_status(status)
@@ -25890,6 +26109,11 @@ class TradingApplication:
       records=records,
       window_days=window_days,
       now=self._clock(),
+    )
+    drill_down = self._build_provider_provenance_scheduler_health_hourly_drill_down(
+      records=records,
+      bucket_key=drilldown_bucket_key,
+      history_limit=drilldown_history_limit,
     )
     all_statuses = tuple(
       sorted(
@@ -25907,6 +26131,12 @@ class TradingApplication:
         "status": normalized_status,
         "window_days": time_series["window_days"],
         "history_limit": normalized_history_limit,
+        "drilldown_bucket_key": (
+          drill_down["bucket_key"]
+          if isinstance(drill_down, dict)
+          else None
+        ),
+        "drilldown_history_limit": max(1, min(drilldown_history_limit, 100)),
       },
       "current": serialize_provider_provenance_scheduler_health(current_snapshot),
       "totals": {
@@ -25924,10 +26154,120 @@ class TradingApplication:
         "statuses": list(all_statuses),
       },
       "time_series": time_series,
+      "drill_down": drill_down,
       "recent_history": [
         serialize_provider_provenance_scheduler_health_record(record)
         for record in records[:normalized_history_limit]
       ],
+    }
+
+  def export_provider_provenance_scheduler_health(
+    self,
+    *,
+    export_format: str = "json",
+    status: str | None = None,
+    window_days: int = 14,
+    history_limit: int = 12,
+    drilldown_bucket_key: str | None = None,
+    drilldown_history_limit: int = 24,
+    offset: int = 0,
+    limit: int = 25,
+  ) -> dict[str, Any]:
+    normalized_format = export_format.strip().lower() if isinstance(export_format, str) else "json"
+    if normalized_format not in {"json", "csv"}:
+      raise ValueError("Unsupported provider provenance scheduler health export format.")
+    analytics_payload = self.get_provider_provenance_scheduler_health_analytics(
+      status=status,
+      window_days=window_days,
+      history_limit=history_limit,
+      drilldown_bucket_key=drilldown_bucket_key,
+      drilldown_history_limit=drilldown_history_limit,
+    )
+    history_payload = self.get_provider_provenance_scheduler_health_history_page(
+      status=status,
+      limit=limit,
+      offset=offset,
+    )
+    current_snapshot = self.get_provider_provenance_scheduler_health()
+    exported_at = self._clock().isoformat()
+    if normalized_format == "json":
+      content = json.dumps(
+        {
+          "export_scope": "provider_provenance_scheduler_health",
+          "exported_at": exported_at,
+          "query": {
+            "status": self._normalize_provider_provenance_scheduler_health_status(status),
+            "window_days": analytics_payload["query"]["window_days"],
+            "history_limit": analytics_payload["query"]["history_limit"],
+            "drilldown_bucket_key": analytics_payload["query"]["drilldown_bucket_key"],
+            "drilldown_history_limit": analytics_payload["query"]["drilldown_history_limit"],
+            "offset": history_payload["query"]["offset"],
+            "limit": history_payload["query"]["limit"],
+          },
+          "current": serialize_provider_provenance_scheduler_health(current_snapshot),
+          "history_page": serialize_provider_provenance_scheduler_health_history(
+            current_snapshot,
+            history_payload,
+          ),
+          "analytics": analytics_payload,
+        },
+        indent=2,
+        sort_keys=True,
+      )
+      return {
+        "content": content,
+        "content_type": "application/json; charset=utf-8",
+        "exported_at": exported_at,
+        "filename": "provider-provenance-scheduler-health.json",
+        "format": "json",
+        "record_count": history_payload["returned"],
+        "total_count": history_payload["total"],
+      }
+    buffer = io.StringIO()
+    fieldnames = (
+      "record_id",
+      "recorded_at",
+      "status",
+      "summary",
+      "cycle_count",
+      "last_executed_count",
+      "total_executed_count",
+      "due_report_count",
+      "max_due_lag_seconds",
+      "last_error",
+      "source_tab_id",
+      "source_tab_label",
+      "issues",
+    )
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for item in history_payload["items"]:
+      serialized = serialize_provider_provenance_scheduler_health_record(item)
+      writer.writerow(
+        {
+          "record_id": serialized["record_id"],
+          "recorded_at": serialized["recorded_at"],
+          "status": serialized["status"],
+          "summary": serialized["summary"],
+          "cycle_count": serialized["cycle_count"],
+          "last_executed_count": serialized["last_executed_count"],
+          "total_executed_count": serialized["total_executed_count"],
+          "due_report_count": serialized["due_report_count"],
+          "max_due_lag_seconds": serialized["max_due_lag_seconds"],
+          "last_error": serialized["last_error"],
+          "source_tab_id": serialized["source_tab_id"],
+          "source_tab_label": serialized["source_tab_label"],
+          "issues": " | ".join(serialized["issues"]),
+        }
+      )
+    return {
+      "content": buffer.getvalue(),
+      "content_type": "text/csv; charset=utf-8",
+      "exported_at": exported_at,
+      "filename": "provider-provenance-scheduler-health.csv",
+      "format": "csv",
+      "record_count": history_payload["returned"],
+      "total_count": history_payload["total"],
     }
 
   def _collect_provider_provenance_scheduler_operator_visibility(
@@ -27239,23 +27579,27 @@ def serialize_provider_provenance_scheduler_health_record(
 
 def serialize_provider_provenance_scheduler_health_history(
   current: ProviderProvenanceSchedulerHealth,
-  records: tuple[ProviderProvenanceSchedulerHealthRecord, ...],
-  *,
-  status: str | None = None,
-  limit: int,
+  payload: dict[str, Any],
 ) -> dict[str, Any]:
+  items = payload.get("items", ())
+  query = payload.get("query", {})
   return {
     "generated_at": current.generated_at.isoformat(),
     "query": {
-      "status": status,
-      "limit": limit,
+      "status": query.get("status"),
+      "limit": int(query.get("limit", 25)),
+      "offset": int(query.get("offset", 0)),
     },
     "current": serialize_provider_provenance_scheduler_health(current),
     "items": [
       serialize_provider_provenance_scheduler_health_record(record)
-      for record in records
+      for record in items
     ],
-    "total": len(records),
+    "total": int(payload.get("total", 0)),
+    "returned": int(payload.get("returned", 0)),
+    "has_more": bool(payload.get("has_more", False)),
+    "next_offset": payload.get("next_offset"),
+    "previous_offset": payload.get("previous_offset"),
   }
 
 

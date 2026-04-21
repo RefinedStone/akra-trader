@@ -617,6 +617,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "filter_expr",
     "status",
     "limit",
+    "offset",
     "app",
   )
   assert tuple(inspect.signature(routes["get_operator_provider_provenance_scheduler_health_analytics"].endpoint).parameters) == (
@@ -625,6 +626,21 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "status",
     "window_days",
     "history_limit",
+    "drilldown_bucket_key",
+    "drilldown_history_limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["export_operator_provider_provenance_scheduler_health"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "status",
+    "window_days",
+    "history_limit",
+    "drilldown_bucket_key",
+    "drilldown_history_limit",
+    "offset",
+    "limit",
+    "format",
     "app",
   )
   assert tuple(inspect.signature(routes["create_preset"].endpoint).parameters) == ("request", "app")
@@ -3302,17 +3318,42 @@ def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trend
 
     history_response = client.get(
       "/api/operator/provider-provenance-analytics/scheduler-health",
-      params={"limit": 10},
+      params={"limit": 2, "offset": 1},
     )
     analytics_response = client.get(
       "/api/operator/provider-provenance-analytics/scheduler-health/analytics",
-      params={"window_days": 3, "history_limit": 5},
+      params={
+        "window_days": 3,
+        "history_limit": 5,
+        "drilldown_bucket_key": "2026-04-22",
+        "drilldown_history_limit": 2,
+      },
+    )
+    export_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-health/export",
+      params={
+        "window_days": 3,
+        "history_limit": 5,
+        "drilldown_bucket_key": "2026-04-22",
+        "drilldown_history_limit": 2,
+        "limit": 2,
+        "offset": 0,
+        "format": "json",
+      },
+    )
+    csv_export_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-health/export",
+      params={"limit": 2, "offset": 1, "format": "csv"},
     )
 
   assert history_response.status_code == 200
   history_payload = history_response.json()
   assert history_payload["current"]["status"] == "failed"
-  assert [entry["status"] for entry in history_payload["items"]] == ["failed", "healthy", "lagging"]
+  assert history_payload["query"]["offset"] == 1
+  assert history_payload["returned"] == 2
+  assert history_payload["next_offset"] is None
+  assert history_payload["previous_offset"] == 0
+  assert [entry["status"] for entry in history_payload["items"]] == ["healthy", "lagging"]
 
   assert analytics_response.status_code == 200
   analytics_payload = analytics_response.json()
@@ -3320,7 +3361,25 @@ def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trend
   assert analytics_payload["totals"]["peak_lag_seconds"] == 600
   assert analytics_payload["time_series"]["health_status"]["summary"]["latest_status"] == "failed"
   assert analytics_payload["time_series"]["lag_trend"]["summary"]["peak_lag_seconds"] == 600
+  assert analytics_payload["drill_down"]["bucket_key"] == "2026-04-22"
+  assert analytics_payload["drill_down"]["bucket_size"] == "hour"
+  assert analytics_payload["drill_down"]["history_limit"] == 2
   assert analytics_payload["recent_history"][0]["status"] == "failed"
+
+  assert export_response.status_code == 200
+  export_payload = export_response.json()
+  assert export_payload["format"] == "json"
+  assert export_payload["record_count"] == 2
+  assert export_payload["total_count"] == 3
+  assert "\"history_page\"" in export_payload["content"]
+  assert "\"drill_down\"" in export_payload["content"]
+
+  assert csv_export_response.status_code == 200
+  csv_export_payload = csv_export_response.json()
+  assert csv_export_payload["format"] == "csv"
+  assert csv_export_payload["record_count"] == 2
+  assert csv_export_payload["total_count"] == 3
+  assert "record_id,recorded_at,status,summary" in csv_export_payload["content"]
 
 
 def test_operator_visibility_endpoint_persists_guarded_live_alert_history(tmp_path: Path) -> None:

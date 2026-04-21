@@ -99,8 +99,8 @@ creation.
 - runtime operator visibility now also surfaces provider-provenance scheduler health plus lag and
   failure alerts, so automation regressions can share the same operational channel as worker faults
 - provider provenance automation now also keeps durable scheduler health history and exposes
-  health / lag trend surfaces in the control room, closing the gap between transient scheduler
-  alerts and reviewable operations history
+  paginated history, export, and daily-to-hourly health / lag drill-down surfaces in the control
+  room, closing the gap between transient scheduler alerts and reviewable operations history
 
 ### Remaining work
 
