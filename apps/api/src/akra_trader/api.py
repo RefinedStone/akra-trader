@@ -415,6 +415,7 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisio
 
 class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRequest(BaseModel):
   item_type: str
+  step_id: str | None = None
   action: str = "update"
   item_ids: list[str] = Field(default_factory=list)
   name_prefix: str | None = None
@@ -439,6 +440,47 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogStageRe
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
   reason: str = "scheduler_narrative_governance_policy_catalog_staged"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepUpdateRequest(
+  BaseModel
+):
+  item_ids: list[str] | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  query_patch: dict[str, Any] | None = None
+  layout_patch: dict[str, Any] | None = None
+  template_id: str | None = None
+  clear_template_link: bool | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_policy_catalog_hierarchy_step_updated"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRestoreRequest(
+  BaseModel
+):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_policy_catalog_hierarchy_step_restored"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernanceRequest(
+  BaseModel
+):
+  action: str
+  step_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  query_patch: dict[str, Any] | None = None
+  layout_patch: dict[str, Any] | None = None
+  template_id: str | None = None
+  clear_template_link: bool | None = None
 
 
 class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest(BaseModel):
@@ -608,6 +650,18 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_capture": (
     OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyCaptureRequest,
     {},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepUpdateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRestoreRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernanceRequest,
+    {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage": (
     OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogStageRequest,

@@ -101,6 +101,9 @@ unclear dataset lineage.
 - those same policy catalogs can now capture reusable template/registry governance hierarchies and
   stage them directly into the approval queue, so a shift handoff can repopulate a catalog-linked
   review stack in one action instead of re-previewing each plan manually
+- those captured hierarchies now also expose step-level edit, revision-restore, and bulk
+  governance workflow, so operators can correct or selectively recover one reusable hierarchy step
+  without replacing the rest of the catalog
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

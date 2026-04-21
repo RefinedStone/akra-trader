@@ -107,16 +107,19 @@ import {
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
+  restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevision,
   restoreProviderProvenanceSchedulerNarrativeRegistryRevision,
   restoreProviderProvenanceSchedulerNarrativeTemplateRevision,
   revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   runProviderProvenanceSchedulerNarrativeGovernancePlanBatchAction,
+  runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance,
   stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   runDueProviderProvenanceScheduledReports,
   runProviderProvenanceScheduledReport,
+  updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep,
   updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   updateProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   updateProviderProvenanceSchedulerNarrativeRegistryEntry,
@@ -538,6 +541,24 @@ function formatProviderProvenanceSchedulerNarrativeGovernanceHierarchySummary(
     .join(" · ")}`;
 }
 
+function formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(
+  step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep,
+) {
+  const patchLabels = [
+    step.name_prefix ? "name prefix" : null,
+    step.name_suffix ? "name suffix" : null,
+    step.description_append ? "description" : null,
+    Object.keys(step.query_patch ?? {}).length ? "query" : null,
+    Object.keys(step.layout_patch ?? {}).length ? "layout" : null,
+    step.template_id ? "template link" : null,
+    step.clear_template_link ? "clear template link" : null,
+  ].filter((value): value is string => Boolean(value));
+  const targetSummary = step.item_names.length
+    ? step.item_names.join(", ")
+    : `${step.item_ids.length} target(s)`;
+  return `${formatWorkflowToken(step.item_type)} · ${targetSummary}${patchLabels.length ? ` · ${patchLabels.join(", ")}` : ""}`;
+}
+
 function formatProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyPosition(
   plan: Pick<
     ProviderProvenanceSchedulerNarrativeGovernancePlan,
@@ -725,9 +746,60 @@ const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraf
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraftState = {
     name_prefix: "",
     name_suffix: "",
-    description_append: "",
-    default_policy_template_id: "",
+  description_append: "",
+  default_policy_template_id: "",
   };
+
+type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraftState = {
+  item_ids_text: string;
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  query_patch: string;
+  layout_patch: string;
+  template_id: string;
+  clear_template_link: boolean;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraftState = {
+    item_ids_text: "",
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    query_patch: "",
+    layout_patch: "",
+    template_id: "",
+    clear_template_link: false,
+  };
+
+type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  query_patch: string;
+  layout_patch: string;
+  template_id: string;
+  clear_template_link: boolean;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    query_patch: "",
+    layout_patch: "",
+    template_id: "",
+    clear_template_link: false,
+  };
+
+type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersionEntry = {
+  revision: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry;
+  step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep;
+  position: number;
+  total: number;
+};
 
 type ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
   queue_state: typeof ALL_FILTER_VALUE | "pending_approval" | "ready_to_apply" | "completed";
@@ -3373,6 +3445,22 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError] =
     useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds, setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds] =
+    useState<string[]>([]);
+  const [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId, setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId] =
+    useState<string | null>(null);
+  const [editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId, setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraftState>(
+      defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft,
+    );
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraftState>(
+      defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft,
+    );
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction] =
+    useState<"delete" | "update" | null>(null);
   const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilter, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilter] =
     useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState>(
       defaultProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilter,
@@ -3694,6 +3782,66 @@ export default function App() {
     [
       selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIdSet,
       providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs,
+    ],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog = useMemo(
+    () =>
+      providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.find(
+        (entry) => entry.catalog_id === selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId,
+      ) ?? null,
+    [
+      providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs,
+      selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId,
+    ],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIdSet = useMemo(
+    () => new Set(selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds),
+    [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps = useMemo(
+    () => selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog?.hierarchy_steps ?? [],
+    [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep = useMemo(
+    () =>
+      selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps.find(
+        (step) => step.step_id === selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId,
+      ) ?? null,
+    [
+      selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId,
+      selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps,
+    ],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersions = useMemo<
+    ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersionEntry[]
+  >(
+    () => {
+      if (
+        !selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory
+        || !selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId
+      ) {
+        return [];
+      }
+      return selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory.history.flatMap((revision) => {
+        const position = revision.hierarchy_steps.findIndex(
+          (step) => step.step_id === selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId,
+        );
+        if (position < 0) {
+          return [];
+        }
+        return [
+          {
+            revision,
+            step: revision.hierarchy_steps[position],
+            position: position + 1,
+            total: revision.hierarchy_steps.length,
+          },
+        ];
+      });
+    },
+    [
+      selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId,
+      selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory,
     ],
   );
   const selectedProviderProvenanceSchedulerNarrativeGovernancePlan = useMemo(
@@ -6359,6 +6507,20 @@ export default function App() {
           governancePolicyCatalogPayload.items.some((entry) => entry.catalog_id === catalogId),
         ),
       );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds((current) => {
+        const selectedCatalog = governancePolicyCatalogPayload.items.find(
+          (entry) => entry.catalog_id === selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId,
+        );
+        if (!selectedCatalog) {
+          return [];
+        }
+        const currentStepIds = new Set(
+          selectedCatalog.hierarchy_steps
+            .map((step) => step.step_id)
+            .filter((value): value is string => Boolean(value)),
+        );
+        return current.filter((stepId) => currentStepIds.has(stepId));
+      });
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft((current) => ({
         ...current,
         default_policy_template_id:
@@ -6398,6 +6560,23 @@ export default function App() {
         setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(null);
         setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(null);
         setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds([]);
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(null);
+        resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft();
+      } else if (selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId) {
+        const selectedCatalog = governancePolicyCatalogPayload.items.find(
+          (entry) => entry.catalog_id === selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId,
+        );
+        if (
+          selectedCatalog
+          && selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId
+          && !selectedCatalog.hierarchy_steps.some(
+            (step) => step.step_id === selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId,
+          )
+        ) {
+          setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(null);
+          resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft();
+        }
       }
       if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlanId && governancePlanPayload.items.length) {
         setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(governancePlanPayload.items[0].plan_id);
@@ -6757,6 +6936,32 @@ export default function App() {
     setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(null);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft(
       defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft,
+    );
+  }
+
+  function resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft() {
+    setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(null);
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft(
+      defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft,
+    );
+  }
+
+  function toggleProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepSelection(
+    stepId: string,
+  ) {
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds((current) =>
+      current.includes(stepId)
+        ? current.filter((candidate) => candidate !== stepId)
+        : [...current, stepId],
+    );
+  }
+
+  function toggleAllProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepSelections() {
+    const allStepIds = selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps
+      .map((step) => step.step_id)
+      .filter((value): value is string => Boolean(value));
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds((current) =>
+      current.length === allStepIds.length ? [] : allStepIds,
     );
   }
 
@@ -7628,12 +7833,18 @@ export default function App() {
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(null);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds([]);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(null);
+      resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft();
       return;
     }
     setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(catalogId);
     setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(null);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryLoading(true);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds([]);
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(null);
+    resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft();
     try {
       const payload = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
         catalogId,
@@ -7755,6 +7966,248 @@ export default function App() {
       );
     } finally {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction(null);
+    }
+  }
+
+  function stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft(
+    step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep,
+  ) {
+    setEditingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(
+      step.step_id ?? null,
+    );
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(
+      step.step_id ?? null,
+    );
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft({
+      item_ids_text: step.item_ids.join(", "),
+      name_prefix: step.name_prefix ?? "",
+      name_suffix: step.name_suffix ?? "",
+      description_append: step.description_append ?? "",
+      query_patch: Object.keys(step.query_patch ?? {}).length ? JSON.stringify(step.query_patch, null, 2) : "",
+      layout_patch: Object.keys(step.layout_patch ?? {}).length ? JSON.stringify(step.layout_patch, null, 2) : "",
+      template_id: step.template_id ?? "",
+      clear_template_link: step.clear_template_link,
+    });
+  }
+
+  function editProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep(
+    step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep,
+  ) {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog) {
+      setProviderProvenanceWorkspaceFeedback("Open a governance policy catalog row first.");
+      return;
+    }
+    if (selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.status !== "active") {
+      setProviderProvenanceWorkspaceFeedback("Restore the governance policy catalog before editing hierarchy steps.");
+      return;
+    }
+    stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft(step);
+    setProviderProvenanceWorkspaceFeedback(
+      `Editing hierarchy step ${step.step_id ?? "unknown"} on ${selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.name}.`,
+    );
+  }
+
+  async function saveProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep() {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog) {
+      setProviderProvenanceWorkspaceFeedback("Open a governance policy catalog row first.");
+      return;
+    }
+    if (!editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId) {
+      setProviderProvenanceWorkspaceFeedback("Select a hierarchy step to edit first.");
+      return;
+    }
+    const currentStep = selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps.find(
+      (step) => step.step_id === editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId,
+    );
+    if (!currentStep) {
+      setProviderProvenanceWorkspaceFeedback("The selected hierarchy step is no longer present on this policy catalog.");
+      return;
+    }
+    const itemIds = Array.from(
+      new Set(
+        providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.item_ids_text
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean),
+      ),
+    );
+    if (!itemIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Hierarchy steps must target at least one template or registry entry.");
+      return;
+    }
+    try {
+      const updated = await updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep({
+        catalogId: selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+        stepId: editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId,
+        itemIds,
+        namePrefix: providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.name_prefix,
+        nameSuffix: providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.name_suffix,
+        descriptionAppend:
+          providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.description_append,
+        queryPatch: parseJsonObjectInput(
+          providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.query_patch,
+        ),
+        layoutPatch:
+          currentStep.item_type === "registry"
+            ? parseJsonObjectInput(
+                providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.layout_patch,
+              )
+            : undefined,
+        templateId:
+          currentStep.item_type === "registry"
+          && providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.template_id.trim()
+            ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.template_id.trim()
+            : undefined,
+        clearTemplateLink:
+          currentStep.item_type === "registry"
+            ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.clear_template_link
+            : undefined,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_policy_catalog_hierarchy_step_update_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const history = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(history);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(
+        editingProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId,
+      );
+      resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft();
+      setProviderProvenanceWorkspaceFeedback(
+        `Updated hierarchy step on governance policy catalog ${updated.name}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Governance policy catalog hierarchy step save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersion(
+    entry: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersionEntry,
+  ) {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog) {
+      setProviderProvenanceWorkspaceFeedback("Open a governance policy catalog row first.");
+      return;
+    }
+    if (!entry.step.step_id) {
+      setProviderProvenanceWorkspaceFeedback("The selected hierarchy step revision does not expose a stable step id.");
+      return;
+    }
+    try {
+      const restored = await restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRevision({
+        catalogId: selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+        stepId: entry.step.step_id,
+        revisionId: entry.revision.revision_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_policy_catalog_hierarchy_step_restore_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const history = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(history);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(entry.step.step_id);
+      setProviderProvenanceWorkspaceFeedback(
+        `Restored hierarchy step ${entry.step.step_id} on governance policy catalog ${restored.name} from revision ${entry.revision.revision_id}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Governance policy catalog hierarchy step restore failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction(
+    action: "delete" | "update",
+  ) {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog) {
+      setProviderProvenanceWorkspaceFeedback("Open a governance policy catalog row first.");
+      return;
+    }
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more hierarchy steps first.");
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction(action);
+    try {
+      const result = await runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernance({
+        catalogId: selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+        action,
+        stepIds: selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: `scheduler_narrative_governance_policy_catalog_hierarchy_steps_bulk_${action}_from_control_room`,
+        namePrefix:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.name_prefix
+            : undefined,
+        nameSuffix:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.name_suffix
+            : undefined,
+        descriptionAppend:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.description_append
+            : undefined,
+        queryPatch:
+          action === "update"
+            ? parseJsonObjectInput(
+                providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.query_patch,
+              )
+            : undefined,
+        layoutPatch:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.layout_patch.trim()
+            ? parseJsonObjectInput(
+                providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.layout_patch,
+              )
+            : undefined,
+        templateId:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.template_id.trim()
+            ? providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.template_id.trim()
+            : undefined,
+        clearTemplateLink:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.clear_template_link
+            ? true
+            : undefined,
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const history = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(
+        selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.catalog_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(history);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+      if (action === "update") {
+        setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft(
+          defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft,
+        );
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Governance policy catalog hierarchy step bulk ${action} failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction(null);
     }
   }
 
@@ -11347,8 +11800,482 @@ export default function App() {
                                             ))}
                                           </tbody>
                                         </table>
-                                      ) : (
+                                    ) : (
                                         <p className="empty-state">Select a policy catalog row and open Versions to inspect revisions.</p>
+                                      )}
+                                    </div>
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Catalog hierarchy steps</strong>
+                                        <p>Edit reusable hierarchy steps, bulk-govern selected steps, and restore an older step snapshot without restoring the whole catalog.</p>
+                                      </div>
+                                      {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog ? (
+                                        <>
+                                          <div className="filter-bar">
+                                            <label>
+                                              <span>Selection</span>
+                                              <button
+                                                className="ghost-button"
+                                                disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps.length}
+                                                onClick={toggleAllProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepSelections}
+                                                type="button"
+                                              >
+                                                {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds.length
+                                                  === selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps.length
+                                                  && selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps.length
+                                                  ? "Clear all"
+                                                  : "Select all"}
+                                              </button>
+                                            </label>
+                                            <label>
+                                              <span>Bulk name prefix</span>
+                                              <input
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft((current) => ({
+                                                    ...current,
+                                                    name_prefix: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder="Reviewed / "
+                                                type="text"
+                                                value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.name_prefix}
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Bulk name suffix</span>
+                                              <input
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft((current) => ({
+                                                    ...current,
+                                                    name_suffix: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder=" / approved"
+                                                type="text"
+                                                value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.name_suffix}
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Bulk description</span>
+                                              <input
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft((current) => ({
+                                                    ...current,
+                                                    description_append: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder="shared governance note"
+                                                type="text"
+                                                value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.description_append}
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Bulk template link</span>
+                                              <select
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft((current) => ({
+                                                    ...current,
+                                                    template_id: event.target.value,
+                                                  }))
+                                                }
+                                                value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.template_id}
+                                              >
+                                                <option value="">Keep current link</option>
+                                                {providerProvenanceSchedulerNarrativeTemplates.map((entry) => (
+                                                  <option key={entry.template_id} value={entry.template_id}>
+                                                    {entry.name}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </label>
+                                            <label>
+                                              <span>Clear link</span>
+                                              <input
+                                                checked={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.clear_template_link}
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft((current) => ({
+                                                    ...current,
+                                                    clear_template_link: event.target.checked,
+                                                  }))
+                                                }
+                                                type="checkbox"
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Action</span>
+                                              <button
+                                                className="ghost-button"
+                                                disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds.length}
+                                                onClick={() => {
+                                                  void runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction("delete");
+                                                }}
+                                                type="button"
+                                              >
+                                                {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction === "delete"
+                                                  ? "Deleting…"
+                                                  : "Delete selected"}
+                                              </button>
+                                            </label>
+                                            <label>
+                                              <span>Action</span>
+                                              <button
+                                                className="ghost-button"
+                                                disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds.length}
+                                                onClick={() => {
+                                                  void runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction("update");
+                                                }}
+                                                type="button"
+                                              >
+                                                {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkAction === "update"
+                                                  ? "Updating…"
+                                                  : "Update selected"}
+                                              </button>
+                                            </label>
+                                          </div>
+                                          <div className="filter-bar">
+                                            <label>
+                                              <span>Bulk query patch</span>
+                                              <textarea
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft((current) => ({
+                                                    ...current,
+                                                    query_patch: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder='{"scheduler_alert_status":"resolved"}'
+                                                rows={3}
+                                                value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.query_patch}
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Bulk layout patch</span>
+                                              <textarea
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft((current) => ({
+                                                    ...current,
+                                                    layout_patch: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder='{"show_recent_exports":true}'
+                                                rows={3}
+                                                value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft.layout_patch}
+                                              />
+                                            </label>
+                                          </div>
+                                          {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps.length ? (
+                                            <table className="data-table">
+                                              <thead>
+                                                <tr>
+                                                  <th aria-label="Select step">Sel</th>
+                                                  <th>Step</th>
+                                                  <th>Patch</th>
+                                                  <th>Action</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps.map((step, index) => (
+                                                  <tr key={step.step_id ?? `${step.item_type}-${index}`}>
+                                                    <td>
+                                                      <input
+                                                        checked={step.step_id ? selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIdSet.has(step.step_id) : false}
+                                                        disabled={!step.step_id}
+                                                        onChange={() => {
+                                                          if (step.step_id) {
+                                                            toggleProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepSelection(step.step_id);
+                                                          }
+                                                        }}
+                                                        type="checkbox"
+                                                      />
+                                                    </td>
+                                                    <td>
+                                                      <strong>{step.step_id ?? `step ${index + 1}`}</strong>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(step)}
+                                                      </p>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {index + 1} of {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps.length}
+                                                      </p>
+                                                    </td>
+                                                    <td>
+                                                      <strong>{step.item_ids.length} target(s)</strong>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {step.item_ids.join(", ")}
+                                                      </p>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {Object.keys(step.query_patch ?? {}).length
+                                                          ? `query ${JSON.stringify(step.query_patch)}`
+                                                          : "no query patch"}
+                                                        {step.item_type === "registry"
+                                                          ? ` · ${
+                                                              Object.keys(step.layout_patch ?? {}).length
+                                                                ? `layout ${JSON.stringify(step.layout_patch)}`
+                                                                : "no layout patch"
+                                                            }`
+                                                          : ""}
+                                                      </p>
+                                                    </td>
+                                                    <td>
+                                                      <div className="market-data-provenance-history-actions">
+                                                        <button
+                                                          className="ghost-button"
+                                                          disabled={!step.step_id || selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.status !== "active"}
+                                                          onClick={() => {
+                                                            editProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep(step);
+                                                          }}
+                                                          type="button"
+                                                        >
+                                                          Edit
+                                                        </button>
+                                                        <button
+                                                          className="ghost-button"
+                                                          disabled={!step.step_id}
+                                                          onClick={() => {
+                                                            setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepId(
+                                                              step.step_id ?? null,
+                                                            );
+                                                          }}
+                                                          type="button"
+                                                        >
+                                                          Versions
+                                                        </button>
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          ) : (
+                                            <p className="empty-state">No hierarchy steps are currently captured on this policy catalog.</p>
+                                          )}
+                                          <div className="market-data-provenance-shared-history">
+                                            <div className="market-data-provenance-history-head">
+                                              <strong>Hierarchy step editor</strong>
+                                              <p>Edit one captured step directly. Empty JSON clears the current patch.</p>
+                                            </div>
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep ? (
+                                              <div className="filter-bar">
+                                                <label>
+                                                  <span>Targets</span>
+                                                  <input
+                                                    onChange={(event) =>
+                                                      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft((current) => ({
+                                                        ...current,
+                                                        item_ids_text: event.target.value,
+                                                      }))
+                                                    }
+                                                    placeholder="id_1, id_2"
+                                                    type="text"
+                                                    value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.item_ids_text}
+                                                  />
+                                                </label>
+                                                <label>
+                                                  <span>Name prefix</span>
+                                                  <input
+                                                    onChange={(event) =>
+                                                      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft((current) => ({
+                                                        ...current,
+                                                        name_prefix: event.target.value,
+                                                      }))
+                                                    }
+                                                    placeholder="Reviewed / "
+                                                    type="text"
+                                                    value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.name_prefix}
+                                                  />
+                                                </label>
+                                                <label>
+                                                  <span>Name suffix</span>
+                                                  <input
+                                                    onChange={(event) =>
+                                                      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft((current) => ({
+                                                        ...current,
+                                                        name_suffix: event.target.value,
+                                                      }))
+                                                    }
+                                                    placeholder=" / approved"
+                                                    type="text"
+                                                    value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.name_suffix}
+                                                  />
+                                                </label>
+                                                <label>
+                                                  <span>Description</span>
+                                                  <input
+                                                    onChange={(event) =>
+                                                      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft((current) => ({
+                                                        ...current,
+                                                        description_append: event.target.value,
+                                                      }))
+                                                    }
+                                                    placeholder="shared governance note"
+                                                    type="text"
+                                                    value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.description_append}
+                                                  />
+                                                </label>
+                                                {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep.item_type === "registry" ? (
+                                                  <>
+                                                    <label>
+                                                      <span>Template link</span>
+                                                      <select
+                                                        onChange={(event) =>
+                                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft((current) => ({
+                                                            ...current,
+                                                            template_id: event.target.value,
+                                                          }))
+                                                        }
+                                                        value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.template_id}
+                                                      >
+                                                        <option value="">No explicit template link</option>
+                                                        {providerProvenanceSchedulerNarrativeTemplates.map((entry) => (
+                                                          <option key={entry.template_id} value={entry.template_id}>
+                                                            {entry.name}
+                                                          </option>
+                                                        ))}
+                                                      </select>
+                                                    </label>
+                                                    <label>
+                                                      <span>Clear link</span>
+                                                      <input
+                                                        checked={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.clear_template_link}
+                                                        onChange={(event) =>
+                                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft((current) => ({
+                                                            ...current,
+                                                            clear_template_link: event.target.checked,
+                                                          }))
+                                                        }
+                                                        type="checkbox"
+                                                      />
+                                                    </label>
+                                                  </>
+                                                ) : null}
+                                                <label>
+                                                  <span>Action</span>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void saveProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep();
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Save step
+                                                  </button>
+                                                </label>
+                                                <label>
+                                                  <span>Action</span>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft}
+                                                    type="button"
+                                                  >
+                                                    Clear draft
+                                                  </button>
+                                                </label>
+                                              </div>
+                                            ) : (
+                                              <p className="empty-state">Select a hierarchy step row and choose Edit to stage it in the editor.</p>
+                                            )}
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep ? (
+                                              <div className="filter-bar">
+                                                <label>
+                                                  <span>Query patch</span>
+                                                  <textarea
+                                                    onChange={(event) =>
+                                                      setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft((current) => ({
+                                                        ...current,
+                                                        query_patch: event.target.value,
+                                                      }))
+                                                    }
+                                                    placeholder='{"scheduler_alert_status":"resolved"}'
+                                                    rows={4}
+                                                    value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.query_patch}
+                                                  />
+                                                </label>
+                                                {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep.item_type === "registry" ? (
+                                                  <label>
+                                                    <span>Layout patch</span>
+                                                    <textarea
+                                                      onChange={(event) =>
+                                                        setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft((current) => ({
+                                                          ...current,
+                                                          layout_patch: event.target.value,
+                                                        }))
+                                                      }
+                                                      placeholder='{"show_recent_exports":true}'
+                                                      rows={4}
+                                                      value={providerProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft.layout_patch}
+                                                    />
+                                                  </label>
+                                                ) : null}
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                          <div className="market-data-provenance-shared-history">
+                                            <div className="market-data-provenance-history-head">
+                                              <strong>Hierarchy step versions</strong>
+                                              <p>Use the loaded catalog revision history to stage a prior step snapshot or restore that step only.</p>
+                                            </div>
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersions.length ? (
+                                              <table className="data-table">
+                                                <thead>
+                                                  <tr>
+                                                    <th>Revision</th>
+                                                    <th>Step</th>
+                                                    <th>Action</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersions.map((entry) => (
+                                                    <tr key={`${entry.revision.revision_id}:${entry.step.step_id ?? "step"}`}>
+                                                      <td>
+                                                        <strong>{entry.revision.revision_id}</strong>
+                                                        <p className="run-lineage-symbol-copy">
+                                                          {entry.revision.reason}
+                                                        </p>
+                                                        <p className="run-lineage-symbol-copy">
+                                                          {formatTimestamp(entry.revision.recorded_at)}
+                                                        </p>
+                                                      </td>
+                                                      <td>
+                                                        <strong>{entry.step.step_id ?? "unknown step"}</strong>
+                                                        <p className="run-lineage-symbol-copy">
+                                                          {formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(entry.step)}
+                                                        </p>
+                                                        <p className="run-lineage-symbol-copy">
+                                                          {entry.position} of {entry.total}
+                                                        </p>
+                                                      </td>
+                                                      <td>
+                                                        <div className="market-data-provenance-history-actions">
+                                                          <button
+                                                            className="ghost-button"
+                                                            onClick={() => {
+                                                              stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft(entry.step);
+                                                            }}
+                                                            type="button"
+                                                          >
+                                                            Stage draft
+                                                          </button>
+                                                          <button
+                                                            className="ghost-button"
+                                                            disabled={!entry.step.step_id || selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog.status !== "active"}
+                                                            onClick={() => {
+                                                              void restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersion(entry);
+                                                            }}
+                                                            type="button"
+                                                          >
+                                                            Restore step
+                                                          </button>
+                                                        </div>
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            ) : (
+                                              <p className="empty-state">Select a hierarchy step and open Versions to inspect step snapshots across catalog revisions.</p>
+                                            )}
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <p className="empty-state">Select a policy catalog row and open Versions to inspect hierarchy steps.</p>
                                       )}
                                     </div>
                                     <div className="market-data-provenance-shared-history">
@@ -11391,6 +12318,10 @@ export default function App() {
                                             <option value="created">Created</option>
                                             <option value="updated">Updated</option>
                                             <option value="hierarchy_captured">Hierarchy captured</option>
+                                            <option value="hierarchy_step_updated">Hierarchy step updated</option>
+                                            <option value="hierarchy_step_restored">Hierarchy step restored</option>
+                                            <option value="hierarchy_steps_bulk_updated">Hierarchy steps bulk updated</option>
+                                            <option value="hierarchy_steps_bulk_deleted">Hierarchy steps bulk deleted</option>
                                             <option value="staged">Staged</option>
                                             <option value="deleted">Deleted</option>
                                             <option value="restored">Restored</option>

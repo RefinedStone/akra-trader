@@ -15172,6 +15172,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_restore",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_list",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_capture",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
@@ -15383,6 +15386,15 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_capture"
   ].path_param_keys == ("catalog_id",)
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update"
+  ].path_param_keys == ("catalog_id", "step_id")
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore"
+  ].path_param_keys == ("catalog_id", "step_id", "revision_id")
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance"
+  ].methods == ("POST",)
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage"
   ].methods == ("POST",)
@@ -17286,6 +17298,82 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     },
   )
   assert len(captured_governance_policy_catalog_payload["hierarchy_steps"]) == 2
+  template_hierarchy_step_id = captured_governance_policy_catalog_payload["hierarchy_steps"][0]["step_id"]
+  registry_hierarchy_step_id = captured_governance_policy_catalog_payload["hierarchy_steps"][1]["step_id"]
+
+  updated_catalog_hierarchy_step_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update"
+    ],
+    app=app,
+    path_params={
+      "catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "step_id": template_hierarchy_step_id,
+    },
+    request_payload={
+      "name_prefix": "Reviewed / ",
+      "query_patch": {
+        "scheduler_alert_status": "active",
+      },
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "update_catalog_hierarchy_step",
+    },
+  )
+  assert updated_catalog_hierarchy_step_payload["hierarchy_steps"][0]["name_prefix"] == "Reviewed / "
+  assert (
+    updated_catalog_hierarchy_step_payload["hierarchy_steps"][0]["query_patch"]["scheduler_alert_status"]
+    == "active"
+  )
+
+  bulk_governed_catalog_hierarchy_step_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance"
+    ],
+    app=app,
+    path_params={"catalog_id": governance_policy_catalog_payload["catalog_id"]},
+    request_payload={
+      "action": "update",
+      "step_ids": [registry_hierarchy_step_id],
+      "layout_patch": {
+        "show_time_series": True,
+      },
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_update_catalog_hierarchy_step",
+    },
+  )
+  assert bulk_governed_catalog_hierarchy_step_payload["applied_count"] == 1
+
+  catalog_history_after_bulk_update_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_list"],
+    app=app,
+    path_params={"catalog_id": governance_policy_catalog_payload["catalog_id"]},
+  )
+  assert catalog_history_after_bulk_update_payload["history"][0]["action"] == "hierarchy_steps_bulk_updated"
+  template_hierarchy_restore_revision_id = next(
+    entry["revision_id"]
+    for entry in reversed(catalog_history_after_bulk_update_payload["history"])
+    if any(step["step_id"] == template_hierarchy_step_id for step in entry["hierarchy_steps"])
+  )
+
+  restored_catalog_hierarchy_step_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore"
+    ],
+    app=app,
+    path_params={
+      "catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "step_id": template_hierarchy_step_id,
+      "revision_id": template_hierarchy_restore_revision_id,
+    },
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "restore_catalog_hierarchy_step_revision",
+    },
+  )
+  assert restored_catalog_hierarchy_step_payload["hierarchy_steps"][0]["name_prefix"] is None
 
   staged_governance_policy_catalog_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage"],

@@ -2129,6 +2129,39 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("catalog_id",),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_capture",
   )
+  operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{catalog_id}/hierarchy-steps/{step_id}",
+    route_name="update_operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step",
+    response_title="Update provider provenance scheduler narrative governance policy catalog hierarchy step",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update",
+    methods=("PATCH",),
+    path_param_keys=("catalog_id", "step_id"),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{catalog_id}/hierarchy-steps/{step_id}/revisions/{revision_id}/restore",
+    route_name="restore_operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step",
+    response_title="Restore provider provenance scheduler narrative governance policy catalog hierarchy step revision",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore",
+    methods=("POST",),
+    path_param_keys=("catalog_id", "step_id", "revision_id"),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{catalog_id}/hierarchy-steps/bulk-governance",
+    route_name="bulk_govern_operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_steps",
+    response_title="Bulk govern provider provenance scheduler narrative governance policy catalog hierarchy steps",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance",
+    methods=("POST",),
+    path_param_keys=("catalog_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance",
+  )
   operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{catalog_id}/stage",
@@ -3949,6 +3982,9 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_restore_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_capture_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_create_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_list_binding,

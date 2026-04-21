@@ -1007,6 +1007,59 @@ def execute_standalone_surface_binding(
         reason=resolved_payload.get("reason", "scheduler_narrative_governance_policy_catalog_hierarchy_captured"),
       )
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update":
+    return serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
+      app.update_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step(
+        resolved_path_params["catalog_id"],
+        resolved_path_params["step_id"],
+        item_ids=resolved_payload.get("item_ids"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        query_patch=resolved_payload.get("query_patch"),
+        layout_patch=resolved_payload.get("layout_patch"),
+        template_id=resolved_payload.get("template_id"),
+        clear_template_link=resolved_payload.get("clear_template_link"),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get(
+          "reason",
+          "scheduler_narrative_governance_policy_catalog_hierarchy_step_updated",
+        ),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore":
+    return serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
+      app.restore_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_revision(
+        resolved_path_params["catalog_id"],
+        resolved_path_params["step_id"],
+        resolved_path_params["revision_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get(
+          "reason",
+          "scheduler_narrative_governance_policy_catalog_hierarchy_step_restored",
+        ),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance":
+    return serialize_provider_provenance_scheduler_narrative_bulk_governance_result(
+      app.bulk_govern_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_steps(
+        resolved_path_params["catalog_id"],
+        resolved_payload.get("step_ids", ()),
+        action=resolved_payload.get("action", ""),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        query_patch=resolved_payload.get("query_patch"),
+        layout_patch=resolved_payload.get("layout_patch"),
+        template_id=resolved_payload.get("template_id"),
+        clear_template_link=resolved_payload.get("clear_template_link"),
+      )
+    )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage":
     return serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_result(
       app.stage_provider_provenance_scheduler_narrative_governance_policy_catalog(

@@ -147,8 +147,9 @@ creation.
 - those policy catalogs now also have lifecycle, audit, and bulk-governance surfaces, but catalog
   governance now also includes reusable staged-plan hierarchies that can be captured from the
   current template/registry workbench and replayed back into the approval queue as catalog-linked
-  plans; stitched multi-occurrence narrative artifacts and deeper server-side narrative search are
-  still not built
+  plans, and those captured hierarchies now also support step edit, step revision restore, and
+  step bulk-governance workflow; stitched multi-occurrence narrative artifacts and deeper
+  server-side narrative search are still not built
 
 ### Remaining work
 

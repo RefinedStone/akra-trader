@@ -2206,6 +2206,65 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert capture_catalog_hierarchy_response.status_code == 200
   captured_catalog_hierarchy_payload = capture_catalog_hierarchy_response.json()
   assert len(captured_catalog_hierarchy_payload["hierarchy_steps"]) == 2
+  template_hierarchy_step_id = captured_catalog_hierarchy_payload["hierarchy_steps"][0]["step_id"]
+  registry_hierarchy_step_id = captured_catalog_hierarchy_payload["hierarchy_steps"][1]["step_id"]
+
+  update_catalog_hierarchy_step_response = client.patch(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/hierarchy-steps/{template_hierarchy_step_id}",
+    json={
+      "name_prefix": "Reviewed / ",
+      "query_patch": {
+        "scheduler_alert_status": "active",
+      },
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "update_catalog_hierarchy_step",
+    },
+  )
+  assert update_catalog_hierarchy_step_response.status_code == 200
+  update_catalog_hierarchy_step_payload = update_catalog_hierarchy_step_response.json()
+  assert update_catalog_hierarchy_step_payload["hierarchy_steps"][0]["name_prefix"] == "Reviewed / "
+
+  bulk_govern_catalog_hierarchy_steps_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/hierarchy-steps/bulk-governance",
+    json={
+      "action": "update",
+      "step_ids": [registry_hierarchy_step_id],
+      "layout_patch": {
+        "show_time_series": True,
+      },
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_update_catalog_hierarchy_step",
+    },
+  )
+  assert bulk_govern_catalog_hierarchy_steps_response.status_code == 200
+  bulk_govern_catalog_hierarchy_steps_payload = bulk_govern_catalog_hierarchy_steps_response.json()
+  assert bulk_govern_catalog_hierarchy_steps_payload["applied_count"] == 1
+
+  catalog_hierarchy_revision_list_response = client.get(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/revisions",
+  )
+  assert catalog_hierarchy_revision_list_response.status_code == 200
+  catalog_hierarchy_revision_list_payload = catalog_hierarchy_revision_list_response.json()
+  assert catalog_hierarchy_revision_list_payload["history"][0]["action"] == "hierarchy_steps_bulk_updated"
+  template_hierarchy_restore_revision_id = next(
+    entry["revision_id"]
+    for entry in reversed(catalog_hierarchy_revision_list_payload["history"])
+    if any(step["step_id"] == template_hierarchy_step_id for step in entry["hierarchy_steps"])
+  )
+
+  restore_catalog_hierarchy_step_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/hierarchy-steps/{template_hierarchy_step_id}/revisions/{template_hierarchy_restore_revision_id}/restore",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "restore_catalog_hierarchy_step_revision",
+    },
+  )
+  assert restore_catalog_hierarchy_step_response.status_code == 200
+  restore_catalog_hierarchy_step_payload = restore_catalog_hierarchy_step_response.json()
+  assert restore_catalog_hierarchy_step_payload["hierarchy_steps"][0]["name_prefix"] is None
 
   stage_catalog_hierarchy_response = client.post(
     f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/stage",

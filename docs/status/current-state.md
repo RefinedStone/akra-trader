@@ -206,6 +206,9 @@ It is not yet a finished live trading product:
   and stage them straight into the approval queue, with catalog-linked plan metadata so operators
   can review a whole staged hierarchy by its source catalog instead of treating each preview as
   orphaned queue work
+- policy-catalog hierarchy steps now also have their own edit, revision-restore, and bulk
+  governance workflow in the control room, so reusable staged hierarchies can be corrected or
+  selectively restored without recapturing or restoring the whole catalog
 
 ### Operator discipline baseline
 

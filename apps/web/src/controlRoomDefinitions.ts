@@ -1815,6 +1815,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditList
 };
 
 export type ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep = {
+  step_id?: string | null;
   item_type: "template" | "registry" | string;
   action: "update" | string;
   item_ids: string[];

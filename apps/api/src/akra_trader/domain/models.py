@@ -1186,6 +1186,7 @@ class ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord:
 @dataclass(frozen=True)
 class ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep:
   item_type: str
+  step_id: str | None = None
   action: str = "update"
   item_ids: tuple[str, ...] = ()
   item_names: tuple[str, ...] = ()
