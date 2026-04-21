@@ -29,6 +29,9 @@ from akra_trader.domain.models import ReplayIntentAliasAuditExportArtifactRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
+from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
+from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
+from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import GuardedLiveKillSwitch
 from akra_trader.domain.models import ClosedTrade
@@ -390,6 +393,9 @@ class TradingApplication:
     self._replay_intent_alias_audit_export_artifacts: dict[str, ReplayIntentAliasAuditExportArtifactRecord] = {}
     self._replay_intent_alias_audit_export_jobs: dict[str, ReplayIntentAliasAuditExportJobRecord] = {}
     self._replay_intent_alias_audit_export_job_audit_records: dict[str, ReplayIntentAliasAuditExportJobAuditRecord] = {}
+    self._provider_provenance_export_artifacts: dict[str, ProviderProvenanceExportArtifactRecord] = {}
+    self._provider_provenance_export_jobs: dict[str, ProviderProvenanceExportJobRecord] = {}
+    self._provider_provenance_export_job_audit_records: dict[str, ProviderProvenanceExportJobAuditRecord] = {}
 
   def list_strategies(
     self,
@@ -1257,6 +1263,345 @@ class TradingApplication:
     )
     return self._save_replay_intent_alias_audit_export_job_audit_record(audit_record)
 
+  def _save_provider_provenance_export_artifact_record(
+    self,
+    record: ProviderProvenanceExportArtifactRecord,
+  ) -> ProviderProvenanceExportArtifactRecord:
+    save_artifact = getattr(self._runs, "save_provider_provenance_export_artifact", None)
+    if callable(save_artifact):
+      return save_artifact(record)
+    self._provider_provenance_export_artifacts[record.artifact_id] = record
+    return record
+
+  def _load_provider_provenance_export_artifact_record(
+    self,
+    artifact_id: str,
+  ) -> ProviderProvenanceExportArtifactRecord | None:
+    get_artifact = getattr(self._runs, "get_provider_provenance_export_artifact", None)
+    if callable(get_artifact):
+      return get_artifact(artifact_id)
+    return self._provider_provenance_export_artifacts.get(artifact_id)
+
+  def _delete_provider_provenance_export_artifact_records(self, artifact_ids: tuple[str, ...]) -> int:
+    delete_artifacts = getattr(self._runs, "delete_provider_provenance_export_artifacts", None)
+    if callable(delete_artifacts):
+      return int(delete_artifacts(artifact_ids))
+    deleted_count = 0
+    for artifact_id in artifact_ids:
+      if artifact_id in self._provider_provenance_export_artifacts:
+        deleted_count += 1
+        del self._provider_provenance_export_artifacts[artifact_id]
+    return deleted_count
+
+  def _prune_provider_provenance_export_artifact_records(self) -> int:
+    current_time = self._clock()
+    prune_artifacts = getattr(self._runs, "prune_provider_provenance_export_artifacts", None)
+    if callable(prune_artifacts):
+      return int(prune_artifacts(current_time))
+    original_count = len(self._provider_provenance_export_artifacts)
+    self._provider_provenance_export_artifacts = {
+      artifact_id: record
+      for artifact_id, record in self._provider_provenance_export_artifacts.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._provider_provenance_export_artifacts)
+
+  def _save_provider_provenance_export_job_record(
+    self,
+    record: ProviderProvenanceExportJobRecord,
+  ) -> ProviderProvenanceExportJobRecord:
+    save_job = getattr(self._runs, "save_provider_provenance_export_job", None)
+    if callable(save_job):
+      return save_job(record)
+    self._provider_provenance_export_jobs[record.job_id] = record
+    return record
+
+  def _load_provider_provenance_export_job_record(
+    self,
+    job_id: str,
+  ) -> ProviderProvenanceExportJobRecord | None:
+    get_job = getattr(self._runs, "get_provider_provenance_export_job", None)
+    if callable(get_job):
+      return get_job(job_id)
+    return self._provider_provenance_export_jobs.get(job_id)
+
+  def _list_provider_provenance_export_job_records(
+    self,
+  ) -> tuple[ProviderProvenanceExportJobRecord, ...]:
+    list_jobs = getattr(self._runs, "list_provider_provenance_export_jobs", None)
+    if callable(list_jobs):
+      return tuple(list_jobs())
+    return tuple(
+      sorted(
+        self._provider_provenance_export_jobs.values(),
+        key=lambda record: (record.exported_at or record.created_at, record.job_id),
+        reverse=True,
+      )
+    )
+
+  def _prune_provider_provenance_export_job_records(self) -> int:
+    current_time = self._clock()
+    prune_jobs = getattr(self._runs, "prune_provider_provenance_export_jobs", None)
+    if callable(prune_jobs):
+      return int(prune_jobs(current_time))
+    original_count = len(self._provider_provenance_export_jobs)
+    self._provider_provenance_export_jobs = {
+      job_id: record
+      for job_id, record in self._provider_provenance_export_jobs.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._provider_provenance_export_jobs)
+
+  def _delete_provider_provenance_export_job_records(self, job_ids: tuple[str, ...]) -> int:
+    delete_jobs = getattr(self._runs, "delete_provider_provenance_export_jobs", None)
+    if callable(delete_jobs):
+      return int(delete_jobs(job_ids))
+    deleted_count = 0
+    for job_id in job_ids:
+      if job_id in self._provider_provenance_export_jobs:
+        deleted_count += 1
+        del self._provider_provenance_export_jobs[job_id]
+    return deleted_count
+
+  def _save_provider_provenance_export_job_audit_record(
+    self,
+    record: ProviderProvenanceExportJobAuditRecord,
+  ) -> ProviderProvenanceExportJobAuditRecord:
+    save_audit = getattr(self._runs, "save_provider_provenance_export_job_audit_record", None)
+    if callable(save_audit):
+      return save_audit(record)
+    self._provider_provenance_export_job_audit_records[record.audit_id] = record
+    return record
+
+  def _list_provider_provenance_export_job_audit_records(
+    self,
+    job_id: str | None = None,
+  ) -> tuple[ProviderProvenanceExportJobAuditRecord, ...]:
+    list_audits = getattr(self._runs, "list_provider_provenance_export_job_audit_records", None)
+    if callable(list_audits):
+      return tuple(list_audits(job_id))
+    records = [
+      record
+      for record in self._provider_provenance_export_job_audit_records.values()
+      if job_id is None or record.job_id == job_id
+    ]
+    return tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def _delete_provider_provenance_export_job_audit_records(self, audit_ids: tuple[str, ...]) -> int:
+    delete_audits = getattr(self._runs, "delete_provider_provenance_export_job_audit_records", None)
+    if callable(delete_audits):
+      return int(delete_audits(audit_ids))
+    deleted_count = 0
+    for audit_id in audit_ids:
+      if audit_id in self._provider_provenance_export_job_audit_records:
+        deleted_count += 1
+        del self._provider_provenance_export_job_audit_records[audit_id]
+    return deleted_count
+
+  def _prune_provider_provenance_export_job_audit_records(self) -> int:
+    current_time = self._clock()
+    prune_audits = getattr(self._runs, "prune_provider_provenance_export_job_audit_records", None)
+    if callable(prune_audits):
+      return int(prune_audits(current_time))
+    original_count = len(self._provider_provenance_export_job_audit_records)
+    self._provider_provenance_export_job_audit_records = {
+      audit_id: record
+      for audit_id, record in self._provider_provenance_export_job_audit_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._provider_provenance_export_job_audit_records)
+
+  def _record_provider_provenance_export_job_event(
+    self,
+    *,
+    record: ProviderProvenanceExportJobRecord,
+    action: str,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> ProviderProvenanceExportJobAuditRecord:
+    self._prune_provider_provenance_export_job_audit_records()
+    recorded_at = self._clock()
+    audit_record = ProviderProvenanceExportJobAuditRecord(
+      audit_id=uuid4().hex[:12],
+      job_id=record.job_id,
+      action=action,
+      recorded_at=recorded_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="30d",
+        recorded_at=recorded_at,
+      ),
+      export_scope=record.export_scope,
+      export_format=record.export_format,
+      focus_key=record.focus_key,
+      focus_label=record.focus_label,
+      symbol=record.symbol,
+      timeframe=record.timeframe,
+      market_data_provider=record.market_data_provider,
+      requested_by_tab_id=record.requested_by_tab_id,
+      requested_by_tab_label=record.requested_by_tab_label,
+      source_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
+      source_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+      detail=(
+        "Provider provenance export created."
+        if action == "created"
+        else "Provider provenance export downloaded."
+      ),
+    )
+    return self._save_provider_provenance_export_job_audit_record(audit_record)
+
+  @staticmethod
+  def _parse_optional_iso_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+      return None
+    normalized_value = value.strip().replace("Z", "+00:00")
+    try:
+      parsed = datetime.fromisoformat(normalized_value)
+    except ValueError:
+      return None
+    if parsed.tzinfo is None:
+      return parsed.replace(tzinfo=UTC)
+    return parsed
+
+  @staticmethod
+  def _normalize_provider_provenance_export_strings(values: Iterable[Any]) -> tuple[str, ...]:
+    normalized_values: list[str] = []
+    for value in values:
+      if not isinstance(value, str):
+        continue
+      candidate = value.strip()
+      if candidate and candidate not in normalized_values:
+        normalized_values.append(candidate)
+    return tuple(normalized_values)
+
+  @staticmethod
+  def _build_provider_provenance_export_filename(
+    *,
+    symbol: str | None,
+    timeframe: str | None,
+    exported_at: datetime | None,
+    fallback_time: datetime,
+  ) -> str:
+    safe_symbol = re.sub(r"[^a-z0-9]+", "-", (symbol or "market").lower()).strip("-") or "market"
+    safe_timeframe = re.sub(r"[^a-z0-9]+", "-", (timeframe or "window").lower()).strip("-") or "window"
+    timestamp = (exported_at or fallback_time).astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return f"provider-provenance-{safe_symbol}-{safe_timeframe}-{timestamp}.json"
+
+  @classmethod
+  def _extract_provider_provenance_export_metadata(
+    cls,
+    payload: dict[str, Any],
+  ) -> dict[str, Any]:
+    focus = payload.get("focus") if isinstance(payload.get("focus"), dict) else {}
+    instrument_id = (
+      focus.get("instrument_id").strip()
+      if isinstance(focus.get("instrument_id"), str) and focus.get("instrument_id").strip()
+      else None
+    )
+    symbol = (
+      focus.get("symbol").strip()
+      if isinstance(focus.get("symbol"), str) and focus.get("symbol").strip()
+      else None
+    )
+    if symbol is None and instrument_id is not None:
+      separator_index = instrument_id.find(":")
+      symbol = instrument_id[separator_index + 1:] if separator_index >= 0 else instrument_id
+    timeframe = (
+      focus.get("timeframe").strip()
+      if isinstance(focus.get("timeframe"), str) and focus.get("timeframe").strip()
+      else None
+    )
+    focus_key = f"{instrument_id}|{timeframe}" if instrument_id and timeframe else None
+    focus_label = f"{symbol} · {timeframe}" if symbol and timeframe else symbol or timeframe
+    provider_incidents = (
+      payload.get("provider_provenance_incidents")
+      if isinstance(payload.get("provider_provenance_incidents"), list)
+      else []
+    )
+    provider_labels = cls._normalize_provider_provenance_export_strings(
+      incident.get("provider")
+      for incident in provider_incidents
+      if isinstance(incident, dict)
+    )
+    vendor_fields = cls._normalize_provider_provenance_export_strings(
+      incident.get("vendor_field")
+      for incident in provider_incidents
+      if isinstance(incident, dict)
+    )
+    export_filters = deepcopy(payload.get("export_filter")) if isinstance(payload.get("export_filter"), dict) else {}
+    result_count = (
+      int(payload["export_result_count"])
+      if isinstance(payload.get("export_result_count"), Number)
+      else len(provider_incidents)
+    )
+    provider_provenance_count = (
+      int(focus["provider_provenance_incident_count"])
+      if isinstance(focus.get("provider_provenance_incident_count"), Number)
+      else len(provider_incidents)
+    )
+    return {
+      "export_scope": (
+        payload.get("export_scope").strip()
+        if isinstance(payload.get("export_scope"), str) and payload.get("export_scope").strip()
+        else "provider_market_context_provenance"
+      ),
+      "exported_at": cls._parse_optional_iso_datetime(payload.get("exported_at")),
+      "focus_key": focus_key,
+      "focus_label": focus_label,
+      "market_data_provider": (
+        focus.get("provider").strip()
+        if isinstance(focus.get("provider"), str) and focus.get("provider").strip()
+        else None
+      ),
+      "venue": (
+        focus.get("venue").strip()
+        if isinstance(focus.get("venue"), str) and focus.get("venue").strip()
+        else None
+      ),
+      "symbol": symbol,
+      "timeframe": timeframe,
+      "result_count": max(result_count, 0),
+      "provider_provenance_count": max(provider_provenance_count, 0),
+      "provider_labels": provider_labels,
+      "vendor_fields": vendor_fields,
+      "filter_summary": (
+        payload.get("export_filter_summary").strip()
+        if isinstance(payload.get("export_filter_summary"), str) and payload.get("export_filter_summary").strip()
+        else None
+      ),
+      "filters": export_filters,
+    }
+
+  @classmethod
+  def _normalize_provider_provenance_export_content(
+    cls,
+    content: str,
+  ) -> tuple[str, dict[str, Any], dict[str, Any]]:
+    normalized_content = content.strip() if isinstance(content, str) else ""
+    if not normalized_content:
+      raise ValueError("Provider provenance export content is required.")
+    try:
+      payload = json.loads(normalized_content)
+    except json.JSONDecodeError as exc:
+      raise ValueError("Provider provenance export content must be valid JSON.") from exc
+    if not isinstance(payload, dict):
+      raise ValueError("Provider provenance export content must be a JSON object.")
+    metadata = cls._extract_provider_provenance_export_metadata(payload)
+    if metadata["export_scope"] != "provider_market_context_provenance":
+      raise ValueError("Unsupported provider provenance export scope.")
+    if metadata["focus_key"] is None or metadata["symbol"] is None or metadata["timeframe"] is None:
+      raise ValueError("Provider provenance export content must include focus instrument_id, symbol, and timeframe.")
+    return normalized_content, payload, metadata
+
   @staticmethod
   def _normalize_replay_intent_alias_audit_action(value: str | None) -> str | None:
     if not isinstance(value, str):
@@ -1676,6 +2021,225 @@ class TradingApplication:
       "deleted_job_ids": list(deleted_job_ids),
       "mode": "matched",
     }
+
+  def create_provider_provenance_export_job(
+    self,
+    *,
+    content: str,
+    requested_by_tab_id: str | None = None,
+    requested_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceExportJobRecord:
+    self._prune_provider_provenance_export_artifact_records()
+    self._prune_provider_provenance_export_job_records()
+    self._prune_provider_provenance_export_job_audit_records()
+    normalized_content, _, metadata = self._normalize_provider_provenance_export_content(content)
+    created_at = self._clock()
+    artifact_id = uuid4().hex[:12]
+    job_id = uuid4().hex[:12]
+    artifact_record = ProviderProvenanceExportArtifactRecord(
+      artifact_id=artifact_id,
+      job_id=job_id,
+      filename=self._build_provider_provenance_export_filename(
+        symbol=metadata["symbol"],
+        timeframe=metadata["timeframe"],
+        exported_at=metadata["exported_at"],
+        fallback_time=created_at,
+      ),
+      content_type="application/json; charset=utf-8",
+      content=normalized_content,
+      created_at=created_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="30d",
+        recorded_at=created_at,
+      ),
+      byte_length=len(normalized_content.encode("utf-8")),
+    )
+    saved_artifact = self._save_provider_provenance_export_artifact_record(artifact_record)
+    record = ProviderProvenanceExportJobRecord(
+      job_id=job_id,
+      export_scope=metadata["export_scope"],
+      export_format="json",
+      filename=saved_artifact.filename,
+      content_type=saved_artifact.content_type,
+      status="completed",
+      created_at=created_at,
+      completed_at=created_at,
+      exported_at=metadata["exported_at"] or created_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="30d",
+        recorded_at=created_at,
+      ),
+      focus_key=metadata["focus_key"],
+      focus_label=metadata["focus_label"],
+      market_data_provider=metadata["market_data_provider"],
+      venue=metadata["venue"],
+      symbol=metadata["symbol"],
+      timeframe=metadata["timeframe"],
+      result_count=metadata["result_count"],
+      provider_provenance_count=metadata["provider_provenance_count"],
+      provider_labels=metadata["provider_labels"],
+      vendor_fields=metadata["vendor_fields"],
+      filter_summary=metadata["filter_summary"],
+      filters=metadata["filters"],
+      requested_by_tab_id=(
+        requested_by_tab_id.strip()
+        if isinstance(requested_by_tab_id, str) and requested_by_tab_id.strip()
+        else None
+      ),
+      requested_by_tab_label=(
+        requested_by_tab_label.strip()
+        if isinstance(requested_by_tab_label, str) and requested_by_tab_label.strip()
+        else None
+      ),
+      artifact_id=saved_artifact.artifact_id,
+      content_length=saved_artifact.byte_length,
+    )
+    saved_record = self._save_provider_provenance_export_job_record(record)
+    self._record_provider_provenance_export_job_event(
+      record=saved_record,
+      action="created",
+      source_tab_id=requested_by_tab_id,
+      source_tab_label=requested_by_tab_label,
+    )
+    return saved_record
+
+  @classmethod
+  def _matches_provider_provenance_export_job_search(
+    cls,
+    record: ProviderProvenanceExportJobRecord,
+    search: str | None,
+  ) -> bool:
+    if not isinstance(search, str) or not search.strip():
+      return True
+    needle = search.strip().lower()
+    haystacks = (
+      record.job_id,
+      record.export_scope,
+      record.filename,
+      record.status,
+      record.focus_key or "",
+      record.focus_label or "",
+      record.market_data_provider or "",
+      record.venue or "",
+      record.symbol or "",
+      record.timeframe or "",
+      record.requested_by_tab_id or "",
+      record.requested_by_tab_label or "",
+      record.filter_summary or "",
+      *record.provider_labels,
+      *record.vendor_fields,
+    )
+    return any(needle in value.lower() for value in haystacks if value)
+
+  def list_provider_provenance_export_jobs(
+    self,
+    *,
+    focus_key: str | None = None,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    provider_label: str | None = None,
+    requested_by_tab_id: str | None = None,
+    status: str | None = None,
+    search: str | None = None,
+    limit: int = 100,
+  ) -> tuple[ProviderProvenanceExportJobRecord, ...]:
+    self._prune_provider_provenance_export_artifact_records()
+    self._prune_provider_provenance_export_job_records()
+    self._prune_provider_provenance_export_job_audit_records()
+    normalized_focus_key = focus_key.strip() if isinstance(focus_key, str) and focus_key.strip() else None
+    normalized_symbol = symbol.strip() if isinstance(symbol, str) and symbol.strip() else None
+    normalized_timeframe = timeframe.strip() if isinstance(timeframe, str) and timeframe.strip() else None
+    normalized_provider_label = (
+      provider_label.strip()
+      if isinstance(provider_label, str) and provider_label.strip()
+      else None
+    )
+    normalized_requested_by_tab_id = (
+      requested_by_tab_id.strip()
+      if isinstance(requested_by_tab_id, str) and requested_by_tab_id.strip()
+      else None
+    )
+    normalized_status = status.strip().lower() if isinstance(status, str) and status.strip() else None
+    normalized_limit = max(1, min(limit, 500))
+    search_value = search.strip().lower() if isinstance(search, str) and search.strip() else None
+    filtered = [
+      record
+      for record in self._list_provider_provenance_export_job_records()
+      if (normalized_focus_key is None or record.focus_key == normalized_focus_key)
+      and (normalized_symbol is None or record.symbol == normalized_symbol)
+      and (normalized_timeframe is None or record.timeframe == normalized_timeframe)
+      and (normalized_provider_label is None or normalized_provider_label in record.provider_labels)
+      and (
+        normalized_requested_by_tab_id is None
+        or record.requested_by_tab_id == normalized_requested_by_tab_id
+      )
+      and (normalized_status is None or record.status == normalized_status)
+      and self._matches_provider_provenance_export_job_search(record, search_value)
+    ]
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_export_job(
+    self,
+    job_id: str,
+  ) -> ProviderProvenanceExportJobRecord:
+    self._prune_provider_provenance_export_artifact_records()
+    self._prune_provider_provenance_export_job_records()
+    normalized_job_id = job_id.strip()
+    if not normalized_job_id:
+      raise LookupError("Provider provenance export job not found.")
+    record = self._load_provider_provenance_export_job_record(normalized_job_id)
+    if record is None:
+      raise LookupError("Provider provenance export job not found.")
+    if record.expires_at is not None and record.expires_at <= self._clock():
+      raise LookupError("Provider provenance export job has expired.")
+    return record
+
+  def get_provider_provenance_export_artifact(
+    self,
+    artifact_id: str,
+  ) -> ProviderProvenanceExportArtifactRecord:
+    self._prune_provider_provenance_export_artifact_records()
+    normalized_artifact_id = artifact_id.strip()
+    if not normalized_artifact_id:
+      raise LookupError("Provider provenance export artifact not found.")
+    record = self._load_provider_provenance_export_artifact_record(normalized_artifact_id)
+    if record is None:
+      raise LookupError("Provider provenance export artifact not found.")
+    if record.expires_at is not None and record.expires_at <= self._clock():
+      raise LookupError("Provider provenance export artifact has expired.")
+    return record
+
+  def download_provider_provenance_export_job(
+    self,
+    job_id: str,
+    *,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> dict[str, Any]:
+    record = self.get_provider_provenance_export_job(job_id)
+    artifact_content = record.content
+    if record.artifact_id:
+      artifact_record = self.get_provider_provenance_export_artifact(record.artifact_id)
+      artifact_content = artifact_record.content
+    self._record_provider_provenance_export_job_event(
+      record=record,
+      action="downloaded",
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+    )
+    return serialize_provider_provenance_export_job_record(
+      record,
+      include_content=True,
+      content=artifact_content,
+    )
+
+  def list_provider_provenance_export_job_history(
+    self,
+    job_id: str,
+  ) -> tuple[ProviderProvenanceExportJobAuditRecord, ...]:
+    record = self.get_provider_provenance_export_job(job_id)
+    self._prune_provider_provenance_export_job_audit_records()
+    return self._list_provider_provenance_export_job_audit_records(record.job_id)
 
   def prune_replay_intent_alias_audits(
     self,
@@ -24192,6 +24756,94 @@ def serialize_replay_intent_alias_audit_export_job_history(
     "job": serialize_replay_intent_alias_audit_export_job_record(record),
     "history": [
       serialize_replay_intent_alias_audit_export_job_audit_record(audit_record)
+      for audit_record in audit_records
+    ],
+  }
+
+
+def serialize_provider_provenance_export_job_record(
+  record: ProviderProvenanceExportJobRecord,
+  *,
+  include_content: bool = False,
+  content: str | None = None,
+) -> dict[str, Any]:
+  payload = {
+    "job_id": record.job_id,
+    "export_scope": record.export_scope,
+    "export_format": record.export_format,
+    "filename": record.filename,
+    "content_type": record.content_type,
+    "status": record.status,
+    "created_at": record.created_at.isoformat(),
+    "completed_at": record.completed_at.isoformat() if record.completed_at is not None else None,
+    "exported_at": record.exported_at.isoformat() if record.exported_at is not None else None,
+    "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+    "focus_key": record.focus_key,
+    "focus_label": record.focus_label,
+    "market_data_provider": record.market_data_provider,
+    "venue": record.venue,
+    "symbol": record.symbol,
+    "timeframe": record.timeframe,
+    "result_count": record.result_count,
+    "provider_provenance_count": record.provider_provenance_count,
+    "provider_labels": list(record.provider_labels),
+    "vendor_fields": list(record.vendor_fields),
+    "filter_summary": record.filter_summary,
+    "filters": deepcopy(record.filters),
+    "requested_by_tab_id": record.requested_by_tab_id,
+    "requested_by_tab_label": record.requested_by_tab_label,
+    "artifact_id": record.artifact_id,
+    "content_length": record.content_length,
+  }
+  if include_content:
+    payload["content"] = content if content is not None else record.content
+  return payload
+
+
+def serialize_provider_provenance_export_job_audit_record(
+  record: ProviderProvenanceExportJobAuditRecord,
+) -> dict[str, Any]:
+  return {
+    "audit_id": record.audit_id,
+    "job_id": record.job_id,
+    "action": record.action,
+    "recorded_at": record.recorded_at.isoformat(),
+    "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+    "export_scope": record.export_scope,
+    "export_format": record.export_format,
+    "focus_key": record.focus_key,
+    "focus_label": record.focus_label,
+    "symbol": record.symbol,
+    "timeframe": record.timeframe,
+    "market_data_provider": record.market_data_provider,
+    "requested_by_tab_id": record.requested_by_tab_id,
+    "requested_by_tab_label": record.requested_by_tab_label,
+    "source_tab_id": record.source_tab_id,
+    "source_tab_label": record.source_tab_label,
+    "detail": record.detail,
+  }
+
+
+def serialize_provider_provenance_export_job_list(
+  records: tuple[ProviderProvenanceExportJobRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_export_job_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
+def serialize_provider_provenance_export_job_history(
+  record: ProviderProvenanceExportJobRecord,
+  audit_records: tuple[ProviderProvenanceExportJobAuditRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "job": serialize_provider_provenance_export_job_record(record),
+    "history": [
+      serialize_provider_provenance_export_job_audit_record(audit_record)
       for audit_record in audit_records
     ],
   }

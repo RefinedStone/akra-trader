@@ -51,14 +51,18 @@ import type {
   RunSurfaceCollectionQueryRuntimeCandidateSample,
 } from "./features/query-builder";
 import {
+  createProviderProvenanceExportJob,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
+  downloadProviderProvenanceExportJob,
   downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   fetchJson,
+  getProviderProvenanceExportJobHistory,
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
+  listProviderProvenanceExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
@@ -254,6 +258,8 @@ import type {
   PresetStructuredDiffDeltaValue,
   PresetStructuredDiffGroup,
   PresetStructuredDiffRow,
+  ProviderProvenanceExportJobEntry,
+  ProviderProvenanceExportJobHistoryPayload,
   ProvenanceArtifactLineDetailView,
   ProvenanceArtifactLineMicroView,
   ReferenceSource,
@@ -2599,6 +2605,18 @@ export default function App() {
     useState<MarketDataProvenanceExportHistoryEntry[]>(
       () => initialMarketDataProvenanceExportStateRef.current?.history ?? [],
     );
+  const [sharedProviderProvenanceExports, setSharedProviderProvenanceExports] =
+    useState<ProviderProvenanceExportJobEntry[]>([]);
+  const [sharedProviderProvenanceExportsLoading, setSharedProviderProvenanceExportsLoading] = useState(false);
+  const [sharedProviderProvenanceExportsError, setSharedProviderProvenanceExportsError] = useState<string | null>(null);
+  const [selectedSharedProviderProvenanceExportJobId, setSelectedSharedProviderProvenanceExportJobId] =
+    useState<string | null>(null);
+  const [selectedSharedProviderProvenanceExportHistory, setSelectedSharedProviderProvenanceExportHistory] =
+    useState<ProviderProvenanceExportJobHistoryPayload | null>(null);
+  const [sharedProviderProvenanceExportHistoryLoading, setSharedProviderProvenanceExportHistoryLoading] =
+    useState(false);
+  const [sharedProviderProvenanceExportHistoryError, setSharedProviderProvenanceExportHistoryError] =
+    useState<string | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -4565,6 +4583,17 @@ export default function App() {
     return trimmed.length ? trimmed : fallback;
   }
 
+  async function fetchSharedProviderProvenanceExports(
+    instrument: MarketDataStatus["instruments"][number],
+  ) {
+    return listProviderProvenanceExportJobs({
+      focusKey: buildMarketDataInstrumentFocusKey(instrument),
+      symbol: resolveMarketDataSymbol(instrument.instrument_id),
+      timeframe: instrument.timeframe,
+      limit: 12,
+    });
+  }
+
   async function loadMarketDataWorkflow(
     instrument: MarketDataStatus["instruments"][number] | null,
   ) {
@@ -4575,10 +4604,19 @@ export default function App() {
       setMarketDataIngestionJobs([]);
       setMarketDataWorkflowError(null);
       setMarketDataWorkflowLoading(false);
+      setSharedProviderProvenanceExports([]);
+      setSharedProviderProvenanceExportsError(null);
+      setSharedProviderProvenanceExportsLoading(false);
+      setSelectedSharedProviderProvenanceExportJobId(null);
+      setSelectedSharedProviderProvenanceExportHistory(null);
+      setSharedProviderProvenanceExportHistoryLoading(false);
+      setSharedProviderProvenanceExportHistoryError(null);
       return;
     }
     setMarketDataWorkflowLoading(true);
     setMarketDataWorkflowError(null);
+    setSharedProviderProvenanceExportsLoading(true);
+    setSharedProviderProvenanceExportsError(null);
     try {
       const symbol = resolveMarketDataSymbol(instrument.instrument_id);
       const [lineageResponse, ingestionResponse] = await Promise.all([
@@ -4598,16 +4636,46 @@ export default function App() {
       }
       setMarketDataLineageHistory(lineageResponse);
       setMarketDataIngestionJobs(ingestionResponse);
+      try {
+        const sharedExportsResponse = await fetchSharedProviderProvenanceExports(instrument);
+        if (marketDataWorkflowRequestIdRef.current !== requestId) {
+          return;
+        }
+        setSharedProviderProvenanceExports(sharedExportsResponse.items);
+        if (
+          selectedSharedProviderProvenanceExportJobId
+          && !sharedExportsResponse.items.some((entry) => entry.job_id === selectedSharedProviderProvenanceExportJobId)
+        ) {
+          setSelectedSharedProviderProvenanceExportJobId(null);
+          setSelectedSharedProviderProvenanceExportHistory(null);
+          setSharedProviderProvenanceExportHistoryError(null);
+        }
+      } catch (error) {
+        if (marketDataWorkflowRequestIdRef.current !== requestId) {
+          return;
+        }
+        setSharedProviderProvenanceExports([]);
+        setSelectedSharedProviderProvenanceExportJobId(null);
+        setSelectedSharedProviderProvenanceExportHistory(null);
+        setSharedProviderProvenanceExportHistoryError(null);
+        setSharedProviderProvenanceExportsError((error as Error).message);
+      }
     } catch (error) {
       if (marketDataWorkflowRequestIdRef.current !== requestId) {
         return;
       }
       setMarketDataLineageHistory([]);
       setMarketDataIngestionJobs([]);
+      setSharedProviderProvenanceExports([]);
+      setSelectedSharedProviderProvenanceExportJobId(null);
+      setSelectedSharedProviderProvenanceExportHistory(null);
+      setSharedProviderProvenanceExportHistoryError(null);
+      setSharedProviderProvenanceExportsError(null);
       setMarketDataWorkflowError((error as Error).message);
     } finally {
       if (marketDataWorkflowRequestIdRef.current === requestId) {
         setMarketDataWorkflowLoading(false);
+        setSharedProviderProvenanceExportsLoading(false);
       }
     }
   }
@@ -4642,31 +4710,101 @@ export default function App() {
       await navigator.clipboard.writeText(
         content,
       );
+      const localEntry: MarketDataProvenanceExportHistoryEntry = {
+        export_id: `${buildMarketDataInstrumentFocusKey(activeMarketInstrument)}:${Date.now()}`,
+        exported_at: exportedAt,
+        focus_key: buildMarketDataInstrumentFocusKey(activeMarketInstrument),
+        focus_label: focusedMarketWorkflowSummary.focusLabel,
+        symbol: resolveMarketDataSymbol(activeMarketInstrument.instrument_id),
+        timeframe: activeMarketInstrument.timeframe,
+        provider: focusedMarketWorkflowExportPayload.focus.provider,
+        venue: focusedMarketWorkflowExportPayload.focus.venue,
+        result_count: filteredFocusedMarketProviderProvenanceEvents.length,
+        provider_provenance_count: focusedMarketProviderProvenanceCount,
+        provider_labels: Array.from(
+          new Set(filteredFocusedMarketProviderProvenanceEvents.map((record) => record.provider)),
+        ),
+        filter: marketDataProvenanceExportFilter,
+        content,
+      };
       setMarketDataProvenanceExportHistory((current) => [
-        {
-          export_id: `${buildMarketDataInstrumentFocusKey(activeMarketInstrument)}:${Date.now()}`,
-          exported_at: exportedAt,
-          focus_key: buildMarketDataInstrumentFocusKey(activeMarketInstrument),
-          focus_label: focusedMarketWorkflowSummary.focusLabel,
-          symbol: resolveMarketDataSymbol(activeMarketInstrument.instrument_id),
-          timeframe: activeMarketInstrument.timeframe,
-          provider: focusedMarketWorkflowExportPayload.focus.provider,
-          venue: focusedMarketWorkflowExportPayload.focus.venue,
-          result_count: filteredFocusedMarketProviderProvenanceEvents.length,
-          provider_provenance_count: focusedMarketProviderProvenanceCount,
-          provider_labels: Array.from(
-            new Set(filteredFocusedMarketProviderProvenanceEvents.map((record) => record.provider)),
-          ),
-          filter: marketDataProvenanceExportFilter,
-          content,
-        },
+        localEntry,
         ...current,
       ].slice(0, MAX_MARKET_DATA_PROVENANCE_EXPORT_HISTORY_ENTRIES));
-      setMarketDataWorkflowExportFeedback(
-        `Copied filtered triage export for ${focusedMarketWorkflowSummary.focusLabel} with ${filteredFocusedMarketProviderProvenanceEvents.length} result(s).`,
-      );
+      try {
+        const sharedEntry = await createProviderProvenanceExportJob({
+          content,
+          requestedByTabId: comparisonHistoryTabIdentity.tabId,
+          requestedByTabLabel: comparisonHistoryTabIdentity.label,
+        });
+        setSharedProviderProvenanceExports((current) => [
+          sharedEntry,
+          ...current.filter((entry) => entry.job_id !== sharedEntry.job_id),
+        ].slice(0, 12));
+        setSharedProviderProvenanceExportsError(null);
+        setMarketDataWorkflowExportFeedback(
+          `Copied filtered triage export for ${focusedMarketWorkflowSummary.focusLabel} and added shared registry entry ${shortenIdentifier(sharedEntry.job_id, 10)}.`,
+        );
+      } catch (error) {
+        setMarketDataWorkflowExportFeedback(
+          `Copied filtered triage export for ${focusedMarketWorkflowSummary.focusLabel}, but shared registry save failed: ${(error as Error).message}`,
+        );
+      }
     } catch {
       setMarketDataWorkflowExportFeedback("Clipboard copy failed for the triage export.");
+    }
+  }
+
+  async function loadSharedProviderProvenanceExportHistory(jobId: string) {
+    if (!jobId.trim()) {
+      return;
+    }
+    if (selectedSharedProviderProvenanceExportJobId === jobId && selectedSharedProviderProvenanceExportHistory) {
+      setSelectedSharedProviderProvenanceExportJobId(null);
+      setSelectedSharedProviderProvenanceExportHistory(null);
+      setSharedProviderProvenanceExportHistoryError(null);
+      return;
+    }
+    setSelectedSharedProviderProvenanceExportJobId(jobId);
+    setSelectedSharedProviderProvenanceExportHistory(null);
+    setSharedProviderProvenanceExportHistoryLoading(true);
+    setSharedProviderProvenanceExportHistoryError(null);
+    try {
+      const historyPayload = await getProviderProvenanceExportJobHistory(jobId);
+      setSelectedSharedProviderProvenanceExportHistory(historyPayload);
+    } catch (error) {
+      setSharedProviderProvenanceExportHistoryError((error as Error).message);
+    } finally {
+      setSharedProviderProvenanceExportHistoryLoading(false);
+    }
+  }
+
+  async function copySharedProviderProvenanceExport(
+    entry: ProviderProvenanceExportJobEntry,
+  ) {
+    if (!navigator.clipboard?.writeText) {
+      setMarketDataWorkflowExportFeedback("Clipboard is unavailable. Copy the shared export from dev tools instead.");
+      return;
+    }
+    try {
+      const downloadPayload = await downloadProviderProvenanceExportJob({
+        jobId: entry.job_id,
+        sourceTabId: comparisonHistoryTabIdentity.tabId,
+        sourceTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      await navigator.clipboard.writeText(downloadPayload.content);
+      setMarketDataWorkflowExportFeedback(
+        `Copied shared export ${shortenIdentifier(entry.job_id, 10)} for ${entry.focus_label ?? entry.symbol ?? "current focus"}.`,
+      );
+      if (selectedSharedProviderProvenanceExportJobId === entry.job_id) {
+        const historyPayload = await getProviderProvenanceExportJobHistory(entry.job_id);
+        setSelectedSharedProviderProvenanceExportHistory(historyPayload);
+        setSharedProviderProvenanceExportHistoryError(null);
+      }
+    } catch (error) {
+      setMarketDataWorkflowExportFeedback(
+        `Shared export copy failed for ${entry.focus_label ?? entry.job_id}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -6007,7 +6145,8 @@ export default function App() {
                                 <strong>Filtered provider readback incidents</strong>
                                 <p>
                                   Export the incidents whose selected market context came back from a provider-native
-                                  field path. Filters and history stay local to this browser.
+                                  field path. Filters stay local to this browser, while copied exports also land in
+                                  the shared registry.
                                 </p>
                               </div>
                               <div className="run-filter-workbench-actions">
@@ -6229,6 +6368,141 @@ export default function App() {
                                   ))}
                                 </tbody>
                               </table>
+                            ) : null}
+                            <div className="market-data-provenance-history-head">
+                              <strong>Team-shared export registry</strong>
+                              <p>
+                                {sharedProviderProvenanceExports.length
+                                  ? `${sharedProviderProvenanceExports.length} shared export snapshot(s) are available for this focus.`
+                                  : "No shared provider provenance exports recorded for this focus yet."}
+                              </p>
+                            </div>
+                            {sharedProviderProvenanceExportsLoading ? (
+                              <p className="empty-state">Loading shared export registry…</p>
+                            ) : null}
+                            {sharedProviderProvenanceExportsError ? (
+                              <p className="market-data-workflow-feedback">
+                                Shared registry load failed: {sharedProviderProvenanceExportsError}
+                              </p>
+                            ) : null}
+                            {sharedProviderProvenanceExports.length ? (
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Exported</th>
+                                    <th>Focus</th>
+                                    <th>Filter</th>
+                                    <th>Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {sharedProviderProvenanceExports.map((entry) => (
+                                    <tr key={entry.job_id}>
+                                      <td>{formatTimestamp(entry.exported_at ?? entry.created_at)}</td>
+                                      <td>
+                                        <strong>{entry.focus_label ?? "Unknown focus"}</strong>
+                                        <p className="run-lineage-symbol-copy">
+                                          {entry.market_data_provider ?? "n/a"} / {entry.venue ?? "n/a"} / {entry.symbol ?? "n/a"} · {entry.timeframe ?? "n/a"}
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          {entry.result_count} result(s) from {entry.provider_provenance_count} provenance incident(s)
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          Requested by {entry.requested_by_tab_label ?? entry.requested_by_tab_id ?? "unknown tab"}
+                                        </p>
+                                      </td>
+                                      <td>
+                                        <strong>{entry.filter_summary ?? "No filter summary recorded."}</strong>
+                                        <p className="run-lineage-symbol-copy">
+                                          Providers: {entry.provider_labels.length ? entry.provider_labels.join(", ") : "n/a"}
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          Vendor fields: {entry.vendor_fields.length ? entry.vendor_fields.join(", ") : "n/a"}
+                                        </p>
+                                      </td>
+                                      <td>
+                                        <div className="market-data-provenance-history-actions">
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => {
+                                              void copySharedProviderProvenanceExport(entry);
+                                            }}
+                                            type="button"
+                                          >
+                                            Copy export
+                                          </button>
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => {
+                                              void loadSharedProviderProvenanceExportHistory(entry.job_id);
+                                            }}
+                                            type="button"
+                                          >
+                                            {selectedSharedProviderProvenanceExportJobId === entry.job_id
+                                              && selectedSharedProviderProvenanceExportHistory
+                                              ? "Hide history"
+                                              : "View history"}
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : null}
+                            {selectedSharedProviderProvenanceExportJobId ? (
+                              <div className="market-data-provenance-shared-history">
+                                <div className="market-data-provenance-history-head">
+                                  <strong>Shared registry audit trail</strong>
+                                  <p>
+                                    {selectedSharedProviderProvenanceExportHistory?.job.focus_label
+                                      ? `${selectedSharedProviderProvenanceExportHistory.job.focus_label} · ${shortenIdentifier(selectedSharedProviderProvenanceExportJobId, 10)}`
+                                      : shortenIdentifier(selectedSharedProviderProvenanceExportJobId, 10)}
+                                  </p>
+                                </div>
+                                {sharedProviderProvenanceExportHistoryLoading ? (
+                                  <p className="empty-state">Loading shared export audit trail…</p>
+                                ) : null}
+                                {sharedProviderProvenanceExportHistoryError ? (
+                                  <p className="market-data-workflow-feedback">
+                                    Shared export audit load failed: {sharedProviderProvenanceExportHistoryError}
+                                  </p>
+                                ) : null}
+                                {selectedSharedProviderProvenanceExportHistory?.history.length ? (
+                                  <table className="data-table">
+                                    <thead>
+                                      <tr>
+                                        <th>When</th>
+                                        <th>Action</th>
+                                        <th>Actor</th>
+                                        <th>Detail</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {selectedSharedProviderProvenanceExportHistory.history.map((record) => (
+                                        <tr key={record.audit_id}>
+                                          <td>{formatTimestamp(record.recorded_at)}</td>
+                                          <td>{formatWorkflowToken(record.action)}</td>
+                                          <td>
+                                            <strong>{record.source_tab_label ?? record.requested_by_tab_label ?? "unknown tab"}</strong>
+                                            <p className="run-lineage-symbol-copy">
+                                              {record.source_tab_id ?? record.requested_by_tab_id ?? "No tab id recorded."}
+                                            </p>
+                                          </td>
+                                          <td>
+                                            <strong>{record.detail}</strong>
+                                            <p className="run-lineage-symbol-copy">
+                                              {record.market_data_provider ?? "n/a"} / {record.symbol ?? "n/a"} · {record.timeframe ?? "n/a"}
+                                            </p>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : selectedSharedProviderProvenanceExportHistory && !sharedProviderProvenanceExportHistoryLoading ? (
+                                  <p className="empty-state">No shared export audit events recorded yet.</p>
+                                ) : null}
+                              </div>
                             ) : null}
                           </div>
                         </div>

@@ -923,6 +923,167 @@ def build_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="operator_visibility",
   )
+  operator_provider_provenance_export_job_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_export_job_create",
+    route_path="/operator/provider-provenance-exports",
+    route_name="create_operator_provider_provenance_export_job",
+    response_title="Create provider provenance export job",
+    scope="app",
+    binding_kind="operator_provider_provenance_export_job_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_export_job_create",
+  )
+  operator_provider_provenance_export_job_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_export_job_list",
+    route_path="/operator/provider-provenance-exports",
+    route_name="list_operator_provider_provenance_export_jobs",
+    response_title="List provider provenance export jobs",
+    scope="app",
+    binding_kind="operator_provider_provenance_export_job_list",
+    filter_keys=(
+      "focus_key",
+      "symbol",
+      "timeframe",
+      "provider_label",
+      "requested_by_tab_id",
+      "status",
+      "search",
+      "limit",
+    ),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "focus_key",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=3),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Focus key",
+          description="Filter provider provenance export jobs by triage focus key.",
+          examples=("binance:BTC/USDT|5m",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "symbol",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=3),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Symbol",
+          description="Filter provider provenance export jobs by symbol.",
+          examples=("BTC/USDT",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "timeframe",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=2, max_length=10),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Timeframe",
+          description="Filter provider provenance export jobs by timeframe.",
+          examples=("5m",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "provider_label",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Provider label",
+          description="Filter provider provenance export jobs by linked provider label.",
+          examples=("pagerduty",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "requested_by_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Requested by tab ID",
+          description="Filter provider provenance export jobs by requesting tab identity.",
+          examples=("tab_local",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "status",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Status",
+          description="Filter provider provenance export jobs by status.",
+          examples=("completed",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search provider provenance export jobs by focus, requester, provider labels, or vendor fields.",
+          examples=("BTC/USDT",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=100,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=500),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of provider provenance export jobs to return.",
+          examples=(25,),
+        ),
+      ),
+    ),
+  )
+  operator_provider_provenance_export_job_download_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_export_job_download",
+    route_path="/operator/provider-provenance-exports/{job_id}/download",
+    route_name="download_operator_provider_provenance_export_job",
+    response_title="Download provider provenance export job",
+    scope="app",
+    binding_kind="operator_provider_provenance_export_job_download",
+    path_param_keys=("job_id",),
+    filter_keys=("source_tab_id", "source_tab_label"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "source_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Source tab ID",
+          description="Optional tab identity to attribute download audit events.",
+          examples=("tab_local",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "source_tab_label",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Source tab label",
+          description="Optional tab label to attribute download audit events.",
+          examples=("Control Room",),
+        ),
+      ),
+    ),
+  )
+  operator_provider_provenance_export_job_history_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_export_job_history",
+    route_path="/operator/provider-provenance-exports/{job_id}/history",
+    route_name="get_operator_provider_provenance_export_job_history",
+    response_title="Provider provenance export job history",
+    scope="app",
+    binding_kind="operator_provider_provenance_export_job_history",
+    path_param_keys=("job_id",),
+  )
   guarded_live_status_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="guarded_live_status",
     route_path="/guarded-live",
@@ -2159,6 +2320,10 @@ def build_standalone_surface_runtime_bindings(
     market_data_lineage_history_binding,
     market_data_ingestion_job_history_binding,
     operator_visibility_binding,
+    operator_provider_provenance_export_job_create_binding,
+    operator_provider_provenance_export_job_list_binding,
+    operator_provider_provenance_export_job_download_binding,
+    operator_provider_provenance_export_job_history_binding,
     guarded_live_status_binding,
     strategy_discovery_binding,
     reference_discovery_binding,

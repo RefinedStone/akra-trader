@@ -502,6 +502,35 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "request",
     "app",
   )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_export_job"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_export_jobs"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "focus_key",
+    "symbol",
+    "timeframe",
+    "provider_label",
+    "requested_by_tab_id",
+    "status",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["download_operator_provider_provenance_export_job"].endpoint).parameters) == (
+    "job_id",
+    "request",
+    "filter_expr",
+    "source_tab_id",
+    "source_tab_label",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["get_operator_provider_provenance_export_job_history"].endpoint).parameters) == (
+    "job_id",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_preset"].endpoint).parameters) == ("request", "app")
   assert tuple(inspect.signature(routes["update_preset"].endpoint).parameters) == ("preset_id", "request", "app")
   assert tuple(inspect.signature(routes["restore_preset_revision"].endpoint).parameters) == (
@@ -946,6 +975,78 @@ def test_replay_link_alias_audit_export_job_endpoints_require_scoped_tokens(tmp_
     headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
   )
   assert write_prune_response.status_code == 200
+
+
+def test_operator_provider_provenance_export_job_endpoints_round_trip(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  export_content = json.dumps(
+    {
+      "exported_at": "2026-04-22T00:00:00Z",
+      "export_scope": "provider_market_context_provenance",
+      "export_filter": {
+        "provider": "pagerduty",
+        "vendor_field": "custom_details.market_context",
+        "search_query": "",
+        "sort": "newest",
+      },
+      "export_filter_summary": "provider pagerduty / vendor field custom_details.market_context",
+      "export_result_count": 1,
+      "focus": {
+        "provider": "binance",
+        "venue": "binance",
+        "instrument_id": "binance:BTC/USDT",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "provider_provenance_incident_count": 2,
+      },
+      "provider_provenance_incidents": [
+        {
+          "event_id": "incident_1",
+          "provider": "pagerduty",
+          "vendor_field": "custom_details.market_context",
+        }
+      ],
+    },
+    indent=2,
+  )
+
+  create_response = client.post(
+    "/api/operator/provider-provenance-exports",
+    json={
+      "content": export_content,
+      "requested_by_tab_id": "tab_ops",
+      "requested_by_tab_label": "Ops desk",
+    },
+  )
+  assert create_response.status_code == 200
+  created_job = create_response.json()
+  assert created_job["focus_key"] == "binance:BTC/USDT|5m"
+  assert created_job["provider_labels"] == ["pagerduty"]
+
+  list_response = client.get(
+    "/api/operator/provider-provenance-exports",
+    params={"focus_key": "binance:BTC/USDT|5m", "limit": 10},
+  )
+  assert list_response.status_code == 200
+  list_payload = list_response.json()
+  assert list_payload["total"] == 1
+  assert list_payload["items"][0]["job_id"] == created_job["job_id"]
+
+  download_response = client.get(
+    f"/api/operator/provider-provenance-exports/{created_job['job_id']}/download",
+    params={"source_tab_id": "tab_review", "source_tab_label": "Review tab"},
+  )
+  assert download_response.status_code == 200
+  download_payload = download_response.json()
+  assert download_payload["content"] == export_content
+
+  history_response = client.get(
+    f"/api/operator/provider-provenance-exports/{created_job['job_id']}/history",
+  )
+  assert history_response.status_code == 200
+  history_payload = history_response.json()
+  assert [item["action"] for item in history_payload["history"]] == ["downloaded", "created"]
+  assert history_payload["history"][0]["source_tab_id"] == "tab_review"
 
 
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:

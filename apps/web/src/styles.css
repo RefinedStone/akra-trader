@@ -2407,6 +2407,14 @@ select {
   gap: 8px;
 }
 
+.market-data-provenance-shared-history {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .market-data-inline-focus-button {
   margin-top: 10px;
   padding: 8px 12px;

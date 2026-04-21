@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
+import json
 from pathlib import Path
 from typing import Any
 
@@ -14323,6 +14324,10 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "market_data_lineage_history",
     "market_data_ingestion_job_history",
     "operator_visibility",
+    "operator_provider_provenance_export_job_create",
+    "operator_provider_provenance_export_job_list",
+    "operator_provider_provenance_export_job_download",
+    "operator_provider_provenance_export_job_history",
     "guarded_live_status",
     "strategy_catalog_discovery",
     "reference_catalog_discovery",
@@ -14401,6 +14406,20 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["market_data_ingestion_job_history"].sort_field_specs[0].key == "started_at"
   assert bindings_by_key["market_data_ingestion_job_history"].sort_field_specs[-1].key == "fetched_candle_count"
   assert bindings_by_key["operator_visibility"].route_path == "/operator/visibility"
+  assert bindings_by_key["operator_provider_provenance_export_job_create"].methods == ("POST",)
+  assert (
+    bindings_by_key["operator_provider_provenance_export_job_create"].request_payload_kind
+    == "operator_provider_provenance_export_job_create"
+  )
+  assert bindings_by_key["operator_provider_provenance_export_job_list"].route_path == (
+    "/operator/provider-provenance-exports"
+  )
+  assert bindings_by_key["operator_provider_provenance_export_job_list"].filter_param_specs[0].key == "focus_key"
+  assert bindings_by_key["operator_provider_provenance_export_job_download"].path_param_keys == ("job_id",)
+  assert bindings_by_key["operator_provider_provenance_export_job_download"].filter_param_specs[0].key == "source_tab_id"
+  assert bindings_by_key["operator_provider_provenance_export_job_history"].route_path == (
+    "/operator/provider-provenance-exports/{job_id}/history"
+  )
   assert bindings_by_key["guarded_live_status"].route_path == "/guarded-live"
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
   assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[0].key == "lane"
@@ -15145,6 +15164,87 @@ def test_replay_link_alias_audit_admin_binding_enforces_scoped_tokens(tmp_path: 
     request_payload={"prune_mode": "expired"},
     headers={"x_akra_replay_audit_admin_token": "write-token"},
   )
+
+
+def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: Path) -> None:
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=build_runs_repository(tmp_path),
+  )
+  bindings_by_key = {
+    binding.surface_key: binding
+    for binding in list_standalone_surface_runtime_bindings(app.get_run_surface_capabilities())
+  }
+  export_content = json.dumps(
+    {
+      "exported_at": "2026-04-22T00:00:00Z",
+      "export_scope": "provider_market_context_provenance",
+      "export_filter": {
+        "provider": "pagerduty",
+        "vendor_field": "custom_details.market_context",
+        "search_query": "",
+        "sort": "newest",
+      },
+      "export_filter_summary": "provider pagerduty / vendor field custom_details.market_context",
+      "export_result_count": 1,
+      "focus": {
+        "provider": "binance",
+        "venue": "binance",
+        "instrument_id": "binance:BTC/USDT",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "provider_provenance_incident_count": 2,
+      },
+      "provider_provenance_incidents": [
+        {
+          "event_id": "incident_1",
+          "provider": "pagerduty",
+          "vendor_field": "custom_details.market_context",
+        }
+      ],
+    },
+    indent=2,
+  )
+
+  created_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_create"],
+    app=app,
+    request_payload={
+      "content": export_content,
+      "requested_by_tab_id": "tab_ops",
+      "requested_by_tab_label": "Ops desk",
+    },
+  )
+  assert created_payload["export_scope"] == "provider_market_context_provenance"
+  assert created_payload["focus_key"] == "binance:BTC/USDT|5m"
+  assert created_payload["provider_labels"] == ["pagerduty"]
+  assert created_payload["vendor_fields"] == ["custom_details.market_context"]
+
+  listed_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_list"],
+    app=app,
+    filters={"focus_key": "binance:BTC/USDT|5m", "limit": 10},
+  )
+  assert listed_payload["total"] == 1
+  assert listed_payload["items"][0]["job_id"] == created_payload["job_id"]
+
+  downloaded_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_download"],
+    app=app,
+    path_params={"job_id": created_payload["job_id"]},
+    filters={"source_tab_id": "tab_review", "source_tab_label": "Review tab"},
+  )
+  assert downloaded_payload["content"] == export_content
+
+  history_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_export_job_history"],
+    app=app,
+    path_params={"job_id": created_payload["job_id"]},
+  )
+  assert [item["action"] for item in history_payload["history"]] == ["downloaded", "created"]
+  assert history_payload["history"][0]["source_tab_id"] == "tab_review"
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

@@ -794,6 +794,70 @@ class ReplayIntentAliasAuditExportJobAuditRecord:
   detail: str = ""
 
 
+@dataclass(frozen=True)
+class ProviderProvenanceExportJobRecord:
+  job_id: str
+  export_scope: str
+  export_format: str
+  filename: str
+  content_type: str
+  status: str
+  created_at: datetime
+  completed_at: datetime | None = None
+  exported_at: datetime | None = None
+  expires_at: datetime | None = None
+  focus_key: str | None = None
+  focus_label: str | None = None
+  market_data_provider: str | None = None
+  venue: str | None = None
+  symbol: str | None = None
+  timeframe: str | None = None
+  result_count: int = 0
+  provider_provenance_count: int = 0
+  provider_labels: tuple[str, ...] = ()
+  vendor_fields: tuple[str, ...] = ()
+  filter_summary: str | None = None
+  filters: dict[str, Any] = field(default_factory=dict)
+  requested_by_tab_id: str | None = None
+  requested_by_tab_label: str | None = None
+  artifact_id: str | None = None
+  content_length: int = 0
+  content: str = ""
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceExportArtifactRecord:
+  artifact_id: str
+  job_id: str
+  filename: str
+  content_type: str
+  content: str
+  created_at: datetime
+  expires_at: datetime | None = None
+  byte_length: int = 0
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceExportJobAuditRecord:
+  audit_id: str
+  job_id: str
+  action: str
+  recorded_at: datetime
+  expires_at: datetime | None = None
+  export_scope: str | None = None
+  export_format: str | None = None
+  focus_key: str | None = None
+  focus_label: str | None = None
+  symbol: str | None = None
+  timeframe: str | None = None
+  market_data_provider: str | None = None
+  requested_by_tab_id: str | None = None
+  requested_by_tab_label: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+  detail: str = ""
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "

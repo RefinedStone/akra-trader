@@ -81,6 +81,18 @@ def serialize_replay_intent_alias_audit_export_job_history(*args, **kwargs):
   return _application_symbol('serialize_replay_intent_alias_audit_export_job_history')(*args, **kwargs)
 
 
+def serialize_provider_provenance_export_job_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_export_job_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_export_job_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_export_job_list')(*args, **kwargs)
+
+
+def serialize_provider_provenance_export_job_history(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_export_job_history')(*args, **kwargs)
+
+
 def serialize_strategy(*args, **kwargs):
   return _application_symbol('serialize_strategy')(*args, **kwargs)
 
@@ -399,6 +411,39 @@ def execute_standalone_surface_binding(
     ]
   if binding.binding_kind == "operator_visibility":
     return asdict(app.get_operator_visibility())
+  if binding.binding_kind == "operator_provider_provenance_export_job_create":
+    return serialize_provider_provenance_export_job_record(
+      app.create_provider_provenance_export_job(
+        content=resolved_payload.get("content", ""),
+        requested_by_tab_id=resolved_payload.get("requested_by_tab_id"),
+        requested_by_tab_label=resolved_payload.get("requested_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_export_job_list":
+    return serialize_provider_provenance_export_job_list(
+      app.list_provider_provenance_export_jobs(
+        focus_key=resolved_filters.get("focus_key"),
+        symbol=resolved_filters.get("symbol"),
+        timeframe=resolved_filters.get("timeframe"),
+        provider_label=resolved_filters.get("provider_label"),
+        requested_by_tab_id=resolved_filters.get("requested_by_tab_id"),
+        status=resolved_filters.get("status"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 100),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_export_job_download":
+    return app.download_provider_provenance_export_job(
+      resolved_path_params["job_id"],
+      source_tab_id=resolved_filters.get("source_tab_id"),
+      source_tab_label=resolved_filters.get("source_tab_label"),
+    )
+  if binding.binding_kind == "operator_provider_provenance_export_job_history":
+    export_job = app.get_provider_provenance_export_job(resolved_path_params["job_id"])
+    return serialize_provider_provenance_export_job_history(
+      export_job,
+      app.list_provider_provenance_export_job_history(resolved_path_params["job_id"]),
+    )
   if binding.binding_kind == "guarded_live_status":
     return asdict(app.get_guarded_live_status())
   if binding.binding_kind == "strategy_catalog_discovery":

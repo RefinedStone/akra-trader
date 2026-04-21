@@ -2,6 +2,9 @@ import { apiBase } from "./controlRoomDefinitions";
 import type {
   MarketDataIngestionJobRecord,
   MarketDataLineageHistoryRecord,
+  ProviderProvenanceExportJobEntry,
+  ProviderProvenanceExportJobHistoryPayload,
+  ProviderProvenanceExportJobListPayload,
   RunSurfaceCollectionQueryBuilderReplayIntentSnapshot,
   RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy,
   RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy,
@@ -91,6 +94,86 @@ export async function listMarketDataIngestionJobs(params: {
   }
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<MarketDataIngestionJobRecord[]>(`/market-data/ingestion-jobs${suffix}`);
+}
+
+export async function createProviderProvenanceExportJob(params: {
+  content: string;
+  requestedByTabId?: string;
+  requestedByTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceExportJobEntry>("/operator/provider-provenance-exports", {
+    method: "POST",
+    body: JSON.stringify({
+      content: params.content,
+      ...(params.requestedByTabId?.trim() ? { requested_by_tab_id: params.requestedByTabId.trim() } : {}),
+      ...(params.requestedByTabLabel?.trim() ? { requested_by_tab_label: params.requestedByTabLabel.trim() } : {}),
+    }),
+  });
+}
+
+export async function listProviderProvenanceExportJobs(params: {
+  focusKey?: string;
+  limit?: number;
+  providerLabel?: string;
+  requestedByTabId?: string;
+  search?: string;
+  status?: string;
+  symbol?: string;
+  timeframe?: string;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.focusKey?.trim()) {
+    searchParams.set("focus_key", params.focusKey.trim());
+  }
+  if (params.symbol?.trim()) {
+    searchParams.set("symbol", params.symbol.trim());
+  }
+  if (params.timeframe?.trim()) {
+    searchParams.set("timeframe", params.timeframe.trim());
+  }
+  if (params.providerLabel?.trim()) {
+    searchParams.set("provider_label", params.providerLabel.trim());
+  }
+  if (params.requestedByTabId?.trim()) {
+    searchParams.set("requested_by_tab_id", params.requestedByTabId.trim());
+  }
+  if (params.status?.trim()) {
+    searchParams.set("status", params.status.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 500))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceExportJobListPayload>(
+    `/operator/provider-provenance-exports${suffix}`,
+  );
+}
+
+export async function downloadProviderProvenanceExportJob(params: {
+  jobId: string;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params.sourceTabId?.trim()) {
+    searchParams.set("source_tab_id", params.sourceTabId.trim());
+  }
+  if (params.sourceTabLabel?.trim()) {
+    searchParams.set("source_tab_label", params.sourceTabLabel.trim());
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceExportJobEntry & { content: string }>(
+    `/operator/provider-provenance-exports/${encodeURIComponent(params.jobId)}/download${suffix}`,
+  );
+}
+
+export async function getProviderProvenanceExportJobHistory(jobId: string) {
+  return fetchJson<ProviderProvenanceExportJobHistoryPayload>(
+    `/operator/provider-provenance-exports/${encodeURIComponent(jobId)}/history`,
+  );
 }
 
 export async function createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias(

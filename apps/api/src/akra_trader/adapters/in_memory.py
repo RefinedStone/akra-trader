@@ -26,6 +26,9 @@ from akra_trader.domain.models import ReplayIntentAliasAuditExportArtifactRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
+from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
+from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
+from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyCatalogSemantics
@@ -267,6 +270,9 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._replay_intent_alias_audit_export_artifacts: OrderedDict[str, ReplayIntentAliasAuditExportArtifactRecord] = OrderedDict()
     self._replay_intent_alias_audit_export_jobs: OrderedDict[str, ReplayIntentAliasAuditExportJobRecord] = OrderedDict()
     self._replay_intent_alias_audit_export_job_audit_records: OrderedDict[str, ReplayIntentAliasAuditExportJobAuditRecord] = OrderedDict()
+    self._provider_provenance_export_artifacts: OrderedDict[str, ProviderProvenanceExportArtifactRecord] = OrderedDict()
+    self._provider_provenance_export_jobs: OrderedDict[str, ProviderProvenanceExportJobRecord] = OrderedDict()
+    self._provider_provenance_export_job_audit_records: OrderedDict[str, ProviderProvenanceExportJobAuditRecord] = OrderedDict()
     self._replay_intent_alias_signing_secret: str | None = None
 
   def save_run(self, run: RunRecord) -> RunRecord:
@@ -501,6 +507,127 @@ class InMemoryRunRepository(RunRepositoryPort):
       if record.expires_at is None or record.expires_at > current_time
     )
     return original_count - len(self._replay_intent_alias_audit_export_job_audit_records)
+
+  def save_provider_provenance_export_artifact(
+    self,
+    record: ProviderProvenanceExportArtifactRecord,
+  ) -> ProviderProvenanceExportArtifactRecord:
+    self._provider_provenance_export_artifacts[record.artifact_id] = record
+    return record
+
+  def get_provider_provenance_export_artifact(
+    self,
+    artifact_id: str,
+  ) -> ProviderProvenanceExportArtifactRecord | None:
+    return self._provider_provenance_export_artifacts.get(artifact_id)
+
+  def delete_provider_provenance_export_artifacts(self, artifact_ids: tuple[str, ...]) -> int:
+    deleted_count = 0
+    for artifact_id in artifact_ids:
+      if artifact_id in self._provider_provenance_export_artifacts:
+        deleted_count += 1
+        del self._provider_provenance_export_artifacts[artifact_id]
+    return deleted_count
+
+  def prune_provider_provenance_export_artifacts(self, current_time: datetime) -> int:
+    original_count = len(self._provider_provenance_export_artifacts)
+    self._provider_provenance_export_artifacts = OrderedDict(
+      (
+        artifact_id,
+        record,
+      )
+      for artifact_id, record in self._provider_provenance_export_artifacts.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._provider_provenance_export_artifacts)
+
+  def save_provider_provenance_export_job(
+    self,
+    record: ProviderProvenanceExportJobRecord,
+  ) -> ProviderProvenanceExportJobRecord:
+    self._provider_provenance_export_jobs[record.job_id] = record
+    return record
+
+  def get_provider_provenance_export_job(
+    self,
+    job_id: str,
+  ) -> ProviderProvenanceExportJobRecord | None:
+    return self._provider_provenance_export_jobs.get(job_id)
+
+  def list_provider_provenance_export_jobs(
+    self,
+  ) -> tuple[ProviderProvenanceExportJobRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_export_jobs.values(),
+        key=lambda record: (record.exported_at or record.created_at, record.job_id),
+        reverse=True,
+      )
+    )
+
+  def prune_provider_provenance_export_jobs(self, current_time: datetime) -> int:
+    original_count = len(self._provider_provenance_export_jobs)
+    self._provider_provenance_export_jobs = OrderedDict(
+      (
+        job_id,
+        record,
+      )
+      for job_id, record in self._provider_provenance_export_jobs.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._provider_provenance_export_jobs)
+
+  def delete_provider_provenance_export_jobs(self, job_ids: tuple[str, ...]) -> int:
+    deleted_count = 0
+    for job_id in job_ids:
+      if job_id in self._provider_provenance_export_jobs:
+        deleted_count += 1
+        del self._provider_provenance_export_jobs[job_id]
+    return deleted_count
+
+  def save_provider_provenance_export_job_audit_record(
+    self,
+    record: ProviderProvenanceExportJobAuditRecord,
+  ) -> ProviderProvenanceExportJobAuditRecord:
+    self._provider_provenance_export_job_audit_records[record.audit_id] = record
+    return record
+
+  def list_provider_provenance_export_job_audit_records(
+    self,
+    job_id: str | None = None,
+  ) -> tuple[ProviderProvenanceExportJobAuditRecord, ...]:
+    records = [
+      record
+      for record in self._provider_provenance_export_job_audit_records.values()
+      if job_id is None or record.job_id == job_id
+    ]
+    return tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def delete_provider_provenance_export_job_audit_records(self, audit_ids: tuple[str, ...]) -> int:
+    deleted_count = 0
+    for audit_id in audit_ids:
+      if audit_id in self._provider_provenance_export_job_audit_records:
+        deleted_count += 1
+        del self._provider_provenance_export_job_audit_records[audit_id]
+    return deleted_count
+
+  def prune_provider_provenance_export_job_audit_records(self, current_time: datetime) -> int:
+    original_count = len(self._provider_provenance_export_job_audit_records)
+    self._provider_provenance_export_job_audit_records = OrderedDict(
+      (
+        audit_id,
+        record,
+      )
+      for audit_id, record in self._provider_provenance_export_job_audit_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._provider_provenance_export_job_audit_records)
 
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     return self._replay_intent_alias_signing_secret

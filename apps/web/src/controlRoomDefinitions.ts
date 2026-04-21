@@ -1017,6 +1017,66 @@ export type MarketDataProvenanceExportStateV1 = {
   history: MarketDataProvenanceExportHistoryEntry[];
 };
 
+export type ProviderProvenanceExportJobEntry = {
+  job_id: string;
+  export_scope: string;
+  export_format: string;
+  filename: string;
+  content_type: string;
+  status: string;
+  created_at: string;
+  completed_at?: string | null;
+  exported_at?: string | null;
+  expires_at?: string | null;
+  focus_key?: string | null;
+  focus_label?: string | null;
+  market_data_provider?: string | null;
+  venue?: string | null;
+  symbol?: string | null;
+  timeframe?: string | null;
+  result_count: number;
+  provider_provenance_count: number;
+  provider_labels: string[];
+  vendor_fields: string[];
+  filter_summary?: string | null;
+  filters: Record<string, unknown>;
+  requested_by_tab_id?: string | null;
+  requested_by_tab_label?: string | null;
+  artifact_id?: string | null;
+  content_length: number;
+  content?: string;
+};
+
+export type ProviderProvenanceExportJobAuditRecord = {
+  audit_id: string;
+  job_id: string;
+  action: string;
+  recorded_at: string;
+  expires_at?: string | null;
+  export_scope?: string | null;
+  export_format?: string | null;
+  focus_key?: string | null;
+  focus_label?: string | null;
+  symbol?: string | null;
+  timeframe?: string | null;
+  market_data_provider?: string | null;
+  requested_by_tab_id?: string | null;
+  requested_by_tab_label?: string | null;
+  source_tab_id?: string | null;
+  source_tab_label?: string | null;
+  detail: string;
+};
+
+export type ProviderProvenanceExportJobListPayload = {
+  items: ProviderProvenanceExportJobEntry[];
+  total: number;
+};
+
+export type ProviderProvenanceExportJobHistoryPayload = {
+  job: ProviderProvenanceExportJobEntry;
+  history: ProviderProvenanceExportJobAuditRecord[];
+};
+
 export type OperatorAlertMarketContextFieldProvenance = {
   scope?: string | null;
   path?: string | null;

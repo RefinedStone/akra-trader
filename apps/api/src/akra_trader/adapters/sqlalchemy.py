@@ -27,6 +27,9 @@ from akra_trader.domain.models import ReplayIntentAliasAuditExportArtifactRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
+from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
+from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
+from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.ports import ExperimentPresetCatalogPort
@@ -118,6 +121,41 @@ replay_intent_alias_audit_export_job_audit_records = Table(
   Column("expires_at", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_export_jobs = Table(
+  "provider_provenance_export_jobs",
+  metadata,
+  Column("job_id", String, primary_key=True),
+  Column("focus_key", String, nullable=True, index=True),
+  Column("symbol", String, nullable=True, index=True),
+  Column("timeframe", String, nullable=True, index=True),
+  Column("market_data_provider", String, nullable=True, index=True),
+  Column("export_format", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("created_at", String, nullable=False, index=True),
+  Column("exported_at", String, nullable=True, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("requested_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_export_artifacts = Table(
+  "provider_provenance_export_artifacts",
+  metadata,
+  Column("artifact_id", String, primary_key=True),
+  Column("job_id", String, nullable=False, index=True),
+  Column("created_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_export_job_audit_records = Table(
+  "provider_provenance_export_job_audit_records",
+  metadata,
+  Column("audit_id", String, primary_key=True),
+  Column("job_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 replay_intent_alias_state = Table(
   "replay_intent_alias_state",
   metadata,
@@ -147,6 +185,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   _replay_alias_audit_export_artifact_adapter = TypeAdapter(ReplayIntentAliasAuditExportArtifactRecord)
   _replay_alias_audit_export_job_adapter = TypeAdapter(ReplayIntentAliasAuditExportJobRecord)
   _replay_alias_audit_export_job_audit_adapter = TypeAdapter(ReplayIntentAliasAuditExportJobAuditRecord)
+  _provider_provenance_export_artifact_adapter = TypeAdapter(ProviderProvenanceExportArtifactRecord)
+  _provider_provenance_export_job_adapter = TypeAdapter(ProviderProvenanceExportJobRecord)
+  _provider_provenance_export_job_audit_adapter = TypeAdapter(ProviderProvenanceExportJobAuditRecord)
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
@@ -565,6 +606,222 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         delete(replay_intent_alias_audit_export_job_audit_records).where(
           replay_intent_alias_audit_export_job_audit_records.c.expires_at.is_not(None),
           replay_intent_alias_audit_export_job_audit_records.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
+  def save_provider_provenance_export_artifact(
+    self,
+    record: ProviderProvenanceExportArtifactRecord,
+  ) -> ProviderProvenanceExportArtifactRecord:
+    payload = self._provider_provenance_export_artifact_adapter.dump_python(record, mode="json")
+    row = {
+      "artifact_id": record.artifact_id,
+      "job_id": record.job_id,
+      "created_at": record.created_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_export_artifacts.c.artifact_id).where(
+          provider_provenance_export_artifacts.c.artifact_id == record.artifact_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_export_artifacts).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_export_artifacts)
+          .where(provider_provenance_export_artifacts.c.artifact_id == record.artifact_id)
+          .values(**row)
+        )
+    return record
+
+  def get_provider_provenance_export_artifact(
+    self,
+    artifact_id: str,
+  ) -> ProviderProvenanceExportArtifactRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_export_artifacts.c.payload).where(
+          provider_provenance_export_artifacts.c.artifact_id == artifact_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_export_artifact_adapter.validate_python(row["payload"])
+
+  def delete_provider_provenance_export_artifacts(self, artifact_ids: tuple[str, ...]) -> int:
+    if not artifact_ids:
+      return 0
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_export_artifacts).where(
+          provider_provenance_export_artifacts.c.artifact_id.in_(artifact_ids)
+        )
+      )
+    return result.rowcount or 0
+
+  def prune_provider_provenance_export_artifacts(self, current_time: datetime) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_export_artifacts).where(
+          provider_provenance_export_artifacts.c.expires_at.is_not(None),
+          provider_provenance_export_artifacts.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
+  def save_provider_provenance_export_job(
+    self,
+    record: ProviderProvenanceExportJobRecord,
+  ) -> ProviderProvenanceExportJobRecord:
+    payload = self._provider_provenance_export_job_adapter.dump_python(record, mode="json")
+    row = {
+      "job_id": record.job_id,
+      "focus_key": record.focus_key,
+      "symbol": record.symbol,
+      "timeframe": record.timeframe,
+      "market_data_provider": record.market_data_provider,
+      "export_format": record.export_format,
+      "status": record.status,
+      "created_at": record.created_at.isoformat(),
+      "exported_at": record.exported_at.isoformat() if record.exported_at is not None else None,
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "requested_by_tab_id": record.requested_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_export_jobs.c.job_id).where(
+          provider_provenance_export_jobs.c.job_id == record.job_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_export_jobs).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_export_jobs)
+          .where(provider_provenance_export_jobs.c.job_id == record.job_id)
+          .values(**row)
+        )
+    return record
+
+  def get_provider_provenance_export_job(
+    self,
+    job_id: str,
+  ) -> ProviderProvenanceExportJobRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_export_jobs.c.payload).where(
+          provider_provenance_export_jobs.c.job_id == job_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_export_job_adapter.validate_python(row["payload"])
+
+  def list_provider_provenance_export_jobs(
+    self,
+  ) -> tuple[ProviderProvenanceExportJobRecord, ...]:
+    statement = select(provider_provenance_export_jobs.c.payload).order_by(
+      provider_provenance_export_jobs.c.exported_at.desc(),
+      provider_provenance_export_jobs.c.created_at.desc(),
+      provider_provenance_export_jobs.c.job_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_export_job_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def prune_provider_provenance_export_jobs(self, current_time: datetime) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_export_jobs).where(
+          provider_provenance_export_jobs.c.expires_at.is_not(None),
+          provider_provenance_export_jobs.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
+  def delete_provider_provenance_export_jobs(self, job_ids: tuple[str, ...]) -> int:
+    if not job_ids:
+      return 0
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_export_jobs).where(
+          provider_provenance_export_jobs.c.job_id.in_(job_ids)
+        )
+      )
+    return result.rowcount or 0
+
+  def save_provider_provenance_export_job_audit_record(
+    self,
+    record: ProviderProvenanceExportJobAuditRecord,
+  ) -> ProviderProvenanceExportJobAuditRecord:
+    payload = self._provider_provenance_export_job_audit_adapter.dump_python(record, mode="json")
+    row = {
+      "audit_id": record.audit_id,
+      "job_id": record.job_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_export_job_audit_records.c.audit_id).where(
+          provider_provenance_export_job_audit_records.c.audit_id == record.audit_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_export_job_audit_records).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_export_job_audit_records)
+          .where(provider_provenance_export_job_audit_records.c.audit_id == record.audit_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_export_job_audit_records(
+    self,
+    job_id: str | None = None,
+  ) -> tuple[ProviderProvenanceExportJobAuditRecord, ...]:
+    statement = select(provider_provenance_export_job_audit_records.c.payload)
+    if job_id is not None:
+      statement = statement.where(provider_provenance_export_job_audit_records.c.job_id == job_id)
+    statement = statement.order_by(
+      provider_provenance_export_job_audit_records.c.recorded_at.desc(),
+      provider_provenance_export_job_audit_records.c.audit_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_export_job_audit_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def delete_provider_provenance_export_job_audit_records(self, audit_ids: tuple[str, ...]) -> int:
+    if not audit_ids:
+      return 0
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_export_job_audit_records).where(
+          provider_provenance_export_job_audit_records.c.audit_id.in_(audit_ids)
+        )
+      )
+    return result.rowcount or 0
+
+  def prune_provider_provenance_export_job_audit_records(self, current_time: datetime) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_export_job_audit_records).where(
+          provider_provenance_export_job_audit_records.c.expires_at.is_not(None),
+          provider_provenance_export_job_audit_records.c.expires_at <= current_time.isoformat(),
         )
       )
     return result.rowcount or 0
