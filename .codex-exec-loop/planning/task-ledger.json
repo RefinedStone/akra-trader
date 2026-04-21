@@ -348,18 +348,18 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add time-series provenance dashboards for provider drift and export burn-up",
       "description": "Extend the new registry-snapshot analytics into time-series views so operators can inspect provider drift timelines, export burn-up, and trend movement over time instead of relying only on current rollups.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 77,
       "dynamic_priority_delta": 19,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T00:36:00+09:00",
+      "updated_at": "2026-04-22T00:48:38+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-analytics-aggregation"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says the shipped analytics remain registry-snapshot based and still lack time-axis trend, burn-up, and provider drift timeline dashboards.",
-      "priority_reason": "Builtin next-task needs one deterministic continuation, and the time-series analytics slice is the clearest direct follow-up because the new rollups and shared registry are already in place while the missing trend views were named first in the latest reply."
+      "direction_relation_note": "Completed on main in commit 7dbcd30 with backend window_days support and daily time_series analytics for provider_drift and export_burn_up, plus control-room 7/14/30 day selectors, daily drift tables, burn-up dashboards, and matching docs updates.",
+      "priority_reason": "Closed after targeted API pytest coverage, compileall verification, web typecheck/build, commit, and push all landed; the remaining explicit follow-ups are server-side saved views/reporting, threshold-based provider-drift alerting, and finer-grained hourly drill-down."
     },
     {
       "id": "task-b1-provider-market-context-cross-focus-pagination",
@@ -376,26 +376,62 @@
       "depends_on": [
         "task-b1-provider-market-context-analytics-aggregation"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly notes that cross-focus querying still centers on a recent-result window and does not yet support server-side pagination or deeper query UX for very large registries.",
-      "priority_reason": "This is executable follow-up work, but it stays proposed behind the time-series dashboard slice so the queue keeps one deterministic next task while deeper large-registry query semantics are scoped against the newly shipped workbench."
+      "direction_relation_note": "This remains a valid scalability follow-up for the provenance workbench, but it was not one of the explicit remaining gaps called out after the time-series dashboards shipped.",
+      "priority_reason": "Keep this proposed behind the newer explicit follow-ups from the latest main-session reply so builtin next-task advances through the operator-visible reporting and alerting gaps first."
     },
     {
       "id": "task-b1-provider-market-context-saved-views-reporting",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Add saved analytics presets, shared dashboard views, and scheduled provenance reports",
-      "description": "Productize the new provenance analytics by letting operators save query presets, share dashboard views across the team, and schedule or export recurring analytics reports.",
-      "status": "proposed",
+      "title": "Add server-side saved analytics presets, shared dashboard views, and scheduled provenance reports",
+      "description": "Productize the new provenance analytics by persisting server-side query presets and shared dashboard views, then using them to drive scheduled or exported recurring provenance reports without browser-local-only state.",
+      "status": "ready",
       "base_priority": 73,
-      "dynamic_priority_delta": 16,
+      "dynamic_priority_delta": 20,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T00:38:00+09:00",
+      "updated_at": "2026-04-22T00:48:38+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-analytics-aggregation"
+        "task-b1-provider-market-context-timeseries-analytics"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly lists saved analytics presets, team-shared dashboard views, and scheduled or exported analytics reports as remaining gaps after the shipped aggregation and cross-focus work.",
-      "priority_reason": "This remains proposed because it is clearly executable but sits behind the next visibility and scalability follow-ups; scheduling and team-shared report productization will be easier once time-series and large-registry query behavior are settled."
+      "direction_relation_note": "The latest main-session reply explicitly lists server-side saved dashboard presets, shared views, and scheduled analytics reports as the first remaining productization gap after commit 7dbcd30 shipped the daily time-series dashboards.",
+      "priority_reason": "Promoted to ready as the deterministic next task because it directly matches the explicit remaining checklist from the latest main-session reply and can build on the just-shipped time-series windows without waiting for further operator judgment."
+    },
+    {
+      "id": "task-b1-provider-market-context-drift-threshold-alerting",
+      "direction_id": "runtime-ops",
+      "title": "Add threshold-based provider-drift alerting on provenance analytics",
+      "description": "Turn the new provider drift analytics into actionable runtime ops signals by defining threshold rules, backend evaluation, and operator-visible alerts when provider provenance drift exceeds configured bounds.",
+      "status": "proposed",
+      "base_priority": 74,
+      "dynamic_priority_delta": 18,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T00:48:38+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-timeseries-analytics"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly calls out threshold-based provider-drift alerting as a remaining gap after the daily provenance dashboard slice landed.",
+      "priority_reason": "This is clearly executable follow-up work, but it stays proposed behind saved views and scheduled reporting so the queue advances through one operator-facing productization slice at a time."
+    },
+    {
+      "id": "task-b1-provider-market-context-hourly-drilldown",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add hourly provenance drill-down beneath daily drift and burn-up dashboards",
+      "description": "Extend the daily-only provenance analytics with finer-grained hourly buckets and drill-down UI so operators can inspect intraday provider drift and export activity without dropping to raw incident timelines.",
+      "status": "proposed",
+      "base_priority": 71,
+      "dynamic_priority_delta": 17,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T00:48:38+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-timeseries-analytics"
+      ],
+      "direction_relation_note": "The latest main-session reply says the new time-series view is daily-only and still lacks any finer-grained hourly drill-down.",
+      "priority_reason": "This is executable follow-up work, but it remains proposed behind the reporting productization slice so the queue keeps one deterministic next task while intraday bucket semantics are scoped cleanly."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
