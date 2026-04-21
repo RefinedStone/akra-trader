@@ -204,36 +204,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add explicit market-context blocks to provider workflow notes and action payloads",
       "description": "Replace free-text-heavy provider workflow notes and action payloads with an explicit market-context block so provider-side remediation steps and downstream operator workflows receive primary_focus, symbol list, and timeframe in a durable structured section instead of prose-only text.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T22:50:00+09:00",
+      "updated_at": "2026-04-21T23:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-primary-focus-pull-normalization"
       ],
-      "direction_relation_note": "The latest main-session reply says the send/receive primary_focus contract is now restored, and explicitly calls out provider workflow notes and action payloads as the next remaining gap because they still rely on free text instead of a structured market-context block.",
-      "priority_reason": "This is now the clearest next executable task because the normalized market-context contract is symmetric end to end, so builtin next-task should convert provider workflow formatting to that same structured shape before adding deeper provider-specific schema enrichment."
+      "direction_relation_note": "Completed on main in commit 781a3eb with explicit nested market_context blocks added to provider workflow action payload creation and parsing plus separate Market context rendering in provider workflow notes/messages.",
+      "priority_reason": "Closed after targeted operator-delivery and application pytest coverage, compileall verification, docs alignment updates, commit, and push all landed; the remaining provider follow-up is vendor-native projection into each provider action HTTP body."
     },
     {
       "id": "task-b1-provider-schema-market-context-enrichment",
       "direction_id": "runtime-ops",
-      "title": "Project provider-native market context into dedicated provider_schema fields",
-      "description": "Enrich provider-native payload normalization so provider-side market context is projected into dedicated provider_schema fields in addition to the shared normalized incident fields, preserving richer third-party schema detail without forcing downstream consumers to parse raw payloads.",
-      "status": "proposed",
-      "base_priority": 80,
-      "dynamic_priority_delta": 15,
+      "title": "Project market_context into vendor-specific provider action fields",
+      "description": "Extend each external provider action HTTP body to map the shared market_context block into the provider's native custom field, metadata, or annotation slots so outbound remediation workflows carry durable market context in provider-native schema positions instead of only the shared generic payload.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 16,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T22:50:00+09:00",
+      "updated_at": "2026-04-21T23:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-primary-focus-pull-normalization"
+        "task-b1-provider-workflow-market-context-structure"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says provider-native market context still is not being projected into dedicated provider_schema fields even though shared normalized incident fields now restore symbol, symbols, timeframe, and primary_focus.",
-      "priority_reason": "This is executable follow-up work, but it stays proposed behind provider workflow payload restructuring so the queue keeps one deterministic next task while the provider-facing structured block contract settles."
+      "direction_relation_note": "The latest main-session reply says the shared workflow market_context block is now done, and explicitly narrows the remaining gap to projecting that context into each provider's vendor-specific action HTTP body fields or metadata slots.",
+      "priority_reason": "This is now the clearest next executable task because builtin next-task needs one immediate follow-up, and the main session directly identifies provider-native outbound projection as the remaining work after commit 781a3eb."
     },
     {
       "id": "task-b1-multi-symbol-risk-scoring-expansion",
