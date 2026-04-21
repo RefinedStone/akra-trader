@@ -276,18 +276,54 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Consume provider market_context provenance in control-room drill-down and export surfaces",
       "description": "Thread the preserved provider-returned market_context provenance into control-room drill-down, analytics, and export/reporting surfaces so operators can inspect which vendor-native field supplied each symbol, symbols, timeframe, and primary_focus claim during incident triage and handoff workflows.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 78,
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T23:35:00+09:00",
+      "updated_at": "2026-04-21T23:55:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-source-provenance-detail"
       ],
-      "direction_relation_note": "The latest main-session reply says provenance preservation is complete in commit ea10a84 and explicitly names the remaining consumer surfaces as control room, analytics/export, and operator drill-down, so this existing reporting task is broadened to cover the full operator-visible consumption slice instead of analytics alone.",
-      "priority_reason": "This is now the clearest next executable task because builtin next-task needs one immediate continuation and the main session directly identifies these consumer surfaces as the remaining work after the backend provenance contract shipped."
+      "direction_relation_note": "Completed on main in commit c4cbf69 with control-room incident drill-down, guarded-live incident rows, merged lineage incident history, and Copy triage export all consuming provider_recovery.market_context_provenance so operators can inspect vendor-native source paths directly in the shipped UI.",
+      "priority_reason": "Closed after the control-room provenance surfaces, clipboard triage export, docs updates, typecheck, build, commit, and push all landed; the remaining follow-up is export productization and analytics aggregation beyond the new clipboard JSON surface."
+    },
+    {
+      "id": "task-b1-provider-market-context-export-productization",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Productize provider provenance export with filters, sort, and persisted history",
+      "description": "Turn the new clipboard-only provider provenance triage export into an operator-grade workflow by adding provider-provenance-specific filter and sort controls plus persisted export history so handoffs and repeat incident reviews do not depend on one-off copy actions.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 18,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T23:55:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-analytics-export"
+      ],
+      "direction_relation_note": "The latest main-session reply says the shipped export is still only a clipboard JSON surface and explicitly calls out missing provider provenance filter/sort and persisted export history, making this the clearest immediate continuation.",
+      "priority_reason": "Builtin next-task needs one executable continuation, and this is the most concrete productization gap left after commit c4cbf69 before broader analytics or dashboard aggregation work."
+    },
+    {
+      "id": "task-b1-provider-market-context-analytics-aggregation",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add provider provenance analytics and dashboard aggregation",
+      "description": "Build analytics and dashboard rollups for provider-returned market_context provenance so operators can see recurring vendor-native source-path patterns, provenance quality drift, and export volume trends beyond per-incident drill-down views.",
+      "status": "proposed",
+      "base_priority": 76,
+      "dynamic_priority_delta": 13,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T23:55:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-analytics-export"
+      ],
+      "direction_relation_note": "The latest main-session reply lists analytics/dashboard aggregation as still missing, but it is broader than the immediate export productization slice and can remain proposed while the operator workflow hardens.",
+      "priority_reason": "This is real follow-up work, but it stays proposed behind the more immediate filter, sort, and persisted export workflow so the queue keeps one deterministic next task."
     },
     {
       "id": "task-b1-multi-symbol-risk-scoring-expansion",
