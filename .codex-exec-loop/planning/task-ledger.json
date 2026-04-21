@@ -222,18 +222,72 @@
       "direction_id": "runtime-ops",
       "title": "Project market_context into vendor-specific provider action fields",
       "description": "Extend each external provider action HTTP body to map the shared market_context block into the provider's native custom field, metadata, or annotation slots so outbound remediation workflows carry durable market context in provider-native schema positions instead of only the shared generic payload.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 16,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T23:05:00+09:00",
+      "updated_at": "2026-04-21T23:15:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-workflow-market-context-structure"
       ],
-      "direction_relation_note": "The latest main-session reply says the shared workflow market_context block is now done, and explicitly narrows the remaining gap to projecting that context into each provider's vendor-specific action HTTP body fields or metadata slots.",
-      "priority_reason": "This is now the clearest next executable task because builtin next-task needs one immediate follow-up, and the main session directly identifies provider-native outbound projection as the remaining work after commit 781a3eb."
+      "direction_relation_note": "Completed on main in commit 286a9e9 with provider-specific post-processors injecting market_context into PagerDuty custom_details, Opsgenie and FireHydrant details, and metadata for the remaining workflow providers while keeping the human-readable note/message block intact.",
+      "priority_reason": "Closed after targeted operator-delivery pytest coverage, compileall verification, docs alignment updates, commit, and push all landed; the next executable provider follow-up is downstream readback that restores and preserves this vendor-native structured context."
+    },
+    {
+      "id": "task-b1-provider-market-context-readback-provenance",
+      "direction_id": "runtime-ops",
+      "title": "Restore vendor-native market_context readback into normalized provenance fields",
+      "description": "Extend provider readback and sync normalization so vendor-native custom_details/details/metadata fields that now carry market_context are parsed back into normalized market context plus source provenance instead of remaining opaque nested provider payloads.",
+      "status": "done",
+      "base_priority": 83,
+      "dynamic_priority_delta": 17,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T23:25:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-schema-market-context-enrichment"
+      ],
+      "direction_relation_note": "Completed on main in commit ace4bbe with operator delivery normalization now restoring market_context from vendor-native custom_details/details/metadata blocks into normalized pull snapshots and provenance fields, with targeted operator_delivery and application sync coverage.",
+      "priority_reason": "Closed after targeted pytest coverage for operator delivery and application sync plus compileall verification, docs status updates, commit, and push all landed; the next immediate provider follow-up is finer-grained source provenance preservation before analytics and export consumers depend on it."
+    },
+    {
+      "id": "task-b1-provider-market-context-source-provenance-detail",
+      "direction_id": "runtime-ops",
+      "title": "Preserve provider-specific source provenance for restored market_context fields",
+      "description": "Refine provider pull normalization and provenance capture so restored market_context fields record which provider-native block and field supplied symbol, symbols, timeframe, and primary_focus claims instead of collapsing them into a single generic normalized source.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 19,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T23:25:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-readback-provenance"
+      ],
+      "direction_relation_note": "The latest main-session reply says normalized readback is complete in commit ace4bbe and explicitly calls out preserving provider-specific source provenance as the next remaining backend step before analytics or export surfaces consume this data.",
+      "priority_reason": "This is the clearest next executable task because builtin next-task needs one immediate continuation and the main session directly prioritizes finer-grained provider source provenance ahead of downstream reporting surfaces."
+    },
+    {
+      "id": "task-b1-provider-market-context-analytics-export",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expose provider market_context provenance in analytics and export surfaces",
+      "description": "Thread normalized provider-returned market_context provenance into analytics, export, or operator-facing reporting surfaces so downstream incident handoff and audit workflows can inspect where each symbol, timeframe, and primary-focus claim came from.",
+      "status": "proposed",
+      "base_priority": 78,
+      "dynamic_priority_delta": 10,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T23:25:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-source-provenance-detail"
+      ],
+      "direction_relation_note": "The latest main-session reply keeps analytics and export hookup as a valid downstream follow-up, but it should now follow the finer-grained provider source provenance work so reporting can expose durable per-field origin detail instead of a flattened normalized source.",
+      "priority_reason": "This remains concrete follow-up work, but it stays proposed behind the new provenance-detail backend step so queue execution preserves one deterministic next task and avoids building reporting on a partially flattened provenance contract."
     },
     {
       "id": "task-b1-multi-symbol-risk-scoring-expansion",
