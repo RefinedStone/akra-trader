@@ -420,18 +420,54 @@
       "direction_id": "runtime-ops",
       "title": "Expose scheduler health, lag, and failure alerts for provenance report automation",
       "description": "Add operator-visible health, lag, and failure surfacing for the new provenance report background scheduler so missed runs, backlog growth, and repeated execution failures are visible without inspecting background logs.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 77,
       "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T01:35:00+09:00",
+      "updated_at": "2026-04-22T01:50:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduled-report-scheduler"
       ],
-      "direction_relation_note": "The latest main-session reply says background execution is now live but there is still no separate operator surface or alerting for scheduler health, lag, and failure, making this the clearest next runtime-ops slice after the scheduler landed.",
-      "priority_reason": "Promoted to ready because it is the most explicit executable follow-up from the latest reply, hardens the just-shipped automation with operator visibility, and should land before broader dashboard-collection organization work."
+      "direction_relation_note": "Completed on main in commit 0567c3c with provider provenance scheduler health snapshots recorded in application state and exposed through /api/operator/visibility, including lag/backlog/failure fields plus scheduler_lag and scheduler_failure alerts and audit events.",
+      "priority_reason": "Closed after targeted scheduler, application, API, and bootstrap pytest coverage plus compileall verification, docs status updates, commit, and push all landed; the remaining explicit gaps are persisted scheduler-health history/trend surfaces and direct delivery or escalation wiring for scheduler failures."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-history-trend-dashboard",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Persist scheduler health history and add trend surfaces for provenance automation",
+      "description": "Extend the new provider provenance scheduler health snapshot into durable history, trendable rollups, and a dedicated operator dashboard panel so lag, backlog, and failure movement can be reviewed over time instead of only from the latest visibility snapshot.",
+      "status": "done",
+      "base_priority": 78,
+      "dynamic_priority_delta": 23,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T02:04:45+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-health-alerting"
+      ],
+      "direction_relation_note": "Completed on main in commit e4978ee with durable ProviderProvenanceSchedulerHealthRecord storage, per-cycle scheduler history capture, standalone history and analytics routes for /api/operator/provider-provenance-analytics/scheduler-health and /scheduler-health/analytics, and control-room trend panels for status mix, lag or backlog movement, and recent scheduler cycles.",
+      "priority_reason": "Closed after backend persistence, new scheduler analytics surfaces, control-room trend consumers, docs alignment, targeted pytest and compileall coverage, and web typecheck/build verification all landed and were pushed."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-escalation-delivery-linking",
+      "direction_id": "runtime-ops",
+      "title": "Link scheduler lag and failure into provider escalation workflows and action surfaces",
+      "description": "Wire provider provenance scheduler lag and failure conditions into provider delivery payloads, incident-escalation workflows, or scheduler-specific operator action surfaces so automation stalls can trigger the same external handoff and guided response paths as other runtime failures.",
+      "status": "proposed",
+      "base_priority": 76,
+      "dynamic_priority_delta": 19,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T02:04:45+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-history-trend-dashboard"
+      ],
+      "direction_relation_note": "The latest main-session reply says scheduler health is now visible in the control room and analytics workspace, but it still is not connected to a provider escalation workflow or any scheduler-specific action surface.",
+      "priority_reason": "This is the second explicit remaining gap after commit e4978ee, so it stays proposed behind the first direct continuation on scheduler analytics depth while keeping the escalation follow-up ready to promote next."
     },
     {
       "id": "task-b1-provider-market-context-dashboard-board",
@@ -472,20 +508,20 @@
     {
       "id": "task-b1-provider-market-context-hourly-drilldown",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Add hourly provenance drill-down beneath daily drift and burn-up dashboards",
-      "description": "Extend the daily-only provenance analytics with finer-grained hourly buckets and drill-down UI so operators can inspect intraday provider drift and export activity without dropping to raw incident timelines.",
-      "status": "proposed",
-      "base_priority": 71,
-      "dynamic_priority_delta": 17,
+      "title": "Add pagination, export, and finer-grained drill-down to scheduler health analytics",
+      "description": "Extend the newly shipped scheduler health history and daily trend surfaces with pageable history access, exportable scheduler analytics, and finer-grained drill-down buckets so operators can investigate automation lag and backlog movement beyond the current daily and recent-history view.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T00:48:38+09:00",
+      "updated_at": "2026-04-22T02:04:45+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-timeseries-analytics"
+        "task-b1-provider-market-context-scheduler-history-trend-dashboard"
       ],
-      "direction_relation_note": "The latest main-session reply says the new time-series view is daily-only and still lacks any finer-grained hourly drill-down.",
-      "priority_reason": "This is executable follow-up work, but it remains proposed behind the reporting productization slice so the queue keeps one deterministic next task while intraday bucket semantics are scoped cleanly."
+      "direction_relation_note": "The latest main-session reply says commit e4978ee added scheduler history and daily trend panels, but the scheduler trend slice still lacks pagination, export, and finer-grained drill-down beyond daily buckets and recent cycles.",
+      "priority_reason": "Promoted to ready because the latest reply names this as the first remaining follow-up after the completed scheduler history task, and builtin next-task should continue through that direct analytics-depth slice before branching into escalation wiring."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
