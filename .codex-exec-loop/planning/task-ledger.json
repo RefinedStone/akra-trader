@@ -640,38 +640,75 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add edit, delete, and version workflow for scheduler narrative templates and registries",
       "description": "Extend the newly shipped scheduler narrative template and registry layer beyond create, list, and apply by adding edit, delete, and version-aware management workflows so operators can safely maintain named narrative assets instead of only accumulating immutable records.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 76,
       "dynamic_priority_delta": 27,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T16:54:51+09:00",
+      "updated_at": "2026-04-22T17:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-narrative-registry-templates"
       ],
-      "direction_relation_note": "The latest main-session reply says scheduler narrative templates and registries now exist as first-class durable records, but their workflow still stops at create or list or apply and lacks edit, delete, and versioning controls.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with one next queued task and the latest main-session reply names management workflow depth for the newly shipped narrative registry or template layer as the most direct executable continuation after commit 9915f7d."
+      "direction_relation_note": "Completed on main in commit cb3935e with scheduler narrative template and registry revision records, update or delete or restore endpoints, revision history surfaces, and control-room edit or delete or versions workflows across the new narrative asset layer.",
+      "priority_reason": "Closed after backend persistence and API work, control-room management workflows, targeted pytest coverage, compileall verification, web typecheck and build, and push all landed; the latest main-session reply now leaves bulk or governance management and stitched multi-occurrence narrative workflows as the explicit follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-narrative-governance-bulk-ops",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add bulk governance workflow for scheduler narrative templates and registries",
+      "description": "Extend the new revision-aware scheduler narrative asset layer with bulk edit or delete actions and a cross-entry governance view so operators can review, clean up, and govern multiple templates or registries together instead of managing one record at a time.",
+      "status": "done",
+      "base_priority": 77,
+      "dynamic_priority_delta": 28,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T05:33:48+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-narrative-registry-management"
+      ],
+      "direction_relation_note": "Completed on main in commit 8587d27 with scheduler narrative template and registry bulk-governance endpoints plus control-room multi-select governance bars, covering batch delete or restore and applied or skipped or failed result summaries across the narrative asset layer.",
+      "priority_reason": "Closed after backend batch governance contracts, control-room multi-select workflows, targeted pytest coverage, compileall verification, web typecheck and build, and push all landed; the latest main-session reply now leaves stronger bulk governance actions and stitched multi-occurrence narrative workflows as the direct follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-narrative-governance-advanced-actions",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add advanced bulk governance actions for scheduler narrative templates and registries",
+      "description": "Extend the shipped bulk delete or restore governance flow with stronger asset-governance actions such as bulk metadata edits, template relink, and approval workflows so operators can reshape and certify narrative assets in groups instead of only pruning or recovering them.",
+      "status": "ready",
+      "base_priority": 78,
+      "dynamic_priority_delta": 29,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T05:33:48+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-narrative-governance-bulk-ops"
+      ],
+      "direction_relation_note": "The latest main-session reply says bulk governance now exists only for delete or restore, while bulk metadata edit, template relink, and bulk approval remain missing from the scheduler narrative template and registry governance layer.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task and the latest main-session reply explicitly lists stronger governance actions as the first remaining executable follow-up after commit 8587d27."
     },
     {
       "id": "task-b1-provider-market-context-cross-incident-narrative-reporting",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Add stitched cross-incident scheduler narrative analytics and reporting",
-      "description": "Extend the new mixed-status scheduler narrative exports beyond one occurrence window by adding stitched multi-occurrence artifacts and cross-incident analytics so operators can review longer recovery patterns and repeated scheduler incidents in one narrative output.",
+      "title": "Add stitched multi-occurrence scheduler narrative artifacts and reporting",
+      "description": "Extend the new mixed-status scheduler narrative workflow beyond one occurrence window by adding stitched multi-occurrence artifacts and cross-incident reporting so operators can review longer recovery patterns and repeated scheduler incidents in one narrative output.",
       "status": "proposed",
       "base_priority": 74,
-      "dynamic_priority_delta": 22,
+      "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T16:54:51+09:00",
+      "updated_at": "2026-04-22T05:33:48+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-mixed-status-narrative-artifact",
         "task-b1-provider-market-context-scheduler-narrative-saved-view-surface",
-        "task-b1-provider-market-context-scheduler-narrative-registry-templates"
+        "task-b1-provider-market-context-scheduler-narrative-registry-management",
+        "task-b1-provider-market-context-scheduler-narrative-governance-bulk-ops"
       ],
-      "direction_relation_note": "The latest main-session reply says scheduler narrative templates and registries now cover reusable single-occurrence lenses, but review still stops at single-occurrence preview and there is still no stitched multi-occurrence narrative artifact or cross-incident analytics layer.",
-      "priority_reason": "This remains a clear executable follow-up, but it stays proposed behind the new template or registry management workflow queue head so builtin next-task advances through stabilizing the newly shipped narrative asset layer before expanding into stitched multi-occurrence reporting."
+      "direction_relation_note": "The latest main-session reply says scheduler narrative review is still centered on individual occurrence or facet workflows even after bulk delete or restore governance shipped, so a deeper stitched narrative artifact spanning multiple occurrences remains missing.",
+      "priority_reason": "This remains the second explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted advanced bulk-governance queue head so builtin next-task advances through the first listed stronger-governance gap before deeper multi-occurrence reporting."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
