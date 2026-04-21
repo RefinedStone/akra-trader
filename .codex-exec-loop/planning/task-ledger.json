@@ -330,18 +330,72 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add provider provenance analytics, dashboard rollups, and cross-focus querying",
       "description": "Build analytics, dashboard rollups, and cross-focus query surfaces for provider-returned market_context provenance so operators can see recurring vendor-native source-path patterns, provenance quality drift, export activity, and related incident clusters beyond per-incident drill-down views.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 76,
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T00:21:00+09:00",
+      "updated_at": "2026-04-22T00:35:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-export-registry-audit"
       ],
-      "direction_relation_note": "The latest main-session reply lists cross-focus search and analytics surfaces as the first explicit remaining gap now that shared export registry data and audit history are durable and pushed on main.",
-      "priority_reason": "Builtin next-task needs one deterministic continuation, and analytics plus cross-focus querying is the clearest immediately executable follow-up because it directly consumes the newly landed shared registry and audit data without waiting on further operator policy decisions."
+      "direction_relation_note": "Completed on main in commit 8f1a947 with provider provenance analytics surfaces added across backend and control-room UI, including provider and vendor-field rollups, current-focus versus all-focus query workbench, cross-focus recent results, and Focus triage jump links.",
+      "priority_reason": "Closed after targeted provider_provenance pytest coverage, compileall for the new standalone surfaces, web typecheck/build verification, docs updates, commit, and push all landed; the next queue should split across the three explicit follow-ups called out in the latest main-session reply."
+    },
+    {
+      "id": "task-b1-provider-market-context-timeseries-analytics",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add time-series provenance dashboards for provider drift and export burn-up",
+      "description": "Extend the new registry-snapshot analytics into time-series views so operators can inspect provider drift timelines, export burn-up, and trend movement over time instead of relying only on current rollups.",
+      "status": "ready",
+      "base_priority": 77,
+      "dynamic_priority_delta": 19,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T00:36:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-analytics-aggregation"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says the shipped analytics remain registry-snapshot based and still lack time-axis trend, burn-up, and provider drift timeline dashboards.",
+      "priority_reason": "Builtin next-task needs one deterministic continuation, and the time-series analytics slice is the clearest direct follow-up because the new rollups and shared registry are already in place while the missing trend views were named first in the latest reply."
+    },
+    {
+      "id": "task-b1-provider-market-context-cross-focus-pagination",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add server-side pagination and deeper query UX for cross-focus provenance search",
+      "description": "Upgrade the cross-focus provenance query workbench beyond the current recent-result window by adding server-side pagination, deeper query controls, and large-registry-safe result handling.",
+      "status": "proposed",
+      "base_priority": 75,
+      "dynamic_priority_delta": 17,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T00:37:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-analytics-aggregation"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly notes that cross-focus querying still centers on a recent-result window and does not yet support server-side pagination or deeper query UX for very large registries.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind the time-series dashboard slice so the queue keeps one deterministic next task while deeper large-registry query semantics are scoped against the newly shipped workbench."
+    },
+    {
+      "id": "task-b1-provider-market-context-saved-views-reporting",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add saved analytics presets, shared dashboard views, and scheduled provenance reports",
+      "description": "Productize the new provenance analytics by letting operators save query presets, share dashboard views across the team, and schedule or export recurring analytics reports.",
+      "status": "proposed",
+      "base_priority": 73,
+      "dynamic_priority_delta": 16,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T00:38:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-analytics-aggregation"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly lists saved analytics presets, team-shared dashboard views, and scheduled or exported analytics reports as remaining gaps after the shipped aggregation and cross-focus work.",
+      "priority_reason": "This remains proposed because it is clearly executable but sits behind the next visibility and scalability follow-ups; scheduling and team-shared report productization will be easier once time-series and large-registry query behavior are settled."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
