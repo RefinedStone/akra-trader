@@ -18,6 +18,8 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
+  ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ProviderProvenanceSchedulerNarrativeGovernancePlanListPayload,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
   ProviderProvenanceSchedulerNarrativeRegistryListPayload,
   ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload,
@@ -920,6 +922,120 @@ export async function restoreProviderProvenanceSchedulerNarrativeRegistryRevisio
         ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
         ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
         ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(params: {
+  itemType: "template" | "registry";
+  itemIds: string[];
+  action: "delete" | "restore" | "update";
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  queryPatch?: Record<string, unknown>;
+  layoutPatch?: Record<string, unknown>;
+  templateId?: string;
+  clearTemplateLink?: boolean;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        item_type: params.itemType,
+        item_ids: params.itemIds,
+        action: params.action,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend?.trim() ? { description_append: params.descriptionAppend.trim() } : {}),
+        ...(params.queryPatch ? { query_patch: params.queryPatch } : {}),
+        ...(params.layoutPatch ? { layout_patch: params.layoutPatch } : {}),
+        ...(params.templateId?.trim() ? { template_id: params.templateId.trim() } : {}),
+        ...(params.clearTemplateLink ? { clear_template_link: true } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeGovernancePlans(params: {
+  itemType?: string;
+  status?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.itemType?.trim()) {
+    searchParams.set("item_type", params.itemType.trim());
+  }
+  if (params.status?.trim()) {
+    searchParams.set("status", params.status.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 100))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlanListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/plans${suffix}`,
+  );
+}
+
+export async function approveProviderProvenanceSchedulerNarrativeGovernancePlan(params: {
+  planId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  note?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/${params.planId}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.note?.trim() ? { note: params.note.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function applyProviderProvenanceSchedulerNarrativeGovernancePlan(params: {
+  planId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/${params.planId}/apply`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function rollbackProviderProvenanceSchedulerNarrativeGovernancePlan(params: {
+  planId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  note?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/${params.planId}/rollback`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.note?.trim() ? { note: params.note.trim() } : {}),
       }),
     },
   );

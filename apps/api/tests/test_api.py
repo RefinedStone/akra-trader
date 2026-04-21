@@ -1750,6 +1750,160 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert all(item["template_id"] == template_payload["template_id"] for item in list_updated_registry_payload["items"])
   assert all(item["layout"]["show_recent_exports"] is True for item in list_updated_registry_payload["items"])
 
+  template_governance_plan_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    json={
+      "item_type": "template",
+      "item_ids": [template_payload["template_id"], bulk_template_payload["template_id"]],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_template_governance_plan",
+      "name_suffix": " / staged",
+      "query_patch": {
+        "scheduler_alert_status": "resolved",
+      },
+    },
+  )
+  assert template_governance_plan_response.status_code == 200
+  template_governance_plan_payload = template_governance_plan_response.json()
+  assert template_governance_plan_payload["status"] == "previewed"
+  assert template_governance_plan_payload["preview_changed_count"] == 2
+  assert template_governance_plan_payload["rollback_ready_count"] == 2
+
+  list_governance_plans_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    params={"item_type": "template", "status": "previewed", "limit": 10},
+  )
+  assert list_governance_plans_response.status_code == 200
+  list_governance_plans_payload = list_governance_plans_response.json()
+  assert list_governance_plans_payload["total"] >= 1
+  assert list_governance_plans_payload["items"][0]["plan_id"] == template_governance_plan_payload["plan_id"]
+
+  approve_template_governance_plan_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{template_governance_plan_payload['plan_id']}/approve",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "approved for rollout",
+    },
+  )
+  assert approve_template_governance_plan_response.status_code == 200
+  approved_template_governance_plan_payload = approve_template_governance_plan_response.json()
+  assert approved_template_governance_plan_payload["status"] == "approved"
+  assert approved_template_governance_plan_payload["approved_at"] is not None
+
+  apply_template_governance_plan_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{template_governance_plan_payload['plan_id']}/apply",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert apply_template_governance_plan_response.status_code == 200
+  applied_template_governance_plan_payload = apply_template_governance_plan_response.json()
+  assert applied_template_governance_plan_payload["status"] == "applied"
+  assert applied_template_governance_plan_payload["applied_result"]["applied_count"] == 2
+
+  list_staged_templates_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    params={"category": "scheduler_failure", "narrative_facet": "recurring_occurrences", "limit": 10},
+  )
+  assert list_staged_templates_response.status_code == 200
+  list_staged_templates_payload = list_staged_templates_response.json()
+  assert all(item["name"].endswith(" / staged") for item in list_staged_templates_payload["items"])
+
+  rollback_template_governance_plan_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{template_governance_plan_payload['plan_id']}/rollback",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "rollback after review",
+    },
+  )
+  assert rollback_template_governance_plan_response.status_code == 200
+  rolled_back_template_governance_plan_payload = rollback_template_governance_plan_response.json()
+  assert rolled_back_template_governance_plan_payload["status"] == "rolled_back"
+  assert rolled_back_template_governance_plan_payload["rollback_result"]["applied_count"] == 2
+
+  reverted_templates_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    params={"category": "scheduler_failure", "narrative_facet": "recurring_occurrences", "limit": 10},
+  )
+  assert reverted_templates_response.status_code == 200
+  reverted_templates_payload = reverted_templates_response.json()
+  assert all(not item["name"].endswith(" / staged") for item in reverted_templates_payload["items"])
+
+  registry_governance_plan_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    json={
+      "item_type": "registry",
+      "item_ids": [registry_payload["registry_id"], bulk_registry_payload["registry_id"]],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_registry_governance_plan",
+      "clear_template_link": True,
+      "layout_patch": {
+        "show_time_series": True,
+      },
+    },
+  )
+  assert registry_governance_plan_response.status_code == 200
+  registry_governance_plan_payload = registry_governance_plan_response.json()
+  assert registry_governance_plan_payload["status"] == "previewed"
+  assert registry_governance_plan_payload["preview_changed_count"] == 2
+
+  approve_registry_governance_plan_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{registry_governance_plan_payload['plan_id']}/approve",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert approve_registry_governance_plan_response.status_code == 200
+  assert approve_registry_governance_plan_response.json()["status"] == "approved"
+
+  apply_registry_governance_plan_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{registry_governance_plan_payload['plan_id']}/apply",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert apply_registry_governance_plan_response.status_code == 200
+  assert apply_registry_governance_plan_response.json()["status"] == "applied"
+
+  registry_without_template_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    params={"category": "scheduler_failure", "narrative_facet": "resolved_narratives", "limit": 10},
+  )
+  assert registry_without_template_response.status_code == 200
+  registry_without_template_payload = registry_without_template_response.json()
+  assert all(item["template_id"] is None for item in registry_without_template_payload["items"])
+
+  rollback_registry_governance_plan_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{registry_governance_plan_payload['plan_id']}/rollback",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert rollback_registry_governance_plan_response.status_code == 200
+  assert rollback_registry_governance_plan_response.json()["status"] == "rolled_back"
+
+  reverted_registry_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    params={
+      "template_id": template_payload["template_id"],
+      "category": "scheduler_failure",
+      "narrative_facet": "resolved_narratives",
+      "limit": 10,
+    },
+  )
+  assert reverted_registry_response.status_code == 200
+  assert reverted_registry_response.json()["total"] == 2
+
   report_response = client.post(
     "/api/operator/provider-provenance-analytics/reports",
     json={

@@ -51,15 +51,16 @@ import type {
   RunSurfaceCollectionQueryRuntimeCandidateSample,
 } from "./features/query-builder";
 import {
+  applyProviderProvenanceSchedulerNarrativeGovernancePlan,
+  approveProviderProvenanceSchedulerNarrativeGovernancePlan,
   createProviderProvenanceAnalyticsPreset,
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
+  createProviderProvenanceSchedulerNarrativeGovernancePlan,
   createProviderProvenanceSchedulerNarrativeRegistryEntry,
   createProviderProvenanceSchedulerNarrativeTemplate,
   createProviderProvenanceScheduledReport,
   approveProviderProvenanceExportJob,
-  bulkGovernProviderProvenanceSchedulerNarrativeRegistryEntries,
-  bulkGovernProviderProvenanceSchedulerNarrativeTemplates,
   deleteProviderProvenanceSchedulerNarrativeRegistryEntry,
   deleteProviderProvenanceSchedulerNarrativeTemplate,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
@@ -78,10 +79,12 @@ import {
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
   listProviderProvenanceAnalyticsPresets,
   listProviderProvenanceDashboardViews,
+  listProviderProvenanceSchedulerNarrativeGovernancePlans,
   listProviderProvenanceSchedulerNarrativeRegistryEntries,
   listProviderProvenanceSchedulerNarrativeRegistryRevisions,
   listProviderProvenanceSchedulerNarrativeTemplates,
   listProviderProvenanceSchedulerNarrativeTemplateRevisions,
+  rollbackProviderProvenanceSchedulerNarrativeGovernancePlan,
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
   listProviderProvenanceExportJobs,
@@ -303,6 +306,7 @@ import type {
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
+  ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
   ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry,
   ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload,
@@ -3139,6 +3143,16 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerNarrativeRegistryHistoryError, setProviderProvenanceSchedulerNarrativeRegistryHistoryError] =
     useState<string | null>(null);
+  const [providerProvenanceSchedulerNarrativeGovernancePlans, setProviderProvenanceSchedulerNarrativeGovernancePlans] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePlan[]>([]);
+  const [providerProvenanceSchedulerNarrativeGovernancePlansLoading, setProviderProvenanceSchedulerNarrativeGovernancePlansLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeGovernancePlansError, setProviderProvenanceSchedulerNarrativeGovernancePlansError] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeGovernancePlanId, setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerNarrativeGovernancePlanAction, setProviderProvenanceSchedulerNarrativeGovernancePlanAction] =
+    useState<"approve" | "apply" | "rollback" | null>(null);
   const [providerProvenanceScheduledReports, setProviderProvenanceScheduledReports] =
     useState<ProviderProvenanceScheduledReportEntry[]>([]);
   const [providerProvenanceScheduledReportsLoading, setProviderProvenanceScheduledReportsLoading] =
@@ -3386,6 +3400,16 @@ export default function App() {
     [
       providerProvenanceSchedulerNarrativeRegistryEntries,
       selectedProviderProvenanceSchedulerNarrativeRegistryIdSet,
+    ],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeGovernancePlan = useMemo(
+    () =>
+      providerProvenanceSchedulerNarrativeGovernancePlans.find(
+        (entry) => entry.plan_id === selectedProviderProvenanceSchedulerNarrativeGovernancePlanId,
+      ) ?? null,
+    [
+      providerProvenanceSchedulerNarrativeGovernancePlans,
+      selectedProviderProvenanceSchedulerNarrativeGovernancePlanId,
     ],
   );
   const selectedProviderProvenanceSchedulerExportEntry = useMemo(
@@ -5846,25 +5870,32 @@ export default function App() {
     setProviderProvenanceDashboardViewsLoading(true);
     setProviderProvenanceSchedulerNarrativeTemplatesLoading(true);
     setProviderProvenanceSchedulerNarrativeRegistryEntriesLoading(true);
+    setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(true);
     setProviderProvenanceScheduledReportsLoading(true);
     setProviderProvenanceAnalyticsPresetsError(null);
     setProviderProvenanceDashboardViewsError(null);
     setProviderProvenanceSchedulerNarrativeTemplatesError(null);
     setProviderProvenanceSchedulerNarrativeRegistryEntriesError(null);
+    setProviderProvenanceSchedulerNarrativeGovernancePlansError(null);
     setProviderProvenanceScheduledReportsError(null);
     try {
-      const [presetPayload, viewPayload, templatePayload, narrativeRegistryPayload, reportPayload] = await Promise.all([
+      const [presetPayload, viewPayload, templatePayload, narrativeRegistryPayload, governancePlanPayload, reportPayload] = await Promise.all([
         listProviderProvenanceAnalyticsPresets({ limit: 24 }),
         listProviderProvenanceDashboardViews({ limit: 24 }),
         listProviderProvenanceSchedulerNarrativeTemplates({ limit: 24 }),
         listProviderProvenanceSchedulerNarrativeRegistryEntries({ limit: 24 }),
+        listProviderProvenanceSchedulerNarrativeGovernancePlans({ limit: 16 }),
         listProviderProvenanceScheduledReports({ limit: 24 }),
       ]);
       setProviderProvenanceAnalyticsPresets(presetPayload.items);
       setProviderProvenanceDashboardViews(viewPayload.items);
       setProviderProvenanceSchedulerNarrativeTemplates(templatePayload.items);
       setProviderProvenanceSchedulerNarrativeRegistryEntries(narrativeRegistryPayload.items);
+      setProviderProvenanceSchedulerNarrativeGovernancePlans(governancePlanPayload.items);
       setProviderProvenanceScheduledReports(reportPayload.items);
+      if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlanId && governancePlanPayload.items.length) {
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(governancePlanPayload.items[0].plan_id);
+      }
       setSelectedProviderProvenanceSchedulerNarrativeTemplateIds((current) =>
         current.filter((templateId) =>
           templatePayload.items.some((entry) => entry.template_id === templateId),
@@ -5901,6 +5932,14 @@ export default function App() {
           : current
       ));
       if (
+        selectedProviderProvenanceSchedulerNarrativeGovernancePlanId
+        && !governancePlanPayload.items.some((entry) => entry.plan_id === selectedProviderProvenanceSchedulerNarrativeGovernancePlanId)
+      ) {
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(
+          governancePlanPayload.items[0]?.plan_id ?? null,
+        );
+      }
+      if (
         selectedProviderProvenanceScheduledReportId
         && !reportPayload.items.some((entry) => entry.report_id === selectedProviderProvenanceScheduledReportId)
       ) {
@@ -5914,6 +5953,7 @@ export default function App() {
       setProviderProvenanceDashboardViews([]);
       setProviderProvenanceSchedulerNarrativeTemplates([]);
       setProviderProvenanceSchedulerNarrativeRegistryEntries([]);
+      setProviderProvenanceSchedulerNarrativeGovernancePlans([]);
       setProviderProvenanceScheduledReports([]);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
@@ -5921,16 +5961,19 @@ export default function App() {
       setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeRegistryId(null);
       setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(null);
       setProviderProvenanceAnalyticsPresetsError(message);
       setProviderProvenanceDashboardViewsError(message);
       setProviderProvenanceSchedulerNarrativeTemplatesError(message);
       setProviderProvenanceSchedulerNarrativeRegistryEntriesError(message);
+      setProviderProvenanceSchedulerNarrativeGovernancePlansError(message);
       setProviderProvenanceScheduledReportsError(message);
     } finally {
       setProviderProvenanceAnalyticsPresetsLoading(false);
       setProviderProvenanceDashboardViewsLoading(false);
       setProviderProvenanceSchedulerNarrativeTemplatesLoading(false);
       setProviderProvenanceSchedulerNarrativeRegistryEntriesLoading(false);
+      setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(false);
       setProviderProvenanceScheduledReportsLoading(false);
     }
   }
@@ -6221,6 +6264,25 @@ export default function App() {
     ];
     const firstFailure = result.results.find((entry) => entry.outcome === "failed" && entry.message);
     return `${formatWorkflowToken(result.action)} ${label}: ${parts.join(" · ")}.${firstFailure?.message ? ` ${firstFailure.message}` : ""}`;
+  }
+
+  function formatProviderProvenanceSchedulerNarrativeGovernancePlanSummary(
+    plan: ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ) {
+    return `${formatWorkflowToken(plan.action)} ${plan.item_type}s · ${plan.preview_changed_count} changed · ${plan.preview_skipped_count} skipped · ${plan.preview_failed_count} failed`;
+  }
+
+  function formatProviderProvenanceSchedulerNarrativeGovernanceDiffValue(value: unknown) {
+    if (value === null || value === undefined) {
+      return "none";
+    }
+    if (typeof value === "string") {
+      return value;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    return JSON.stringify(value);
   }
 
   function buildProviderProvenanceSchedulerNarrativeTemplateBulkQueryPatch() {
@@ -6641,27 +6703,19 @@ export default function App() {
       setProviderProvenanceWorkspaceFeedback("Select one or more scheduler narrative templates first.");
       return;
     }
-    if (
-      action === "delete"
-      && typeof window !== "undefined"
-      && !window.confirm(
-        `Apply bulk delete to ${selectedProviderProvenanceSchedulerNarrativeTemplateIds.length} scheduler narrative template(s)?`,
-      )
-    ) {
-      return;
-    }
     setProviderProvenanceSchedulerNarrativeTemplateBulkAction(action);
     try {
       const selectedIds = [...selectedProviderProvenanceSchedulerNarrativeTemplateIds];
       const queryPatch = action === "update"
         ? buildProviderProvenanceSchedulerNarrativeTemplateBulkQueryPatch()
         : undefined;
-      const result = await bulkGovernProviderProvenanceSchedulerNarrativeTemplates({
+      const plan = await createProviderProvenanceSchedulerNarrativeGovernancePlan({
+        itemType: "template",
+        itemIds: selectedIds,
         action,
-        templateIds: selectedIds,
         actorTabId: comparisonHistoryTabIdentity.tabId,
         actorTabLabel: comparisonHistoryTabIdentity.label,
-        reason: `scheduler_narrative_template_bulk_${action}_from_control_room`,
+        reason: `scheduler_narrative_template_bulk_${action}_preview_from_control_room`,
         namePrefix:
           action === "update" ? providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_prefix : undefined,
         nameSuffix:
@@ -6672,36 +6726,19 @@ export default function App() {
             : undefined,
         queryPatch,
       });
-      if (
-        action === "delete"
-        && editingProviderProvenanceSchedulerNarrativeTemplateId
-        && selectedIds.includes(editingProviderProvenanceSchedulerNarrativeTemplateId)
-      ) {
-        resetProviderProvenanceSchedulerNarrativeTemplateDraft();
-      }
       await loadProviderProvenanceWorkspaceRegistry();
-      if (
-        selectedProviderProvenanceSchedulerNarrativeTemplateId
-        && selectedIds.includes(selectedProviderProvenanceSchedulerNarrativeTemplateId)
-      ) {
-        const history = await listProviderProvenanceSchedulerNarrativeTemplateRevisions(
-          selectedProviderProvenanceSchedulerNarrativeTemplateId,
-        );
-        setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(history);
-        setProviderProvenanceSchedulerNarrativeTemplateHistoryError(null);
-      }
-      setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(plan.plan_id);
       if (action === "update") {
         setProviderProvenanceSchedulerNarrativeTemplateBulkDraft(
           defaultProviderProvenanceSchedulerNarrativeTemplateBulkDraft,
         );
       }
       setProviderProvenanceWorkspaceFeedback(
-        formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
+        `Previewed template governance plan ${shortenIdentifier(plan.plan_id, 10)}. ${formatProviderProvenanceSchedulerNarrativeGovernancePlanSummary(plan)}`,
       );
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
-        `Scheduler narrative template bulk governance failed: ${(error as Error).message}`,
+        `Scheduler narrative template governance preview failed: ${(error as Error).message}`,
       );
     } finally {
       setProviderProvenanceSchedulerNarrativeTemplateBulkAction(null);
@@ -6715,15 +6752,6 @@ export default function App() {
       setProviderProvenanceWorkspaceFeedback("Select one or more scheduler narrative registry entries first.");
       return;
     }
-    if (
-      action === "delete"
-      && typeof window !== "undefined"
-      && !window.confirm(
-        `Apply bulk delete to ${selectedProviderProvenanceSchedulerNarrativeRegistryIds.length} scheduler narrative registry entr${selectedProviderProvenanceSchedulerNarrativeRegistryIds.length === 1 ? "y" : "ies"}?`,
-      )
-    ) {
-      return;
-    }
     setProviderProvenanceSchedulerNarrativeRegistryBulkAction(action);
     try {
       const selectedIds = [...selectedProviderProvenanceSchedulerNarrativeRegistryIds];
@@ -6733,12 +6761,13 @@ export default function App() {
       const layoutPatch = action === "update"
         ? buildProviderProvenanceSchedulerNarrativeRegistryBulkLayoutPatch()
         : undefined;
-      const result = await bulkGovernProviderProvenanceSchedulerNarrativeRegistryEntries({
+      const plan = await createProviderProvenanceSchedulerNarrativeGovernancePlan({
+        itemType: "registry",
+        itemIds: selectedIds,
         action,
-        registryIds: selectedIds,
         actorTabId: comparisonHistoryTabIdentity.tabId,
         actorTabLabel: comparisonHistoryTabIdentity.label,
-        reason: `scheduler_narrative_registry_bulk_${action}_from_control_room`,
+        reason: `scheduler_narrative_registry_bulk_${action}_preview_from_control_room`,
         namePrefix:
           action === "update" ? providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_prefix : undefined,
         nameSuffix:
@@ -6759,39 +6788,139 @@ export default function App() {
           action === "update"
           && providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id === CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE,
       });
-      if (
-        action === "delete"
-        && editingProviderProvenanceSchedulerNarrativeRegistryId
-        && selectedIds.includes(editingProviderProvenanceSchedulerNarrativeRegistryId)
-      ) {
-        resetProviderProvenanceSchedulerNarrativeRegistryDraft();
-      }
       await loadProviderProvenanceWorkspaceRegistry();
-      if (
-        selectedProviderProvenanceSchedulerNarrativeRegistryId
-        && selectedIds.includes(selectedProviderProvenanceSchedulerNarrativeRegistryId)
-      ) {
-        const history = await listProviderProvenanceSchedulerNarrativeRegistryRevisions(
-          selectedProviderProvenanceSchedulerNarrativeRegistryId,
-        );
-        setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(history);
-        setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
-      }
-      setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(plan.plan_id);
       if (action === "update") {
         setProviderProvenanceSchedulerNarrativeRegistryBulkDraft(
           defaultProviderProvenanceSchedulerNarrativeRegistryBulkDraft,
         );
       }
       setProviderProvenanceWorkspaceFeedback(
-        formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
+        `Previewed registry governance plan ${shortenIdentifier(plan.plan_id, 10)}. ${formatProviderProvenanceSchedulerNarrativeGovernancePlanSummary(plan)}`,
       );
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
-        `Scheduler narrative registry bulk governance failed: ${(error as Error).message}`,
+        `Scheduler narrative registry governance preview failed: ${(error as Error).message}`,
       );
     } finally {
       setProviderProvenanceSchedulerNarrativeRegistryBulkAction(null);
+    }
+  }
+
+  async function approveProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan() {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlan) {
+      setProviderProvenanceWorkspaceFeedback("Select a scheduler governance plan first.");
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeGovernancePlanAction("approve");
+    try {
+      const updated = await approveProviderProvenanceSchedulerNarrativeGovernancePlan({
+        planId: selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
+      setProviderProvenanceWorkspaceFeedback(
+        `Approved scheduler governance plan ${shortenIdentifier(updated.plan_id, 10)}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler governance approval failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernancePlanAction(null);
+    }
+  }
+
+  async function applyProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan() {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlan) {
+      setProviderProvenanceWorkspaceFeedback("Select a scheduler governance plan first.");
+      return;
+    }
+    if (
+      typeof window !== "undefined"
+      && !window.confirm(
+        `Apply approved scheduler governance plan ${shortenIdentifier(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id, 10)}?`,
+      )
+    ) {
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeGovernancePlanAction("apply");
+    try {
+      const updated = await applyProviderProvenanceSchedulerNarrativeGovernancePlan({
+        planId: selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      if (updated.item_type === "template") {
+        const affectedIds = new Set(updated.target_ids);
+        if (
+          editingProviderProvenanceSchedulerNarrativeTemplateId
+          && affectedIds.has(editingProviderProvenanceSchedulerNarrativeTemplateId)
+        ) {
+          resetProviderProvenanceSchedulerNarrativeTemplateDraft();
+        }
+      } else {
+        const affectedIds = new Set(updated.target_ids);
+        if (
+          editingProviderProvenanceSchedulerNarrativeRegistryId
+          && affectedIds.has(editingProviderProvenanceSchedulerNarrativeRegistryId)
+        ) {
+          resetProviderProvenanceSchedulerNarrativeRegistryDraft();
+        }
+      }
+      await loadProviderProvenanceWorkspaceRegistry();
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
+      setProviderProvenanceWorkspaceFeedback(
+        updated.applied_result
+          ? formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(updated.applied_result)
+          : `Applied scheduler governance plan ${shortenIdentifier(updated.plan_id, 10)}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler governance apply failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernancePlanAction(null);
+    }
+  }
+
+  async function rollbackProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan() {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlan) {
+      setProviderProvenanceWorkspaceFeedback("Select a scheduler governance plan first.");
+      return;
+    }
+    if (
+      typeof window !== "undefined"
+      && !window.confirm(
+        `Rollback scheduler governance plan ${shortenIdentifier(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id, 10)} to its pre-apply revisions?`,
+      )
+    ) {
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeGovernancePlanAction("rollback");
+    try {
+      const updated = await rollbackProviderProvenanceSchedulerNarrativeGovernancePlan({
+        planId: selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
+      setProviderProvenanceWorkspaceFeedback(
+        updated.rollback_result
+          ? formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(updated.rollback_result)
+          : `Rolled back scheduler governance plan ${shortenIdentifier(updated.plan_id, 10)}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler governance rollback failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernancePlanAction(null);
     }
   }
 
@@ -9291,8 +9420,8 @@ export default function App() {
                                           type="button"
                                         >
                                           {providerProvenanceSchedulerNarrativeTemplateBulkAction === "delete"
-                                            ? "Deleting…"
-                                            : "Delete selected"}
+                                            ? "Previewing…"
+                                            : "Preview delete"}
                                         </button>
                                         <button
                                           className="ghost-button"
@@ -9303,8 +9432,8 @@ export default function App() {
                                           type="button"
                                         >
                                           {providerProvenanceSchedulerNarrativeTemplateBulkAction === "restore"
-                                            ? "Restoring…"
-                                            : "Restore selected"}
+                                            ? "Previewing…"
+                                            : "Preview restore"}
                                         </button>
                                       </div>
                                     </div>
@@ -9313,7 +9442,7 @@ export default function App() {
                                     <div className="provider-provenance-governance-editor">
                                       <div className="market-data-provenance-history-head">
                                         <strong>Advanced bulk edits</strong>
-                                        <p>Apply metadata or scheduler-lens patches to the selected templates in one pass.</p>
+                                        <p>Preview metadata or scheduler-lens patches, then approve and apply them with rollback planning.</p>
                                       </div>
                                       <div className="filter-bar">
                                         <label>
@@ -9458,8 +9587,8 @@ export default function App() {
                                               type="button"
                                             >
                                               {providerProvenanceSchedulerNarrativeTemplateBulkAction === "update"
-                                                ? "Applying…"
-                                                : "Apply bulk edit"}
+                                                ? "Previewing…"
+                                                : "Preview bulk edit"}
                                             </button>
                                           </div>
                                         </label>
@@ -9767,8 +9896,8 @@ export default function App() {
                                           type="button"
                                         >
                                           {providerProvenanceSchedulerNarrativeRegistryBulkAction === "delete"
-                                            ? "Deleting…"
-                                            : "Delete selected"}
+                                            ? "Previewing…"
+                                            : "Preview delete"}
                                         </button>
                                         <button
                                           className="ghost-button"
@@ -9779,8 +9908,8 @@ export default function App() {
                                           type="button"
                                         >
                                           {providerProvenanceSchedulerNarrativeRegistryBulkAction === "restore"
-                                            ? "Restoring…"
-                                            : "Restore selected"}
+                                            ? "Previewing…"
+                                            : "Preview restore"}
                                         </button>
                                       </div>
                                     </div>
@@ -9789,7 +9918,7 @@ export default function App() {
                                     <div className="provider-provenance-governance-editor">
                                       <div className="market-data-provenance-history-head">
                                         <strong>Advanced bulk edits</strong>
-                                        <p>Apply metadata, query, template-link, or board-layout patches to the selected registries.</p>
+                                        <p>Preview metadata, query, template-link, or board-layout patches, then approve and apply them with rollback planning.</p>
                                       </div>
                                       <div className="filter-bar">
                                         <label>
@@ -10013,8 +10142,8 @@ export default function App() {
                                               type="button"
                                             >
                                               {providerProvenanceSchedulerNarrativeRegistryBulkAction === "update"
-                                                ? "Applying…"
-                                                : "Apply bulk edit"}
+                                                ? "Previewing…"
+                                                : "Preview bulk edit"}
                                             </button>
                                           </div>
                                         </label>
@@ -10210,6 +10339,200 @@ export default function App() {
                                             ))}
                                           </tbody>
                                         </table>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="provider-provenance-workspace-card">
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Governance plans</strong>
+                                    <p>Review bulk diff previews, stage approval, apply the saved plan, and roll back to the captured pre-apply revisions.</p>
+                                  </div>
+                                  {providerProvenanceSchedulerNarrativeGovernancePlansLoading ? (
+                                    <p className="empty-state">Loading governance plans…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeGovernancePlansError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Governance plan registry load failed: {providerProvenanceSchedulerNarrativeGovernancePlansError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeGovernancePlans.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Plan</th>
+                                          <th>Preview</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceSchedulerNarrativeGovernancePlans.map((plan) => (
+                                          <tr
+                                            key={plan.plan_id}
+                                            className={
+                                              selectedProviderProvenanceSchedulerNarrativeGovernancePlanId === plan.plan_id
+                                                ? "active-row"
+                                                : undefined
+                                            }
+                                          >
+                                            <td>
+                                              <strong>
+                                                {formatWorkflowToken(plan.action)} {plan.item_type}
+                                              </strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {shortenIdentifier(plan.plan_id, 10)} · {formatWorkflowToken(plan.status)}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {plan.created_by_tab_label ?? plan.created_by_tab_id ?? "unknown tab"} · {formatTimestamp(plan.updated_at)}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{formatProviderProvenanceSchedulerNarrativeGovernancePlanSummary(plan)}</strong>
+                                              <p className="run-lineage-symbol-copy">{plan.rollback_summary}</p>
+                                            </td>
+                                            <td>
+                                              <div className="market-data-provenance-history-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(plan.plan_id);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  {selectedProviderProvenanceSchedulerNarrativeGovernancePlanId === plan.plan_id ? "Selected" : "Inspect"}
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No staged scheduler governance plans yet.</p>
+                                  )}
+                                  {selectedProviderProvenanceSchedulerNarrativeGovernancePlan ? (
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Selected plan</strong>
+                                        <p>
+                                          {formatWorkflowToken(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.action)} {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.item_type} · {" "}
+                                          {formatWorkflowToken(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.status)} · {" "}
+                                          {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.preview_items.length} preview row(s)
+                                        </p>
+                                      </div>
+                                      <div className="provider-provenance-governance-summary">
+                                        <strong>{selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rollback_summary}</strong>
+                                        <span>
+                                          Approval {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.approved_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.approved_at) : "pending"} · {" "}
+                                          Apply {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.applied_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.applied_at) : "not applied"} · {" "}
+                                          Rollback {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rolled_back_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rolled_back_at) : "not rolled back"}
+                                        </span>
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            selectedProviderProvenanceSchedulerNarrativeGovernancePlan.status !== "previewed"
+                                            || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
+                                          }
+                                          onClick={() => {
+                                            void approveProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan();
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerNarrativeGovernancePlanAction === "approve"
+                                            ? "Approving…"
+                                            : "Approve plan"}
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            selectedProviderProvenanceSchedulerNarrativeGovernancePlan.status !== "approved"
+                                            || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
+                                          }
+                                          onClick={() => {
+                                            void applyProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan();
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerNarrativeGovernancePlanAction === "apply"
+                                            ? "Applying…"
+                                            : "Apply approved plan"}
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            selectedProviderProvenanceSchedulerNarrativeGovernancePlan.status !== "applied"
+                                            || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
+                                          }
+                                          onClick={() => {
+                                            void rollbackProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan();
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerNarrativeGovernancePlanAction === "rollback"
+                                            ? "Rolling back…"
+                                            : "Rollback plan"}
+                                        </button>
+                                      </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Item</th>
+                                            <th>Diff preview</th>
+                                            <th>Rollback</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.preview_items.map((item) => (
+                                            <tr key={item.item_id}>
+                                              <td>
+                                                <strong>{item.item_name ?? item.item_id}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(item.outcome)} · {formatWorkflowToken(item.status ?? "unknown")}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {item.message ?? "No preview note."}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <strong>
+                                                  {item.changed_fields.length ? item.changed_fields.join(", ") : "No field changes"}
+                                                </strong>
+                                                {item.changed_fields.length ? (
+                                                  <div className="provider-provenance-governance-summary">
+                                                    {item.changed_fields.map((fieldName) => (
+                                                      <span key={fieldName}>
+                                                        {fieldName}: {formatProviderProvenanceSchedulerNarrativeGovernanceDiffValue(item.field_diffs[fieldName]?.before)} {"->"}{" "}
+                                                        {formatProviderProvenanceSchedulerNarrativeGovernanceDiffValue(item.field_diffs[fieldName]?.after)}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                ) : null}
+                                              </td>
+                                              <td>
+                                                <strong>
+                                                  {item.rollback_revision_id
+                                                    ? shortenIdentifier(item.rollback_revision_id, 10)
+                                                    : "No rollback revision"}
+                                                </strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  current {item.current_revision_id ? shortenIdentifier(item.current_revision_id, 10) : "n/a"}
+                                                </p>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                      {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.applied_result ? (
+                                        <p className="run-lineage-symbol-copy">
+                                          Apply result: {formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.applied_result)}
+                                        </p>
+                                      ) : null}
+                                      {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rollback_result ? (
+                                        <p className="run-lineage-symbol-copy">
+                                          Rollback result: {formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rollback_result)}
+                                        </p>
                                       ) : null}
                                     </div>
                                   ) : null}

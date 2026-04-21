@@ -1027,6 +1027,57 @@ class ProviderProvenanceSchedulerNarrativeBulkGovernanceResult:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePreviewItem:
+  item_id: str
+  item_name: str | None = None
+  status: str | None = None
+  current_revision_id: str | None = None
+  apply_revision_id: str | None = None
+  rollback_revision_id: str | None = None
+  outcome: str = "changed"
+  message: str | None = None
+  changed_fields: tuple[str, ...] = ()
+  field_diffs: dict[str, dict[str, Any]] = field(default_factory=dict)
+  current_snapshot: dict[str, Any] = field(default_factory=dict)
+  proposed_snapshot: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+  plan_id: str
+  item_type: str
+  action: str
+  reason: str
+  status: str = "previewed"
+  request_payload: dict[str, Any] = field(default_factory=dict)
+  target_ids: tuple[str, ...] = ()
+  preview_requested_count: int = 0
+  preview_changed_count: int = 0
+  preview_skipped_count: int = 0
+  preview_failed_count: int = 0
+  preview_items: tuple[ProviderProvenanceSchedulerNarrativeGovernancePreviewItem, ...] = ()
+  rollback_ready_count: int = 0
+  rollback_summary: str = ""
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+  approved_at: datetime | None = None
+  approved_by_tab_id: str | None = None
+  approved_by_tab_label: str | None = None
+  approval_note: str | None = None
+  applied_at: datetime | None = None
+  applied_by_tab_id: str | None = None
+  applied_by_tab_label: str | None = None
+  applied_result: ProviderProvenanceSchedulerNarrativeBulkGovernanceResult | None = None
+  rolled_back_at: datetime | None = None
+  rolled_back_by_tab_id: str | None = None
+  rolled_back_by_tab_label: str | None = None
+  rollback_note: str | None = None
+  rollback_result: ProviderProvenanceSchedulerNarrativeBulkGovernanceResult | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceScheduledReportAuditRecord:
   audit_id: str
   report_id: str

@@ -145,6 +145,14 @@ def serialize_provider_provenance_scheduler_narrative_registry_revision_list(*ar
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_registry_revision_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_narrative_governance_plan_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_plan_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_plan_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_plan_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduled_report_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduled_report_record')(*args, **kwargs)
 
@@ -783,6 +791,58 @@ def execute_standalone_surface_binding(
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
         reason=resolved_payload.get("reason", "scheduler_narrative_registry_revision_restored"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_create":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.create_provider_provenance_scheduler_narrative_governance_plan(
+        item_type=resolved_payload.get("item_type", ""),
+        item_ids=resolved_payload.get("item_ids", ()),
+        action=resolved_payload.get("action", ""),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        query_patch=resolved_payload.get("query_patch"),
+        layout_patch=resolved_payload.get("layout_patch"),
+        template_id=resolved_payload.get("template_id"),
+        clear_template_link=bool(resolved_payload.get("clear_template_link", False)),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_list":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_list(
+      app.list_provider_provenance_scheduler_narrative_governance_plans(
+        item_type=resolved_filters.get("item_type"),
+        status=resolved_filters.get("status"),
+        limit=resolved_filters.get("limit", 20),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_approve":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.approve_provider_provenance_scheduler_narrative_governance_plan(
+        resolved_path_params["plan_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        note=resolved_payload.get("note"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_apply":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.apply_provider_provenance_scheduler_narrative_governance_plan(
+        resolved_path_params["plan_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_rollback":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.rollback_provider_provenance_scheduler_narrative_governance_plan(
+        resolved_path_params["plan_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        note=resolved_payload.get("note"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduled_report_create":

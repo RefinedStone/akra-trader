@@ -188,6 +188,9 @@ It is not yet a finished live trading product:
 - that bulk governance layer now also supports advanced batch edits, so operators can patch saved
   scheduler narrative names, descriptions, query filters, and shared-board links/layout flags
   across multiple entries in one pass
+- scheduler narrative bulk governance now also runs through staged governance plans with per-item
+  diff preview, explicit approval, drift checks at apply time, and rollback plans pinned to the
+  captured pre-change revisions instead of applying irreversible batch edits immediately
 
 ### Operator discipline baseline
 

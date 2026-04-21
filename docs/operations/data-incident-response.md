@@ -84,6 +84,9 @@ unclear dataset lineage.
 - that bulk governance flow now also supports advanced batch edits for metadata, query filters,
   registry template links, and board layout flags, so the saved scheduler review layer can be
   re-aligned during incident handoff without reopening each entry individually
+- those same bulk edits now stage a governance plan first, showing per-entry diffs, requiring an
+  explicit approval step before apply, and keeping rollback targets tied to the captured
+  pre-approval revisions if the shared scheduler review lens needs to be reverted
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

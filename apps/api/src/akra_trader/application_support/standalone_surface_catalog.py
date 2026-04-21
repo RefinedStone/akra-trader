@@ -1762,6 +1762,93 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("registry_id", "revision_id"),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_registry_revision_restore",
   )
+  operator_provider_provenance_scheduler_narrative_governance_plan_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_create",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    route_name="create_operator_provider_provenance_scheduler_narrative_governance_plan",
+    response_title="Create provider provenance scheduler narrative governance plan",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_plan_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_plan_create",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_plan_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    route_name="list_operator_provider_provenance_scheduler_narrative_governance_plans",
+    response_title="List provider provenance scheduler narrative governance plans",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_plan_list",
+    filter_keys=("item_type", "status", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "item_type",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Item type",
+          description="Filter scheduler narrative governance plans by template or registry scope.",
+          examples=("template",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "status",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Plan status",
+          description="Filter scheduler narrative governance plans by previewed, approved, applied, or rolled_back state.",
+          examples=("approved",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=20,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=100),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler narrative governance plans to return.",
+          examples=(20,),
+        ),
+      ),
+    ),
+  )
+  operator_provider_provenance_scheduler_narrative_governance_plan_approve_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_approve",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{plan_id}/approve",
+    route_name="approve_operator_provider_provenance_scheduler_narrative_governance_plan",
+    response_title="Approve provider provenance scheduler narrative governance plan",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_plan_approve",
+    methods=("POST",),
+    path_param_keys=("plan_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_plan_approve",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_plan_apply_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_apply",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{plan_id}/apply",
+    route_name="apply_operator_provider_provenance_scheduler_narrative_governance_plan",
+    response_title="Apply provider provenance scheduler narrative governance plan",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_plan_apply",
+    methods=("POST",),
+    path_param_keys=("plan_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_plan_apply",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_plan_rollback_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_rollback",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{plan_id}/rollback",
+    route_name="rollback_operator_provider_provenance_scheduler_narrative_governance_plan",
+    response_title="Rollback provider provenance scheduler narrative governance plan",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_plan_rollback",
+    methods=("POST",),
+    path_param_keys=("plan_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_plan_rollback",
+  )
   operator_provider_provenance_scheduled_report_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduled_report_create",
     route_path="/operator/provider-provenance-analytics/reports",
@@ -3447,6 +3534,11 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_registry_bulk_governance_binding,
     operator_provider_provenance_scheduler_narrative_registry_revision_list_binding,
     operator_provider_provenance_scheduler_narrative_registry_revision_restore_binding,
+    operator_provider_provenance_scheduler_narrative_governance_plan_create_binding,
+    operator_provider_provenance_scheduler_narrative_governance_plan_list_binding,
+    operator_provider_provenance_scheduler_narrative_governance_plan_approve_binding,
+    operator_provider_provenance_scheduler_narrative_governance_plan_apply_binding,
+    operator_provider_provenance_scheduler_narrative_governance_plan_rollback_binding,
     operator_provider_provenance_scheduled_report_create_binding,
     operator_provider_provenance_scheduled_report_list_binding,
     operator_provider_provenance_scheduled_report_run_binding,

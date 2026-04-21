@@ -333,6 +333,39 @@ class OperatorProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceRequest(
   clear_template_link: bool = False
 
 
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest(BaseModel):
+  item_type: str
+  item_ids: list[str] = Field(default_factory=list)
+  action: str
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  query_patch: dict[str, Any] | None = None
+  layout_patch: dict[str, Any] | None = None
+  template_id: str | None = None
+  clear_template_link: bool = False
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanApprovalRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  note: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanApplyRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanRollbackRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  note: str | None = None
+
+
 class OperatorProviderProvenanceSchedulerNarrativeRegistryRevisionRestoreRequest(BaseModel):
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
@@ -410,6 +443,22 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_registry_bulk_governance": (
     OperatorProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_plan_create": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_plan_approve": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePlanApprovalRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_plan_apply": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePlanApplyRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_plan_rollback": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePlanRollbackRequest,
     {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_registry_revision_restore": (

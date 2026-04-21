@@ -15156,6 +15156,11 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_registry_bulk_governance",
     "operator_provider_provenance_scheduler_narrative_registry_revision_list",
     "operator_provider_provenance_scheduler_narrative_registry_revision_restore",
+    "operator_provider_provenance_scheduler_narrative_governance_plan_create",
+    "operator_provider_provenance_scheduler_narrative_governance_plan_list",
+    "operator_provider_provenance_scheduler_narrative_governance_plan_approve",
+    "operator_provider_provenance_scheduler_narrative_governance_plan_apply",
+    "operator_provider_provenance_scheduler_narrative_governance_plan_rollback",
     "operator_provider_provenance_scheduled_report_create",
     "operator_provider_provenance_scheduled_report_list",
     "operator_provider_provenance_scheduled_report_run",
@@ -15320,6 +15325,19 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_revision_restore"].path_param_keys == (
     "registry_id",
     "revision_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"].methods == ("POST",)
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[0].key == (
+    "item_type"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_approve"].path_param_keys == (
+    "plan_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_apply"].path_param_keys == (
+    "plan_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_rollback"].path_param_keys == (
+    "plan_id",
   )
   assert bindings_by_key["operator_provider_provenance_scheduled_report_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduled_report_list"].filter_param_specs[1].key == (
@@ -16744,6 +16762,158 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert all(item["name"].endswith(" / governed") for item in updated_registry_list_payload["items"])
   assert all(item["template_id"] == template_payload["template_id"] for item in updated_registry_list_payload["items"])
   assert all(item["layout"]["show_recent_exports"] is True for item in updated_registry_list_payload["items"])
+
+  template_governance_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
+    app=app,
+    request_payload={
+      "item_type": "template",
+      "item_ids": [template_payload["template_id"], bulk_template_payload["template_id"]],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_template_governance_plan",
+      "name_suffix": " / staged",
+      "query_patch": {
+        "scheduler_alert_status": "resolved",
+      },
+    },
+  )
+  assert template_governance_plan_payload["status"] == "previewed"
+  assert template_governance_plan_payload["preview_changed_count"] == 2
+  assert template_governance_plan_payload["rollback_ready_count"] == 2
+  assert any("name" in item["changed_fields"] for item in template_governance_plan_payload["preview_items"])
+
+  governance_plan_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"],
+    app=app,
+    filters={"item_type": "template", "status": "previewed", "limit": 10},
+  )
+  assert governance_plan_list_payload["total"] >= 1
+  assert governance_plan_list_payload["items"][0]["plan_id"] == template_governance_plan_payload["plan_id"]
+
+  approved_template_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_approve"],
+    app=app,
+    path_params={"plan_id": template_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "approved for shift rollout",
+    },
+  )
+  assert approved_template_plan_payload["status"] == "approved"
+  assert approved_template_plan_payload["approved_at"] is not None
+
+  applied_template_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_apply"],
+    app=app,
+    path_params={"plan_id": template_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert applied_template_plan_payload["status"] == "applied"
+  assert applied_template_plan_payload["applied_result"]["applied_count"] == 2
+  staged_template_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_list"],
+    app=app,
+    filters={"category": "scheduler_failure", "narrative_facet": "recurring_occurrences", "limit": 10},
+  )
+  assert all(item["name"].endswith(" / staged") for item in staged_template_list_payload["items"])
+
+  rolled_back_template_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_rollback"],
+    app=app,
+    path_params={"plan_id": template_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "rollback after review",
+    },
+  )
+  assert rolled_back_template_plan_payload["status"] == "rolled_back"
+  assert rolled_back_template_plan_payload["rollback_result"]["applied_count"] == 2
+  reverted_template_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_list"],
+    app=app,
+    filters={"category": "scheduler_failure", "narrative_facet": "recurring_occurrences", "limit": 10},
+  )
+  assert all(not item["name"].endswith(" / staged") for item in reverted_template_list_payload["items"])
+
+  registry_governance_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
+    app=app,
+    request_payload={
+      "item_type": "registry",
+      "item_ids": [registry_payload["registry_id"], bulk_registry_payload["registry_id"]],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_registry_governance_plan",
+      "clear_template_link": True,
+      "layout_patch": {
+        "show_time_series": True,
+      },
+    },
+  )
+  assert registry_governance_plan_payload["status"] == "previewed"
+  assert registry_governance_plan_payload["preview_changed_count"] == 2
+  assert any(
+    "template_id" in item["changed_fields"] or "layout" in item["changed_fields"]
+    for item in registry_governance_plan_payload["preview_items"]
+  )
+
+  approved_registry_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_approve"],
+    app=app,
+    path_params={"plan_id": registry_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert approved_registry_plan_payload["status"] == "approved"
+
+  applied_registry_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_apply"],
+    app=app,
+    path_params={"plan_id": registry_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert applied_registry_plan_payload["status"] == "applied"
+  registry_without_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_list"],
+    app=app,
+    filters={"category": "scheduler_failure", "narrative_facet": "resolved_narratives", "limit": 10},
+  )
+  assert all(item["template_id"] is None for item in registry_without_template_payload["items"])
+
+  rolled_back_registry_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_rollback"],
+    app=app,
+    path_params={"plan_id": registry_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert rolled_back_registry_plan_payload["status"] == "rolled_back"
+  reverted_registry_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_list"],
+    app=app,
+    filters={
+      "template_id": template_payload["template_id"],
+      "category": "scheduler_failure",
+      "narrative_facet": "resolved_narratives",
+      "limit": 10,
+    },
+  )
+  assert reverted_registry_list_payload["total"] == 2
 
   report_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduled_report_create"],

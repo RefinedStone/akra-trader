@@ -133,6 +133,9 @@ creation.
 - the same governance workflow now also supports advanced batch edits, so teams can patch metadata,
   scheduler query filters, registry template links, and board layout flags across multiple saved
   scheduler review entries in one step
+- scheduler narrative batch governance now also has a staged plan layer with diff preview,
+  explicit approval, apply-time drift protection, and rollback to captured revisions, so shared
+  review-lens changes are auditable before they mutate the saved workspace state
 
 ### Remaining work
 

@@ -39,6 +39,8 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceResult
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePreviewItem
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
@@ -448,6 +450,10 @@ class TradingApplication:
     self._provider_provenance_scheduler_narrative_registry_revisions: dict[
       str,
       ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
+    ] = {}
+    self._provider_provenance_scheduler_narrative_governance_plans: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
     ] = {}
     self._provider_provenance_scheduled_report_audit_records: dict[str, ProviderProvenanceScheduledReportAuditRecord] = {}
     self._provider_provenance_scheduler_health_records: dict[str, ProviderProvenanceSchedulerHealthRecord] = {}
@@ -1816,6 +1822,39 @@ class TradingApplication:
       sorted(
         self._provider_provenance_scheduler_narrative_registry_revisions.values(),
         key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_narrative_governance_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    save_record = getattr(self._runs, "save_provider_provenance_scheduler_narrative_governance_plan", None)
+    if callable(save_record):
+      return save_record(record)
+    self._provider_provenance_scheduler_narrative_governance_plans[record.plan_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_narrative_governance_plan_record(
+    self,
+    plan_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord | None:
+    get_record = getattr(self._runs, "get_provider_provenance_scheduler_narrative_governance_plan", None)
+    if callable(get_record):
+      return get_record(plan_id)
+    return self._provider_provenance_scheduler_narrative_governance_plans.get(plan_id)
+
+  def _list_provider_provenance_scheduler_narrative_governance_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...]:
+    list_records = getattr(self._runs, "list_provider_provenance_scheduler_narrative_governance_plans", None)
+    if callable(list_records):
+      return tuple(list_records())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_governance_plans.values(),
+        key=lambda record: (record.updated_at, record.plan_id),
         reverse=True,
       )
     )
@@ -4656,6 +4695,394 @@ class TradingApplication:
         merged[key] = layout_patch[key]
     return self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(merged)
 
+  def _build_provider_provenance_scheduler_narrative_template_snapshot(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeTemplateRecord,
+  ) -> dict[str, Any]:
+    normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+    return {
+      "name": record.name,
+      "description": record.description,
+      "status": self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+      "query": deepcopy(normalized_query),
+      "focus": self._build_provider_provenance_workspace_focus_payload(normalized_query),
+      "filter_summary": self._build_provider_provenance_analytics_filter_summary(normalized_query),
+    }
+
+  def _build_provider_provenance_scheduler_narrative_registry_snapshot(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
+  ) -> dict[str, Any]:
+    normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+    normalized_layout = self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+      record.layout
+    )
+    return {
+      "name": record.name,
+      "description": record.description,
+      "template_id": record.template_id,
+      "status": self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+      "query": deepcopy(normalized_query),
+      "focus": self._build_provider_provenance_workspace_focus_payload(normalized_query),
+      "filter_summary": self._build_provider_provenance_analytics_filter_summary(normalized_query),
+      "layout": deepcopy(normalized_layout),
+    }
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_narrative_field_diffs(
+    current_snapshot: dict[str, Any],
+    proposed_snapshot: dict[str, Any],
+    fields: Iterable[str],
+  ) -> tuple[tuple[str, ...], dict[str, dict[str, Any]]]:
+    changed_fields: list[str] = []
+    field_diffs: dict[str, dict[str, Any]] = {}
+    for field_name in fields:
+      current_value = current_snapshot.get(field_name)
+      proposed_value = proposed_snapshot.get(field_name)
+      if current_value == proposed_value:
+        continue
+      changed_fields.append(field_name)
+      field_diffs[field_name] = {
+        "before": deepcopy(current_value),
+        "after": deepcopy(proposed_value),
+      }
+    return tuple(changed_fields), field_diffs
+
+  def _preview_provider_provenance_scheduler_narrative_template_governance_item(
+    self,
+    current: ProviderProvenanceSchedulerNarrativeTemplateRecord,
+    *,
+    action: str,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    description_append: str | None = None,
+    query_patch: dict[str, Any] | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePreviewItem:
+    current_snapshot = self._build_provider_provenance_scheduler_narrative_template_snapshot(current)
+    if action == "delete":
+      if current.status == "deleted":
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.template_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="skipped",
+          message="Template is already deleted.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      proposed = replace(current, status="deleted")
+      proposed_snapshot = self._build_provider_provenance_scheduler_narrative_template_snapshot(proposed)
+      changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+        current_snapshot,
+        proposed_snapshot,
+        ("status",),
+      )
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.template_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="changed",
+        message="Template will be deleted.",
+        changed_fields=changed_fields,
+        field_diffs=field_diffs,
+        current_snapshot=current_snapshot,
+        proposed_snapshot=proposed_snapshot,
+      )
+    if action == "restore":
+      if current.status != "deleted":
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.template_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="skipped",
+          message="Template is already active.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      revision = self._find_latest_active_provider_provenance_scheduler_narrative_template_revision(
+        current.template_id
+      )
+      if revision is None:
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.template_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="failed",
+          message="No active revision is available for restore.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      proposed = replace(
+        current,
+        name=revision.name,
+        description=revision.description,
+        query=self._normalize_provider_provenance_analytics_query_payload(revision.query),
+        status="active",
+      )
+      proposed_snapshot = self._build_provider_provenance_scheduler_narrative_template_snapshot(proposed)
+      changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+        current_snapshot,
+        proposed_snapshot,
+        ("name", "description", "status", "query", "filter_summary", "focus"),
+      )
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.template_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        apply_revision_id=revision.revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="changed",
+        message="Template will be restored from the latest active revision.",
+        changed_fields=changed_fields,
+        field_diffs=field_diffs,
+        current_snapshot=current_snapshot,
+        proposed_snapshot=proposed_snapshot,
+      )
+    if current.status == "deleted":
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.template_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="skipped",
+        message="Template is deleted; restore it before applying bulk edits.",
+        current_snapshot=current_snapshot,
+        proposed_snapshot=deepcopy(current_snapshot),
+      )
+    updated_name = f"{name_prefix or ''}{current.name}{name_suffix or ''}"
+    updated_description = (
+      f"{current.description} {description_append}".strip()
+      if description_append is not None
+      else current.description
+    )
+    updated_query = self._build_provider_provenance_scheduler_narrative_bulk_template_query(
+      current.query,
+      query_patch,
+    )
+    proposed = replace(current, name=updated_name, description=updated_description, query=updated_query)
+    proposed_snapshot = self._build_provider_provenance_scheduler_narrative_template_snapshot(proposed)
+    changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+      current_snapshot,
+      proposed_snapshot,
+      ("name", "description", "query", "filter_summary", "focus"),
+    )
+    if not changed_fields:
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.template_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="skipped",
+        message="Template already matches the requested bulk edits.",
+        current_snapshot=current_snapshot,
+        proposed_snapshot=deepcopy(current_snapshot),
+      )
+    return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+      item_id=current.template_id,
+      item_name=current.name,
+      status=current.status,
+      current_revision_id=current.current_revision_id,
+      rollback_revision_id=current.current_revision_id,
+      outcome="changed",
+      message="Template will be updated with the requested bulk governance patch.",
+      changed_fields=changed_fields,
+      field_diffs=field_diffs,
+      current_snapshot=current_snapshot,
+      proposed_snapshot=proposed_snapshot,
+    )
+
+  def _preview_provider_provenance_scheduler_narrative_registry_governance_item(
+    self,
+    current: ProviderProvenanceSchedulerNarrativeRegistryRecord,
+    *,
+    action: str,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    description_append: str | None = None,
+    query_patch: dict[str, Any] | None = None,
+    layout_patch: dict[str, Any] | None = None,
+    template_id: str | None = None,
+    clear_template_link: bool = False,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePreviewItem:
+    current_snapshot = self._build_provider_provenance_scheduler_narrative_registry_snapshot(current)
+    if action == "delete":
+      if current.status == "deleted":
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.registry_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="skipped",
+          message="Registry is already deleted.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      proposed = replace(current, status="deleted")
+      proposed_snapshot = self._build_provider_provenance_scheduler_narrative_registry_snapshot(proposed)
+      changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+        current_snapshot,
+        proposed_snapshot,
+        ("status",),
+      )
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.registry_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="changed",
+        message="Registry will be deleted.",
+        changed_fields=changed_fields,
+        field_diffs=field_diffs,
+        current_snapshot=current_snapshot,
+        proposed_snapshot=proposed_snapshot,
+      )
+    if action == "restore":
+      if current.status != "deleted":
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.registry_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="skipped",
+          message="Registry is already active.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      revision = self._find_latest_active_provider_provenance_scheduler_narrative_registry_revision(
+        current.registry_id
+      )
+      if revision is None:
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.registry_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="failed",
+          message="No active revision is available for restore.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      proposed = replace(
+        current,
+        name=revision.name,
+        description=revision.description,
+        query=self._normalize_provider_provenance_analytics_query_payload(revision.query),
+        layout=self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+          revision.layout
+        ),
+        template_id=revision.template_id,
+        status="active",
+      )
+      proposed_snapshot = self._build_provider_provenance_scheduler_narrative_registry_snapshot(proposed)
+      changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+        current_snapshot,
+        proposed_snapshot,
+        ("name", "description", "template_id", "status", "query", "filter_summary", "focus", "layout"),
+      )
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.registry_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        apply_revision_id=revision.revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="changed",
+        message="Registry will be restored from the latest active revision.",
+        changed_fields=changed_fields,
+        field_diffs=field_diffs,
+        current_snapshot=current_snapshot,
+        proposed_snapshot=proposed_snapshot,
+      )
+    if current.status == "deleted":
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.registry_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="skipped",
+        message="Registry is deleted; restore it before applying bulk edits.",
+        current_snapshot=current_snapshot,
+        proposed_snapshot=deepcopy(current_snapshot),
+      )
+    updated_name = f"{name_prefix or ''}{current.name}{name_suffix or ''}"
+    updated_description = (
+      f"{current.description} {description_append}".strip()
+      if description_append is not None
+      else current.description
+    )
+    updated_query = self._build_provider_provenance_scheduler_narrative_bulk_template_query(
+      current.query,
+      query_patch,
+    )
+    updated_layout = self._build_provider_provenance_scheduler_narrative_bulk_registry_layout(
+      current.layout,
+      layout_patch,
+    )
+    updated_template_id = (
+      None
+      if clear_template_link
+      else (
+        template_id.strip()
+        if isinstance(template_id, str) and template_id.strip()
+        else current.template_id
+      )
+    )
+    proposed = replace(
+      current,
+      name=updated_name,
+      description=updated_description,
+      query=updated_query,
+      layout=updated_layout,
+      template_id=updated_template_id,
+    )
+    proposed_snapshot = self._build_provider_provenance_scheduler_narrative_registry_snapshot(proposed)
+    changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+      current_snapshot,
+      proposed_snapshot,
+      ("name", "description", "template_id", "query", "filter_summary", "focus", "layout"),
+    )
+    if not changed_fields:
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.registry_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="skipped",
+        message="Registry already matches the requested bulk edits.",
+        current_snapshot=current_snapshot,
+        proposed_snapshot=deepcopy(current_snapshot),
+      )
+    return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+      item_id=current.registry_id,
+      item_name=current.name,
+      status=current.status,
+      current_revision_id=current.current_revision_id,
+      rollback_revision_id=current.current_revision_id,
+      outcome="changed",
+      message="Registry will be updated with the requested bulk governance patch.",
+      changed_fields=changed_fields,
+      field_diffs=field_diffs,
+      current_snapshot=current_snapshot,
+      proposed_snapshot=proposed_snapshot,
+    )
+
   def _find_latest_active_provider_provenance_scheduler_narrative_template_revision(
     self,
     template_id: str,
@@ -5376,7 +5803,7 @@ class TradingApplication:
             layout_patch,
           )
           updated_template_id = (
-            None
+            ""
             if clear_template_link
             else (
               template_id.strip()
@@ -5451,6 +5878,573 @@ class TradingApplication:
       skipped_count=skipped_count,
       failed_count=failed_count,
       results=tuple(results),
+    )
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_governance_item_type(
+    item_type: str,
+  ) -> str:
+    normalized = item_type.strip().lower()
+    if normalized not in {"template", "registry"}:
+      raise ValueError("Unsupported scheduler narrative governance item type.")
+    return normalized
+
+  def create_provider_provenance_scheduler_narrative_governance_plan(
+    self,
+    *,
+    item_type: str,
+    item_ids: Iterable[str],
+    action: str,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str | None = None,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    description_append: str | None = None,
+    query_patch: dict[str, Any] | None = None,
+    layout_patch: dict[str, Any] | None = None,
+    template_id: str | None = None,
+    clear_template_link: bool = False,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    normalized_item_type = self._normalize_provider_provenance_scheduler_narrative_governance_item_type(
+      item_type
+    )
+    normalized_action = action.strip().lower()
+    if normalized_action not in {"delete", "restore", "update"}:
+      raise ValueError("Unsupported scheduler narrative governance action.")
+    normalized_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(item_ids)
+    normalized_name_prefix = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      name_prefix,
+      preserve_outer_spacing=True,
+    )
+    normalized_name_suffix = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      name_suffix,
+      preserve_outer_spacing=True,
+    )
+    normalized_description_append = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      description_append
+    )
+    if (
+      normalized_action == "update"
+      and normalized_item_type == "template"
+      and normalized_name_prefix is None
+      and normalized_name_suffix is None
+      and normalized_description_append is None
+      and not isinstance(query_patch, dict)
+    ):
+      raise ValueError("No scheduler narrative template bulk update fields were provided.")
+    if (
+      normalized_action == "update"
+      and normalized_item_type == "registry"
+      and normalized_name_prefix is None
+      and normalized_name_suffix is None
+      and normalized_description_append is None
+      and not isinstance(query_patch, dict)
+      and not isinstance(layout_patch, dict)
+      and template_id is None
+      and not clear_template_link
+    ):
+      raise ValueError("No scheduler narrative registry bulk update fields were provided.")
+    resolved_reason = (
+      reason.strip()
+      if isinstance(reason, str) and reason.strip()
+      else (
+        f"scheduler_narrative_{normalized_item_type}_bulk_deleted"
+        if normalized_action == "delete"
+        else (
+          f"scheduler_narrative_{normalized_item_type}_bulk_restored"
+          if normalized_action == "restore"
+          else f"scheduler_narrative_{normalized_item_type}_bulk_updated"
+        )
+      )
+    )
+    preview_items: list[ProviderProvenanceSchedulerNarrativeGovernancePreviewItem] = []
+    for item_id in normalized_ids:
+      try:
+        if normalized_item_type == "template":
+          current_template = self.get_provider_provenance_scheduler_narrative_template(item_id)
+          preview_items.append(
+            self._preview_provider_provenance_scheduler_narrative_template_governance_item(
+              current_template,
+              action=normalized_action,
+              name_prefix=normalized_name_prefix,
+              name_suffix=normalized_name_suffix,
+              description_append=normalized_description_append,
+              query_patch=query_patch,
+            )
+          )
+        else:
+          current_registry = self.get_provider_provenance_scheduler_narrative_registry_entry(item_id)
+          preview_items.append(
+            self._preview_provider_provenance_scheduler_narrative_registry_governance_item(
+              current_registry,
+              action=normalized_action,
+              name_prefix=normalized_name_prefix,
+              name_suffix=normalized_name_suffix,
+              description_append=normalized_description_append,
+              query_patch=query_patch,
+              layout_patch=layout_patch,
+              template_id=template_id,
+              clear_template_link=clear_template_link,
+            )
+          )
+      except (LookupError, RuntimeError, ValueError) as exc:
+        preview_items.append(
+          ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+            item_id=item_id,
+            outcome="failed",
+            message=str(exc),
+          )
+        )
+    preview_changed_count = sum(1 for item in preview_items if item.outcome == "changed")
+    preview_skipped_count = sum(1 for item in preview_items if item.outcome == "skipped")
+    preview_failed_count = sum(1 for item in preview_items if item.outcome == "failed")
+    rollback_ready_count = sum(
+      1
+      for item in preview_items
+      if item.outcome == "changed" and item.rollback_revision_id is not None
+    )
+    request_payload: dict[str, Any] = {
+      "item_type": normalized_item_type,
+      "item_ids": list(normalized_ids),
+      "action": normalized_action,
+    }
+    if normalized_name_prefix is not None:
+      request_payload["name_prefix"] = normalized_name_prefix
+    if normalized_name_suffix is not None:
+      request_payload["name_suffix"] = normalized_name_suffix
+    if normalized_description_append is not None:
+      request_payload["description_append"] = normalized_description_append
+    if isinstance(query_patch, dict) and query_patch:
+      request_payload["query_patch"] = deepcopy(query_patch)
+    if isinstance(layout_patch, dict) and layout_patch:
+      request_payload["layout_patch"] = deepcopy(layout_patch)
+    if isinstance(template_id, str) and template_id.strip():
+      request_payload["template_id"] = template_id.strip()
+    if clear_template_link:
+      request_payload["clear_template_link"] = True
+    now = self._clock()
+    return self._save_provider_provenance_scheduler_narrative_governance_plan_record(
+      ProviderProvenanceSchedulerNarrativeGovernancePlanRecord(
+        plan_id=uuid4().hex[:12],
+        item_type=normalized_item_type,
+        action=normalized_action,
+        reason=resolved_reason,
+        status="previewed",
+        request_payload=request_payload,
+        target_ids=normalized_ids,
+        preview_requested_count=len(normalized_ids),
+        preview_changed_count=preview_changed_count,
+        preview_skipped_count=preview_skipped_count,
+        preview_failed_count=preview_failed_count,
+        preview_items=tuple(preview_items),
+        rollback_ready_count=rollback_ready_count,
+        rollback_summary=(
+          f"Rollback can restore {rollback_ready_count} pre-apply revision snapshot(s)."
+          if rollback_ready_count
+          else "No rollback snapshot is available for this governance plan."
+        ),
+        created_at=now,
+        updated_at=now,
+        created_by_tab_id=(
+          actor_tab_id.strip()
+          if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+          else None
+        ),
+        created_by_tab_label=(
+          actor_tab_label.strip()
+          if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+          else None
+        ),
+      )
+    )
+
+  def list_provider_provenance_scheduler_narrative_governance_plans(
+    self,
+    *,
+    item_type: str | None = None,
+    status: str | None = None,
+    limit: int = 20,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...]:
+    normalized_item_type = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_item_type(item_type)
+      if isinstance(item_type, str) and item_type.strip()
+      else None
+    )
+    normalized_status = (
+      status.strip().lower()
+      if isinstance(status, str) and status.strip()
+      else None
+    )
+    normalized_limit = max(1, min(limit, 100))
+    filtered: list[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord] = []
+    for record in self._list_provider_provenance_scheduler_narrative_governance_plan_records():
+      if normalized_item_type is not None and record.item_type != normalized_item_type:
+        continue
+      if normalized_status is not None and record.status != normalized_status:
+        continue
+      filtered.append(record)
+      if len(filtered) >= normalized_limit:
+        break
+    return tuple(filtered)
+
+  def get_provider_provenance_scheduler_narrative_governance_plan(
+    self,
+    plan_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    normalized_plan_id = plan_id.strip()
+    if not normalized_plan_id:
+      raise LookupError("Provider provenance scheduler narrative governance plan not found.")
+    record = self._load_provider_provenance_scheduler_narrative_governance_plan_record(normalized_plan_id)
+    if record is None:
+      raise LookupError("Provider provenance scheduler narrative governance plan not found.")
+    return record
+
+  def approve_provider_provenance_scheduler_narrative_governance_plan(
+    self,
+    plan_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    note: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    current = self.get_provider_provenance_scheduler_narrative_governance_plan(plan_id)
+    if current.status == "applied":
+      raise RuntimeError("Applied governance plans cannot be approved again.")
+    if current.status == "rolled_back":
+      raise RuntimeError("Rolled-back governance plans cannot be approved again.")
+    approved_at = self._clock()
+    return self._save_provider_provenance_scheduler_narrative_governance_plan_record(
+      replace(
+        current,
+        status="approved",
+        updated_at=approved_at,
+        approved_at=approved_at,
+        approved_by_tab_id=(
+          actor_tab_id.strip()
+          if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+          else None
+        ),
+        approved_by_tab_label=(
+          actor_tab_label.strip()
+          if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+          else None
+        ),
+        approval_note=note.strip() if isinstance(note, str) and note.strip() else current.approval_note,
+      )
+    )
+
+  def apply_provider_provenance_scheduler_narrative_governance_plan(
+    self,
+    plan_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    current = self.get_provider_provenance_scheduler_narrative_governance_plan(plan_id)
+    if current.status != "approved":
+      raise RuntimeError("Approve the scheduler narrative governance plan before applying it.")
+    request_payload = current.request_payload
+    results: list[ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult] = []
+    applied_count = 0
+    skipped_count = 0
+    failed_count = 0
+    for preview in current.preview_items:
+      if preview.outcome == "skipped":
+        skipped_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=preview.item_id,
+            item_name=preview.item_name,
+            outcome="skipped",
+            status=preview.status,
+            current_revision_id=preview.current_revision_id,
+            message=preview.message,
+          )
+        )
+        continue
+      if preview.outcome == "failed":
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=preview.item_id,
+            item_name=preview.item_name,
+            outcome="failed",
+            status=preview.status,
+            current_revision_id=preview.current_revision_id,
+            message=preview.message,
+          )
+        )
+        continue
+      try:
+        if current.item_type == "template":
+          existing = self.get_provider_provenance_scheduler_narrative_template(preview.item_id)
+          if existing.current_revision_id != preview.current_revision_id:
+            raise RuntimeError("Template drifted since the governance preview was created.")
+          if current.action == "delete":
+            updated = self.delete_provider_provenance_scheduler_narrative_template(
+              preview.item_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          elif current.action == "restore":
+            if not preview.apply_revision_id:
+              raise RuntimeError("No restore revision was captured in the governance preview.")
+            updated = self.restore_provider_provenance_scheduler_narrative_template_revision(
+              preview.item_id,
+              preview.apply_revision_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          else:
+            updated_name = (
+              f"{request_payload.get('name_prefix', '')}{existing.name}{request_payload.get('name_suffix', '')}"
+            )
+            updated_description = (
+              f"{existing.description} {request_payload['description_append']}".strip()
+              if isinstance(request_payload.get("description_append"), str)
+              else existing.description
+            )
+            updated_query = self._build_provider_provenance_scheduler_narrative_bulk_template_query(
+              existing.query,
+              request_payload.get("query_patch"),
+            )
+            updated = self.update_provider_provenance_scheduler_narrative_template(
+              preview.item_id,
+              name=updated_name,
+              description=updated_description,
+              query=updated_query,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          results.append(
+            ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+              item_id=updated.template_id,
+              item_name=updated.name,
+              outcome="applied",
+              status=updated.status,
+              current_revision_id=updated.current_revision_id,
+              message=preview.message,
+            )
+          )
+        else:
+          existing = self.get_provider_provenance_scheduler_narrative_registry_entry(preview.item_id)
+          if existing.current_revision_id != preview.current_revision_id:
+            raise RuntimeError("Registry drifted since the governance preview was created.")
+          if current.action == "delete":
+            updated = self.delete_provider_provenance_scheduler_narrative_registry_entry(
+              preview.item_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          elif current.action == "restore":
+            if not preview.apply_revision_id:
+              raise RuntimeError("No restore revision was captured in the governance preview.")
+            updated = self.restore_provider_provenance_scheduler_narrative_registry_revision(
+              preview.item_id,
+              preview.apply_revision_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          else:
+            updated_name = (
+              f"{request_payload.get('name_prefix', '')}{existing.name}{request_payload.get('name_suffix', '')}"
+            )
+            updated_description = (
+              f"{existing.description} {request_payload['description_append']}".strip()
+              if isinstance(request_payload.get("description_append"), str)
+              else existing.description
+            )
+            updated_query = self._build_provider_provenance_scheduler_narrative_bulk_template_query(
+              existing.query,
+              request_payload.get("query_patch"),
+            )
+            updated_layout = self._build_provider_provenance_scheduler_narrative_bulk_registry_layout(
+              existing.layout,
+              request_payload.get("layout_patch"),
+            )
+            updated_template_id = (
+              ""
+              if bool(request_payload.get("clear_template_link"))
+              else (
+                request_payload.get("template_id")
+                if isinstance(request_payload.get("template_id"), str)
+                else existing.template_id
+              )
+            )
+            updated = self.update_provider_provenance_scheduler_narrative_registry_entry(
+              preview.item_id,
+              name=updated_name,
+              description=updated_description,
+              query=updated_query,
+              layout=updated_layout,
+              template_id=updated_template_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          results.append(
+            ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+              item_id=updated.registry_id,
+              item_name=updated.name,
+              outcome="applied",
+              status=updated.status,
+              current_revision_id=updated.current_revision_id,
+              message=preview.message,
+            )
+          )
+        applied_count += 1
+      except (LookupError, RuntimeError, ValueError) as exc:
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=preview.item_id,
+            item_name=preview.item_name,
+            outcome="failed",
+            message=str(exc),
+          )
+        )
+    applied_result = ProviderProvenanceSchedulerNarrativeBulkGovernanceResult(
+      item_type=current.item_type,
+      action=current.action,
+      reason=current.reason,
+      requested_count=len(current.target_ids),
+      applied_count=applied_count,
+      skipped_count=skipped_count,
+      failed_count=failed_count,
+      results=tuple(results),
+    )
+    applied_at = self._clock()
+    return self._save_provider_provenance_scheduler_narrative_governance_plan_record(
+      replace(
+        current,
+        status="applied",
+        updated_at=applied_at,
+        applied_at=applied_at,
+        applied_by_tab_id=(
+          actor_tab_id.strip()
+          if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+          else None
+        ),
+        applied_by_tab_label=(
+          actor_tab_label.strip()
+          if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+          else None
+        ),
+        applied_result=applied_result,
+      )
+    )
+
+  def rollback_provider_provenance_scheduler_narrative_governance_plan(
+    self,
+    plan_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    note: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    current = self.get_provider_provenance_scheduler_narrative_governance_plan(plan_id)
+    if current.status != "applied":
+      raise RuntimeError("Only applied scheduler narrative governance plans can be rolled back.")
+    results: list[ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult] = []
+    applied_count = 0
+    skipped_count = 0
+    failed_count = 0
+    for preview in current.preview_items:
+      if preview.rollback_revision_id is None:
+        skipped_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=preview.item_id,
+            item_name=preview.item_name,
+            outcome="skipped",
+            message="No rollback revision was captured for this item.",
+          )
+        )
+        continue
+      try:
+        if current.item_type == "template":
+          updated = self.restore_provider_provenance_scheduler_narrative_template_revision(
+            preview.item_id,
+            preview.rollback_revision_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason="scheduler_narrative_template_governance_rollback",
+          )
+          results.append(
+            ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+              item_id=updated.template_id,
+              item_name=updated.name,
+              outcome="applied",
+              status=updated.status,
+              current_revision_id=updated.current_revision_id,
+              message="Template restored to the pre-apply revision snapshot.",
+            )
+          )
+        else:
+          updated = self.restore_provider_provenance_scheduler_narrative_registry_revision(
+            preview.item_id,
+            preview.rollback_revision_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason="scheduler_narrative_registry_governance_rollback",
+          )
+          results.append(
+            ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+              item_id=updated.registry_id,
+              item_name=updated.name,
+              outcome="applied",
+              status=updated.status,
+              current_revision_id=updated.current_revision_id,
+              message="Registry restored to the pre-apply revision snapshot.",
+            )
+          )
+        applied_count += 1
+      except (LookupError, RuntimeError, ValueError) as exc:
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=preview.item_id,
+            item_name=preview.item_name,
+            outcome="failed",
+            message=str(exc),
+          )
+        )
+    rollback_result = ProviderProvenanceSchedulerNarrativeBulkGovernanceResult(
+      item_type=current.item_type,
+      action="rollback",
+      reason=current.reason,
+      requested_count=len(current.target_ids),
+      applied_count=applied_count,
+      skipped_count=skipped_count,
+      failed_count=failed_count,
+      results=tuple(results),
+    )
+    rolled_back_at = self._clock()
+    return self._save_provider_provenance_scheduler_narrative_governance_plan_record(
+      replace(
+        current,
+        status="rolled_back",
+        updated_at=rolled_back_at,
+        rolled_back_at=rolled_back_at,
+        rolled_back_by_tab_id=(
+          actor_tab_id.strip()
+          if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+          else None
+        ),
+        rolled_back_by_tab_label=(
+          actor_tab_label.strip()
+          if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+          else None
+        ),
+        rollback_note=note.strip() if isinstance(note, str) and note.strip() else current.rollback_note,
+        rollback_result=rollback_result,
+      )
     )
 
   def create_provider_provenance_scheduled_report(
@@ -31070,6 +32064,92 @@ def serialize_provider_provenance_scheduler_narrative_bulk_governance_result(
       }
       for item in record.results
     ],
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_preview_item(
+  record: ProviderProvenanceSchedulerNarrativeGovernancePreviewItem,
+) -> dict[str, Any]:
+  return {
+    "item_id": record.item_id,
+    "item_name": record.item_name,
+    "status": (
+      TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+        record.status
+      )
+      if record.status is not None
+      else None
+    ),
+    "current_revision_id": record.current_revision_id,
+    "apply_revision_id": record.apply_revision_id,
+    "rollback_revision_id": record.rollback_revision_id,
+    "outcome": record.outcome,
+    "message": record.message,
+    "changed_fields": list(record.changed_fields),
+    "field_diffs": deepcopy(record.field_diffs),
+    "current_snapshot": deepcopy(record.current_snapshot),
+    "proposed_snapshot": deepcopy(record.proposed_snapshot),
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+  record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
+) -> dict[str, Any]:
+  return {
+    "plan_id": record.plan_id,
+    "item_type": record.item_type,
+    "action": record.action,
+    "reason": record.reason,
+    "status": record.status,
+    "request_payload": deepcopy(record.request_payload),
+    "target_ids": list(record.target_ids),
+    "preview_requested_count": record.preview_requested_count,
+    "preview_changed_count": record.preview_changed_count,
+    "preview_skipped_count": record.preview_skipped_count,
+    "preview_failed_count": record.preview_failed_count,
+    "preview_items": [
+      serialize_provider_provenance_scheduler_narrative_governance_preview_item(item)
+      for item in record.preview_items
+    ],
+    "rollback_ready_count": record.rollback_ready_count,
+    "rollback_summary": record.rollback_summary,
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+    "approved_at": record.approved_at.isoformat() if record.approved_at is not None else None,
+    "approved_by_tab_id": record.approved_by_tab_id,
+    "approved_by_tab_label": record.approved_by_tab_label,
+    "approval_note": record.approval_note,
+    "applied_at": record.applied_at.isoformat() if record.applied_at is not None else None,
+    "applied_by_tab_id": record.applied_by_tab_id,
+    "applied_by_tab_label": record.applied_by_tab_label,
+    "applied_result": (
+      serialize_provider_provenance_scheduler_narrative_bulk_governance_result(record.applied_result)
+      if record.applied_result is not None
+      else None
+    ),
+    "rolled_back_at": record.rolled_back_at.isoformat() if record.rolled_back_at is not None else None,
+    "rolled_back_by_tab_id": record.rolled_back_by_tab_id,
+    "rolled_back_by_tab_label": record.rolled_back_by_tab_label,
+    "rollback_note": record.rollback_note,
+    "rollback_result": (
+      serialize_provider_provenance_scheduler_narrative_bulk_governance_result(record.rollback_result)
+      if record.rollback_result is not None
+      else None
+    ),
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_plan_list(
+  records: tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduler_narrative_governance_plan_record(record)
+      for record in records
+    ],
+    "total": len(records),
   }
 
 

@@ -1634,6 +1634,60 @@ export type ProviderProvenanceSchedulerNarrativeBulkGovernanceResult = {
   results: ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult[];
 };
 
+export type ProviderProvenanceSchedulerNarrativeGovernancePreviewItem = {
+  item_id: string;
+  item_name?: string | null;
+  status?: "active" | "deleted" | string | null;
+  current_revision_id?: string | null;
+  apply_revision_id?: string | null;
+  rollback_revision_id?: string | null;
+  outcome: "changed" | "skipped" | "failed" | string;
+  message?: string | null;
+  changed_fields: string[];
+  field_diffs: Record<string, { before?: unknown; after?: unknown }>;
+  current_snapshot: Record<string, unknown>;
+  proposed_snapshot: Record<string, unknown>;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePlan = {
+  plan_id: string;
+  item_type: "template" | "registry" | string;
+  action: "delete" | "restore" | "update" | "rollback" | string;
+  reason: string;
+  status: "previewed" | "approved" | "applied" | "rolled_back" | string;
+  request_payload: Record<string, unknown>;
+  target_ids: string[];
+  preview_requested_count: number;
+  preview_changed_count: number;
+  preview_skipped_count: number;
+  preview_failed_count: number;
+  preview_items: ProviderProvenanceSchedulerNarrativeGovernancePreviewItem[];
+  rollback_ready_count: number;
+  rollback_summary: string;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+  approved_at?: string | null;
+  approved_by_tab_id?: string | null;
+  approved_by_tab_label?: string | null;
+  approval_note?: string | null;
+  applied_at?: string | null;
+  applied_by_tab_id?: string | null;
+  applied_by_tab_label?: string | null;
+  applied_result?: ProviderProvenanceSchedulerNarrativeBulkGovernanceResult | null;
+  rolled_back_at?: string | null;
+  rolled_back_by_tab_id?: string | null;
+  rolled_back_by_tab_label?: string | null;
+  rollback_note?: string | null;
+  rollback_result?: ProviderProvenanceSchedulerNarrativeBulkGovernanceResult | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePlanListPayload = {
+  items: ProviderProvenanceSchedulerNarrativeGovernancePlan[];
+  total: number;
+};
+
 export type ProviderProvenanceSchedulerNarrativeRegistryEntry = {
   registry_id: string;
   name: string;

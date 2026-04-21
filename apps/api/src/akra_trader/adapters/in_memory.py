@@ -32,6 +32,7 @@ from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
@@ -300,6 +301,10 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_scheduler_narrative_registry_revisions: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_narrative_governance_plans: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
     ] = OrderedDict()
     self._provider_provenance_scheduled_report_audit_records: OrderedDict[str, ProviderProvenanceScheduledReportAuditRecord] = OrderedDict()
     self._provider_provenance_scheduler_health_records: OrderedDict[str, ProviderProvenanceSchedulerHealthRecord] = OrderedDict()
@@ -826,6 +831,30 @@ class InMemoryRunRepository(RunRepositoryPort):
     revision_id: str,
   ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord | None:
     return self._provider_provenance_scheduler_narrative_registry_revisions.get(revision_id)
+
+  def save_provider_provenance_scheduler_narrative_governance_plan(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    self._provider_provenance_scheduler_narrative_governance_plans[record.plan_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_plans(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_governance_plans.values(),
+        key=lambda record: (record.updated_at, record.plan_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_narrative_governance_plan(
+    self,
+    plan_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord | None:
+    return self._provider_provenance_scheduler_narrative_governance_plans.get(plan_id)
 
   def save_provider_provenance_scheduled_report_audit_record(
     self,
