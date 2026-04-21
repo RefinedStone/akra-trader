@@ -29,9 +29,13 @@ from akra_trader.domain.models import ReplayIntentAliasAuditExportArtifactRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
+from akra_trader.domain.models import ProviderProvenanceAnalyticsPresetRecord
+from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
+from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
+from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import GuardedLiveKillSwitch
 from akra_trader.domain.models import ClosedTrade
@@ -396,6 +400,10 @@ class TradingApplication:
     self._provider_provenance_export_artifacts: dict[str, ProviderProvenanceExportArtifactRecord] = {}
     self._provider_provenance_export_jobs: dict[str, ProviderProvenanceExportJobRecord] = {}
     self._provider_provenance_export_job_audit_records: dict[str, ProviderProvenanceExportJobAuditRecord] = {}
+    self._provider_provenance_analytics_presets: dict[str, ProviderProvenanceAnalyticsPresetRecord] = {}
+    self._provider_provenance_dashboard_views: dict[str, ProviderProvenanceDashboardViewRecord] = {}
+    self._provider_provenance_scheduled_reports: dict[str, ProviderProvenanceScheduledReportRecord] = {}
+    self._provider_provenance_scheduled_report_audit_records: dict[str, ProviderProvenanceScheduledReportAuditRecord] = {}
 
   def list_strategies(
     self,
@@ -1459,6 +1467,193 @@ class TradingApplication:
     )
     return self._save_provider_provenance_export_job_audit_record(audit_record)
 
+  def _save_provider_provenance_analytics_preset_record(
+    self,
+    record: ProviderProvenanceAnalyticsPresetRecord,
+  ) -> ProviderProvenanceAnalyticsPresetRecord:
+    save_preset = getattr(self._runs, "save_provider_provenance_analytics_preset", None)
+    if callable(save_preset):
+      return save_preset(record)
+    self._provider_provenance_analytics_presets[record.preset_id] = record
+    return record
+
+  def _load_provider_provenance_analytics_preset_record(
+    self,
+    preset_id: str,
+  ) -> ProviderProvenanceAnalyticsPresetRecord | None:
+    get_preset = getattr(self._runs, "get_provider_provenance_analytics_preset", None)
+    if callable(get_preset):
+      return get_preset(preset_id)
+    return self._provider_provenance_analytics_presets.get(preset_id)
+
+  def _list_provider_provenance_analytics_preset_records(
+    self,
+  ) -> tuple[ProviderProvenanceAnalyticsPresetRecord, ...]:
+    list_presets = getattr(self._runs, "list_provider_provenance_analytics_presets", None)
+    if callable(list_presets):
+      return tuple(list_presets())
+    return tuple(
+      sorted(
+        self._provider_provenance_analytics_presets.values(),
+        key=lambda record: (record.updated_at, record.preset_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_dashboard_view_record(
+    self,
+    record: ProviderProvenanceDashboardViewRecord,
+  ) -> ProviderProvenanceDashboardViewRecord:
+    save_view = getattr(self._runs, "save_provider_provenance_dashboard_view", None)
+    if callable(save_view):
+      return save_view(record)
+    self._provider_provenance_dashboard_views[record.view_id] = record
+    return record
+
+  def _load_provider_provenance_dashboard_view_record(
+    self,
+    view_id: str,
+  ) -> ProviderProvenanceDashboardViewRecord | None:
+    get_view = getattr(self._runs, "get_provider_provenance_dashboard_view", None)
+    if callable(get_view):
+      return get_view(view_id)
+    return self._provider_provenance_dashboard_views.get(view_id)
+
+  def _list_provider_provenance_dashboard_view_records(
+    self,
+  ) -> tuple[ProviderProvenanceDashboardViewRecord, ...]:
+    list_views = getattr(self._runs, "list_provider_provenance_dashboard_views", None)
+    if callable(list_views):
+      return tuple(list_views())
+    return tuple(
+      sorted(
+        self._provider_provenance_dashboard_views.values(),
+        key=lambda record: (record.updated_at, record.view_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduled_report_record(
+    self,
+    record: ProviderProvenanceScheduledReportRecord,
+  ) -> ProviderProvenanceScheduledReportRecord:
+    save_report = getattr(self._runs, "save_provider_provenance_scheduled_report", None)
+    if callable(save_report):
+      return save_report(record)
+    self._provider_provenance_scheduled_reports[record.report_id] = record
+    return record
+
+  def _load_provider_provenance_scheduled_report_record(
+    self,
+    report_id: str,
+  ) -> ProviderProvenanceScheduledReportRecord | None:
+    get_report = getattr(self._runs, "get_provider_provenance_scheduled_report", None)
+    if callable(get_report):
+      return get_report(report_id)
+    return self._provider_provenance_scheduled_reports.get(report_id)
+
+  def _list_provider_provenance_scheduled_report_records(
+    self,
+  ) -> tuple[ProviderProvenanceScheduledReportRecord, ...]:
+    list_reports = getattr(self._runs, "list_provider_provenance_scheduled_reports", None)
+    if callable(list_reports):
+      return tuple(list_reports())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduled_reports.values(),
+        key=lambda record: (record.updated_at, record.report_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduled_report_audit_record(
+    self,
+    record: ProviderProvenanceScheduledReportAuditRecord,
+  ) -> ProviderProvenanceScheduledReportAuditRecord:
+    save_audit = getattr(self._runs, "save_provider_provenance_scheduled_report_audit_record", None)
+    if callable(save_audit):
+      return save_audit(record)
+    self._provider_provenance_scheduled_report_audit_records[record.audit_id] = record
+    return record
+
+  def _list_provider_provenance_scheduled_report_audit_records(
+    self,
+    report_id: str | None = None,
+  ) -> tuple[ProviderProvenanceScheduledReportAuditRecord, ...]:
+    list_audits = getattr(self._runs, "list_provider_provenance_scheduled_report_audit_records", None)
+    if callable(list_audits):
+      return tuple(list_audits(report_id))
+    records = [
+      record
+      for record in self._provider_provenance_scheduled_report_audit_records.values()
+      if report_id is None or record.report_id == report_id
+    ]
+    return tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def _prune_provider_provenance_scheduled_report_audit_records(self) -> int:
+    current_time = self._clock()
+    prune_audits = getattr(self._runs, "prune_provider_provenance_scheduled_report_audit_records", None)
+    if callable(prune_audits):
+      return int(prune_audits(current_time))
+    original_count = len(self._provider_provenance_scheduled_report_audit_records)
+    self._provider_provenance_scheduled_report_audit_records = {
+      audit_id: record
+      for audit_id, record in self._provider_provenance_scheduled_report_audit_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._provider_provenance_scheduled_report_audit_records)
+
+  def _record_provider_provenance_scheduled_report_event(
+    self,
+    *,
+    record: ProviderProvenanceScheduledReportRecord,
+    action: str,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+    export_job_id: str | None = None,
+    detail: str | None = None,
+  ) -> ProviderProvenanceScheduledReportAuditRecord:
+    self._prune_provider_provenance_scheduled_report_audit_records()
+    recorded_at = self._clock()
+    audit_record = ProviderProvenanceScheduledReportAuditRecord(
+      audit_id=uuid4().hex[:12],
+      report_id=record.report_id,
+      action=action,
+      recorded_at=recorded_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="30d",
+        recorded_at=recorded_at,
+      ),
+      source_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
+      source_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+      export_job_id=export_job_id.strip() if isinstance(export_job_id, str) and export_job_id.strip() else None,
+      detail=detail or f"Provider provenance scheduled report {action}.",
+    )
+    return self._save_provider_provenance_scheduled_report_audit_record(audit_record)
+
+  @staticmethod
+  def _calculate_provider_provenance_scheduled_report_next_run(
+    *,
+    reference_time: datetime,
+    cadence: str,
+    status: str,
+  ) -> datetime | None:
+    if status != "scheduled":
+      return None
+    if cadence == "weekly":
+      return reference_time + timedelta(days=7)
+    return reference_time + timedelta(days=1)
+
   @staticmethod
   def _parse_optional_iso_datetime(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
@@ -1501,6 +1696,11 @@ class TradingApplication:
     cls,
     payload: dict[str, Any],
   ) -> dict[str, Any]:
+    export_scope = (
+      payload.get("export_scope").strip()
+      if isinstance(payload.get("export_scope"), str) and payload.get("export_scope").strip()
+      else "provider_market_context_provenance"
+    )
     focus = payload.get("focus") if isinstance(payload.get("focus"), dict) else {}
     instrument_id = (
       focus.get("instrument_id").strip()
@@ -1522,38 +1722,67 @@ class TradingApplication:
     )
     focus_key = f"{instrument_id}|{timeframe}" if instrument_id and timeframe else None
     focus_label = f"{symbol} · {timeframe}" if symbol and timeframe else symbol or timeframe
-    provider_incidents = (
-      payload.get("provider_provenance_incidents")
-      if isinstance(payload.get("provider_provenance_incidents"), list)
-      else []
-    )
-    provider_labels = cls._normalize_provider_provenance_export_strings(
-      incident.get("provider")
-      for incident in provider_incidents
-      if isinstance(incident, dict)
-    )
-    vendor_fields = cls._normalize_provider_provenance_export_strings(
-      incident.get("vendor_field")
-      for incident in provider_incidents
-      if isinstance(incident, dict)
-    )
     export_filters = deepcopy(payload.get("export_filter")) if isinstance(payload.get("export_filter"), dict) else {}
-    result_count = (
-      int(payload["export_result_count"])
-      if isinstance(payload.get("export_result_count"), Number)
-      else len(provider_incidents)
-    )
-    provider_provenance_count = (
-      int(focus["provider_provenance_incident_count"])
-      if isinstance(focus.get("provider_provenance_incident_count"), Number)
-      else len(provider_incidents)
-    )
+    if export_scope == "provider_provenance_analytics_report":
+      analytics_payload = payload.get("analytics") if isinstance(payload.get("analytics"), dict) else {}
+      totals_payload = analytics_payload.get("totals") if isinstance(analytics_payload.get("totals"), dict) else {}
+      available_filters_payload = (
+        analytics_payload.get("available_filters")
+        if isinstance(analytics_payload.get("available_filters"), dict)
+        else {}
+      )
+      provider_labels = cls._normalize_provider_provenance_export_strings(
+        available_filters_payload.get("provider_labels")
+        if isinstance(available_filters_payload.get("provider_labels"), list)
+        else ()
+      )
+      vendor_fields = cls._normalize_provider_provenance_export_strings(
+        available_filters_payload.get("vendor_fields")
+        if isinstance(available_filters_payload.get("vendor_fields"), list)
+        else ()
+      )
+      result_count = (
+        int(totals_payload["result_count"])
+        if isinstance(totals_payload.get("result_count"), Number)
+        else 0
+      )
+      provider_provenance_count = (
+        int(totals_payload["provider_provenance_count"])
+        if isinstance(totals_payload.get("provider_provenance_count"), Number)
+        else (
+          int(focus["provider_provenance_incident_count"])
+          if isinstance(focus.get("provider_provenance_incident_count"), Number)
+          else 0
+        )
+      )
+    else:
+      provider_incidents = (
+        payload.get("provider_provenance_incidents")
+        if isinstance(payload.get("provider_provenance_incidents"), list)
+        else []
+      )
+      provider_labels = cls._normalize_provider_provenance_export_strings(
+        incident.get("provider")
+        for incident in provider_incidents
+        if isinstance(incident, dict)
+      )
+      vendor_fields = cls._normalize_provider_provenance_export_strings(
+        incident.get("vendor_field")
+        for incident in provider_incidents
+        if isinstance(incident, dict)
+      )
+      result_count = (
+        int(payload["export_result_count"])
+        if isinstance(payload.get("export_result_count"), Number)
+        else len(provider_incidents)
+      )
+      provider_provenance_count = (
+        int(focus["provider_provenance_incident_count"])
+        if isinstance(focus.get("provider_provenance_incident_count"), Number)
+        else len(provider_incidents)
+      )
     return {
-      "export_scope": (
-        payload.get("export_scope").strip()
-        if isinstance(payload.get("export_scope"), str) and payload.get("export_scope").strip()
-        else "provider_market_context_provenance"
-      ),
+      "export_scope": export_scope,
       "exported_at": cls._parse_optional_iso_datetime(payload.get("exported_at")),
       "focus_key": focus_key,
       "focus_label": focus_label,
@@ -1596,9 +1825,15 @@ class TradingApplication:
     if not isinstance(payload, dict):
       raise ValueError("Provider provenance export content must be a JSON object.")
     metadata = cls._extract_provider_provenance_export_metadata(payload)
-    if metadata["export_scope"] != "provider_market_context_provenance":
+    if metadata["export_scope"] not in {
+      "provider_market_context_provenance",
+      "provider_provenance_analytics_report",
+    }:
       raise ValueError("Unsupported provider provenance export scope.")
-    if metadata["focus_key"] is None or metadata["symbol"] is None or metadata["timeframe"] is None:
+    if (
+      metadata["export_scope"] == "provider_market_context_provenance"
+      and (metadata["focus_key"] is None or metadata["symbol"] is None or metadata["timeframe"] is None)
+    ):
       raise ValueError("Provider provenance export content must include focus instrument_id, symbol, and timeframe.")
     return normalized_content, payload, metadata
 
@@ -2174,7 +2409,8 @@ class TradingApplication:
     filtered = [
       record
       for record in self._list_provider_provenance_export_job_records()
-      if (normalized_focus_key is None or record.focus_key == normalized_focus_key)
+      if record.export_scope == "provider_market_context_provenance"
+      and (normalized_focus_key is None or record.focus_key == normalized_focus_key)
       and (normalized_symbol is None or record.symbol == normalized_symbol)
       and (normalized_timeframe is None or record.timeframe == normalized_timeframe)
       and (normalized_provider_label is None or normalized_provider_label in record.provider_labels)
@@ -2715,6 +2951,806 @@ class TradingApplication:
         },
       },
     }
+
+  @staticmethod
+  def _normalize_provider_provenance_workspace_name(
+    value: str | None,
+    *,
+    field_name: str,
+  ) -> str:
+    normalized_value = value.strip() if isinstance(value, str) else ""
+    if not normalized_value:
+      raise ValueError(f"Provider provenance {field_name} is required.")
+    return normalized_value
+
+  @classmethod
+  def _normalize_provider_provenance_analytics_query_payload(
+    cls,
+    payload: dict[str, Any] | None,
+  ) -> dict[str, Any]:
+    query = deepcopy(payload) if isinstance(payload, dict) else {}
+    focus_scope = query.get("focus_scope")
+    normalized_focus_scope = (
+      focus_scope.strip()
+      if isinstance(focus_scope, str) and focus_scope.strip() in {"current_focus", "all_focuses"}
+      else "all_focuses"
+    )
+    normalized_query = {
+      "focus_scope": normalized_focus_scope,
+      "focus_key": (
+        query.get("focus_key").strip()
+        if isinstance(query.get("focus_key"), str) and query.get("focus_key").strip()
+        else None
+      ),
+      "symbol": (
+        query.get("symbol").strip()
+        if isinstance(query.get("symbol"), str) and query.get("symbol").strip()
+        else None
+      ),
+      "timeframe": (
+        query.get("timeframe").strip()
+        if isinstance(query.get("timeframe"), str) and query.get("timeframe").strip()
+        else None
+      ),
+      "provider_label": (
+        query.get("provider_label").strip()
+        if isinstance(query.get("provider_label"), str) and query.get("provider_label").strip()
+        else None
+      ),
+      "vendor_field": (
+        query.get("vendor_field").strip()
+        if isinstance(query.get("vendor_field"), str) and query.get("vendor_field").strip()
+        else None
+      ),
+      "market_data_provider": (
+        query.get("market_data_provider").strip()
+        if isinstance(query.get("market_data_provider"), str) and query.get("market_data_provider").strip()
+        else None
+      ),
+      "venue": (
+        query.get("venue").strip()
+        if isinstance(query.get("venue"), str) and query.get("venue").strip()
+        else None
+      ),
+      "requested_by_tab_id": (
+        query.get("requested_by_tab_id").strip()
+        if isinstance(query.get("requested_by_tab_id"), str) and query.get("requested_by_tab_id").strip()
+        else None
+      ),
+      "status": (
+        query.get("status").strip()
+        if isinstance(query.get("status"), str) and query.get("status").strip()
+        else None
+      ),
+      "search": (
+        query.get("search").strip()
+        if isinstance(query.get("search"), str) and query.get("search").strip()
+        else None
+      ),
+      "result_limit": (
+        max(1, min(int(query.get("result_limit")), 50))
+        if isinstance(query.get("result_limit"), Number)
+        else 12
+      ),
+      "window_days": (
+        max(3, min(int(query.get("window_days")), 90))
+        if isinstance(query.get("window_days"), Number)
+        else 14
+      ),
+    }
+    if normalized_focus_scope == "current_focus" and (
+      normalized_query["focus_key"] is None
+      or normalized_query["symbol"] is None
+      or normalized_query["timeframe"] is None
+    ):
+      raise ValueError(
+        "Current-focus provider provenance workspace entries require focus_key, symbol, and timeframe."
+      )
+    return normalized_query
+
+  @staticmethod
+  def _normalize_provider_provenance_dashboard_layout_payload(
+    payload: dict[str, Any] | None,
+  ) -> dict[str, Any]:
+    layout = deepcopy(payload) if isinstance(payload, dict) else {}
+    highlight_panel = layout.get("highlight_panel")
+    normalized_highlight_panel = (
+      highlight_panel.strip()
+      if isinstance(highlight_panel, str)
+      and highlight_panel.strip() in {"overview", "drift", "burn_up", "rollups", "recent_exports"}
+      else "overview"
+    )
+    return {
+      "highlight_panel": normalized_highlight_panel,
+      "show_rollups": bool(layout.get("show_rollups", True)),
+      "show_time_series": bool(layout.get("show_time_series", True)),
+      "show_recent_exports": bool(layout.get("show_recent_exports", True)),
+    }
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduled_report_cadence(
+    value: str | None,
+  ) -> str:
+    normalized_value = value.strip() if isinstance(value, str) else ""
+    if not normalized_value:
+      return "daily"
+    if normalized_value not in {"daily", "weekly"}:
+      raise ValueError("Provider provenance scheduled report cadence must be daily or weekly.")
+    return normalized_value
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduled_report_status(
+    value: str | None,
+  ) -> str:
+    normalized_value = value.strip() if isinstance(value, str) else ""
+    if not normalized_value:
+      return "scheduled"
+    if normalized_value not in {"scheduled", "paused"}:
+      raise ValueError("Provider provenance scheduled report status must be scheduled or paused.")
+    return normalized_value
+
+  @classmethod
+  def _matches_provider_provenance_workspace_search(
+    cls,
+    *,
+    values: Iterable[Any],
+    search: str | None,
+  ) -> bool:
+    if not isinstance(search, str) or not search.strip():
+      return True
+    needle = search.strip().lower()
+    return any(
+      needle in value.strip().lower()
+      for value in values
+      if isinstance(value, str) and value.strip()
+    )
+
+  @classmethod
+  def _build_provider_provenance_workspace_focus_payload(
+    cls,
+    query: dict[str, Any],
+  ) -> dict[str, Any]:
+    focus_key = query.get("focus_key") if isinstance(query.get("focus_key"), str) else None
+    market_data_provider = query.get("market_data_provider") if isinstance(query.get("market_data_provider"), str) else None
+    symbol = query.get("symbol") if isinstance(query.get("symbol"), str) else None
+    timeframe = query.get("timeframe") if isinstance(query.get("timeframe"), str) else None
+    instrument_id = None
+    if focus_key and "|" in focus_key:
+      instrument_id = focus_key.split("|", 1)[0]
+    elif market_data_provider and symbol:
+      instrument_id = f"{market_data_provider}:{symbol}"
+    return {
+      "provider": market_data_provider,
+      "venue": query.get("venue") if isinstance(query.get("venue"), str) else None,
+      "instrument_id": instrument_id,
+      "symbol": symbol,
+      "timeframe": timeframe,
+    }
+
+  @classmethod
+  def _build_provider_provenance_analytics_filter_summary(
+    cls,
+    query: dict[str, Any],
+  ) -> str:
+    parts = [
+      "current focus" if query.get("focus_scope") == "current_focus" else "all focuses",
+      f"{int(query.get('window_days', 14))}d window",
+      f"provider {query['provider_label']}" if isinstance(query.get("provider_label"), str) else None,
+      f"vendor field {query['vendor_field']}" if isinstance(query.get("vendor_field"), str) else None,
+      f"market data {query['market_data_provider']}" if isinstance(query.get("market_data_provider"), str) else None,
+      f"requester {query['requested_by_tab_id']}" if isinstance(query.get("requested_by_tab_id"), str) else None,
+      f"search {query['search']}" if isinstance(query.get("search"), str) else None,
+    ]
+    return " / ".join(part for part in parts if isinstance(part, str) and part)
+
+  @classmethod
+  def _build_provider_provenance_analytics_report_payload(
+    cls,
+    *,
+    report: ProviderProvenanceScheduledReportRecord,
+    analytics: dict[str, Any],
+    preset: ProviderProvenanceAnalyticsPresetRecord | None,
+    view: ProviderProvenanceDashboardViewRecord | None,
+    exported_at: datetime,
+  ) -> dict[str, Any]:
+    normalized_query = cls._normalize_provider_provenance_analytics_query_payload(report.query)
+    focus_payload = cls._build_provider_provenance_workspace_focus_payload(normalized_query)
+    focus_payload["provider_provenance_incident_count"] = (
+      analytics.get("totals", {}).get("provider_provenance_count", 0)
+      if isinstance(analytics.get("totals"), dict)
+      else 0
+    )
+    return {
+      "exported_at": exported_at.isoformat(),
+      "export_scope": "provider_provenance_analytics_report",
+      "export_filter": deepcopy(normalized_query),
+      "export_filter_summary": cls._build_provider_provenance_analytics_filter_summary(normalized_query),
+      "focus": focus_payload,
+      "analytics": deepcopy(analytics),
+      "preset": (
+        {
+          "preset_id": preset.preset_id,
+          "name": preset.name,
+          "description": preset.description,
+        }
+        if preset is not None
+        else None
+      ),
+      "view": (
+        {
+          "view_id": view.view_id,
+          "name": view.name,
+          "description": view.description,
+          "layout": deepcopy(view.layout),
+        }
+        if view is not None
+        else None
+      ),
+      "report": {
+        "report_id": report.report_id,
+        "name": report.name,
+        "description": report.description,
+        "cadence": report.cadence,
+        "status": report.status,
+        "next_run_at": report.next_run_at.isoformat() if report.next_run_at is not None else None,
+        "last_run_at": report.last_run_at.isoformat() if report.last_run_at is not None else None,
+        "preset_id": report.preset_id,
+        "view_id": report.view_id,
+      },
+    }
+
+  def create_provider_provenance_analytics_preset(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    query: dict[str, Any] | None = None,
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceAnalyticsPresetRecord:
+    now = self._clock()
+    record = ProviderProvenanceAnalyticsPresetRecord(
+      preset_id=uuid4().hex[:12],
+      name=self._normalize_provider_provenance_workspace_name(name, field_name="preset name"),
+      description=description.strip() if isinstance(description, str) else "",
+      query=self._normalize_provider_provenance_analytics_query_payload(query),
+      created_at=now,
+      updated_at=now,
+      created_by_tab_id=(
+        created_by_tab_id.strip()
+        if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+        else None
+      ),
+      created_by_tab_label=(
+        created_by_tab_label.strip()
+        if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+        else None
+      ),
+    )
+    return self._save_provider_provenance_analytics_preset_record(record)
+
+  def list_provider_provenance_analytics_presets(
+    self,
+    *,
+    created_by_tab_id: str | None = None,
+    focus_scope: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceAnalyticsPresetRecord, ...]:
+    normalized_creator = (
+      created_by_tab_id.strip()
+      if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+      else None
+    )
+    normalized_focus_scope = (
+      focus_scope.strip()
+      if isinstance(focus_scope, str) and focus_scope.strip() in {"current_focus", "all_focuses"}
+      else None
+    )
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceAnalyticsPresetRecord] = []
+    for record in self._list_provider_provenance_analytics_preset_records():
+      normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+      if normalized_creator is not None and record.created_by_tab_id != normalized_creator:
+        continue
+      if normalized_focus_scope is not None and normalized_query["focus_scope"] != normalized_focus_scope:
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.preset_id,
+          record.name,
+          record.description,
+          record.created_by_tab_id,
+          record.created_by_tab_label,
+          normalized_query.get("focus_key"),
+          normalized_query.get("symbol"),
+          normalized_query.get("timeframe"),
+          normalized_query.get("provider_label"),
+          normalized_query.get("vendor_field"),
+          normalized_query.get("market_data_provider"),
+          normalized_query.get("requested_by_tab_id"),
+          normalized_query.get("search"),
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(replace(record, query=normalized_query))
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_analytics_preset(
+    self,
+    preset_id: str,
+  ) -> ProviderProvenanceAnalyticsPresetRecord:
+    normalized_preset_id = preset_id.strip()
+    if not normalized_preset_id:
+      raise LookupError("Provider provenance analytics preset not found.")
+    record = self._load_provider_provenance_analytics_preset_record(normalized_preset_id)
+    if record is None:
+      raise LookupError("Provider provenance analytics preset not found.")
+    return replace(
+      record,
+      query=self._normalize_provider_provenance_analytics_query_payload(record.query),
+    )
+
+  def create_provider_provenance_dashboard_view(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    query: dict[str, Any] | None = None,
+    layout: dict[str, Any] | None = None,
+    preset_id: str | None = None,
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceDashboardViewRecord:
+    now = self._clock()
+    normalized_preset_id = (
+      preset_id.strip()
+      if isinstance(preset_id, str) and preset_id.strip()
+      else None
+    )
+    preset_record = (
+      self.get_provider_provenance_analytics_preset(normalized_preset_id)
+      if normalized_preset_id is not None
+      else None
+    )
+    resolved_query = (
+      query
+      if isinstance(query, dict) and query
+      else preset_record.query if preset_record is not None else None
+    )
+    record = ProviderProvenanceDashboardViewRecord(
+      view_id=uuid4().hex[:12],
+      name=self._normalize_provider_provenance_workspace_name(name, field_name="dashboard view name"),
+      description=description.strip() if isinstance(description, str) else "",
+      query=self._normalize_provider_provenance_analytics_query_payload(resolved_query),
+      layout=self._normalize_provider_provenance_dashboard_layout_payload(layout),
+      preset_id=normalized_preset_id,
+      created_at=now,
+      updated_at=now,
+      created_by_tab_id=(
+        created_by_tab_id.strip()
+        if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+        else None
+      ),
+      created_by_tab_label=(
+        created_by_tab_label.strip()
+        if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+        else None
+      ),
+    )
+    return self._save_provider_provenance_dashboard_view_record(record)
+
+  def list_provider_provenance_dashboard_views(
+    self,
+    *,
+    preset_id: str | None = None,
+    created_by_tab_id: str | None = None,
+    focus_scope: str | None = None,
+    highlight_panel: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceDashboardViewRecord, ...]:
+    normalized_preset_id = (
+      preset_id.strip()
+      if isinstance(preset_id, str) and preset_id.strip()
+      else None
+    )
+    normalized_creator = (
+      created_by_tab_id.strip()
+      if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+      else None
+    )
+    normalized_focus_scope = (
+      focus_scope.strip()
+      if isinstance(focus_scope, str) and focus_scope.strip() in {"current_focus", "all_focuses"}
+      else None
+    )
+    normalized_highlight_panel = (
+      highlight_panel.strip()
+      if isinstance(highlight_panel, str)
+      and highlight_panel.strip() in {"overview", "drift", "burn_up", "rollups", "recent_exports"}
+      else None
+    )
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceDashboardViewRecord] = []
+    for record in self._list_provider_provenance_dashboard_view_records():
+      normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+      normalized_layout = self._normalize_provider_provenance_dashboard_layout_payload(record.layout)
+      if normalized_preset_id is not None and record.preset_id != normalized_preset_id:
+        continue
+      if normalized_creator is not None and record.created_by_tab_id != normalized_creator:
+        continue
+      if normalized_focus_scope is not None and normalized_query["focus_scope"] != normalized_focus_scope:
+        continue
+      if normalized_highlight_panel is not None and normalized_layout["highlight_panel"] != normalized_highlight_panel:
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.view_id,
+          record.name,
+          record.description,
+          record.preset_id,
+          record.created_by_tab_id,
+          record.created_by_tab_label,
+          normalized_query.get("focus_key"),
+          normalized_query.get("symbol"),
+          normalized_query.get("timeframe"),
+          normalized_query.get("provider_label"),
+          normalized_query.get("vendor_field"),
+          normalized_query.get("market_data_provider"),
+          normalized_query.get("requested_by_tab_id"),
+          normalized_query.get("search"),
+          normalized_layout.get("highlight_panel"),
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(
+        replace(record, query=normalized_query, layout=normalized_layout)
+      )
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_dashboard_view(
+    self,
+    view_id: str,
+  ) -> ProviderProvenanceDashboardViewRecord:
+    normalized_view_id = view_id.strip()
+    if not normalized_view_id:
+      raise LookupError("Provider provenance dashboard view not found.")
+    record = self._load_provider_provenance_dashboard_view_record(normalized_view_id)
+    if record is None:
+      raise LookupError("Provider provenance dashboard view not found.")
+    return replace(
+      record,
+      query=self._normalize_provider_provenance_analytics_query_payload(record.query),
+      layout=self._normalize_provider_provenance_dashboard_layout_payload(record.layout),
+    )
+
+  def create_provider_provenance_scheduled_report(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    query: dict[str, Any] | None = None,
+    layout: dict[str, Any] | None = None,
+    preset_id: str | None = None,
+    view_id: str | None = None,
+    cadence: str = "daily",
+    status: str = "scheduled",
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceScheduledReportRecord:
+    now = self._clock()
+    normalized_preset_id = (
+      preset_id.strip()
+      if isinstance(preset_id, str) and preset_id.strip()
+      else None
+    )
+    normalized_view_id = (
+      view_id.strip()
+      if isinstance(view_id, str) and view_id.strip()
+      else None
+    )
+    preset_record = (
+      self.get_provider_provenance_analytics_preset(normalized_preset_id)
+      if normalized_preset_id is not None
+      else None
+    )
+    view_record = (
+      self.get_provider_provenance_dashboard_view(normalized_view_id)
+      if normalized_view_id is not None
+      else None
+    )
+    resolved_query = (
+      query
+      if isinstance(query, dict) and query
+      else view_record.query if view_record is not None
+      else preset_record.query if preset_record is not None
+      else None
+    )
+    resolved_layout = (
+      layout
+      if isinstance(layout, dict) and layout
+      else view_record.layout if view_record is not None
+      else None
+    )
+    normalized_status = self._normalize_provider_provenance_scheduled_report_status(status)
+    normalized_cadence = self._normalize_provider_provenance_scheduled_report_cadence(cadence)
+    record = ProviderProvenanceScheduledReportRecord(
+      report_id=uuid4().hex[:12],
+      name=self._normalize_provider_provenance_workspace_name(name, field_name="scheduled report name"),
+      description=description.strip() if isinstance(description, str) else "",
+      query=self._normalize_provider_provenance_analytics_query_payload(resolved_query),
+      layout=self._normalize_provider_provenance_dashboard_layout_payload(resolved_layout),
+      preset_id=(view_record.preset_id if view_record is not None and view_record.preset_id else normalized_preset_id),
+      view_id=normalized_view_id,
+      cadence=normalized_cadence,
+      status=normalized_status,
+      created_at=now,
+      updated_at=now,
+      next_run_at=self._calculate_provider_provenance_scheduled_report_next_run(
+        reference_time=now,
+        cadence=normalized_cadence,
+        status=normalized_status,
+      ),
+      last_run_at=None,
+      last_export_job_id=None,
+      created_by_tab_id=(
+        created_by_tab_id.strip()
+        if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+        else None
+      ),
+      created_by_tab_label=(
+        created_by_tab_label.strip()
+        if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+        else None
+      ),
+    )
+    saved_record = self._save_provider_provenance_scheduled_report_record(record)
+    self._record_provider_provenance_scheduled_report_event(
+      record=saved_record,
+      action="created",
+      source_tab_id=saved_record.created_by_tab_id,
+      source_tab_label=saved_record.created_by_tab_label,
+      detail="Provider provenance scheduled report created.",
+    )
+    return saved_record
+
+  def list_provider_provenance_scheduled_reports(
+    self,
+    *,
+    status: str | None = None,
+    cadence: str | None = None,
+    preset_id: str | None = None,
+    view_id: str | None = None,
+    created_by_tab_id: str | None = None,
+    focus_scope: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceScheduledReportRecord, ...]:
+    normalized_status = (
+      status.strip()
+      if isinstance(status, str) and status.strip() in {"scheduled", "paused"}
+      else None
+    )
+    normalized_cadence = (
+      cadence.strip()
+      if isinstance(cadence, str) and cadence.strip() in {"daily", "weekly"}
+      else None
+    )
+    normalized_preset_id = (
+      preset_id.strip()
+      if isinstance(preset_id, str) and preset_id.strip()
+      else None
+    )
+    normalized_view_id = (
+      view_id.strip()
+      if isinstance(view_id, str) and view_id.strip()
+      else None
+    )
+    normalized_creator = (
+      created_by_tab_id.strip()
+      if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+      else None
+    )
+    normalized_focus_scope = (
+      focus_scope.strip()
+      if isinstance(focus_scope, str) and focus_scope.strip() in {"current_focus", "all_focuses"}
+      else None
+    )
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceScheduledReportRecord] = []
+    for record in self._list_provider_provenance_scheduled_report_records():
+      normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+      normalized_layout = self._normalize_provider_provenance_dashboard_layout_payload(record.layout)
+      if normalized_status is not None and record.status != normalized_status:
+        continue
+      if normalized_cadence is not None and record.cadence != normalized_cadence:
+        continue
+      if normalized_preset_id is not None and record.preset_id != normalized_preset_id:
+        continue
+      if normalized_view_id is not None and record.view_id != normalized_view_id:
+        continue
+      if normalized_creator is not None and record.created_by_tab_id != normalized_creator:
+        continue
+      if normalized_focus_scope is not None and normalized_query["focus_scope"] != normalized_focus_scope:
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.report_id,
+          record.name,
+          record.description,
+          record.preset_id,
+          record.view_id,
+          record.created_by_tab_id,
+          record.created_by_tab_label,
+          record.status,
+          record.cadence,
+          normalized_query.get("focus_key"),
+          normalized_query.get("symbol"),
+          normalized_query.get("timeframe"),
+          normalized_query.get("provider_label"),
+          normalized_query.get("vendor_field"),
+          normalized_query.get("market_data_provider"),
+          normalized_query.get("requested_by_tab_id"),
+          normalized_query.get("search"),
+          normalized_layout.get("highlight_panel"),
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(
+        replace(record, query=normalized_query, layout=normalized_layout)
+      )
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_scheduled_report(
+    self,
+    report_id: str,
+  ) -> ProviderProvenanceScheduledReportRecord:
+    normalized_report_id = report_id.strip()
+    if not normalized_report_id:
+      raise LookupError("Provider provenance scheduled report not found.")
+    record = self._load_provider_provenance_scheduled_report_record(normalized_report_id)
+    if record is None:
+      raise LookupError("Provider provenance scheduled report not found.")
+    return replace(
+      record,
+      query=self._normalize_provider_provenance_analytics_query_payload(record.query),
+      layout=self._normalize_provider_provenance_dashboard_layout_payload(record.layout),
+    )
+
+  def run_provider_provenance_scheduled_report(
+    self,
+    report_id: str,
+    *,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+    detail: str | None = None,
+  ) -> dict[str, Any]:
+    record = self.get_provider_provenance_scheduled_report(report_id)
+    preset_record = (
+      self.get_provider_provenance_analytics_preset(record.preset_id)
+      if record.preset_id is not None
+      else None
+    )
+    view_record = (
+      self.get_provider_provenance_dashboard_view(record.view_id)
+      if record.view_id is not None
+      else None
+    )
+    normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+    exported_at = self._clock()
+    analytics = self.get_provider_provenance_export_analytics(
+      focus_key=normalized_query.get("focus_key"),
+      symbol=normalized_query.get("symbol"),
+      timeframe=normalized_query.get("timeframe"),
+      provider_label=normalized_query.get("provider_label"),
+      vendor_field=normalized_query.get("vendor_field"),
+      market_data_provider=normalized_query.get("market_data_provider"),
+      venue=normalized_query.get("venue"),
+      requested_by_tab_id=normalized_query.get("requested_by_tab_id"),
+      status=normalized_query.get("status"),
+      search=normalized_query.get("search"),
+      result_limit=int(normalized_query.get("result_limit", 12)),
+      window_days=int(normalized_query.get("window_days", 14)),
+    )
+    report_payload = self._build_provider_provenance_analytics_report_payload(
+      report=record,
+      analytics=analytics,
+      preset=preset_record,
+      view=view_record,
+      exported_at=exported_at,
+    )
+    export_job = self.create_provider_provenance_export_job(
+      content=json.dumps(report_payload, indent=2, sort_keys=True),
+      requested_by_tab_id=(
+        source_tab_id.strip()
+        if isinstance(source_tab_id, str) and source_tab_id.strip()
+        else record.created_by_tab_id
+      ),
+      requested_by_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else record.created_by_tab_label
+      ),
+    )
+    updated_record = replace(
+      record,
+      query=normalized_query,
+      layout=self._normalize_provider_provenance_dashboard_layout_payload(record.layout),
+      updated_at=exported_at,
+      next_run_at=self._calculate_provider_provenance_scheduled_report_next_run(
+        reference_time=exported_at,
+        cadence=record.cadence,
+        status=record.status,
+      ),
+      last_run_at=exported_at,
+      last_export_job_id=export_job.job_id,
+    )
+    saved_record = self._save_provider_provenance_scheduled_report_record(updated_record)
+    self._record_provider_provenance_scheduled_report_event(
+      record=saved_record,
+      action="ran",
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+      export_job_id=export_job.job_id,
+      detail=detail or "Provider provenance scheduled report run completed.",
+    )
+    return {
+      "report": saved_record,
+      "export_job": export_job,
+    }
+
+  def run_due_provider_provenance_scheduled_reports(
+    self,
+    *,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+    due_before: datetime | None = None,
+    limit: int = 25,
+  ) -> dict[str, Any]:
+    reference_time = due_before or self._clock()
+    normalized_limit = max(1, min(limit, 100))
+    candidate_records = [
+      record
+      for record in self.list_provider_provenance_scheduled_reports(
+        status="scheduled",
+        limit=500,
+      )
+      if record.next_run_at is not None and record.next_run_at <= reference_time
+    ]
+    candidate_records.sort(
+      key=lambda record: (
+        record.next_run_at or record.updated_at,
+        record.updated_at,
+        record.report_id,
+      )
+    )
+    results = [
+      self.run_provider_provenance_scheduled_report(
+        record.report_id,
+        source_tab_id=source_tab_id,
+        source_tab_label=source_tab_label,
+        detail="Due provider provenance scheduled report run completed.",
+      )
+      for record in candidate_records[:normalized_limit]
+    ]
+    return {
+      "generated_at": self._clock().isoformat(),
+      "due_before": reference_time.isoformat(),
+      "executed_count": len(results),
+      "items": results,
+    }
+
+  def list_provider_provenance_scheduled_report_history(
+    self,
+    report_id: str,
+  ) -> tuple[ProviderProvenanceScheduledReportAuditRecord, ...]:
+    record = self.get_provider_provenance_scheduled_report(report_id)
+    self._prune_provider_provenance_scheduled_report_audit_records()
+    return self._list_provider_provenance_scheduled_report_audit_records(record.report_id)
 
   def get_provider_provenance_export_job(
     self,
@@ -25383,6 +26419,184 @@ def serialize_provider_provenance_export_job_history(
     "history": [
       serialize_provider_provenance_export_job_audit_record(audit_record)
       for audit_record in audit_records
+    ],
+  }
+
+
+def serialize_provider_provenance_analytics_preset_record(
+  record: ProviderProvenanceAnalyticsPresetRecord,
+) -> dict[str, Any]:
+  normalized_query = TradingApplication._normalize_provider_provenance_analytics_query_payload(
+    record.query
+  )
+  return {
+    "preset_id": record.preset_id,
+    "name": record.name,
+    "description": record.description,
+    "query": deepcopy(normalized_query),
+    "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
+    "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
+      normalized_query
+    ),
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_analytics_preset_list(
+  records: tuple[ProviderProvenanceAnalyticsPresetRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_analytics_preset_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
+def serialize_provider_provenance_dashboard_view_record(
+  record: ProviderProvenanceDashboardViewRecord,
+) -> dict[str, Any]:
+  normalized_query = TradingApplication._normalize_provider_provenance_analytics_query_payload(
+    record.query
+  )
+  normalized_layout = TradingApplication._normalize_provider_provenance_dashboard_layout_payload(
+    record.layout
+  )
+  return {
+    "view_id": record.view_id,
+    "name": record.name,
+    "description": record.description,
+    "preset_id": record.preset_id,
+    "query": deepcopy(normalized_query),
+    "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
+    "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
+      normalized_query
+    ),
+    "layout": deepcopy(normalized_layout),
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_dashboard_view_list(
+  records: tuple[ProviderProvenanceDashboardViewRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_dashboard_view_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
+def serialize_provider_provenance_scheduled_report_record(
+  record: ProviderProvenanceScheduledReportRecord,
+) -> dict[str, Any]:
+  normalized_query = TradingApplication._normalize_provider_provenance_analytics_query_payload(
+    record.query
+  )
+  normalized_layout = TradingApplication._normalize_provider_provenance_dashboard_layout_payload(
+    record.layout
+  )
+  return {
+    "report_id": record.report_id,
+    "name": record.name,
+    "description": record.description,
+    "preset_id": record.preset_id,
+    "view_id": record.view_id,
+    "cadence": record.cadence,
+    "status": record.status,
+    "query": deepcopy(normalized_query),
+    "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
+    "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
+      normalized_query
+    ),
+    "layout": deepcopy(normalized_layout),
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "next_run_at": record.next_run_at.isoformat() if record.next_run_at is not None else None,
+    "last_run_at": record.last_run_at.isoformat() if record.last_run_at is not None else None,
+    "last_export_job_id": record.last_export_job_id,
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduled_report_list(
+  records: tuple[ProviderProvenanceScheduledReportRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduled_report_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
+def serialize_provider_provenance_scheduled_report_audit_record(
+  record: ProviderProvenanceScheduledReportAuditRecord,
+) -> dict[str, Any]:
+  return {
+    "audit_id": record.audit_id,
+    "report_id": record.report_id,
+    "action": record.action,
+    "recorded_at": record.recorded_at.isoformat(),
+    "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+    "source_tab_id": record.source_tab_id,
+    "source_tab_label": record.source_tab_label,
+    "export_job_id": record.export_job_id,
+    "detail": record.detail,
+  }
+
+
+def serialize_provider_provenance_scheduled_report_history(
+  record: ProviderProvenanceScheduledReportRecord,
+  audit_records: tuple[ProviderProvenanceScheduledReportAuditRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "report": serialize_provider_provenance_scheduled_report_record(record),
+    "history": [
+      serialize_provider_provenance_scheduled_report_audit_record(audit_record)
+      for audit_record in audit_records
+    ],
+  }
+
+
+def serialize_provider_provenance_scheduled_report_run_result(
+  payload: dict[str, Any],
+) -> dict[str, Any]:
+  report = payload.get("report")
+  export_job = payload.get("export_job")
+  if not isinstance(report, ProviderProvenanceScheduledReportRecord):
+    raise ValueError("Provider provenance scheduled report result is missing the report record.")
+  if not isinstance(export_job, ProviderProvenanceExportJobRecord):
+    raise ValueError("Provider provenance scheduled report result is missing the export job record.")
+  return {
+    "report": serialize_provider_provenance_scheduled_report_record(report),
+    "export_job": serialize_provider_provenance_export_job_record(export_job),
+  }
+
+
+def serialize_provider_provenance_scheduled_report_run_due_result(
+  payload: dict[str, Any],
+) -> dict[str, Any]:
+  items = payload.get("items")
+  return {
+    "generated_at": payload.get("generated_at"),
+    "due_before": payload.get("due_before"),
+    "executed_count": int(payload.get("executed_count", 0)),
+    "items": [
+      serialize_provider_provenance_scheduled_report_run_result(item)
+      for item in items
+      if isinstance(item, dict)
     ],
   }
 

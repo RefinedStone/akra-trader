@@ -858,6 +858,65 @@ class ProviderProvenanceExportJobAuditRecord:
   detail: str = ""
 
 
+@dataclass(frozen=True)
+class ProviderProvenanceAnalyticsPresetRecord:
+  preset_id: str
+  name: str
+  description: str = ""
+  query: dict[str, Any] = field(default_factory=dict)
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceDashboardViewRecord:
+  view_id: str
+  name: str
+  description: str = ""
+  query: dict[str, Any] = field(default_factory=dict)
+  layout: dict[str, Any] = field(default_factory=dict)
+  preset_id: str | None = None
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceScheduledReportRecord:
+  report_id: str
+  name: str
+  description: str = ""
+  query: dict[str, Any] = field(default_factory=dict)
+  layout: dict[str, Any] = field(default_factory=dict)
+  preset_id: str | None = None
+  view_id: str | None = None
+  cadence: str = "daily"
+  status: str = "scheduled"
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  next_run_at: datetime | None = None
+  last_run_at: datetime | None = None
+  last_export_job_id: str | None = None
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceScheduledReportAuditRecord:
+  audit_id: str
+  report_id: str
+  action: str
+  recorded_at: datetime
+  expires_at: datetime | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+  export_job_id: str | None = None
+  detail: str = ""
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "

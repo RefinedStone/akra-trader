@@ -93,6 +93,42 @@ def serialize_provider_provenance_export_job_history(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_export_job_history')(*args, **kwargs)
 
 
+def serialize_provider_provenance_analytics_preset_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_analytics_preset_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_analytics_preset_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_analytics_preset_list')(*args, **kwargs)
+
+
+def serialize_provider_provenance_dashboard_view_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_dashboard_view_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_dashboard_view_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_dashboard_view_list')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduled_report_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduled_report_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduled_report_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduled_report_list')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduled_report_history(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduled_report_history')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduled_report_run_result(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduled_report_run_result')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduled_report_run_due_result(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduled_report_run_due_result')(*args, **kwargs)
+
+
 def serialize_strategy(*args, **kwargs):
   return _application_symbol('serialize_strategy')(*args, **kwargs)
 
@@ -461,6 +497,99 @@ def execute_standalone_surface_binding(
     return serialize_provider_provenance_export_job_history(
       export_job,
       app.list_provider_provenance_export_job_history(resolved_path_params["job_id"]),
+    )
+  if binding.binding_kind == "operator_provider_provenance_analytics_preset_create":
+    return serialize_provider_provenance_analytics_preset_record(
+      app.create_provider_provenance_analytics_preset(
+        name=resolved_payload["name"],
+        description=resolved_payload.get("description") or "",
+        query=resolved_payload.get("query"),
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_analytics_preset_list":
+    return serialize_provider_provenance_analytics_preset_list(
+      app.list_provider_provenance_analytics_presets(
+        created_by_tab_id=resolved_filters.get("created_by_tab_id"),
+        focus_scope=resolved_filters.get("focus_scope"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_dashboard_view_create":
+    return serialize_provider_provenance_dashboard_view_record(
+      app.create_provider_provenance_dashboard_view(
+        name=resolved_payload["name"],
+        description=resolved_payload.get("description") or "",
+        query=resolved_payload.get("query"),
+        layout=resolved_payload.get("layout"),
+        preset_id=resolved_payload.get("preset_id"),
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_dashboard_view_list":
+    return serialize_provider_provenance_dashboard_view_list(
+      app.list_provider_provenance_dashboard_views(
+        preset_id=resolved_filters.get("preset_id"),
+        created_by_tab_id=resolved_filters.get("created_by_tab_id"),
+        focus_scope=resolved_filters.get("focus_scope"),
+        highlight_panel=resolved_filters.get("highlight_panel"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduled_report_create":
+    return serialize_provider_provenance_scheduled_report_record(
+      app.create_provider_provenance_scheduled_report(
+        name=resolved_payload["name"],
+        description=resolved_payload.get("description") or "",
+        query=resolved_payload.get("query"),
+        layout=resolved_payload.get("layout"),
+        preset_id=resolved_payload.get("preset_id"),
+        view_id=resolved_payload.get("view_id"),
+        cadence=resolved_payload.get("cadence") or "daily",
+        status=resolved_payload.get("status") or "scheduled",
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduled_report_list":
+    return serialize_provider_provenance_scheduled_report_list(
+      app.list_provider_provenance_scheduled_reports(
+        status=resolved_filters.get("status"),
+        cadence=resolved_filters.get("cadence"),
+        preset_id=resolved_filters.get("preset_id"),
+        view_id=resolved_filters.get("view_id"),
+        created_by_tab_id=resolved_filters.get("created_by_tab_id"),
+        focus_scope=resolved_filters.get("focus_scope"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduled_report_run":
+    return serialize_provider_provenance_scheduled_report_run_result(
+      app.run_provider_provenance_scheduled_report(
+        resolved_path_params["report_id"],
+        source_tab_id=resolved_payload.get("source_tab_id"),
+        source_tab_label=resolved_payload.get("source_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduled_report_run_due":
+    return serialize_provider_provenance_scheduled_report_run_due_result(
+      app.run_due_provider_provenance_scheduled_reports(
+        source_tab_id=resolved_payload.get("source_tab_id"),
+        source_tab_label=resolved_payload.get("source_tab_label"),
+        due_before=resolved_payload.get("due_before"),
+        limit=resolved_payload.get("limit", 25),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduled_report_history":
+    report = app.get_provider_provenance_scheduled_report(resolved_path_params["report_id"])
+    return serialize_provider_provenance_scheduled_report_history(
+      report,
+      app.list_provider_provenance_scheduled_report_history(resolved_path_params["report_id"]),
     )
   if binding.binding_kind == "guarded_live_status":
     return asdict(app.get_guarded_live_status())

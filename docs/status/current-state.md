@@ -144,6 +144,9 @@ It is not yet a finished live trading product:
   filters, sort modes, persisted local export history, a team-shared server registry with
   download audit trail, analytics/cross-focus dashboard rollups, and daily time-series views for
   provider drift plus export burn-up instead of a one-off clipboard action
+- provider provenance analytics now also supports server-side saved presets, shared dashboard
+  views, scheduled provenance reports, manual due-run execution, and report audit history so the
+  analytics workbench is no longer browser-local only
 
 ### Operator discipline baseline
 
@@ -163,6 +166,9 @@ It is not yet a finished live trading product:
   history, normalized alert symbol/timeframe payloads, and deterministic multi-symbol primary-focus
   routing plus backend `primary_focus` metadata, but deeper operator action guidance and richer
   history query controls on top of those surfaces are still thin
+- provider provenance analytics is now durable and team-shared, but scheduled reports are still
+  manual/ops-triggered rather than executed by a background scheduler and there are no saved
+  cross-team dashboard collections above preset/view/report records yet
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to

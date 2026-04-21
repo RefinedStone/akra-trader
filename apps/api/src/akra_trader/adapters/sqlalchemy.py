@@ -28,8 +28,12 @@ from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
+from akra_trader.domain.models import ProviderProvenanceAnalyticsPresetRecord
+from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
+from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
+from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.ports import ExperimentPresetCatalogPort
@@ -156,6 +160,48 @@ provider_provenance_export_job_audit_records = Table(
   Column("expires_at", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_analytics_presets = Table(
+  "provider_provenance_analytics_presets",
+  metadata,
+  Column("preset_id", String, primary_key=True),
+  Column("name", String, nullable=False, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_dashboard_views = Table(
+  "provider_provenance_dashboard_views",
+  metadata,
+  Column("view_id", String, primary_key=True),
+  Column("name", String, nullable=False, index=True),
+  Column("preset_id", String, nullable=True, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduled_reports = Table(
+  "provider_provenance_scheduled_reports",
+  metadata,
+  Column("report_id", String, primary_key=True),
+  Column("name", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("cadence", String, nullable=False, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("next_run_at", String, nullable=True, index=True),
+  Column("last_run_at", String, nullable=True, index=True),
+  Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduled_report_audit_records = Table(
+  "provider_provenance_scheduled_report_audit_records",
+  metadata,
+  Column("audit_id", String, primary_key=True),
+  Column("report_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 replay_intent_alias_state = Table(
   "replay_intent_alias_state",
   metadata,
@@ -188,6 +234,10 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   _provider_provenance_export_artifact_adapter = TypeAdapter(ProviderProvenanceExportArtifactRecord)
   _provider_provenance_export_job_adapter = TypeAdapter(ProviderProvenanceExportJobRecord)
   _provider_provenance_export_job_audit_adapter = TypeAdapter(ProviderProvenanceExportJobAuditRecord)
+  _provider_provenance_analytics_preset_adapter = TypeAdapter(ProviderProvenanceAnalyticsPresetRecord)
+  _provider_provenance_dashboard_view_adapter = TypeAdapter(ProviderProvenanceDashboardViewRecord)
+  _provider_provenance_scheduled_report_adapter = TypeAdapter(ProviderProvenanceScheduledReportRecord)
+  _provider_provenance_scheduled_report_audit_adapter = TypeAdapter(ProviderProvenanceScheduledReportAuditRecord)
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
@@ -826,6 +876,238 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       )
     return result.rowcount or 0
 
+  def save_provider_provenance_analytics_preset(
+    self,
+    record: ProviderProvenanceAnalyticsPresetRecord,
+  ) -> ProviderProvenanceAnalyticsPresetRecord:
+    payload = self._provider_provenance_analytics_preset_adapter.dump_python(record, mode="json")
+    row = {
+      "preset_id": record.preset_id,
+      "name": record.name,
+      "updated_at": record.updated_at.isoformat(),
+      "created_by_tab_id": record.created_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_analytics_presets.c.preset_id).where(
+          provider_provenance_analytics_presets.c.preset_id == record.preset_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_analytics_presets).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_analytics_presets)
+          .where(provider_provenance_analytics_presets.c.preset_id == record.preset_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_analytics_presets(
+    self,
+  ) -> tuple[ProviderProvenanceAnalyticsPresetRecord, ...]:
+    statement = select(provider_provenance_analytics_presets.c.payload).order_by(
+      provider_provenance_analytics_presets.c.updated_at.desc(),
+      provider_provenance_analytics_presets.c.preset_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_analytics_preset_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def get_provider_provenance_analytics_preset(
+    self,
+    preset_id: str,
+  ) -> ProviderProvenanceAnalyticsPresetRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_analytics_presets.c.payload).where(
+          provider_provenance_analytics_presets.c.preset_id == preset_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_analytics_preset_adapter.validate_python(row["payload"])
+
+  def save_provider_provenance_dashboard_view(
+    self,
+    record: ProviderProvenanceDashboardViewRecord,
+  ) -> ProviderProvenanceDashboardViewRecord:
+    payload = self._provider_provenance_dashboard_view_adapter.dump_python(record, mode="json")
+    row = {
+      "view_id": record.view_id,
+      "name": record.name,
+      "preset_id": record.preset_id,
+      "updated_at": record.updated_at.isoformat(),
+      "created_by_tab_id": record.created_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_dashboard_views.c.view_id).where(
+          provider_provenance_dashboard_views.c.view_id == record.view_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_dashboard_views).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_dashboard_views)
+          .where(provider_provenance_dashboard_views.c.view_id == record.view_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_dashboard_views(
+    self,
+  ) -> tuple[ProviderProvenanceDashboardViewRecord, ...]:
+    statement = select(provider_provenance_dashboard_views.c.payload).order_by(
+      provider_provenance_dashboard_views.c.updated_at.desc(),
+      provider_provenance_dashboard_views.c.view_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_dashboard_view_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def get_provider_provenance_dashboard_view(
+    self,
+    view_id: str,
+  ) -> ProviderProvenanceDashboardViewRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_dashboard_views.c.payload).where(
+          provider_provenance_dashboard_views.c.view_id == view_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_dashboard_view_adapter.validate_python(row["payload"])
+
+  def save_provider_provenance_scheduled_report(
+    self,
+    record: ProviderProvenanceScheduledReportRecord,
+  ) -> ProviderProvenanceScheduledReportRecord:
+    payload = self._provider_provenance_scheduled_report_adapter.dump_python(record, mode="json")
+    row = {
+      "report_id": record.report_id,
+      "name": record.name,
+      "status": record.status,
+      "cadence": record.cadence,
+      "updated_at": record.updated_at.isoformat(),
+      "next_run_at": record.next_run_at.isoformat() if record.next_run_at is not None else None,
+      "last_run_at": record.last_run_at.isoformat() if record.last_run_at is not None else None,
+      "created_by_tab_id": record.created_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduled_reports.c.report_id).where(
+          provider_provenance_scheduled_reports.c.report_id == record.report_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduled_reports).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduled_reports)
+          .where(provider_provenance_scheduled_reports.c.report_id == record.report_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduled_reports(
+    self,
+  ) -> tuple[ProviderProvenanceScheduledReportRecord, ...]:
+    statement = select(provider_provenance_scheduled_reports.c.payload).order_by(
+      provider_provenance_scheduled_reports.c.updated_at.desc(),
+      provider_provenance_scheduled_reports.c.report_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduled_report_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduled_report(
+    self,
+    report_id: str,
+  ) -> ProviderProvenanceScheduledReportRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduled_reports.c.payload).where(
+          provider_provenance_scheduled_reports.c.report_id == report_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduled_report_adapter.validate_python(row["payload"])
+
+  def save_provider_provenance_scheduled_report_audit_record(
+    self,
+    record: ProviderProvenanceScheduledReportAuditRecord,
+  ) -> ProviderProvenanceScheduledReportAuditRecord:
+    payload = self._provider_provenance_scheduled_report_audit_adapter.dump_python(record, mode="json")
+    row = {
+      "audit_id": record.audit_id,
+      "report_id": record.report_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduled_report_audit_records.c.audit_id).where(
+          provider_provenance_scheduled_report_audit_records.c.audit_id == record.audit_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduled_report_audit_records).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduled_report_audit_records)
+          .where(provider_provenance_scheduled_report_audit_records.c.audit_id == record.audit_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduled_report_audit_records(
+    self,
+    report_id: str | None = None,
+  ) -> tuple[ProviderProvenanceScheduledReportAuditRecord, ...]:
+    statement = select(provider_provenance_scheduled_report_audit_records.c.payload)
+    if report_id is not None:
+      statement = statement.where(
+        provider_provenance_scheduled_report_audit_records.c.report_id == report_id
+      )
+    statement = statement.order_by(
+      provider_provenance_scheduled_report_audit_records.c.recorded_at.desc(),
+      provider_provenance_scheduled_report_audit_records.c.audit_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduled_report_audit_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def prune_provider_provenance_scheduled_report_audit_records(self, current_time: datetime) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_scheduled_report_audit_records).where(
+          provider_provenance_scheduled_report_audit_records.c.expires_at.is_not(None),
+          provider_provenance_scheduled_report_audit_records.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     with self._engine.connect() as connection:
       row = connection.execute(
@@ -931,8 +1213,35 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_replay_intent_alias_audit_export_job_audit_records_action", "action"),
         ("ix_replay_intent_alias_audit_export_job_audit_records_recorded_at", "recorded_at"),
         ("ix_replay_intent_alias_audit_export_job_audit_records_expires_at", "expires_at"),
+        ("ix_provider_provenance_analytics_presets_name", "name"),
+        ("ix_provider_provenance_analytics_presets_updated_at", "updated_at"),
+        ("ix_provider_provenance_analytics_presets_created_by_tab_id", "created_by_tab_id"),
+        ("ix_provider_provenance_dashboard_views_name", "name"),
+        ("ix_provider_provenance_dashboard_views_preset_id", "preset_id"),
+        ("ix_provider_provenance_dashboard_views_updated_at", "updated_at"),
+        ("ix_provider_provenance_dashboard_views_created_by_tab_id", "created_by_tab_id"),
+        ("ix_provider_provenance_scheduled_reports_name", "name"),
+        ("ix_provider_provenance_scheduled_reports_status", "status"),
+        ("ix_provider_provenance_scheduled_reports_cadence", "cadence"),
+        ("ix_provider_provenance_scheduled_reports_updated_at", "updated_at"),
+        ("ix_provider_provenance_scheduled_reports_next_run_at", "next_run_at"),
+        ("ix_provider_provenance_scheduled_reports_last_run_at", "last_run_at"),
+        ("ix_provider_provenance_scheduled_reports_created_by_tab_id", "created_by_tab_id"),
+        ("ix_provider_provenance_scheduled_report_audit_records_report_id", "report_id"),
+        ("ix_provider_provenance_scheduled_report_audit_records_action", "action"),
+        ("ix_provider_provenance_scheduled_report_audit_records_recorded_at", "recorded_at"),
+        ("ix_provider_provenance_scheduled_report_audit_records_expires_at", "expires_at"),
       ):
         table_name = (
+          "provider_provenance_scheduled_report_audit_records"
+          if index_name.startswith("ix_provider_provenance_scheduled_report_audit_records_")
+          else "provider_provenance_scheduled_reports"
+          if index_name.startswith("ix_provider_provenance_scheduled_reports_")
+          else "provider_provenance_dashboard_views"
+          if index_name.startswith("ix_provider_provenance_dashboard_views_")
+          else "provider_provenance_analytics_presets"
+          if index_name.startswith("ix_provider_provenance_analytics_presets_")
+          else
           "run_record_tags"
           if index_name == "ix_run_record_tags_tag"
           else "replay_intent_alias_audit_export_artifacts"

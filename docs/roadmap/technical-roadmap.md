@@ -93,12 +93,17 @@ creation.
   local export history, a shared server-side registry with audit trail, analytics plus
   cross-focus query rollups, and time-series drift / burn-up dashboards, moving it closer to a
   real operator handoff surface
+- provider provenance analytics now also persists saved presets, shared dashboard views, and
+  scheduled provenance reports with manual run / run-due and audit history, so analytics state is
+  durable across operators rather than pinned to one browser tab
 
 ### Remaining work
 
 - decompose the current monolithic UI into clearer product surfaces
 - improve active-session views for positions, fills, lag, and recent decisions
 - align UI state and operator workflows with runbooks and promotion rules
+- add a background execution path for scheduled provenance reports and team-level dashboard
+  collections above the current preset/view/report records
 
 ## Track D: Runtime Ops And Guarded-Live Stabilization
 

@@ -51,7 +51,10 @@ import type {
   RunSurfaceCollectionQueryRuntimeCandidateSample,
 } from "./features/query-builder";
 import {
+  createProviderProvenanceAnalyticsPreset,
+  createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
+  createProviderProvenanceScheduledReport,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   downloadProviderProvenanceExportJob,
@@ -60,16 +63,22 @@ import {
   fetchJson,
   getProviderProvenanceExportAnalytics,
   getProviderProvenanceExportJobHistory,
+  getProviderProvenanceScheduledReportHistory,
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
+  listProviderProvenanceAnalyticsPresets,
+  listProviderProvenanceDashboardViews,
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
   listProviderProvenanceExportJobs,
+  listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
+  runDueProviderProvenanceScheduledReports,
+  runProviderProvenanceScheduledReport,
 } from "./controlRoomApi";
 
 
@@ -259,9 +268,14 @@ import type {
   PresetStructuredDiffDeltaValue,
   PresetStructuredDiffGroup,
   PresetStructuredDiffRow,
+  ProviderProvenanceAnalyticsPresetEntry,
+  ProviderProvenanceDashboardLayout,
+  ProviderProvenanceDashboardViewEntry,
   ProviderProvenanceExportAnalyticsPayload,
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobHistoryPayload,
+  ProviderProvenanceScheduledReportEntry,
+  ProviderProvenanceScheduledReportHistoryPayload,
   ProvenanceArtifactLineDetailView,
   ProvenanceArtifactLineMicroView,
   ReferenceSource,
@@ -361,6 +375,36 @@ const defaultProviderProvenanceAnalyticsQueryState: ProviderProvenanceAnalyticsQ
   requested_by_tab_id: ALL_FILTER_VALUE,
   search_query: "",
   window_days: 14,
+};
+
+const defaultProviderProvenanceDashboardLayout: ProviderProvenanceDashboardLayout = {
+  highlight_panel: "overview",
+  show_rollups: true,
+  show_time_series: true,
+  show_recent_exports: true,
+};
+
+const defaultProviderProvenanceWorkspaceDraft = {
+  name: "",
+  description: "",
+};
+
+type ProviderProvenanceReportDraftState = {
+  name: string;
+  description: string;
+  preset_id: string;
+  view_id: string;
+  cadence: "daily" | "weekly";
+  status: "scheduled" | "paused";
+};
+
+const defaultProviderProvenanceReportDraft: ProviderProvenanceReportDraftState = {
+  name: "",
+  description: "",
+  preset_id: "",
+  view_id: "",
+  cadence: "daily",
+  status: "scheduled",
 };
 
 function buildPresetFormFromPreset(preset: ExperimentPreset) {
@@ -2084,6 +2128,65 @@ function formatProviderProvenanceAnalyticsQuerySummary(
   return parts.join(" / ");
 }
 
+function normalizeProviderProvenanceDashboardLayoutState(
+  layout: Partial<ProviderProvenanceDashboardLayout> | null | undefined,
+): ProviderProvenanceDashboardLayout {
+  return {
+    highlight_panel:
+      layout?.highlight_panel === "drift"
+      || layout?.highlight_panel === "burn_up"
+      || layout?.highlight_panel === "rollups"
+      || layout?.highlight_panel === "recent_exports"
+        ? layout.highlight_panel
+        : "overview",
+    show_rollups: layout?.show_rollups !== false,
+    show_time_series: layout?.show_time_series !== false,
+    show_recent_exports: layout?.show_recent_exports !== false,
+  };
+}
+
+function buildProviderProvenanceAnalyticsWorkspaceQuery(
+  query: ProviderProvenanceAnalyticsQueryState,
+  instrument: MarketDataStatus["instruments"][number] | null,
+) {
+  return {
+    focus_scope: query.scope,
+    ...(query.scope === "current_focus" && instrument
+      ? {
+          focus_key: buildMarketDataInstrumentFocusKey(instrument),
+          symbol: resolveMarketDataSymbol(instrument.instrument_id),
+          timeframe: instrument.timeframe,
+        }
+      : {}),
+    ...(query.provider_label !== ALL_FILTER_VALUE ? { provider_label: query.provider_label } : {}),
+    ...(query.vendor_field !== ALL_FILTER_VALUE ? { vendor_field: query.vendor_field } : {}),
+    ...(query.market_data_provider !== ALL_FILTER_VALUE ? { market_data_provider: query.market_data_provider } : {}),
+    ...(query.requested_by_tab_id !== ALL_FILTER_VALUE ? { requested_by_tab_id: query.requested_by_tab_id } : {}),
+    ...(query.search_query.trim() ? { search: query.search_query.trim() } : {}),
+    result_limit: 12,
+    window_days: query.window_days,
+  };
+}
+
+function buildProviderProvenanceAnalyticsQueryStateFromWorkspaceQuery(
+  query: ProviderProvenanceAnalyticsPresetEntry["query"]
+    | ProviderProvenanceDashboardViewEntry["query"]
+    | ProviderProvenanceScheduledReportEntry["query"],
+): ProviderProvenanceAnalyticsQueryState {
+  return {
+    scope: query.focus_scope,
+    provider_label: query.provider_label ?? ALL_FILTER_VALUE,
+    vendor_field: query.vendor_field ?? ALL_FILTER_VALUE,
+    market_data_provider: query.market_data_provider ?? ALL_FILTER_VALUE,
+    requested_by_tab_id: query.requested_by_tab_id ?? ALL_FILTER_VALUE,
+    search_query: query.search ?? "",
+    window_days:
+      typeof query.window_days === "number" && Number.isFinite(query.window_days)
+        ? Math.max(3, Math.min(Math.round(query.window_days), 90))
+        : 14,
+  };
+}
+
 function resolveProviderProvenanceSeriesBarWidth(value: number, maxValue: number) {
   if (maxValue <= 0 || value <= 0) {
     return "0%";
@@ -2669,10 +2772,48 @@ export default function App() {
     useState<string | null>(null);
   const [providerProvenanceAnalyticsQuery, setProviderProvenanceAnalyticsQuery] =
     useState<ProviderProvenanceAnalyticsQueryState>(defaultProviderProvenanceAnalyticsQueryState);
+  const [providerProvenanceDashboardLayout, setProviderProvenanceDashboardLayout] =
+    useState<ProviderProvenanceDashboardLayout>(defaultProviderProvenanceDashboardLayout);
   const [providerProvenanceAnalytics, setProviderProvenanceAnalytics] =
     useState<ProviderProvenanceExportAnalyticsPayload | null>(null);
   const [providerProvenanceAnalyticsLoading, setProviderProvenanceAnalyticsLoading] = useState(false);
   const [providerProvenanceAnalyticsError, setProviderProvenanceAnalyticsError] = useState<string | null>(null);
+  const [providerProvenanceWorkspaceFeedback, setProviderProvenanceWorkspaceFeedback] = useState<string | null>(null);
+  const [providerProvenancePresetDraft, setProviderProvenancePresetDraft] = useState(
+    defaultProviderProvenanceWorkspaceDraft,
+  );
+  const [providerProvenanceViewDraft, setProviderProvenanceViewDraft] = useState(() => ({
+    ...defaultProviderProvenanceWorkspaceDraft,
+    preset_id: "",
+  }));
+  const [providerProvenanceReportDraft, setProviderProvenanceReportDraft] =
+    useState<ProviderProvenanceReportDraftState>(defaultProviderProvenanceReportDraft);
+  const [providerProvenanceAnalyticsPresets, setProviderProvenanceAnalyticsPresets] =
+    useState<ProviderProvenanceAnalyticsPresetEntry[]>([]);
+  const [providerProvenanceAnalyticsPresetsLoading, setProviderProvenanceAnalyticsPresetsLoading] =
+    useState(false);
+  const [providerProvenanceAnalyticsPresetsError, setProviderProvenanceAnalyticsPresetsError] =
+    useState<string | null>(null);
+  const [providerProvenanceDashboardViews, setProviderProvenanceDashboardViews] =
+    useState<ProviderProvenanceDashboardViewEntry[]>([]);
+  const [providerProvenanceDashboardViewsLoading, setProviderProvenanceDashboardViewsLoading] =
+    useState(false);
+  const [providerProvenanceDashboardViewsError, setProviderProvenanceDashboardViewsError] =
+    useState<string | null>(null);
+  const [providerProvenanceScheduledReports, setProviderProvenanceScheduledReports] =
+    useState<ProviderProvenanceScheduledReportEntry[]>([]);
+  const [providerProvenanceScheduledReportsLoading, setProviderProvenanceScheduledReportsLoading] =
+    useState(false);
+  const [providerProvenanceScheduledReportsError, setProviderProvenanceScheduledReportsError] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceScheduledReportId, setSelectedProviderProvenanceScheduledReportId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceScheduledReportHistory, setSelectedProviderProvenanceScheduledReportHistory] =
+    useState<ProviderProvenanceScheduledReportHistoryPayload | null>(null);
+  const [providerProvenanceScheduledReportHistoryLoading, setProviderProvenanceScheduledReportHistoryLoading] =
+    useState(false);
+  const [providerProvenanceScheduledReportHistoryError, setProviderProvenanceScheduledReportHistoryError] =
+    useState<string | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -4078,6 +4219,10 @@ export default function App() {
     void loadProviderProvenanceAnalytics(activeMarketInstrument);
   }, [activeMarketInstrument, marketStatus, providerProvenanceAnalyticsQuery]);
 
+  useEffect(() => {
+    void loadProviderProvenanceWorkspaceRegistry();
+  }, []);
+
   const providerProvenanceDriftBarMax = useMemo(
     () =>
       Math.max(
@@ -4738,6 +4883,45 @@ export default function App() {
     }
   }
 
+  async function loadProviderProvenanceWorkspaceRegistry() {
+    setProviderProvenanceAnalyticsPresetsLoading(true);
+    setProviderProvenanceDashboardViewsLoading(true);
+    setProviderProvenanceScheduledReportsLoading(true);
+    setProviderProvenanceAnalyticsPresetsError(null);
+    setProviderProvenanceDashboardViewsError(null);
+    setProviderProvenanceScheduledReportsError(null);
+    try {
+      const [presetPayload, viewPayload, reportPayload] = await Promise.all([
+        listProviderProvenanceAnalyticsPresets({ limit: 24 }),
+        listProviderProvenanceDashboardViews({ limit: 24 }),
+        listProviderProvenanceScheduledReports({ limit: 24 }),
+      ]);
+      setProviderProvenanceAnalyticsPresets(presetPayload.items);
+      setProviderProvenanceDashboardViews(viewPayload.items);
+      setProviderProvenanceScheduledReports(reportPayload.items);
+      if (
+        selectedProviderProvenanceScheduledReportId
+        && !reportPayload.items.some((entry) => entry.report_id === selectedProviderProvenanceScheduledReportId)
+      ) {
+        setSelectedProviderProvenanceScheduledReportId(null);
+        setSelectedProviderProvenanceScheduledReportHistory(null);
+        setProviderProvenanceScheduledReportHistoryError(null);
+      }
+    } catch (error) {
+      const message = (error as Error).message;
+      setProviderProvenanceAnalyticsPresets([]);
+      setProviderProvenanceDashboardViews([]);
+      setProviderProvenanceScheduledReports([]);
+      setProviderProvenanceAnalyticsPresetsError(message);
+      setProviderProvenanceDashboardViewsError(message);
+      setProviderProvenanceScheduledReportsError(message);
+    } finally {
+      setProviderProvenanceAnalyticsPresetsLoading(false);
+      setProviderProvenanceDashboardViewsLoading(false);
+      setProviderProvenanceScheduledReportsLoading(false);
+    }
+  }
+
   async function loadMarketDataWorkflow(
     instrument: MarketDataStatus["instruments"][number] | null,
   ) {
@@ -4854,6 +5038,233 @@ export default function App() {
     );
   }
 
+  async function toggleProviderProvenanceScheduledReportHistory(reportId: string) {
+    if (
+      selectedProviderProvenanceScheduledReportId === reportId
+      && selectedProviderProvenanceScheduledReportHistory
+    ) {
+      setSelectedProviderProvenanceScheduledReportId(null);
+      setSelectedProviderProvenanceScheduledReportHistory(null);
+      setProviderProvenanceScheduledReportHistoryError(null);
+      return;
+    }
+    setSelectedProviderProvenanceScheduledReportId(reportId);
+    setSelectedProviderProvenanceScheduledReportHistory(null);
+    setProviderProvenanceScheduledReportHistoryLoading(true);
+    setProviderProvenanceScheduledReportHistoryError(null);
+    try {
+      const historyPayload = await getProviderProvenanceScheduledReportHistory(reportId);
+      setSelectedProviderProvenanceScheduledReportHistory(historyPayload);
+    } catch (error) {
+      setProviderProvenanceScheduledReportHistoryError((error as Error).message);
+    } finally {
+      setProviderProvenanceScheduledReportHistoryLoading(false);
+    }
+  }
+
+  async function applyProviderProvenanceWorkspaceQuery(
+    entry:
+      | ProviderProvenanceAnalyticsPresetEntry
+      | ProviderProvenanceDashboardViewEntry
+      | ProviderProvenanceScheduledReportEntry,
+    options: {
+      includeLayout: boolean;
+      feedbackLabel: string;
+    },
+  ) {
+    const { includeLayout, feedbackLabel } = options;
+    setProviderProvenanceAnalyticsQuery(
+      buildProviderProvenanceAnalyticsQueryStateFromWorkspaceQuery(entry.query),
+    );
+    if (includeLayout && "layout" in entry) {
+      setProviderProvenanceDashboardLayout(
+        normalizeProviderProvenanceDashboardLayoutState(entry.layout),
+      );
+    }
+    if (entry.query.focus_scope === "current_focus" && entry.query.focus_key) {
+      await focusMarketInstrumentFromProviderExport({
+        focus_key: entry.query.focus_key,
+        focus_label: entry.name,
+      });
+      setProviderProvenanceWorkspaceFeedback(`${feedbackLabel} applied and triage focus updated.`);
+    } else {
+      setProviderProvenanceWorkspaceFeedback(`${feedbackLabel} applied to the shared analytics workbench.`);
+    }
+  }
+
+  async function saveCurrentProviderProvenancePreset() {
+    if (!providerProvenancePresetDraft.name.trim()) {
+      setProviderProvenanceWorkspaceFeedback("Enter a preset name before saving the current analytics query.");
+      return;
+    }
+    if (providerProvenanceAnalyticsQuery.scope === "current_focus" && !activeMarketInstrument) {
+      setProviderProvenanceWorkspaceFeedback("Select a triage focus before saving a current-focus analytics preset.");
+      return;
+    }
+    try {
+      const createdPreset = await createProviderProvenanceAnalyticsPreset({
+        name: providerProvenancePresetDraft.name.trim(),
+        description: providerProvenancePresetDraft.description.trim(),
+        query: buildProviderProvenanceAnalyticsWorkspaceQuery(
+          providerProvenanceAnalyticsQuery,
+          activeMarketInstrument,
+        ),
+        createdByTabId: comparisonHistoryTabIdentity.tabId,
+        createdByTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenancePresetDraft(defaultProviderProvenanceWorkspaceDraft);
+      setProviderProvenanceViewDraft((current) => ({
+        ...current,
+        preset_id: createdPreset.preset_id,
+      }));
+      setProviderProvenanceReportDraft((current) => ({
+        ...current,
+        preset_id: createdPreset.preset_id,
+      }));
+      await loadProviderProvenanceWorkspaceRegistry();
+      setProviderProvenanceWorkspaceFeedback(`Saved analytics preset ${createdPreset.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Analytics preset save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function saveCurrentProviderProvenanceDashboardView() {
+    if (!providerProvenanceViewDraft.name.trim()) {
+      setProviderProvenanceWorkspaceFeedback("Enter a dashboard view name before saving the current layout.");
+      return;
+    }
+    if (providerProvenanceAnalyticsQuery.scope === "current_focus" && !activeMarketInstrument) {
+      setProviderProvenanceWorkspaceFeedback("Select a triage focus before saving a current-focus dashboard view.");
+      return;
+    }
+    try {
+      const createdView = await createProviderProvenanceDashboardView({
+        name: providerProvenanceViewDraft.name.trim(),
+        description: providerProvenanceViewDraft.description.trim(),
+        query: buildProviderProvenanceAnalyticsWorkspaceQuery(
+          providerProvenanceAnalyticsQuery,
+          activeMarketInstrument,
+        ),
+        layout: providerProvenanceDashboardLayout,
+        presetId: providerProvenanceViewDraft.preset_id.trim() || undefined,
+        createdByTabId: comparisonHistoryTabIdentity.tabId,
+        createdByTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceViewDraft({
+        ...defaultProviderProvenanceWorkspaceDraft,
+        preset_id: createdView.preset_id ?? "",
+      });
+      setProviderProvenanceReportDraft((current) => ({
+        ...current,
+        view_id: createdView.view_id,
+        preset_id: createdView.preset_id ?? current.preset_id,
+      }));
+      await loadProviderProvenanceWorkspaceRegistry();
+      setProviderProvenanceWorkspaceFeedback(`Saved shared dashboard view ${createdView.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Dashboard view save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function createCurrentProviderProvenanceScheduledReport() {
+    if (!providerProvenanceReportDraft.name.trim()) {
+      setProviderProvenanceWorkspaceFeedback("Enter a scheduled report name before saving.");
+      return;
+    }
+    if (providerProvenanceAnalyticsQuery.scope === "current_focus" && !activeMarketInstrument) {
+      setProviderProvenanceWorkspaceFeedback("Select a triage focus before scheduling a current-focus report.");
+      return;
+    }
+    try {
+      const createdReport = await createProviderProvenanceScheduledReport({
+        name: providerProvenanceReportDraft.name.trim(),
+        description: providerProvenanceReportDraft.description.trim(),
+        query: buildProviderProvenanceAnalyticsWorkspaceQuery(
+          providerProvenanceAnalyticsQuery,
+          activeMarketInstrument,
+        ),
+        layout: providerProvenanceDashboardLayout,
+        presetId: providerProvenanceReportDraft.preset_id.trim() || undefined,
+        viewId: providerProvenanceReportDraft.view_id.trim() || undefined,
+        cadence: providerProvenanceReportDraft.cadence,
+        status: providerProvenanceReportDraft.status,
+        createdByTabId: comparisonHistoryTabIdentity.tabId,
+        createdByTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceReportDraft({
+        ...defaultProviderProvenanceReportDraft,
+        preset_id: createdReport.preset_id ?? "",
+        view_id: createdReport.view_id ?? "",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      setProviderProvenanceWorkspaceFeedback(`Saved scheduled provenance report ${createdReport.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduled report save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function runSharedProviderProvenanceScheduledReport(
+    entry: ProviderProvenanceScheduledReportEntry,
+  ) {
+    try {
+      const runPayload = await runProviderProvenanceScheduledReport({
+        reportId: entry.report_id,
+        sourceTabId: comparisonHistoryTabIdentity.tabId,
+        sourceTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (selectedProviderProvenanceScheduledReportId === entry.report_id) {
+        const historyPayload = await getProviderProvenanceScheduledReportHistory(entry.report_id);
+        setSelectedProviderProvenanceScheduledReportHistory(historyPayload);
+        setProviderProvenanceScheduledReportHistoryError(null);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        `Ran scheduled provenance report ${entry.name} and generated export ${shortenIdentifier(runPayload.export_job.job_id, 10)}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduled report run failed for ${entry.name}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function runDueSharedProviderProvenanceScheduledReports() {
+    try {
+      const duePayload = await runDueProviderProvenanceScheduledReports({
+        sourceTabId: comparisonHistoryTabIdentity.tabId,
+        sourceTabLabel: comparisonHistoryTabIdentity.label,
+        dueBefore: new Date().toISOString(),
+        limit: 10,
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (
+        selectedProviderProvenanceScheduledReportId
+        && duePayload.items.some((item) => item.report.report_id === selectedProviderProvenanceScheduledReportId)
+      ) {
+        const historyPayload = await getProviderProvenanceScheduledReportHistory(
+          selectedProviderProvenanceScheduledReportId,
+        );
+        setSelectedProviderProvenanceScheduledReportHistory(historyPayload);
+        setProviderProvenanceScheduledReportHistoryError(null);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        duePayload.executed_count
+          ? `Ran ${duePayload.executed_count} due scheduled provenance report(s).`
+          : "No scheduled provenance reports were due.",
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Due scheduled report run failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
   async function copyFocusedMarketWorkflowExport() {
     if (!activeMarketInstrument || !focusedMarketWorkflowExportPayload || !focusedMarketWorkflowSummary) {
       setMarketDataWorkflowExportFeedback("Select a triage focus before exporting provider provenance.");
@@ -4945,8 +5356,9 @@ export default function App() {
     }
   }
 
-  async function copySharedProviderProvenanceExport(
-    entry: ProviderProvenanceExportJobEntry,
+  async function copyProviderProvenanceExportJobById(
+    jobId: string,
+    label: string,
   ) {
     if (!navigator.clipboard?.writeText) {
       setMarketDataWorkflowExportFeedback("Clipboard is unavailable. Copy the shared export from dev tools instead.");
@@ -4954,24 +5366,33 @@ export default function App() {
     }
     try {
       const downloadPayload = await downloadProviderProvenanceExportJob({
-        jobId: entry.job_id,
+        jobId,
         sourceTabId: comparisonHistoryTabIdentity.tabId,
         sourceTabLabel: comparisonHistoryTabIdentity.label,
       });
       await navigator.clipboard.writeText(downloadPayload.content);
       setMarketDataWorkflowExportFeedback(
-        `Copied shared export ${shortenIdentifier(entry.job_id, 10)} for ${entry.focus_label ?? entry.symbol ?? "current focus"}.`,
+        `Copied shared export ${shortenIdentifier(jobId, 10)} for ${label}.`,
       );
-      if (selectedSharedProviderProvenanceExportJobId === entry.job_id) {
-        const historyPayload = await getProviderProvenanceExportJobHistory(entry.job_id);
+      if (selectedSharedProviderProvenanceExportJobId === jobId) {
+        const historyPayload = await getProviderProvenanceExportJobHistory(jobId);
         setSelectedSharedProviderProvenanceExportHistory(historyPayload);
         setSharedProviderProvenanceExportHistoryError(null);
       }
     } catch (error) {
       setMarketDataWorkflowExportFeedback(
-        `Shared export copy failed for ${entry.focus_label ?? entry.job_id}: ${(error as Error).message}`,
+        `Shared export copy failed for ${label}: ${(error as Error).message}`,
       );
     }
+  }
+
+  async function copySharedProviderProvenanceExport(
+    entry: ProviderProvenanceExportJobEntry,
+  ) {
+    await copyProviderProvenanceExportJobById(
+      entry.job_id,
+      entry.focus_label ?? entry.symbol ?? "current focus",
+    );
   }
 
   async function copySavedMarketDataProvenanceExport(
@@ -6763,6 +7184,596 @@ export default function App() {
                                     ? `${providerProvenanceAnalytics.totals.unique_focus_count} focus anchor(s)`
                                     : "Waiting for rollups"}
                                 </span>
+                                <span className="run-filter-summary-chip">
+                                  Layout {providerProvenanceDashboardLayout.highlight_panel}
+                                </span>
+                              </div>
+                              <div className="provider-provenance-workspace-grid">
+                                <div className="provider-provenance-workspace-card">
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Dashboard layout</strong>
+                                    <p>
+                                      Save and replay the current analytics layout as a shared dashboard view.
+                                    </p>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Highlight</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceDashboardLayout((current) => ({
+                                            ...current,
+                                            highlight_panel:
+                                              event.target.value === "drift"
+                                              || event.target.value === "burn_up"
+                                              || event.target.value === "rollups"
+                                              || event.target.value === "recent_exports"
+                                                ? event.target.value
+                                                : "overview",
+                                          }))
+                                        }
+                                        value={providerProvenanceDashboardLayout.highlight_panel}
+                                      >
+                                        <option value="overview">Overview</option>
+                                        <option value="drift">Drift</option>
+                                        <option value="burn_up">Burn-up</option>
+                                        <option value="rollups">Rollups</option>
+                                        <option value="recent_exports">Recent exports</option>
+                                      </select>
+                                    </label>
+                                    <label className="provider-provenance-checkbox">
+                                      <input
+                                        checked={providerProvenanceDashboardLayout.show_time_series}
+                                        onChange={(event) =>
+                                          setProviderProvenanceDashboardLayout((current) => ({
+                                            ...current,
+                                            show_time_series: event.target.checked,
+                                          }))
+                                        }
+                                        type="checkbox"
+                                      />
+                                      <span>Show time series</span>
+                                    </label>
+                                    <label className="provider-provenance-checkbox">
+                                      <input
+                                        checked={providerProvenanceDashboardLayout.show_rollups}
+                                        onChange={(event) =>
+                                          setProviderProvenanceDashboardLayout((current) => ({
+                                            ...current,
+                                            show_rollups: event.target.checked,
+                                          }))
+                                        }
+                                        type="checkbox"
+                                      />
+                                      <span>Show rollups</span>
+                                    </label>
+                                    <label className="provider-provenance-checkbox">
+                                      <input
+                                        checked={providerProvenanceDashboardLayout.show_recent_exports}
+                                        onChange={(event) =>
+                                          setProviderProvenanceDashboardLayout((current) => ({
+                                            ...current,
+                                            show_recent_exports: event.target.checked,
+                                          }))
+                                        }
+                                        type="checkbox"
+                                      />
+                                      <span>Show recent exports</span>
+                                    </label>
+                                  </div>
+                                  {providerProvenanceWorkspaceFeedback ? (
+                                    <p className="market-data-workflow-feedback">
+                                      {providerProvenanceWorkspaceFeedback}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="provider-provenance-workspace-card">
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Saved analytics presets</strong>
+                                    <p>Save the current analytics query as a server-side preset and re-apply it later.</p>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Name</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenancePresetDraft((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="BTC drift watch"
+                                        type="text"
+                                        value={providerProvenancePresetDraft.name}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Description</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenancePresetDraft((current) => ({
+                                            ...current,
+                                            description: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="current focus drift query"
+                                        type="text"
+                                        value={providerProvenancePresetDraft.description}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Action</span>
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          void saveCurrentProviderProvenancePreset();
+                                        }}
+                                        type="button"
+                                      >
+                                        Save preset
+                                      </button>
+                                    </label>
+                                  </div>
+                                  {providerProvenanceAnalyticsPresetsLoading ? (
+                                    <p className="empty-state">Loading analytics presets…</p>
+                                  ) : null}
+                                  {providerProvenanceAnalyticsPresetsError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Preset registry load failed: {providerProvenanceAnalyticsPresetsError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceAnalyticsPresets.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Preset</th>
+                                          <th>Filter</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceAnalyticsPresets.slice(0, 6).map((entry) => (
+                                          <tr key={entry.preset_id}>
+                                            <td>
+                                              <strong>{entry.name}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.focus.symbol ?? "all symbols"} · {entry.focus.timeframe ?? "all windows"}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.created_by_tab_label ?? entry.created_by_tab_id ?? "unknown tab"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{entry.filter_summary}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                Updated {formatTimestamp(entry.updated_at)}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <button
+                                                className="ghost-button"
+                                                onClick={() => {
+                                                  void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                    includeLayout: false,
+                                                    feedbackLabel: `Preset ${entry.name}`,
+                                                  });
+                                                }}
+                                                type="button"
+                                              >
+                                                Apply
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No server-side analytics presets saved yet.</p>
+                                  )}
+                                </div>
+                                <div className="provider-provenance-workspace-card">
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Shared dashboard views</strong>
+                                    <p>Store the current analytics query together with the chosen layout emphasis.</p>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Name</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceViewDraft((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="BTC drift board"
+                                        type="text"
+                                        value={providerProvenanceViewDraft.name}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Description</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceViewDraft((current) => ({
+                                            ...current,
+                                            description: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="shared dashboard view"
+                                        type="text"
+                                        value={providerProvenanceViewDraft.description}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Preset link</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceViewDraft((current) => ({
+                                            ...current,
+                                            preset_id: event.target.value,
+                                          }))
+                                        }
+                                        value={providerProvenanceViewDraft.preset_id}
+                                      >
+                                        <option value="">No preset link</option>
+                                        {providerProvenanceAnalyticsPresets.map((entry) => (
+                                          <option key={entry.preset_id} value={entry.preset_id}>
+                                            {entry.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Action</span>
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          void saveCurrentProviderProvenanceDashboardView();
+                                        }}
+                                        type="button"
+                                      >
+                                        Save view
+                                      </button>
+                                    </label>
+                                  </div>
+                                  {providerProvenanceDashboardViewsLoading ? (
+                                    <p className="empty-state">Loading dashboard views…</p>
+                                  ) : null}
+                                  {providerProvenanceDashboardViewsError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Dashboard view registry load failed: {providerProvenanceDashboardViewsError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceDashboardViews.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>View</th>
+                                          <th>Layout</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceDashboardViews.slice(0, 6).map((entry) => (
+                                          <tr key={entry.view_id}>
+                                            <td>
+                                              <strong>{entry.name}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.filter_summary}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.preset_id ? `Preset ${shortenIdentifier(entry.preset_id, 10)}` : "No preset link"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{entry.layout.highlight_panel}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.layout.show_time_series ? "time series" : "no time series"} · {" "}
+                                                {entry.layout.show_rollups ? "rollups" : "no rollups"} · {" "}
+                                                {entry.layout.show_recent_exports ? "recent exports" : "no recent exports"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <button
+                                                className="ghost-button"
+                                                onClick={() => {
+                                                  void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                    includeLayout: true,
+                                                    feedbackLabel: `View ${entry.name}`,
+                                                  });
+                                                }}
+                                                type="button"
+                                              >
+                                                Apply
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No shared dashboard views saved yet.</p>
+                                  )}
+                                </div>
+                                <div className="provider-provenance-workspace-card">
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Scheduled provenance reports</strong>
+                                    <p>Persist the current analytics view as a durable report and run it on demand or when due.</p>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Name</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceReportDraft((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="BTC weekly provenance report"
+                                        type="text"
+                                        value={providerProvenanceReportDraft.name}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Description</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceReportDraft((current) => ({
+                                            ...current,
+                                            description: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="weekly drift roll-up"
+                                        type="text"
+                                        value={providerProvenanceReportDraft.description}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Cadence</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceReportDraft((current) => ({
+                                            ...current,
+                                            cadence: event.target.value === "weekly" ? "weekly" : "daily",
+                                          }))
+                                        }
+                                        value={providerProvenanceReportDraft.cadence}
+                                      >
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Status</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceReportDraft((current) => ({
+                                            ...current,
+                                            status: event.target.value === "paused" ? "paused" : "scheduled",
+                                          }))
+                                        }
+                                        value={providerProvenanceReportDraft.status}
+                                      >
+                                        <option value="scheduled">Scheduled</option>
+                                        <option value="paused">Paused</option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Preset</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceReportDraft((current) => ({
+                                            ...current,
+                                            preset_id: event.target.value,
+                                          }))
+                                        }
+                                        value={providerProvenanceReportDraft.preset_id}
+                                      >
+                                        <option value="">No preset link</option>
+                                        {providerProvenanceAnalyticsPresets.map((entry) => (
+                                          <option key={entry.preset_id} value={entry.preset_id}>
+                                            {entry.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>View</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceReportDraft((current) => ({
+                                            ...current,
+                                            view_id: event.target.value,
+                                          }))
+                                        }
+                                        value={providerProvenanceReportDraft.view_id}
+                                      >
+                                        <option value="">No view link</option>
+                                        {providerProvenanceDashboardViews.map((entry) => (
+                                          <option key={entry.view_id} value={entry.view_id}>
+                                            {entry.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                  </div>
+                                  <div className="run-filter-workbench-actions">
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => {
+                                        void createCurrentProviderProvenanceScheduledReport();
+                                      }}
+                                      type="button"
+                                    >
+                                      Save report
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => {
+                                        void runDueSharedProviderProvenanceScheduledReports();
+                                      }}
+                                      type="button"
+                                    >
+                                      Run due now
+                                    </button>
+                                  </div>
+                                  {providerProvenanceScheduledReportsLoading ? (
+                                    <p className="empty-state">Loading scheduled reports…</p>
+                                  ) : null}
+                                  {providerProvenanceScheduledReportsError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduled report registry load failed: {providerProvenanceScheduledReportsError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceScheduledReports.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Report</th>
+                                          <th>Schedule</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceScheduledReports.slice(0, 6).map((entry) => (
+                                          <tr key={entry.report_id}>
+                                            <td>
+                                              <strong>{entry.name}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.filter_summary}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.view_id ? `View ${shortenIdentifier(entry.view_id, 10)}` : "No view link"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{entry.status} · {entry.cadence}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                Next {formatTimestamp(entry.next_run_at)}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                Last {formatTimestamp(entry.last_run_at)}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <div className="market-data-provenance-history-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void runSharedProviderProvenanceScheduledReport(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Run now
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                      includeLayout: true,
+                                                      feedbackLabel: `Report ${entry.name}`,
+                                                    });
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Apply
+                                                </button>
+                                                {entry.last_export_job_id ? (
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void copyProviderProvenanceExportJobById(entry.last_export_job_id!, entry.name);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Copy latest export
+                                                  </button>
+                                                ) : null}
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void toggleProviderProvenanceScheduledReportHistory(entry.report_id);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  {selectedProviderProvenanceScheduledReportId === entry.report_id
+                                                    && selectedProviderProvenanceScheduledReportHistory
+                                                    ? "Hide history"
+                                                    : "View history"}
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No scheduled provenance reports saved yet.</p>
+                                  )}
+                                  {selectedProviderProvenanceScheduledReportId ? (
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Scheduled report audit trail</strong>
+                                        <p>
+                                          Review report runs and copy any generated analytics export artifact.
+                                        </p>
+                                      </div>
+                                      {providerProvenanceScheduledReportHistoryLoading ? (
+                                        <p className="empty-state">Loading scheduled report history…</p>
+                                      ) : null}
+                                      {providerProvenanceScheduledReportHistoryError ? (
+                                        <p className="market-data-workflow-feedback">
+                                          Scheduled report history failed: {providerProvenanceScheduledReportHistoryError}
+                                        </p>
+                                      ) : null}
+                                      {selectedProviderProvenanceScheduledReportHistory ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>When</th>
+                                              <th>Action</th>
+                                              <th>Detail</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {selectedProviderProvenanceScheduledReportHistory.history.map((entry) => (
+                                              <tr key={entry.audit_id}>
+                                                <td>{formatTimestamp(entry.recorded_at)}</td>
+                                                <td>
+                                                  <strong>{entry.action}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.source_tab_label ?? entry.source_tab_id ?? "unknown source"}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{entry.detail}</strong>
+                                                  {entry.export_job_id ? (
+                                                    <div className="market-data-provenance-history-actions">
+                                                      <button
+                                                        className="ghost-button"
+                                                        onClick={() => {
+                                                          void copyProviderProvenanceExportJobById(
+                                                            entry.export_job_id!,
+                                                            selectedProviderProvenanceScheduledReportHistory.report.name,
+                                                          );
+                                                        }}
+                                                        type="button"
+                                                      >
+                                                        Copy export
+                                                      </button>
+                                                    </div>
+                                                  ) : null}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </div>
                               </div>
                               {providerProvenanceAnalyticsLoading ? (
                                 <p className="empty-state">Loading provider provenance analytics…</p>
@@ -6800,8 +7811,9 @@ export default function App() {
                                       <strong>{providerProvenanceAnalytics.totals.vendor_field_count}</strong>
                                     </div>
                                   </div>
-                                  <div className="status-grid-two-column market-data-provenance-time-series-grid">
-                                    <div className="market-data-provenance-time-series-panel">
+                                  {providerProvenanceDashboardLayout.show_time_series ? (
+                                    <div className="status-grid-two-column market-data-provenance-time-series-grid">
+                                      <div className="market-data-provenance-time-series-panel">
                                       <div className="market-data-provenance-history-head">
                                         <strong>Provider drift by day</strong>
                                         <p>
@@ -6873,8 +7885,8 @@ export default function App() {
                                       ) : (
                                         <p className="empty-state">No provider drift buckets match the current query.</p>
                                       )}
-                                    </div>
-                                    <div className="market-data-provenance-time-series-panel">
+                                      </div>
+                                      <div className="market-data-provenance-time-series-panel">
                                       <div className="market-data-provenance-history-head">
                                         <strong>Export burn-up</strong>
                                         <p>
@@ -6944,10 +7956,12 @@ export default function App() {
                                       ) : (
                                         <p className="empty-state">No burn-up buckets match the current query.</p>
                                       )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="status-grid-two-column">
-                                    <div>
+                                  ) : null}
+                                  {providerProvenanceDashboardLayout.show_rollups ? (
+                                    <div className="status-grid-two-column">
+                                      <div>
                                       <h3>Provider rollup</h3>
                                       {providerProvenanceAnalytics.rollups.providers.length ? (
                                         <table className="data-table">
@@ -6986,8 +8000,8 @@ export default function App() {
                                       ) : (
                                         <p className="empty-state">No provider rollups match the current query.</p>
                                       )}
-                                    </div>
-                                    <div>
+                                      </div>
+                                      <div>
                                       <h3>Focus hotspots</h3>
                                       {providerProvenanceAnalytics.rollups.focuses.length ? (
                                         <table className="data-table">
@@ -7034,10 +8048,12 @@ export default function App() {
                                       ) : (
                                         <p className="empty-state">No focus hotspots match the current query.</p>
                                       )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="status-grid-two-column">
-                                    <div>
+                                  ) : null}
+                                  {providerProvenanceDashboardLayout.show_rollups ? (
+                                    <div className="status-grid-two-column">
+                                      <div>
                                       <h3>Vendor-field rollup</h3>
                                       {providerProvenanceAnalytics.rollups.vendor_fields.length ? (
                                         <table className="data-table">
@@ -7071,8 +8087,8 @@ export default function App() {
                                       ) : (
                                         <p className="empty-state">No vendor-field rollups match the current query.</p>
                                       )}
-                                    </div>
-                                    <div>
+                                      </div>
+                                      <div>
                                       <h3>Requester rollup</h3>
                                       {providerProvenanceAnalytics.rollups.requesters.length ? (
                                         <table className="data-table">
@@ -7106,9 +8122,11 @@ export default function App() {
                                       ) : (
                                         <p className="empty-state">No requester rollups match the current query.</p>
                                       )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div>
+                                  ) : null}
+                                  {providerProvenanceDashboardLayout.show_recent_exports ? (
+                                    <div>
                                     <h3>Cross-focus results</h3>
                                     {providerProvenanceAnalytics.recent_exports.length ? (
                                       <table className="data-table">
@@ -7174,7 +8192,8 @@ export default function App() {
                                     ) : (
                                       <p className="empty-state">No shared provider provenance exports match the current analytics query.</p>
                                     )}
-                                  </div>
+                                    </div>
+                                  ) : null}
                                 </>
                               ) : null}
                             </div>

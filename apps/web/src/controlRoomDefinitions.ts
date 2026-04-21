@@ -1203,6 +1203,131 @@ export type ProviderProvenanceExportAnalyticsPayload = {
   recent_exports: ProviderProvenanceExportJobEntry[];
 };
 
+export type ProviderProvenanceAnalyticsWorkspaceQuery = {
+  focus_scope: "current_focus" | "all_focuses";
+  focus_key?: string | null;
+  symbol?: string | null;
+  timeframe?: string | null;
+  provider_label?: string | null;
+  vendor_field?: string | null;
+  market_data_provider?: string | null;
+  venue?: string | null;
+  requested_by_tab_id?: string | null;
+  status?: string | null;
+  search?: string | null;
+  result_limit: number;
+  window_days: number;
+};
+
+export type ProviderProvenanceDashboardLayout = {
+  highlight_panel: "overview" | "drift" | "burn_up" | "rollups" | "recent_exports";
+  show_rollups: boolean;
+  show_time_series: boolean;
+  show_recent_exports: boolean;
+};
+
+export type ProviderProvenanceWorkspaceFocus = {
+  provider?: string | null;
+  venue?: string | null;
+  instrument_id?: string | null;
+  symbol?: string | null;
+  timeframe?: string | null;
+  provider_provenance_incident_count?: number;
+};
+
+export type ProviderProvenanceAnalyticsPresetEntry = {
+  preset_id: string;
+  name: string;
+  description: string;
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceAnalyticsPresetListPayload = {
+  items: ProviderProvenanceAnalyticsPresetEntry[];
+  total: number;
+};
+
+export type ProviderProvenanceDashboardViewEntry = {
+  view_id: string;
+  name: string;
+  description: string;
+  preset_id?: string | null;
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  layout: ProviderProvenanceDashboardLayout;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceDashboardViewListPayload = {
+  items: ProviderProvenanceDashboardViewEntry[];
+  total: number;
+};
+
+export type ProviderProvenanceScheduledReportEntry = {
+  report_id: string;
+  name: string;
+  description: string;
+  preset_id?: string | null;
+  view_id?: string | null;
+  cadence: "daily" | "weekly";
+  status: "scheduled" | "paused";
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  layout: ProviderProvenanceDashboardLayout;
+  created_at: string;
+  updated_at: string;
+  next_run_at?: string | null;
+  last_run_at?: string | null;
+  last_export_job_id?: string | null;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceScheduledReportListPayload = {
+  items: ProviderProvenanceScheduledReportEntry[];
+  total: number;
+};
+
+export type ProviderProvenanceScheduledReportAuditRecord = {
+  audit_id: string;
+  report_id: string;
+  action: string;
+  recorded_at: string;
+  expires_at?: string | null;
+  source_tab_id?: string | null;
+  source_tab_label?: string | null;
+  export_job_id?: string | null;
+  detail: string;
+};
+
+export type ProviderProvenanceScheduledReportHistoryPayload = {
+  report: ProviderProvenanceScheduledReportEntry;
+  history: ProviderProvenanceScheduledReportAuditRecord[];
+};
+
+export type ProviderProvenanceScheduledReportRunResult = {
+  report: ProviderProvenanceScheduledReportEntry;
+  export_job: ProviderProvenanceExportJobEntry;
+};
+
+export type ProviderProvenanceScheduledReportRunDuePayload = {
+  generated_at: string;
+  due_before: string;
+  executed_count: number;
+  items: ProviderProvenanceScheduledReportRunResult[];
+};
+
 export type OperatorAlertMarketContextFieldProvenance = {
   scope?: string | null;
   path?: string | null;

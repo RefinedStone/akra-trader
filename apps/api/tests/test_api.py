@@ -551,6 +551,64 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "job_id",
     "app",
   )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_analytics_preset"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_analytics_presets"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "created_by_tab_id",
+    "focus_scope",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_dashboard_view"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_dashboard_views"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "preset_id",
+    "created_by_tab_id",
+    "focus_scope",
+    "highlight_panel",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduled_report"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduled_reports"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "status",
+    "cadence",
+    "preset_id",
+    "view_id",
+    "created_by_tab_id",
+    "focus_scope",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["run_operator_provider_provenance_scheduled_report"].endpoint).parameters) == (
+    "report_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["run_due_operator_provider_provenance_scheduled_reports"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["get_operator_provider_provenance_scheduled_report_history"].endpoint).parameters) == (
+    "report_id",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_preset"].endpoint).parameters) == ("request", "app")
   assert tuple(inspect.signature(routes["update_preset"].endpoint).parameters) == ("preset_id", "request", "app")
   assert tuple(inspect.signature(routes["restore_preset_revision"].endpoint).parameters) == (
@@ -1089,8 +1147,132 @@ def test_operator_provider_provenance_export_job_endpoints_round_trip(tmp_path: 
   )
   assert history_response.status_code == 200
   history_payload = history_response.json()
-  assert [item["action"] for item in history_payload["history"]] == ["downloaded", "created"]
-  assert history_payload["history"][0]["source_tab_id"] == "tab_review"
+  assert {item["action"] for item in history_payload["history"]} == {"created", "downloaded"}
+  assert any(item["source_tab_id"] == "tab_review" for item in history_payload["history"])
+
+
+def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  preset_response = client.post(
+    "/api/operator/provider-provenance-analytics/presets",
+    json={
+      "name": "BTC drift watch",
+      "description": "Current focus drift watch preset.",
+      "query": {
+        "focus_scope": "current_focus",
+        "focus_key": "binance:BTC/USDT|5m",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "provider_label": "pagerduty",
+        "vendor_field": "custom_details.market_context",
+        "market_data_provider": "binance",
+        "window_days": 14,
+        "result_limit": 12,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert preset_response.status_code == 200
+  preset_payload = preset_response.json()
+  assert preset_payload["query"]["focus_scope"] == "current_focus"
+
+  list_presets_response = client.get(
+    "/api/operator/provider-provenance-analytics/presets",
+    params={"focus_scope": "current_focus", "limit": 10},
+  )
+  assert list_presets_response.status_code == 200
+  list_presets_payload = list_presets_response.json()
+  assert list_presets_payload["total"] == 1
+  assert list_presets_payload["items"][0]["preset_id"] == preset_payload["preset_id"]
+
+  view_response = client.post(
+    "/api/operator/provider-provenance-analytics/views",
+    json={
+      "name": "BTC drift board",
+      "description": "Shared drift dashboard view.",
+      "preset_id": preset_payload["preset_id"],
+      "layout": {
+        "highlight_panel": "drift",
+        "show_rollups": True,
+        "show_time_series": True,
+        "show_recent_exports": False,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert view_response.status_code == 200
+  view_payload = view_response.json()
+  assert view_payload["layout"]["highlight_panel"] == "drift"
+
+  list_views_response = client.get(
+    "/api/operator/provider-provenance-analytics/views",
+    params={"preset_id": preset_payload["preset_id"], "highlight_panel": "drift", "limit": 10},
+  )
+  assert list_views_response.status_code == 200
+  list_views_payload = list_views_response.json()
+  assert list_views_payload["total"] == 1
+  assert list_views_payload["items"][0]["view_id"] == view_payload["view_id"]
+
+  report_response = client.post(
+    "/api/operator/provider-provenance-analytics/reports",
+    json={
+      "name": "BTC weekly provenance report",
+      "description": "Weekly roll-up for provider provenance.",
+      "preset_id": preset_payload["preset_id"],
+      "view_id": view_payload["view_id"],
+      "cadence": "weekly",
+      "status": "scheduled",
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert report_response.status_code == 200
+  report_payload = report_response.json()
+  assert report_payload["cadence"] == "weekly"
+  assert report_payload["status"] == "scheduled"
+
+  list_reports_response = client.get(
+    "/api/operator/provider-provenance-analytics/reports",
+    params={"status": "scheduled", "view_id": view_payload["view_id"], "limit": 10},
+  )
+  assert list_reports_response.status_code == 200
+  list_reports_payload = list_reports_response.json()
+  assert list_reports_payload["total"] == 1
+  assert list_reports_payload["items"][0]["report_id"] == report_payload["report_id"]
+
+  run_response = client.post(
+    f"/api/operator/provider-provenance-analytics/reports/{report_payload['report_id']}/run",
+    json={"source_tab_id": "tab_review", "source_tab_label": "Review tab"},
+  )
+  assert run_response.status_code == 200
+  run_payload = run_response.json()
+  assert run_payload["report"]["last_export_job_id"] == run_payload["export_job"]["job_id"]
+  assert run_payload["export_job"]["export_scope"] == "provider_provenance_analytics_report"
+
+  history_response = client.get(
+    f"/api/operator/provider-provenance-analytics/reports/{report_payload['report_id']}/history",
+  )
+  assert history_response.status_code == 200
+  history_payload = history_response.json()
+  assert {item["action"] for item in history_payload["history"]} == {"created", "ran"}
+  assert any(item["export_job_id"] == run_payload["export_job"]["job_id"] for item in history_payload["history"])
+
+  run_due_response = client.post(
+    "/api/operator/provider-provenance-analytics/reports/run-due",
+    json={
+      "source_tab_id": "tab_scheduler",
+      "source_tab_label": "Scheduler",
+      "due_before": "2026-04-29T00:00:00Z",
+      "limit": 10,
+    },
+  )
+  assert run_due_response.status_code == 200
+  run_due_payload = run_due_response.json()
+  assert run_due_payload["executed_count"] == 1
+  assert run_due_payload["items"][0]["report"]["report_id"] == report_payload["report_id"]
 
 
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:

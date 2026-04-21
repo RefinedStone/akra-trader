@@ -26,9 +26,13 @@ from akra_trader.domain.models import ReplayIntentAliasAuditExportArtifactRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
+from akra_trader.domain.models import ProviderProvenanceAnalyticsPresetRecord
+from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
+from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
+from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyCatalogSemantics
@@ -273,6 +277,10 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_export_artifacts: OrderedDict[str, ProviderProvenanceExportArtifactRecord] = OrderedDict()
     self._provider_provenance_export_jobs: OrderedDict[str, ProviderProvenanceExportJobRecord] = OrderedDict()
     self._provider_provenance_export_job_audit_records: OrderedDict[str, ProviderProvenanceExportJobAuditRecord] = OrderedDict()
+    self._provider_provenance_analytics_presets: OrderedDict[str, ProviderProvenanceAnalyticsPresetRecord] = OrderedDict()
+    self._provider_provenance_dashboard_views: OrderedDict[str, ProviderProvenanceDashboardViewRecord] = OrderedDict()
+    self._provider_provenance_scheduled_reports: OrderedDict[str, ProviderProvenanceScheduledReportRecord] = OrderedDict()
+    self._provider_provenance_scheduled_report_audit_records: OrderedDict[str, ProviderProvenanceScheduledReportAuditRecord] = OrderedDict()
     self._replay_intent_alias_signing_secret: str | None = None
 
   def save_run(self, run: RunRecord) -> RunRecord:
@@ -628,6 +636,114 @@ class InMemoryRunRepository(RunRepositoryPort):
       if record.expires_at is None or record.expires_at > current_time
     )
     return original_count - len(self._provider_provenance_export_job_audit_records)
+
+  def save_provider_provenance_analytics_preset(
+    self,
+    record: ProviderProvenanceAnalyticsPresetRecord,
+  ) -> ProviderProvenanceAnalyticsPresetRecord:
+    self._provider_provenance_analytics_presets[record.preset_id] = record
+    return record
+
+  def list_provider_provenance_analytics_presets(
+    self,
+  ) -> tuple[ProviderProvenanceAnalyticsPresetRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_analytics_presets.values(),
+        key=lambda record: (record.updated_at, record.preset_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_analytics_preset(
+    self,
+    preset_id: str,
+  ) -> ProviderProvenanceAnalyticsPresetRecord | None:
+    return self._provider_provenance_analytics_presets.get(preset_id)
+
+  def save_provider_provenance_dashboard_view(
+    self,
+    record: ProviderProvenanceDashboardViewRecord,
+  ) -> ProviderProvenanceDashboardViewRecord:
+    self._provider_provenance_dashboard_views[record.view_id] = record
+    return record
+
+  def list_provider_provenance_dashboard_views(
+    self,
+  ) -> tuple[ProviderProvenanceDashboardViewRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_dashboard_views.values(),
+        key=lambda record: (record.updated_at, record.view_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_dashboard_view(
+    self,
+    view_id: str,
+  ) -> ProviderProvenanceDashboardViewRecord | None:
+    return self._provider_provenance_dashboard_views.get(view_id)
+
+  def save_provider_provenance_scheduled_report(
+    self,
+    record: ProviderProvenanceScheduledReportRecord,
+  ) -> ProviderProvenanceScheduledReportRecord:
+    self._provider_provenance_scheduled_reports[record.report_id] = record
+    return record
+
+  def list_provider_provenance_scheduled_reports(
+    self,
+  ) -> tuple[ProviderProvenanceScheduledReportRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduled_reports.values(),
+        key=lambda record: (record.updated_at, record.report_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduled_report(
+    self,
+    report_id: str,
+  ) -> ProviderProvenanceScheduledReportRecord | None:
+    return self._provider_provenance_scheduled_reports.get(report_id)
+
+  def save_provider_provenance_scheduled_report_audit_record(
+    self,
+    record: ProviderProvenanceScheduledReportAuditRecord,
+  ) -> ProviderProvenanceScheduledReportAuditRecord:
+    self._provider_provenance_scheduled_report_audit_records[record.audit_id] = record
+    return record
+
+  def list_provider_provenance_scheduled_report_audit_records(
+    self,
+    report_id: str | None = None,
+  ) -> tuple[ProviderProvenanceScheduledReportAuditRecord, ...]:
+    records = [
+      record
+      for record in self._provider_provenance_scheduled_report_audit_records.values()
+      if report_id is None or record.report_id == report_id
+    ]
+    return tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def prune_provider_provenance_scheduled_report_audit_records(self, current_time: datetime) -> int:
+    original_count = len(self._provider_provenance_scheduled_report_audit_records)
+    self._provider_provenance_scheduled_report_audit_records = OrderedDict(
+      (
+        audit_id,
+        record,
+      )
+      for audit_id, record in self._provider_provenance_scheduled_report_audit_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._provider_provenance_scheduled_report_audit_records)
 
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     return self._replay_intent_alias_signing_secret

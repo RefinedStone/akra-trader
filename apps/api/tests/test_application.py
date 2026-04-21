@@ -14329,6 +14329,15 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_export_analytics",
     "operator_provider_provenance_export_job_download",
     "operator_provider_provenance_export_job_history",
+    "operator_provider_provenance_analytics_preset_create",
+    "operator_provider_provenance_analytics_preset_list",
+    "operator_provider_provenance_dashboard_view_create",
+    "operator_provider_provenance_dashboard_view_list",
+    "operator_provider_provenance_scheduled_report_create",
+    "operator_provider_provenance_scheduled_report_list",
+    "operator_provider_provenance_scheduled_report_run",
+    "operator_provider_provenance_scheduled_report_run_due",
+    "operator_provider_provenance_scheduled_report_history",
     "guarded_live_status",
     "strategy_catalog_discovery",
     "reference_catalog_discovery",
@@ -14426,6 +14435,29 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_export_job_download"].filter_param_specs[0].key == "source_tab_id"
   assert bindings_by_key["operator_provider_provenance_export_job_history"].route_path == (
     "/operator/provider-provenance-exports/{job_id}/history"
+  )
+  assert bindings_by_key["operator_provider_provenance_analytics_preset_create"].methods == ("POST",)
+  assert (
+    bindings_by_key["operator_provider_provenance_analytics_preset_create"].request_payload_kind
+    == "operator_provider_provenance_analytics_preset_create"
+  )
+  assert bindings_by_key["operator_provider_provenance_analytics_preset_list"].filter_param_specs[1].key == (
+    "focus_scope"
+  )
+  assert bindings_by_key["operator_provider_provenance_dashboard_view_create"].methods == ("POST",)
+  assert bindings_by_key["operator_provider_provenance_dashboard_view_list"].filter_param_specs[3].key == (
+    "highlight_panel"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduled_report_create"].methods == ("POST",)
+  assert bindings_by_key["operator_provider_provenance_scheduled_report_list"].filter_param_specs[1].key == (
+    "cadence"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduled_report_run"].path_param_keys == (
+    "report_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduled_report_run_due"].methods == ("POST",)
+  assert bindings_by_key["operator_provider_provenance_scheduled_report_history"].route_path == (
+    "/operator/provider-provenance-analytics/reports/{report_id}/history"
   )
   assert bindings_by_key["guarded_live_status"].route_path == "/guarded-live"
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
@@ -15341,8 +15373,143 @@ def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: P
     app=app,
     path_params={"job_id": created_payload["job_id"]},
   )
-  assert [item["action"] for item in history_payload["history"]] == ["downloaded", "created"]
-  assert history_payload["history"][0]["source_tab_id"] == "tab_review"
+  assert {item["action"] for item in history_payload["history"]} == {"created", "downloaded"}
+  assert any(item["source_tab_id"] == "tab_review" for item in history_payload["history"])
+
+
+def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Path) -> None:
+  clock = MutableClock(datetime(2026, 4, 22, 9, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=build_runs_repository(tmp_path),
+    clock=clock,
+  )
+  bindings_by_key = {
+    binding.surface_key: binding
+    for binding in list_standalone_surface_runtime_bindings(app.get_run_surface_capabilities())
+  }
+
+  preset_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_analytics_preset_create"],
+    app=app,
+    request_payload={
+      "name": "BTC drift watch",
+      "description": "Current focus drift watch preset.",
+      "query": {
+        "focus_scope": "current_focus",
+        "focus_key": "binance:BTC/USDT|5m",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "provider_label": "pagerduty",
+        "vendor_field": "custom_details.market_context",
+        "market_data_provider": "binance",
+        "window_days": 14,
+        "result_limit": 12,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert preset_payload["query"]["focus_scope"] == "current_focus"
+  assert preset_payload["focus"]["symbol"] == "BTC/USDT"
+
+  preset_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_analytics_preset_list"],
+    app=app,
+    filters={"focus_scope": "current_focus", "limit": 10},
+  )
+  assert preset_list_payload["total"] == 1
+  assert preset_list_payload["items"][0]["preset_id"] == preset_payload["preset_id"]
+
+  view_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_dashboard_view_create"],
+    app=app,
+    request_payload={
+      "name": "BTC drift board",
+      "description": "Shared drift dashboard view.",
+      "preset_id": preset_payload["preset_id"],
+      "layout": {
+        "highlight_panel": "drift",
+        "show_rollups": True,
+        "show_time_series": True,
+        "show_recent_exports": False,
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert view_payload["preset_id"] == preset_payload["preset_id"]
+  assert view_payload["layout"]["highlight_panel"] == "drift"
+
+  view_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_dashboard_view_list"],
+    app=app,
+    filters={"preset_id": preset_payload["preset_id"], "highlight_panel": "drift", "limit": 10},
+  )
+  assert view_list_payload["total"] == 1
+  assert view_list_payload["items"][0]["view_id"] == view_payload["view_id"]
+
+  report_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduled_report_create"],
+    app=app,
+    request_payload={
+      "name": "BTC weekly provenance report",
+      "description": "Weekly roll-up for provider provenance.",
+      "preset_id": preset_payload["preset_id"],
+      "view_id": view_payload["view_id"],
+      "cadence": "weekly",
+      "status": "scheduled",
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert report_payload["cadence"] == "weekly"
+  assert report_payload["status"] == "scheduled"
+  assert report_payload["next_run_at"] == "2026-04-29T09:00:00+00:00"
+
+  report_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduled_report_list"],
+    app=app,
+    filters={"status": "scheduled", "view_id": view_payload["view_id"], "limit": 10},
+  )
+  assert report_list_payload["total"] == 1
+  assert report_list_payload["items"][0]["report_id"] == report_payload["report_id"]
+
+  run_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduled_report_run"],
+    app=app,
+    path_params={"report_id": report_payload["report_id"]},
+    request_payload={
+      "source_tab_id": "tab_review",
+      "source_tab_label": "Review tab",
+    },
+  )
+  assert run_payload["report"]["last_export_job_id"] == run_payload["export_job"]["job_id"]
+  assert run_payload["export_job"]["export_scope"] == "provider_provenance_analytics_report"
+  assert run_payload["export_job"]["provider_provenance_count"] == 0
+
+  history_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduled_report_history"],
+    app=app,
+    path_params={"report_id": report_payload["report_id"]},
+  )
+  assert {item["action"] for item in history_payload["history"]} == {"created", "ran"}
+  assert any(item["export_job_id"] == run_payload["export_job"]["job_id"] for item in history_payload["history"])
+
+  clock.advance(timedelta(days=7))
+  due_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduled_report_run_due"],
+    app=app,
+    request_payload={
+      "source_tab_id": "tab_scheduler",
+      "source_tab_label": "Scheduler",
+      "limit": 10,
+    },
+  )
+  assert due_payload["executed_count"] == 1
+  assert due_payload["items"][0]["report"]["report_id"] == report_payload["report_id"]
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

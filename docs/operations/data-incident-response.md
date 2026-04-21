@@ -41,6 +41,9 @@ unclear dataset lineage.
   provider/vendor/focus/requester rollups, cross-focus query results, and daily provider-drift /
   export burn-up dashboards so repeated incident handoff does not start from an empty clipboard
   or an untraceable copy action
+- provider provenance analytics now also has server-side saved presets, shared dashboard views,
+  scheduled provenance reports, report audit trails, and manual run-due controls so teams can
+  reuse the same triage and analytics framing across shifts instead of rebuilding filters locally
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

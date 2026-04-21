@@ -198,6 +198,49 @@ class OperatorProviderProvenanceExportJobCreateRequest(BaseModel):
   requested_by_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
+  name: str
+  description: str = ""
+  query: dict[str, Any] = Field(default_factory=dict)
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceDashboardViewCreateRequest(BaseModel):
+  name: str
+  description: str = ""
+  query: dict[str, Any] = Field(default_factory=dict)
+  layout: dict[str, Any] = Field(default_factory=dict)
+  preset_id: str | None = None
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceScheduledReportCreateRequest(BaseModel):
+  name: str
+  description: str = ""
+  query: dict[str, Any] = Field(default_factory=dict)
+  layout: dict[str, Any] = Field(default_factory=dict)
+  preset_id: str | None = None
+  view_id: str | None = None
+  cadence: str = "daily"
+  status: str = "scheduled"
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceScheduledReportRunRequest(BaseModel):
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceScheduledReportRunDueRequest(BaseModel):
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+  due_before: datetime | None = None
+  limit: int = Field(default=25, ge=1, le=100)
+
+
 REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_alias_create": (ReplayLinkAliasCreateRequest, {}),
   "replay_link_alias_revoke": (ReplayLinkAliasRevokeRequest, {}),
@@ -205,6 +248,11 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_audit_export_job_create": (ReplayLinkAliasAuditExportJobCreateRequest, {}),
   "replay_link_audit_export_job_prune": (ReplayLinkAliasAuditExportJobPruneRequest, {}),
   "operator_provider_provenance_export_job_create": (OperatorProviderProvenanceExportJobCreateRequest, {}),
+  "operator_provider_provenance_analytics_preset_create": (OperatorProviderProvenanceAnalyticsPresetCreateRequest, {}),
+  "operator_provider_provenance_dashboard_view_create": (OperatorProviderProvenanceDashboardViewCreateRequest, {}),
+  "operator_provider_provenance_scheduled_report_create": (OperatorProviderProvenanceScheduledReportCreateRequest, {}),
+  "operator_provider_provenance_scheduled_report_run": (OperatorProviderProvenanceScheduledReportRunRequest, {}),
+  "operator_provider_provenance_scheduled_report_run_due": (OperatorProviderProvenanceScheduledReportRunDueRequest, {}),
   "preset_create": (ExperimentPresetRequest, {}),
   "preset_update": (ExperimentPresetUpdateRequest, {"exclude_unset": True}),
   "preset_revision_restore": (ExperimentPresetRevisionRestoreRequest, {}),
