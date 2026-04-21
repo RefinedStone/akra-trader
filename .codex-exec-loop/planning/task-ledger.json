@@ -454,20 +454,20 @@
     {
       "id": "task-b1-provider-market-context-scheduler-escalation-delivery-linking",
       "direction_id": "runtime-ops",
-      "title": "Link scheduler lag and failure into provider escalation workflows and action surfaces",
-      "description": "Wire provider provenance scheduler lag and failure conditions into provider delivery payloads, incident-escalation workflows, or scheduler-specific operator action surfaces so automation stalls can trigger the same external handoff and guided response paths as other runtime failures.",
-      "status": "proposed",
+      "title": "Productize scheduler health export delivery, audit trail, and escalation workflows",
+      "description": "Turn the new direct scheduler-health JSON or CSV export into an operator-grade delivery flow by adding team-shared registry or audit capture, scheduled delivery or push paths, and escalation-oriented action surfaces so automation stalls can be handed off and reviewed like other runtime failures.",
+      "status": "ready",
       "base_priority": 76,
-      "dynamic_priority_delta": 19,
+      "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T02:04:45+09:00",
+      "updated_at": "2026-04-22T02:20:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-history-trend-dashboard"
       ],
-      "direction_relation_note": "The latest main-session reply says scheduler health is now visible in the control room and analytics workspace, but it still is not connected to a provider escalation workflow or any scheduler-specific action surface.",
-      "priority_reason": "This is the second explicit remaining gap after commit e4978ee, so it stays proposed behind the first direct continuation on scheduler analytics depth while keeping the escalation follow-up ready to promote next."
+      "direction_relation_note": "The latest main-session reply says commit e5554a0 added direct scheduler-health JSON or CSV export plus hourly drill-down, but export productization is still missing: there is no team-shared registry, audit trail, scheduled delivery, or escalation-oriented handoff flow around those scheduler analytics artifacts.",
+      "priority_reason": "Promoted to ready because the just-completed scheduler analytics slice explicitly leaves export delivery, auditability, and scheduled handoff as the first remaining follow-up, so builtin next-task should continue there before opening another deeper query surface."
     },
     {
       "id": "task-b1-provider-market-context-dashboard-board",
@@ -510,18 +510,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add pagination, export, and finer-grained drill-down to scheduler health analytics",
       "description": "Extend the newly shipped scheduler health history and daily trend surfaces with pageable history access, exportable scheduler analytics, and finer-grained drill-down buckets so operators can investigate automation lag and backlog movement beyond the current daily and recent-history view.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T02:04:45+09:00",
+      "updated_at": "2026-04-22T02:20:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-history-trend-dashboard"
       ],
-      "direction_relation_note": "The latest main-session reply says commit e4978ee added scheduler history and daily trend panels, but the scheduler trend slice still lacks pagination, export, and finer-grained drill-down beyond daily buckets and recent cycles.",
-      "priority_reason": "Promoted to ready because the latest reply names this as the first remaining follow-up after the completed scheduler history task, and builtin next-task should continue through that direct analytics-depth slice before branching into escalation wiring."
+      "direction_relation_note": "Completed on main in commit e5554a0 with offset or limit pagination for scheduler health history, direct JSON or CSV export from /api/operator/provider-provenance-analytics/scheduler-health/export, and selected-day hour-bucket drill-down plus raw cycle records across the control-room scheduler automation panel.",
+      "priority_reason": "Closed after backend analytics routes, control-room pagination and export consumers, targeted pytest plus compileall coverage, web typecheck and build verification, and push all landed; the remaining explicit gaps are export productization and deeper than hour-bucket query surfaces."
+    },
+    {
+      "id": "task-b1-provider-market-context-subhour-scheduler-query-surface",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add sub-hour scheduler drill-down and deeper server-side query surfaces",
+      "description": "Extend scheduler health analytics beyond the new day-to-hour drill-down by adding sub-hour granularity and deeper server-side query controls so operators can inspect automation lag or backlog spikes below hourly buckets without relying on oversized client-side payloads.",
+      "status": "proposed",
+      "base_priority": 75,
+      "dynamic_priority_delta": 18,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T02:20:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-hourly-drilldown"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says scheduler drill-down now stops at day-to-hour buckets after commit e5554a0, leaving sub-hour granularity and a deeper server-side query surface as the second remaining follow-up.",
+      "priority_reason": "Keep this proposed behind scheduler export productization so builtin next-task follows the explicit main-session order while preserving the deeper analytics continuation as the next clear option."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
