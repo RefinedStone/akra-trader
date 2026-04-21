@@ -75,39 +75,75 @@
     {
       "id": "task-b1-lineage-history-retention-pagination",
       "direction_id": "data-trust-and-lineage",
-      "title": "Define retention, pagination, and action-guidance surfaces for lineage history",
-      "description": "Add the retention boundaries, pagination contract, query limits, and operator action-guidance surface needed to keep lineage-history and ingestion-jobs usable as durable operational records rather than unbounded payload dumps.",
+      "title": "Add pagination, filtering, and export to lineage incident history",
+      "description": "Extend the shipped lineage incident history surface with pagination, richer filtering, and export support so operators can work larger incident timelines without scanning an unbounded merged panel.",
       "status": "proposed",
       "base_priority": 80,
-      "dynamic_priority_delta": 11,
+      "dynamic_priority_delta": 12,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:24:00+09:00",
+      "updated_at": "2026-04-21T21:38:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-lineage-query-surfaces"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says pagination, retention, and operator action guidance for lineage and ingestion history still need a separate product surface after the new control-room triage view landed.",
-      "priority_reason": "This remains important for durability and operator usability, but it can stay proposed while the next operator workflow step focuses on alert-driven triage entry."
+      "direction_relation_note": "The latest main-session reply narrowed this follow-up from broad retention guidance to a concrete lineage-incident-history product slice: pagination, richer filtering, and export on top of the newly merged control-room history panel.",
+      "priority_reason": "This is clearly executable follow-up work, but it stays proposed behind the alert-payload normalization slice so the queue keeps one deterministic next task."
     },
     {
       "id": "task-b1-alert-lineage-correlation",
       "direction_id": "runtime-ops",
       "title": "Auto-link alerts into instrument triage focus and lineage incident history",
       "description": "Expose direct alert-to-lineage and alert-to-ingestion-history correlations so stale-data and failure alerts automatically open the exact instrument, timeframe, boundary, checkpoint, and failed sync job context in operator triage workflows.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 14,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:24:00+09:00",
+      "updated_at": "2026-04-21T21:38:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-lineage-query-surfaces",
         "task-b1-control-room-lineage-operations"
       ],
-      "direction_relation_note": "The latest main-session reply says the next operator workflow step is to automatically connect alerts to the new instrument triage focus and lineage or ingestion history that now exists in the control room.",
-      "priority_reason": "This becomes the queue head because the operator requested the next queued task immediately and alert-driven entry is the clearest executable follow-up now that control-room triage consumption is complete."
+      "direction_relation_note": "Completed on main in commit 0e5e259 with alert-to-instrument linking, auto-selected triage focus from linked alerts, Focus triage entry points across alert and incident tables, and merged lineage incident history in the control room.",
+      "priority_reason": "Closed after the frontend workflow, docs updates, typecheck, commit, and push landed, so queue selection should move to the explicit follow-ups called out in the latest main-session reply."
+    },
+    {
+      "id": "task-b1-alert-payload-normalization",
+      "direction_id": "runtime-ops",
+      "title": "Embed normalized symbol and timeframe in alert payloads",
+      "description": "Push normalized symbol and timeframe fields into runtime alert payloads so control-room triage linking can rely on durable backend contracts instead of frontend-side heuristics around run metadata and alert text.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 15,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T21:38:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-alert-lineage-correlation"
+      ],
+      "direction_relation_note": "The latest main-session reply lists normalized symbol/timeframe in alert payloads as the first remaining item so the just-shipped control-room alert linkage stops depending on frontend heuristics.",
+      "priority_reason": "This becomes the single ready queue head because it is the clearest immediate hardening step after the linked-alert workflow shipped and it directly improves operator trust in alert-driven triage."
+    },
+    {
+      "id": "task-b1-triage-operator-actions",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Open ack, escalation, and remediation flows from the triage panel",
+      "description": "Connect the control-room triage panel to operator actions so ack, escalation, and remediation workflows can be launched directly from the alert and lineage context instead of requiring a separate surface or manual workflow handoff.",
+      "status": "proposed",
+      "base_priority": 79,
+      "dynamic_priority_delta": 10,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T21:38:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-alert-lineage-correlation"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly calls out triage-panel operator actions as remaining work now that alert correlation and merged lineage history are present.",
+      "priority_reason": "This is executable follow-up work, but it remains proposed so the queue stays focused on the backend contract that stabilizes the newly shipped alert-linking behavior first."
     },
     {
       "id": "task-b1-lineage-category-ui",
