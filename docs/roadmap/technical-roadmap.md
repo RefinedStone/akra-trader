@@ -73,6 +73,8 @@ creation.
   incident history
 - runtime and guarded-live alert payloads now include normalized symbol/timeframe context where the
   runtime can resolve it directly
+- multi-symbol operator alerts now collapse onto one deterministic primary market-data focus using
+  instrument risk, live-session relevance, payload order, and stable fallback
 
 ### Remaining work
 

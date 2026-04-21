@@ -120,6 +120,9 @@ It is not yet a finished live trading product:
 - operator surfaces for replay-link alias governance and audit export administration
 - runtime control-room workflows now consume focused market-data lineage and ingestion-job history
   for selected instruments during incident triage
+- multi-symbol runtime alerts now resolve to a deterministic primary triage focus using instrument
+  risk, live-session relevance, payload symbol order, and stable lexical fallback, with the reason
+  shown inline to operators
 
 ### Operator discipline baseline
 
@@ -136,8 +139,9 @@ It is not yet a finished live trading product:
 - dataset-boundary contracts, rerun validation categories, operator-visible lineage summaries, and
   normalized lineage or ingestion history surfaces now exist, and the control room now consumes
   focused history for incident triage with alert-linked focus routing, merged lineage incident
-  history, and normalized alert symbol/timeframe payloads, but deeper operator action guidance and
-  richer history query controls on top of those surfaces are still thin
+  history, normalized alert symbol/timeframe payloads, and deterministic multi-symbol primary-focus
+  routing, but deeper operator action guidance and richer history query controls on top of those
+  surfaces are still thin
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to

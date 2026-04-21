@@ -1744,6 +1744,10 @@ type LinkedMarketInstrumentContext = {
   symbol: string;
   timeframe: string;
   matchReason: string;
+  candidateCount: number;
+  candidateLabels: string[];
+  primaryFocusPolicy: string;
+  primaryFocusReason: string;
 };
 
 type MarketDataLinkableAlertRecord = {
@@ -1769,6 +1773,14 @@ type MarketDataIncidentHistoryEntry = {
   summary: string;
   detail: string;
   tone: "critical" | "warning" | "neutral";
+};
+
+type MarketDataPrimaryFocusSelection = {
+  instrument: MarketDataStatus["instruments"][number];
+  candidateCount: number;
+  candidateLabels: string[];
+  primaryFocusPolicy: string;
+  primaryFocusReason: string;
 };
 
 function escapeRegExp(value: string) {
@@ -1801,14 +1813,158 @@ function dedupeMarketDataInstruments(
   );
 }
 
-function pickPreferredMarketDataInstrument(
-  candidates: MarketDataStatus["instruments"][number][],
+function formatMarketDataInstrumentLabel(
+  instrument: MarketDataStatus["instruments"][number],
 ) {
+  return `${resolveMarketDataSymbol(instrument.instrument_id)} · ${instrument.timeframe}`;
+}
+
+function getMarketDataInstrumentSyncSeverityRank(syncStatus: string) {
+  switch (syncStatus) {
+    case "error":
+      return 4;
+    case "stale":
+      return 3;
+    case "lagging":
+      return 2;
+    case "syncing":
+      return 1;
+    case "synced":
+      return 0;
+    default:
+      return syncStatus !== "synced" ? 1 : 0;
+  }
+}
+
+function getMarketDataInstrumentRiskScore(
+  instrument: MarketDataStatus["instruments"][number],
+) {
+  return (
+    getMarketDataInstrumentSyncSeverityRank(instrument.sync_status) * 1000
+    + Math.min(instrument.failure_count_24h, 99) * 100
+    + instrument.backfill_gap_windows.length * 40
+    + instrument.issues.length * 35
+    + ((instrument.backfill_contiguous_missing_candles ?? 0) > 0 ? 20 : 0)
+    + (instrument.backfill_target_candles !== null && instrument.backfill_complete === false ? 10 : 0)
+    + Math.min(Math.ceil((instrument.lag_seconds ?? 0) / 60), 15)
+  );
+}
+
+function buildLiveMarketDataPreference(args: {
+  guardedLive: GuardedLiveStatus | null;
+  liveRuns: Run[];
+}) {
+  const { guardedLive, liveRuns } = args;
+  const exactKeys = new Set<string>();
+  const symbolSet = new Set<string>();
+  const register = (symbol?: string | null, timeframe?: string | null) => {
+    if (!symbol) {
+      return;
+    }
+    const normalizedSymbol = normalizeMarketSymbol(symbol);
+    symbolSet.add(normalizedSymbol);
+    if (timeframe) {
+      exactKeys.add(`${normalizedSymbol}|${timeframe}`);
+    }
+  };
+
+  liveRuns.forEach((run) => {
+    run.config.symbols.forEach((symbol) => {
+      register(symbol, run.config.timeframe);
+    });
+  });
+
+  register(guardedLive?.session_handoff.symbol, guardedLive?.session_handoff.kline_snapshot?.timeframe ?? null);
+  register(guardedLive?.ownership.symbol);
+  register(guardedLive?.order_book.symbol);
+  register(guardedLive?.session_restore.symbol);
+
+  return { exactKeys, symbolSet };
+}
+
+function getMarketDataInstrumentLiveRelevance(
+  instrument: MarketDataStatus["instruments"][number],
+  livePreference: ReturnType<typeof buildLiveMarketDataPreference>,
+) {
+  const symbol = normalizeMarketSymbol(resolveMarketDataSymbol(instrument.instrument_id));
+  if (livePreference.exactKeys.has(`${symbol}|${instrument.timeframe}`)) {
+    return 2;
+  }
+  if (livePreference.symbolSet.has(symbol)) {
+    return 1;
+  }
+  return 0;
+}
+
+function selectPrimaryMarketDataInstrument(args: {
+  candidates: MarketDataStatus["instruments"][number][],
+  guardedLive: GuardedLiveStatus | null;
+  liveRuns: Run[];
+  symbolOrder?: string[];
+}) {
+  const { candidates, guardedLive, liveRuns, symbolOrder = [] } = args;
   const deduped = dedupeMarketDataInstruments(candidates);
   if (!deduped.length) {
     return null;
   }
-  return deduped.find((instrument) => isMarketDataInstrumentAtRisk(instrument)) ?? deduped[0];
+
+  const livePreference = buildLiveMarketDataPreference({ guardedLive, liveRuns });
+  const symbolOrderBySymbol = new Map<string, number>();
+  symbolOrder.forEach((symbol, index) => {
+    const normalizedSymbol = normalizeMarketSymbol(symbol);
+    if (!symbolOrderBySymbol.has(normalizedSymbol)) {
+      symbolOrderBySymbol.set(normalizedSymbol, index);
+    }
+  });
+
+  const rankedCandidates = deduped
+    .map((instrument) => {
+      const normalizedSymbol = normalizeMarketSymbol(resolveMarketDataSymbol(instrument.instrument_id));
+      return {
+        instrument,
+        label: formatMarketDataInstrumentLabel(instrument),
+        riskScore: getMarketDataInstrumentRiskScore(instrument),
+        liveRelevance: getMarketDataInstrumentLiveRelevance(instrument, livePreference),
+        payloadOrder: symbolOrderBySymbol.get(normalizedSymbol) ?? Number.MAX_SAFE_INTEGER,
+        lexicalKey: `${normalizedSymbol}|${instrument.timeframe}|${instrument.instrument_id}`,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.riskScore - left.riskScore
+        || right.liveRelevance - left.liveRelevance
+        || left.payloadOrder - right.payloadOrder
+        || left.lexicalKey.localeCompare(right.lexicalKey),
+    );
+
+  const primary = rankedCandidates[0];
+  const nextCandidate = rankedCandidates[1] ?? null;
+  let primaryFocusReason = "Only one matching market-data instrument was linked.";
+  if (nextCandidate) {
+    if (primary.riskScore !== nextCandidate.riskScore) {
+      primaryFocusReason = `Selected the highest-risk market-data candidate from ${rankedCandidates.length} linked instruments.`;
+    } else if (primary.liveRelevance !== nextCandidate.liveRelevance) {
+      primaryFocusReason =
+        primary.liveRelevance === 2
+          ? "Risk tied, so the exact live symbol/timeframe candidate became the primary triage focus."
+          : "Risk tied, so the active live symbol candidate became the primary triage focus.";
+    } else if (
+      primary.payloadOrder !== nextCandidate.payloadOrder
+      && primary.payloadOrder !== Number.MAX_SAFE_INTEGER
+    ) {
+      primaryFocusReason = "Risk and live relevance tied, so payload symbol order broke the tie.";
+    } else {
+      primaryFocusReason = "Risk, live relevance, and payload order tied, so lexical ordering kept focus stable.";
+    }
+  }
+
+  return {
+    instrument: primary.instrument,
+    candidateCount: rankedCandidates.length,
+    candidateLabels: rankedCandidates.map((candidate) => candidate.label),
+    primaryFocusPolicy: "risk -> live -> payload order -> lexical",
+    primaryFocusReason,
+  } satisfies MarketDataPrimaryFocusSelection;
 }
 
 function extractMatchingMarketTimeframe(
@@ -1837,16 +1993,30 @@ function extractMatchingMarketSymbols(
 }
 
 function buildLinkedMarketInstrumentContext(
-  instrument: MarketDataStatus["instruments"][number],
+  selection: MarketDataPrimaryFocusSelection,
   matchReason: string,
 ): LinkedMarketInstrumentContext {
+  const { instrument } = selection;
   return {
     instrument,
     focusKey: buildMarketDataInstrumentFocusKey(instrument),
     symbol: resolveMarketDataSymbol(instrument.instrument_id),
     timeframe: instrument.timeframe,
     matchReason,
+    candidateCount: selection.candidateCount,
+    candidateLabels: selection.candidateLabels,
+    primaryFocusPolicy: selection.primaryFocusPolicy,
+    primaryFocusReason: selection.primaryFocusReason,
   };
+}
+
+function formatLinkedMarketPrimaryFocusNote(
+  link: LinkedMarketInstrumentContext | null,
+) {
+  if (!link || link.candidateCount <= 1) {
+    return null;
+  }
+  return `Primary focus policy (${link.primaryFocusPolicy}): ${link.primaryFocusReason} Candidate order: ${link.candidateLabels.join(", ")}.`;
 }
 
 function resolveInstrumentsBySymbolsAndTimeframe(args: {
@@ -1886,41 +2056,50 @@ function resolveMarketDataInstrumentLink(args: {
   );
   const explicitTimeframe = record.timeframe?.trim() || null;
   if (explicitSymbols.length) {
-    const explicitInstrument = pickPreferredMarketDataInstrument(
-      resolveInstrumentsBySymbolsAndTimeframe({
+    const explicitSelection = selectPrimaryMarketDataInstrument({
+      candidates: resolveInstrumentsBySymbolsAndTimeframe({
         marketStatus,
         symbols: explicitSymbols,
         timeframe: explicitTimeframe,
       }),
-    );
-    if (explicitInstrument) {
-      return buildLinkedMarketInstrumentContext(explicitInstrument, "payload_market_context");
+      guardedLive,
+      liveRuns,
+      symbolOrder: explicitSymbols,
+    });
+    if (explicitSelection) {
+      return buildLinkedMarketInstrumentContext(explicitSelection, "payload_market_context");
     }
   }
   const run = record.run_id ? runById.get(record.run_id) : undefined;
   if (run) {
-    const runInstrument = pickPreferredMarketDataInstrument(
-      resolveInstrumentsBySymbolsAndTimeframe({
+    const runSelection = selectPrimaryMarketDataInstrument({
+      candidates: resolveInstrumentsBySymbolsAndTimeframe({
         marketStatus,
         symbols: run.config.symbols,
         timeframe: run.config.timeframe,
       }),
-    );
-    if (runInstrument) {
-      return buildLinkedMarketInstrumentContext(runInstrument, "run_context");
+      guardedLive,
+      liveRuns,
+      symbolOrder: run.config.symbols,
+    });
+    if (runSelection) {
+      return buildLinkedMarketInstrumentContext(runSelection, "run_context");
     }
   }
 
   if (record.provider_recovery_symbols?.length) {
-    const providerRecoveryInstrument = pickPreferredMarketDataInstrument(
-      resolveInstrumentsBySymbolsAndTimeframe({
+    const providerRecoverySelection = selectPrimaryMarketDataInstrument({
+      candidates: resolveInstrumentsBySymbolsAndTimeframe({
         marketStatus,
         symbols: record.provider_recovery_symbols,
         timeframe: record.provider_recovery_timeframe,
       }),
-    );
-    if (providerRecoveryInstrument) {
-      return buildLinkedMarketInstrumentContext(providerRecoveryInstrument, "provider_recovery");
+      guardedLive,
+      liveRuns,
+      symbolOrder: record.provider_recovery_symbols,
+    });
+    if (providerRecoverySelection) {
+      return buildLinkedMarketInstrumentContext(providerRecoverySelection, "provider_recovery");
     }
   }
 
@@ -1939,40 +2118,49 @@ function resolveMarketDataInstrumentLink(args: {
     ?? guardedLiveTimeframe;
 
   if (matchedSymbols.length && matchedTimeframe) {
-    const exactInstrument = pickPreferredMarketDataInstrument(
-      resolveInstrumentsBySymbolsAndTimeframe({
+    const exactSelection = selectPrimaryMarketDataInstrument({
+      candidates: resolveInstrumentsBySymbolsAndTimeframe({
         marketStatus,
         symbols: matchedSymbols,
         timeframe: matchedTimeframe,
       }),
-    );
-    if (exactInstrument) {
-      return buildLinkedMarketInstrumentContext(exactInstrument, "symbol_timeframe_match");
+      guardedLive,
+      liveRuns,
+      symbolOrder: matchedSymbols,
+    });
+    if (exactSelection) {
+      return buildLinkedMarketInstrumentContext(exactSelection, "symbol_timeframe_match");
     }
   }
 
   if (record.source === "guarded_live" && guardedLiveSymbol && matchedTimeframe) {
-    const guardedLiveInstrument = pickPreferredMarketDataInstrument(
-      resolveInstrumentsBySymbolsAndTimeframe({
+    const guardedLiveSelection = selectPrimaryMarketDataInstrument({
+      candidates: resolveInstrumentsBySymbolsAndTimeframe({
         marketStatus,
         symbols: [guardedLiveSymbol],
         timeframe: matchedTimeframe,
       }),
-    );
-    if (guardedLiveInstrument) {
-      return buildLinkedMarketInstrumentContext(guardedLiveInstrument, "guarded_live_context");
+      guardedLive,
+      liveRuns,
+      symbolOrder: [guardedLiveSymbol],
+    });
+    if (guardedLiveSelection) {
+      return buildLinkedMarketInstrumentContext(guardedLiveSelection, "guarded_live_context");
     }
   }
 
   if (matchedSymbols.length) {
-    const symbolInstrument = pickPreferredMarketDataInstrument(
-      resolveInstrumentsBySymbolsAndTimeframe({
+    const symbolSelection = selectPrimaryMarketDataInstrument({
+      candidates: resolveInstrumentsBySymbolsAndTimeframe({
         marketStatus,
         symbols: matchedSymbols,
       }),
-    );
-    if (symbolInstrument) {
-      return buildLinkedMarketInstrumentContext(symbolInstrument, "symbol_match");
+      guardedLive,
+      liveRuns,
+      symbolOrder: matchedSymbols,
+    });
+    if (symbolSelection) {
+      return buildLinkedMarketInstrumentContext(symbolSelection, "symbol_match");
     }
   }
 
@@ -1994,22 +2182,30 @@ function resolveMarketDataInstrumentLink(args: {
         timeframeCandidates = liveScopedCandidates;
       }
     }
-    const timeframeInstrument = pickPreferredMarketDataInstrument(timeframeCandidates);
-    if (timeframeInstrument) {
-      return buildLinkedMarketInstrumentContext(timeframeInstrument, "timeframe_market_data_match");
+    const timeframeSelection = selectPrimaryMarketDataInstrument({
+      candidates: timeframeCandidates,
+      guardedLive,
+      liveRuns,
+      symbolOrder: liveRuns.flatMap((liveRun) => liveRun.config.symbols),
+    });
+    if (timeframeSelection) {
+      return buildLinkedMarketInstrumentContext(timeframeSelection, "timeframe_market_data_match");
     }
   }
 
   if (record.source === "guarded_live" && guardedLiveSymbol) {
-    const guardedLiveInstrument = pickPreferredMarketDataInstrument(
-      resolveInstrumentsBySymbolsAndTimeframe({
+    const guardedLiveSelection = selectPrimaryMarketDataInstrument({
+      candidates: resolveInstrumentsBySymbolsAndTimeframe({
         marketStatus,
         symbols: [guardedLiveSymbol],
         timeframe: guardedLiveTimeframe,
       }),
-    );
-    if (guardedLiveInstrument) {
-      return buildLinkedMarketInstrumentContext(guardedLiveInstrument, "guarded_live_symbol");
+      guardedLive,
+      liveRuns,
+      symbolOrder: [guardedLiveSymbol],
+    });
+    if (guardedLiveSelection) {
+      return buildLinkedMarketInstrumentContext(guardedLiveSelection, "guarded_live_symbol");
     }
   }
 
@@ -2069,7 +2265,7 @@ function resolveAutoLinkedMarketInstrument(args: {
       } => entry.link !== null,
     )
     .sort((left, right) => compareAlertLinkPriority(left.alert, right.alert));
-  return linkedAlerts[0]?.link.instrument ?? null;
+  return linkedAlerts[0]?.link ?? null;
 }
 
 export default function App() {
@@ -2378,7 +2574,7 @@ export default function App() {
       const runtimeRunMap = new Map(
         [...sandboxResponse, ...paperResponse, ...liveResponse].map((run) => [run.config.run_id, run]),
       );
-      const autoLinkedInstrument = resolveAutoLinkedMarketInstrument({
+      const autoLinkedInstrumentLink = resolveAutoLinkedMarketInstrument({
         guardedLive: guardedLiveResponse,
         liveRuns: liveResponse,
         marketStatus: marketResponse,
@@ -2388,7 +2584,8 @@ export default function App() {
       const preferredMarketInstrument = resolvePreferredMarketDataInstrument(
         marketResponse,
         activeMarketInstrumentKey
-        ?? (autoLinkedInstrument ? buildMarketDataInstrumentFocusKey(autoLinkedInstrument) : null),
+        ?? autoLinkedInstrumentLink?.focusKey
+        ?? null,
       );
       setActiveMarketInstrumentKey(
         preferredMarketInstrument
@@ -3411,7 +3608,7 @@ export default function App() {
     [linkedOperatorIncidentEvents],
   );
 
-  const autoLinkedMarketInstrument = useMemo(
+  const autoLinkedMarketInstrumentLink = useMemo(
     () =>
       resolveAutoLinkedMarketInstrument({
         guardedLive,
@@ -3458,6 +3655,26 @@ export default function App() {
     [activeMarketInstrumentFocusKey, linkedOperatorIncidentEvents],
   );
 
+  const focusedMultiSymbolPrimaryLink = useMemo(
+    () =>
+      focusedLinkedOperatorAlerts.find((entry) => (entry.link?.candidateCount ?? 0) > 1)?.link
+      ?? focusedLinkedOperatorIncidentEvents.find((entry) => (entry.link?.candidateCount ?? 0) > 1)?.link
+      ?? focusedLinkedOperatorAlertHistory.find((entry) => (entry.link?.candidateCount ?? 0) > 1)?.link
+      ?? (
+        autoLinkedMarketInstrumentLink?.focusKey === activeMarketInstrumentFocusKey
+        && autoLinkedMarketInstrumentLink.candidateCount > 1
+          ? autoLinkedMarketInstrumentLink
+          : null
+      ),
+    [
+      activeMarketInstrumentFocusKey,
+      autoLinkedMarketInstrumentLink,
+      focusedLinkedOperatorAlertHistory,
+      focusedLinkedOperatorAlerts,
+      focusedLinkedOperatorIncidentEvents,
+    ],
+  );
+
   const focusedMarketIncidentHistory = useMemo(() => {
     if (!activeMarketInstrument) {
       return [] as MarketDataIncidentHistoryEntry[];
@@ -3465,26 +3682,28 @@ export default function App() {
 
     const entries: MarketDataIncidentHistoryEntry[] = [];
 
-    focusedLinkedOperatorAlerts.forEach(({ alert }) => {
+    focusedLinkedOperatorAlerts.forEach(({ alert, link }) => {
+      const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(link);
       entries.push({
         entryId: `alert:${alert.alert_id}`,
         occurredAt: alert.detected_at,
         sourceLabel: "Active alert",
         statusLabel: `${formatWorkflowToken(alert.severity)} / ${formatWorkflowToken(alert.category)}`,
         summary: alert.summary,
-        detail: `${alert.detail} Delivery: ${alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}.`,
+        detail: `${alert.detail} Delivery: ${alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}.${primaryFocusNote ? ` ${primaryFocusNote}` : ""}`,
         tone: alert.severity === "critical" ? "critical" : "warning",
       });
     });
 
-    focusedLinkedOperatorAlertHistory.forEach(({ alert }) => {
+    focusedLinkedOperatorAlertHistory.forEach(({ alert, link }) => {
+      const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(link);
       entries.push({
         entryId: `alert-history:${alert.alert_id}:${alert.status}`,
         occurredAt: alert.resolved_at ?? alert.detected_at,
         sourceLabel: alert.status === "resolved" ? "Resolved alert" : "Alert history",
         statusLabel: `${formatWorkflowToken(alert.status)} / ${formatWorkflowToken(alert.category)}`,
         summary: alert.summary,
-        detail: `${alert.detail} Detected ${formatTimestamp(alert.detected_at)}.`,
+        detail: `${alert.detail} Detected ${formatTimestamp(alert.detected_at)}.${primaryFocusNote ? ` ${primaryFocusNote}` : ""}`,
         tone:
           alert.status === "resolved"
             ? "neutral"
@@ -3494,18 +3713,19 @@ export default function App() {
       });
     });
 
-    focusedLinkedOperatorIncidentEvents.forEach(({ event }) => {
+    focusedLinkedOperatorIncidentEvents.forEach(({ event, link }) => {
       const remediationDetail =
         event.remediation.state !== "not_applicable"
           ? ` Remediation: ${formatWorkflowToken(event.remediation.state)}${event.remediation.summary ? ` / ${event.remediation.summary}` : ""}.`
           : "";
+      const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(link);
       entries.push({
         entryId: `incident:${event.event_id}`,
         occurredAt: event.timestamp,
         sourceLabel: "Incident event",
         statusLabel: `${formatWorkflowToken(event.kind)} / ${formatWorkflowToken(event.severity)}`,
         summary: event.summary,
-        detail: `${event.detail} Ack: ${formatWorkflowToken(event.acknowledgment_state)}. Escalation: level ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail}`,
+        detail: `${event.detail} Ack: ${formatWorkflowToken(event.acknowledgment_state)}. Escalation: level ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail}${primaryFocusNote ? ` ${primaryFocusNote}` : ""}`,
         tone: event.severity === "critical" ? "critical" : "warning",
       });
     });
@@ -3566,12 +3786,13 @@ export default function App() {
       })
       .slice(0, 10);
   }, [
-    activeMarketInstrument,
-    focusedLinkedOperatorAlertHistory,
-    focusedLinkedOperatorAlerts,
-    focusedLinkedOperatorIncidentEvents,
-    marketDataIngestionJobs,
-    marketDataLineageHistory,
+      activeMarketInstrument,
+      focusedMultiSymbolPrimaryLink,
+      focusedLinkedOperatorAlertHistory,
+      focusedLinkedOperatorAlerts,
+      focusedLinkedOperatorIncidentEvents,
+      marketDataIngestionJobs,
+      marketDataLineageHistory,
   ]);
 
   const focusedMarketWorkflowSummary = useMemo(() => {
@@ -4861,10 +5082,15 @@ export default function App() {
                               ? `History load failed: ${marketDataWorkflowError}`
                               : focusedMarketWorkflowSummary?.latestLineage
                                 ? `Latest lineage snapshot recorded ${formatTimestamp(focusedMarketWorkflowSummary.latestLineage.recorded_at)} with ${formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage.validation_claim)} claim. ${focusedMarketWorkflowSummary.linkedAlertCount} active alert(s) and ${focusedMarketWorkflowSummary.linkedIncidentCount} incident event(s) are linked to this focus.`
-                                : autoLinkedMarketInstrument
-                                  ? `Runtime alerts currently resolve to ${resolveMarketDataSymbol(autoLinkedMarketInstrument.instrument_id)} · ${autoLinkedMarketInstrument.timeframe}, but no lineage history has been recorded yet.`
+                                : autoLinkedMarketInstrumentLink
+                                  ? `Runtime alerts currently resolve to ${autoLinkedMarketInstrumentLink.symbol} · ${autoLinkedMarketInstrumentLink.timeframe}, but no lineage history has been recorded yet.`
                                   : "No lineage or ingestion history recorded for the current focus."}
                         </p>
+                        {focusedMultiSymbolPrimaryLink ? (
+                          <p className="market-data-workflow-policy-copy">
+                            Multi-symbol primary focus: {focusedMultiSymbolPrimaryLink.primaryFocusReason} Candidate order: {focusedMultiSymbolPrimaryLink.candidateLabels.join(", ")}.
+                          </p>
+                        ) : null}
                       </div>
                       {incidentFocusedInstruments.length ? (
                         <div className="market-data-workflow-chip-row">
@@ -5079,6 +5305,7 @@ export default function App() {
                         <tbody>
                           {operatorVisibility.alerts.map((alert) => {
                             const linkedInstrument = linkedOperatorAlertById.get(alert.alert_id) ?? null;
+                            const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(linkedInstrument);
                             return (
                               <tr key={alert.alert_id}>
                                 <td>{alert.severity}</td>
@@ -5090,15 +5317,22 @@ export default function App() {
                                     Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
                                   </p>
                                   {linkedInstrument ? (
-                                    <button
-                                      className="market-data-inline-focus-button"
-                                      onClick={() => {
-                                        void handleMarketInstrumentFocus(linkedInstrument.instrument);
-                                      }}
-                                      type="button"
-                                    >
-                                      Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
-                                    </button>
+                                    <>
+                                      <button
+                                        className="market-data-inline-focus-button"
+                                        onClick={() => {
+                                          void handleMarketInstrumentFocus(linkedInstrument.instrument);
+                                        }}
+                                        type="button"
+                                      >
+                                        Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
+                                      </button>
+                                      {primaryFocusNote ? (
+                                        <p className="market-data-inline-focus-note">
+                                          {primaryFocusNote}
+                                        </p>
+                                      ) : null}
+                                    </>
                                   ) : null}
                                 </td>
                                 <td>{formatTimestamp(alert.detected_at)}</td>
@@ -5162,6 +5396,7 @@ export default function App() {
                     <tbody>
                       {operatorVisibility.incident_events.slice(0, 8).map((event) => {
                         const linkedInstrument = linkedOperatorIncidentEventById.get(event.event_id) ?? null;
+                        const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(linkedInstrument);
                         return (
                           <tr key={`incident-${event.event_id}`}>
                             <td>{formatTimestamp(event.timestamp)}</td>
@@ -5206,15 +5441,22 @@ export default function App() {
                                   : ""}
                               </p>
                               {linkedInstrument ? (
-                                <button
-                                  className="market-data-inline-focus-button"
-                                  onClick={() => {
-                                    void handleMarketInstrumentFocus(linkedInstrument.instrument);
-                                  }}
-                                  type="button"
-                                >
-                                  Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
-                                </button>
+                                <>
+                                  <button
+                                    className="market-data-inline-focus-button"
+                                    onClick={() => {
+                                      void handleMarketInstrumentFocus(linkedInstrument.instrument);
+                                    }}
+                                    type="button"
+                                  >
+                                    Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
+                                  </button>
+                                  {primaryFocusNote ? (
+                                    <p className="market-data-inline-focus-note">
+                                      {primaryFocusNote}
+                                    </p>
+                                  ) : null}
+                                </>
                               ) : null}
                               {event.remediation.state !== "not_applicable" ? (
                                 <>
@@ -5319,6 +5561,7 @@ export default function App() {
                     <tbody>
                       {operatorVisibility.alert_history.slice(0, 8).map((alert) => {
                         const linkedInstrument = linkedOperatorAlertHistoryById.get(alert.alert_id) ?? null;
+                        const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(linkedInstrument);
                         return (
                           <tr key={`history-${alert.alert_id}`}>
                             <td>{alert.status}</td>
@@ -5330,15 +5573,22 @@ export default function App() {
                                 Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
                               </p>
                               {linkedInstrument ? (
-                                <button
-                                  className="market-data-inline-focus-button"
-                                  onClick={() => {
-                                    void handleMarketInstrumentFocus(linkedInstrument.instrument);
-                                  }}
-                                  type="button"
-                                >
-                                  Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
-                                </button>
+                                <>
+                                  <button
+                                    className="market-data-inline-focus-button"
+                                    onClick={() => {
+                                      void handleMarketInstrumentFocus(linkedInstrument.instrument);
+                                    }}
+                                    type="button"
+                                  >
+                                    Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
+                                  </button>
+                                  {primaryFocusNote ? (
+                                    <p className="market-data-inline-focus-note">
+                                      {primaryFocusNote}
+                                    </p>
+                                  ) : null}
+                                </>
                               ) : null}
                             </td>
                             <td>{formatTimestamp(alert.detected_at)}</td>

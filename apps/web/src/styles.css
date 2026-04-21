@@ -2349,6 +2349,14 @@ select {
   font-size: 0.82rem;
 }
 
+.market-data-workflow-policy-copy {
+  margin: 0;
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .market-data-workflow-chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -2371,6 +2379,14 @@ select {
 .market-data-inline-focus-button:hover {
   transform: translateY(-1px);
   background: rgba(19, 117, 236, 0.12);
+}
+
+.market-data-inline-focus-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 .market-data-incident-badge {

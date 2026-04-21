@@ -17,6 +17,8 @@ unclear dataset lineage.
 - control-room triage workflow that binds the currently selected instrument to lineage and
   ingestion history review, auto-links runtime alerts into that focus, and keeps a merged lineage
   incident history in view
+- multi-symbol alerts resolve to one explicit primary triage focus using instrument risk,
+  live-session relevance, payload symbol order, and stable fallback, and the control room shows why
 - operator and guarded-live alert payloads now carry normalized symbol/timeframe context when the
   runtime knows it
 - run provenance and rerun-boundary views
@@ -28,6 +30,8 @@ unclear dataset lineage.
 ## Triage
 
 1. Identify the affected venue, symbol set, and timeframe.
+   If one alert covers multiple symbols, use the control-room primary-focus note as the initial
+   review anchor rather than guessing the lead symbol.
 2. Determine whether the issue is freshness, gap coverage, repeated failure, or lineage ambiguity.
 3. Determine whether any active sandbox, paper, or guarded-live sessions depend on the affected data.
 4. Separate one-off lag from a true incident. Repeated failure or unclear lineage is an incident.
