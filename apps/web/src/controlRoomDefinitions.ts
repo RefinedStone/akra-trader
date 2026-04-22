@@ -1315,6 +1315,13 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     top_score: number;
     max_term_coverage_pct: number;
     phrase_match_count: number;
+    operator_count: number;
+    semantic_concept_count: number;
+    negated_term_count: number;
+    parsed_terms: string[];
+    parsed_phrases: string[];
+    parsed_operators: string[];
+    semantic_concepts: string[];
   } | null;
   items: (OperatorAlertEntry & {
     narrative: {
@@ -1333,11 +1340,17 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     search_match?: {
       score: number;
       matched_terms: string[];
+      matched_phrases: string[];
       matched_fields: string[];
       term_coverage_pct: number;
       phrase_match: boolean;
       exact_match: boolean;
       highlights: string[];
+      semantic_concepts: string[];
+      operator_hits: string[];
+      lexical_score: number;
+      semantic_score: number;
+      operator_score: number;
       ranking_reason?: string | null;
     } | null;
   })[];

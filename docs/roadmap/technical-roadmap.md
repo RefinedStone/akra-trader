@@ -164,6 +164,9 @@ creation.
 - that same scheduler search surface now also computes weighted retrieval ranking plus matched
   field highlights, so future narrative-review tooling can sort and explain scheduler matches
   instead of only returning an unranked filtered occurrence set
+- that same search surface now also parses advanced query operators and semantic scheduler
+  concepts, so future narrative tooling can build on server-side filtered intent retrieval rather
+  than a single free-text substring layer
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

@@ -13,6 +13,7 @@ import io
 import json
 from numbers import Number
 import re
+import shlex
 from threading import Lock
 from typing import Any
 from typing import Callable
@@ -36654,11 +36655,13 @@ class TradingApplication:
     ) is not None
 
   @staticmethod
-  def _tokenize_provider_provenance_scheduler_alert_search_query(
-    search: str,
-  ) -> tuple[str, ...]:
-    tokens = tuple(dict.fromkeys(re.findall(r"[a-z0-9:_./-]+", search.lower())))
-    return tokens or ((search.strip().lower(),) if search.strip() else ())
+  def _normalize_provider_provenance_scheduler_alert_search_text(
+    value: str | None,
+  ) -> str | None:
+    if not isinstance(value, str):
+      return None
+    normalized = " ".join(value.strip().lower().split())
+    return normalized or None
 
   @staticmethod
   def _truncate_provider_provenance_scheduler_search_highlight(
@@ -36670,6 +36673,312 @@ class TradingApplication:
     if len(normalized) <= max_length:
       return normalized
     return f"{normalized[:max_length - 1].rstrip()}…"
+
+  @staticmethod
+  def _canonicalize_provider_provenance_scheduler_alert_search_keyword(
+    value: str | None,
+  ) -> str | None:
+    if not isinstance(value, str):
+      return None
+    normalized = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    return normalized or None
+
+  @staticmethod
+  def _provider_provenance_scheduler_alert_search_semantic_alias_groups(
+  ) -> dict[str, tuple[str, ...]]:
+    return {
+      "lag": ("lag", "lagging", "delayed", "late", "overdue", "behind", "backlog", "stale"),
+      "failure": (
+        "failure",
+        "failed",
+        "error",
+        "errors",
+        "fault",
+        "faulted",
+        "broken",
+        "crash",
+        "crashed",
+        "unhealthy",
+      ),
+      "recovery": (
+        "recovery",
+        "recover",
+        "recovered",
+        "restored",
+        "stabilized",
+        "stabilised",
+        "healed",
+        "caught_up",
+      ),
+      "post_resolution": (
+        "post_resolution",
+        "post-resolution",
+        "after_resolution",
+        "after-resolution",
+        "recovery_window",
+      ),
+      "recurring": ("recurring", "recurred", "repeat", "repeated", "again", "flapping"),
+      "active": ("active", "open", "ongoing", "current"),
+      "resolved": ("resolved", "closed", "ended", "cleared"),
+      "healthy": ("healthy", "stable", "nominal"),
+      "focus": ("focus", "focused", "primary_focus", "primary-focus", "targeted"),
+    }
+
+  @classmethod
+  def _normalize_provider_provenance_scheduler_alert_search_semantic_concept(
+    cls,
+    value: str | None,
+  ) -> str | None:
+    normalized = cls._canonicalize_provider_provenance_scheduler_alert_search_keyword(value)
+    if normalized is None:
+      return None
+    lookup: dict[str, str] = {}
+    for concept, aliases in cls._provider_provenance_scheduler_alert_search_semantic_alias_groups().items():
+      lookup[cls._canonicalize_provider_provenance_scheduler_alert_search_keyword(concept) or concept] = concept
+      for alias in aliases:
+        canonical_alias = cls._canonicalize_provider_provenance_scheduler_alert_search_keyword(alias)
+        if canonical_alias is not None:
+          lookup[canonical_alias] = concept
+    return lookup.get(normalized)
+
+  @classmethod
+  def _tokenize_provider_provenance_scheduler_alert_search_query(
+    cls,
+    search: str,
+  ) -> tuple[str, ...]:
+    tokens = tuple(
+      dict.fromkeys(
+        fragment
+        for token in re.findall(r"[a-z0-9:_./-]+", search.lower())
+        for fragment in (
+          cls._normalize_provider_provenance_scheduler_alert_search_text(token),
+        )
+        if fragment is not None
+      )
+    )
+    return tokens or ((search.strip().lower(),) if search.strip() else ())
+
+  @classmethod
+  def _normalize_provider_provenance_scheduler_alert_search_operator_field(
+    cls,
+    value: str | None,
+  ) -> str | None:
+    normalized = cls._canonicalize_provider_provenance_scheduler_alert_search_keyword(value)
+    if normalized is None:
+      return None
+    aliases = {
+      "category": "category",
+      "cat": "category",
+      "status": "status",
+      "facet": "facet",
+      "mode": "mode",
+      "symbol": "symbol",
+      "sym": "symbol",
+      "timeframe": "timeframe",
+      "tf": "timeframe",
+      "severity": "severity",
+      "source": "source",
+      "focus": "focus",
+      "sequence": "sequence",
+      "seq": "sequence",
+      "concept": "concept",
+      "semantic": "concept",
+      "has": "has",
+      "occurrence": "occurrence",
+      "id": "occurrence",
+      "text": "text",
+      "summary": "text",
+    }
+    return aliases.get(normalized)
+
+  @classmethod
+  def _normalize_provider_provenance_scheduler_alert_search_operator_value(
+    cls,
+    *,
+    field: str,
+    value: str,
+  ) -> str | None:
+    normalized_text = cls._normalize_provider_provenance_scheduler_alert_search_text(value)
+    if normalized_text is None:
+      return None
+    normalized_keyword = cls._canonicalize_provider_provenance_scheduler_alert_search_keyword(value)
+    if field == "category":
+      if normalized_keyword in {"lag", "lagging", "scheduler_lag"}:
+        return "scheduler_lag"
+      if normalized_keyword in {"failure", "failed", "error", "errors", "scheduler_failure"}:
+        return "scheduler_failure"
+      return normalized_text
+    if field == "status":
+      if normalized_keyword in {"active", "open", "ongoing", "current"}:
+        return "active"
+      if normalized_keyword in {"resolved", "closed", "ended"}:
+        return "resolved"
+      return normalized_text
+    if field == "facet":
+      if normalized_keyword in {"resolved", "resolved_narrative", "resolved_narratives"}:
+        return "resolved_narratives"
+      if normalized_keyword in {
+        "post_resolution",
+        "post_resolution_recovery",
+        "post_resolution_history",
+        "recovery",
+      }:
+        return "post_resolution_recovery"
+      if normalized_keyword in {"recurring", "recurring_occurrence", "recurring_occurrences"}:
+        return "recurring_occurrences"
+      if normalized_keyword in {"all", "all_occurrences"}:
+        return "all_occurrences"
+      return normalized_text
+    if field == "concept":
+      return cls._normalize_provider_provenance_scheduler_alert_search_semantic_concept(value)
+    if field == "has":
+      if normalized_keyword in {"post_resolution", "recovery", "post_resolution_recovery"}:
+        return "post_resolution"
+      if normalized_keyword in {"recurring", "recurring_occurrence"}:
+        return "recurring"
+      if normalized_keyword in {"primary_focus", "focus"}:
+        return "primary_focus"
+      if normalized_keyword in {"active", "resolved"}:
+        return normalized_keyword
+      return normalized_text
+    return normalized_text
+
+  @classmethod
+  def _parse_provider_provenance_scheduler_alert_search_query(
+    cls,
+    search: str | None,
+  ) -> dict[str, Any]:
+    if not isinstance(search, str) or not search.strip():
+      return {
+        "query": None,
+        "terms": (),
+        "phrases": (),
+        "excluded_terms": (),
+        "excluded_phrases": (),
+        "operators": (),
+        "semantic_concepts": (),
+        "excluded_semantic_concepts": (),
+      }
+    normalized_query = search.strip()
+    try:
+      raw_parts = tuple(shlex.split(normalized_query))
+    except ValueError:
+      raw_parts = tuple(
+        part.strip().strip("\"'")
+        for part in re.findall(r'"[^"]+"|\'[^\']+\'|\S+', normalized_query)
+        if part.strip().strip("\"'")
+      )
+    terms: list[str] = []
+    phrases: list[str] = []
+    excluded_terms: list[str] = []
+    excluded_phrases: list[str] = []
+    operators: list[dict[str, Any]] = []
+    for part in raw_parts:
+      negated = part.startswith(("-", "!"))
+      body = part[1:] if negated else part
+      if ":" in body:
+        raw_field, raw_value = body.split(":", 1)
+        normalized_field = cls._normalize_provider_provenance_scheduler_alert_search_operator_field(raw_field)
+        normalized_value = cls._normalize_provider_provenance_scheduler_alert_search_operator_value(
+          field=normalized_field or "",
+          value=raw_value,
+        ) if normalized_field is not None else None
+        if normalized_field is not None and normalized_value is not None:
+          operators.append(
+            {
+              "field": normalized_field,
+              "value": normalized_value,
+              "negated": negated,
+              "raw": f"{'-' if negated else ''}{normalized_field}:{normalized_value}",
+            }
+          )
+          continue
+      normalized_body = cls._normalize_provider_provenance_scheduler_alert_search_text(body)
+      if normalized_body is None:
+        continue
+      target = excluded_phrases if negated and " " in normalized_body else (
+        excluded_terms if negated else (phrases if " " in normalized_body else terms)
+      )
+      target.append(normalized_body)
+    semantic_concepts = tuple(
+      dict.fromkeys(
+        concept
+        for value in (*terms, *phrases)
+        for concept in (cls._normalize_provider_provenance_scheduler_alert_search_semantic_concept(value),)
+        if concept is not None
+      )
+    )
+    excluded_semantic_concepts = tuple(
+      dict.fromkeys(
+        concept
+        for value in (*excluded_terms, *excluded_phrases)
+        for concept in (cls._normalize_provider_provenance_scheduler_alert_search_semantic_concept(value),)
+        if concept is not None
+      )
+    )
+    return {
+      "query": normalized_query,
+      "terms": tuple(dict.fromkeys(terms)),
+      "phrases": tuple(dict.fromkeys(phrases)),
+      "excluded_terms": tuple(dict.fromkeys(excluded_terms)),
+      "excluded_phrases": tuple(dict.fromkeys(excluded_phrases)),
+      "operators": tuple(operators),
+      "semantic_concepts": semantic_concepts,
+      "excluded_semantic_concepts": excluded_semantic_concepts,
+    }
+
+  @classmethod
+  def _build_provider_provenance_scheduler_alert_occurrence_semantic_concepts(
+    cls,
+    *,
+    row: Mapping[str, Any],
+  ) -> tuple[str, ...]:
+    alert = row.get("alert")
+    narrative = row.get("narrative")
+    if not isinstance(alert, OperatorAlert):
+      return ()
+    status_sequence = tuple(narrative.get("status_sequence", ()) or ()) if isinstance(narrative, Mapping) else ()
+    post_resolution_status_sequence = (
+      tuple(narrative.get("post_resolution_status_sequence", ()) or ())
+      if isinstance(narrative, Mapping)
+      else ()
+    )
+    facet_flags = tuple(narrative.get("facet_flags", ()) or ()) if isinstance(narrative, Mapping) else ()
+    concepts: list[str] = []
+    if alert.category == "scheduler_lag":
+      concepts.append("lag")
+    if alert.category == "scheduler_failure":
+      concepts.append("failure")
+    if alert.status == "active":
+      concepts.append("active")
+    if alert.status == "resolved":
+      concepts.append("resolved")
+    if alert.primary_focus is not None:
+      concepts.append("focus")
+    if "healthy" in status_sequence or "healthy" in post_resolution_status_sequence:
+      concepts.append("healthy")
+    if isinstance(narrative, Mapping) and narrative.get("has_post_resolution_history"):
+      concepts.extend(("recovery", "post_resolution"))
+    if "recurring_occurrence" in facet_flags:
+      concepts.append("recurring")
+    if (
+      ("lagging" in status_sequence or "failed" in status_sequence)
+      and "healthy" in post_resolution_status_sequence
+    ):
+      concepts.append("recovery")
+    return tuple(dict.fromkeys(concepts))
+
+  @classmethod
+  def _build_provider_provenance_scheduler_alert_occurrence_semantic_values(
+    cls,
+    *,
+    row: Mapping[str, Any],
+  ) -> tuple[str, ...]:
+    values: list[str] = []
+    for concept in cls._build_provider_provenance_scheduler_alert_occurrence_semantic_concepts(row=row):
+      values.append(concept)
+      values.extend(cls._provider_provenance_scheduler_alert_search_semantic_alias_groups().get(concept, ()))
+    return tuple(dict.fromkeys(value for value in values if isinstance(value, str) and value.strip()))
 
   @classmethod
   def _build_provider_provenance_scheduler_alert_occurrence_search_fields(
@@ -36689,6 +36998,7 @@ class TradingApplication:
       if isinstance(narrative, Mapping)
       else ()
     )
+    semantic_values = cls._build_provider_provenance_scheduler_alert_occurrence_semantic_values(row=row)
     return (
       (
         "occurrence_id",
@@ -36766,6 +37076,11 @@ class TradingApplication:
         ),
       ),
       (
+        "semantic",
+        135,
+        semantic_values,
+      ),
+      (
         "classification",
         90,
         tuple(
@@ -36799,6 +37114,125 @@ class TradingApplication:
     )
 
   @classmethod
+  def _build_provider_provenance_scheduler_alert_occurrence_operator_fields(
+    cls,
+    *,
+    row: Mapping[str, Any],
+  ) -> dict[str, tuple[str, ...]]:
+    alert = row.get("alert")
+    narrative = row.get("narrative")
+    if not isinstance(alert, OperatorAlert):
+      return {}
+    primary_focus = alert.primary_focus
+    facet_flags = tuple(narrative.get("facet_flags", ()) or ()) if isinstance(narrative, Mapping) else ()
+    status_sequence = tuple(narrative.get("status_sequence", ()) or ()) if isinstance(narrative, Mapping) else ()
+    post_resolution_status_sequence = (
+      tuple(narrative.get("post_resolution_status_sequence", ()) or ())
+      if isinstance(narrative, Mapping)
+      else ()
+    )
+    has_flags: list[str] = []
+    if isinstance(narrative, Mapping) and narrative.get("has_post_resolution_history"):
+      has_flags.append("post_resolution")
+    if "recurring_occurrence" in facet_flags:
+      has_flags.append("recurring")
+    if primary_focus is not None:
+      has_flags.extend(("primary_focus", "focus"))
+    if alert.status in {"active", "resolved"}:
+      has_flags.append(alert.status)
+    field_values = {
+      "occurrence": (
+        alert.occurrence_id,
+        alert.alert_id,
+      ),
+      "category": (
+        alert.category,
+        "scheduler_lag" if alert.category == "scheduler_lag" else None,
+        "scheduler_failure" if alert.category == "scheduler_failure" else None,
+        "lag" if alert.category == "scheduler_lag" else None,
+        "failure" if alert.category == "scheduler_failure" else None,
+      ),
+      "status": (alert.status,),
+      "facet": (
+        narrative.get("facet") if isinstance(narrative, Mapping) else None,
+        *facet_flags,
+        "resolved_narratives"
+        if isinstance(narrative, Mapping) and narrative.get("can_reconstruct_narrative")
+        else None,
+        "post_resolution_recovery"
+        if isinstance(narrative, Mapping) and narrative.get("has_post_resolution_history")
+        else None,
+        "recurring_occurrences" if "recurring_occurrence" in facet_flags else None,
+        "all_occurrences",
+      ),
+      "mode": (narrative.get("narrative_mode") if isinstance(narrative, Mapping) else None,),
+      "symbol": (
+        alert.symbol,
+        *alert.symbols,
+        primary_focus.symbol if primary_focus is not None else None,
+        *(primary_focus.candidate_symbols if primary_focus is not None else ()),
+      ),
+      "timeframe": (
+        alert.timeframe,
+        primary_focus.timeframe if primary_focus is not None else None,
+      ),
+      "severity": (alert.severity,),
+      "source": (alert.source,),
+      "focus": (
+        primary_focus.symbol if primary_focus is not None else None,
+        primary_focus.timeframe if primary_focus is not None else None,
+        primary_focus.policy if primary_focus is not None else None,
+        primary_focus.reason if primary_focus is not None else None,
+        *(primary_focus.candidate_symbols if primary_focus is not None else ()),
+      ),
+      "sequence": (
+        *status_sequence,
+        " ".join(status_sequence) if status_sequence else None,
+        " -> ".join(status_sequence) if status_sequence else None,
+        *post_resolution_status_sequence,
+        " ".join(post_resolution_status_sequence) if post_resolution_status_sequence else None,
+        " -> ".join(post_resolution_status_sequence) if post_resolution_status_sequence else None,
+      ),
+      "concept": cls._build_provider_provenance_scheduler_alert_occurrence_semantic_concepts(row=row),
+      "has": tuple(has_flags),
+      "text": (alert.summary, alert.detail),
+    }
+    return {
+      field: tuple(
+        dict.fromkeys(
+          normalized
+          for raw_value in values
+          for normalized in (
+            cls._normalize_provider_provenance_scheduler_alert_search_operator_value(
+              field=field,
+              value=raw_value,
+            ) if isinstance(raw_value, str) and raw_value.strip() else None,
+          )
+          if normalized is not None
+        )
+      )
+      for field, values in field_values.items()
+    }
+
+  @classmethod
+  def _match_provider_provenance_scheduler_alert_occurrence_operator(
+    cls,
+    *,
+    row: Mapping[str, Any],
+    operator: Mapping[str, Any],
+  ) -> tuple[str, ...]:
+    field = operator.get("field")
+    value = operator.get("value")
+    if not isinstance(field, str) or not isinstance(value, str):
+      return ()
+    candidates = cls._build_provider_provenance_scheduler_alert_occurrence_operator_fields(
+      row=row
+    ).get(field, ())
+    if field in {"category", "status", "facet", "mode", "severity", "concept", "has", "timeframe"}:
+      return tuple(candidate for candidate in candidates if candidate == value)
+    return tuple(candidate for candidate in candidates if value in candidate)
+
+  @classmethod
   def _build_provider_provenance_scheduler_alert_occurrence_search_match(
     cls,
     *,
@@ -36807,41 +37241,91 @@ class TradingApplication:
   ) -> dict[str, Any] | None:
     if not isinstance(search, str) or not search.strip():
       return None
-    normalized_search = search.strip().lower()
-    tokens = cls._tokenize_provider_provenance_scheduler_alert_search_query(normalized_search)
-    if not tokens:
+    parsed_query = cls._parse_provider_provenance_scheduler_alert_search_query(search)
+    terms = parsed_query["terms"]
+    phrases = parsed_query["phrases"]
+    excluded_terms = parsed_query["excluded_terms"]
+    excluded_phrases = parsed_query["excluded_phrases"]
+    operators = parsed_query["operators"]
+    semantic_query_concepts = parsed_query["semantic_concepts"]
+    if not any((terms, phrases, excluded_terms, excluded_phrases, operators, semantic_query_concepts)):
+      return None
+    search_fields = cls._build_provider_provenance_scheduler_alert_occurrence_search_fields(row=row)
+    normalized_field_values = tuple(
+      (field_name, field_weight, raw_value, normalized_value)
+      for field_name, field_weight, field_values in search_fields
+      for raw_value in field_values
+      for normalized_value in (
+        cls._normalize_provider_provenance_scheduler_alert_search_text(raw_value),
+      )
+      if normalized_value is not None
+    )
+    for excluded_fragment in (*excluded_terms, *excluded_phrases):
+      if any(excluded_fragment in normalized_value for _, _, _, normalized_value in normalized_field_values):
+        return None
+    excluded_semantic_concepts = parsed_query["excluded_semantic_concepts"]
+    row_semantic_concepts = cls._build_provider_provenance_scheduler_alert_occurrence_semantic_concepts(row=row)
+    if excluded_semantic_concepts and any(
+      concept in row_semantic_concepts for concept in excluded_semantic_concepts
+    ):
       return None
     matched_terms: set[str] = set()
+    matched_phrases: set[str] = set()
     matched_fields: list[str] = []
     highlights: list[str] = []
-    score = 0
+    lexical_score = 0
+    operator_score = 0
+    semantic_score = 0
     phrase_match = False
     exact_match = False
     field_hits = 0
-    for field_name, field_weight, field_values in (
-      cls._build_provider_provenance_scheduler_alert_occurrence_search_fields(row=row)
-    ):
+    operator_hits: list[str] = []
+    for operator in operators:
+      matched_candidates = cls._match_provider_provenance_scheduler_alert_occurrence_operator(
+        row=row,
+        operator=operator,
+      )
+      if operator.get("negated"):
+        if matched_candidates:
+          return None
+        continue
+      if not matched_candidates:
+        return None
+      operator_label = f"{operator['field']}:{operator['value']}"
+      operator_hits.append(operator_label)
+      operator_score += 160 + (15 * min(len(matched_candidates), 2))
+      if len(highlights) < 3:
+        highlights.append(
+          f"operator {operator_label}: "
+          f"{cls._truncate_provider_provenance_scheduler_search_highlight(matched_candidates[0])}"
+        )
+    for field_name, field_weight, field_values in search_fields:
       best_field_score = 0
       best_field_highlight: str | None = None
       field_matched_terms: set[str] = set()
+      field_matched_phrases: set[str] = set()
       field_phrase_match = False
       field_exact_match = False
       for raw_value in field_values:
-        normalized_value = raw_value.strip().lower()
-        if not normalized_value:
+        normalized_value = cls._normalize_provider_provenance_scheduler_alert_search_text(raw_value)
+        if normalized_value is None:
           continue
         value_score = 0
-        if normalized_search == normalized_value:
-          value_score += field_weight * 5
-          field_exact_match = True
-          field_phrase_match = True
-        elif normalized_search in normalized_value:
-          value_score += field_weight * 3
-          field_phrase_match = True
-        for token in tokens:
+        for phrase in phrases:
+          if phrase == normalized_value:
+            value_score += field_weight * 4
+            field_matched_phrases.add(phrase)
+            field_phrase_match = True
+            field_exact_match = True
+          elif phrase in normalized_value:
+            value_score += field_weight * 3
+            field_matched_phrases.add(phrase)
+            field_phrase_match = True
+        for token in terms:
           if token == normalized_value:
             value_score += field_weight * 3
             field_matched_terms.add(token)
+            field_exact_match = True
           elif normalized_value.startswith(token):
             value_score += field_weight * 2
             field_matched_terms.add(token)
@@ -36857,6 +37341,7 @@ class TradingApplication:
         continue
       field_hits += 1
       matched_terms.update(field_matched_terms)
+      matched_phrases.update(field_matched_phrases)
       matched_fields.append(field_name)
       if best_field_highlight is not None and best_field_highlight not in highlights:
         highlights.append(best_field_highlight)
@@ -36864,10 +37349,24 @@ class TradingApplication:
         phrase_match = True
       if field_exact_match:
         exact_match = True
-      score += best_field_score
+      lexical_score += best_field_score
+    semantic_hits = tuple(
+      concept for concept in semantic_query_concepts if concept in row_semantic_concepts
+    )
+    if semantic_hits:
+      semantic_score += 110 * len(semantic_hits)
+      if len(highlights) < 3:
+        highlights.append(f"semantic: {', '.join(semantic_hits)}")
+    if terms and not matched_terms and not semantic_hits:
+      return None
+    if phrases and not matched_phrases:
+      return None
+    score = lexical_score + semantic_score + operator_score
     if score <= 0:
       return None
-    coverage = len(matched_terms) / len(tokens)
+    lexical_unit_total = len(terms) + len(phrases)
+    lexical_units_matched = len(matched_terms) + len(matched_phrases)
+    coverage = lexical_units_matched / lexical_unit_total if lexical_unit_total > 0 else 1.0
     coverage_pct = int(round(coverage * 100))
     score += coverage_pct * 2
     score += field_hits * 5
@@ -36880,16 +37379,29 @@ class TradingApplication:
       ranking_reason_parts.append("exact field match")
     elif phrase_match:
       ranking_reason_parts.append("phrase match")
-    ranking_reason_parts.append(f"{len(matched_terms)} of {len(tokens)} term(s) matched")
+    if operator_hits:
+      ranking_reason_parts.append(f"{len(operator_hits)} operator(s) satisfied")
+    if semantic_hits:
+      ranking_reason_parts.append(f"semantic hit: {', '.join(semantic_hits)}")
+    if lexical_unit_total > 0:
+      ranking_reason_parts.append(
+        f"{lexical_units_matched} of {lexical_unit_total} lexical unit(s) matched"
+      )
     ranking_reason_parts.append(f"{field_hits} ranked field(s)")
     return {
       "score": score,
       "matched_terms": tuple(sorted(matched_terms)),
+      "matched_phrases": tuple(sorted(matched_phrases)),
       "matched_fields": tuple(matched_fields),
       "term_coverage_pct": coverage_pct,
       "phrase_match": phrase_match,
       "exact_match": exact_match,
       "highlights": tuple(highlights[:3]),
+      "semantic_concepts": semantic_hits,
+      "operator_hits": tuple(operator_hits),
+      "lexical_score": lexical_score,
+      "semantic_score": semantic_score,
+      "operator_score": operator_score,
       "ranking_reason": " · ".join(ranking_reason_parts),
     }
 
@@ -37246,12 +37758,11 @@ class TradingApplication:
     )
     search_summary = None
     if normalized_search is not None:
+      parsed_search = self._parse_provider_provenance_scheduler_alert_search_query(normalized_search)
       search_summary = {
         "query": normalized_search,
-        "mode": "weighted_field_ranking",
-        "token_count": len(
-          self._tokenize_provider_provenance_scheduler_alert_search_query(normalized_search)
-        ),
+        "mode": "advanced_query_semantic_ranking",
+        "token_count": len(parsed_search.get("terms", ())) + len(parsed_search.get("phrases", ())),
         "matched_occurrences": total,
         "top_score": max(
           (int(row.get("search_match", {}).get("score", 0)) for row in filtered_history),
@@ -37267,6 +37778,19 @@ class TradingApplication:
         "phrase_match_count": sum(
           1 for row in filtered_history if bool(row.get("search_match", {}).get("phrase_match"))
         ),
+        "operator_count": len(parsed_search.get("operators", ())),
+        "semantic_concept_count": len(parsed_search.get("semantic_concepts", ())),
+        "negated_term_count": len(parsed_search.get("excluded_terms", ()))
+        + len(parsed_search.get("excluded_phrases", ()))
+        + sum(1 for operator in parsed_search.get("operators", ()) if operator.get("negated")),
+        "parsed_terms": tuple(parsed_search.get("terms", ())),
+        "parsed_phrases": tuple(parsed_search.get("phrases", ())),
+        "parsed_operators": tuple(
+          operator.get("raw")
+          for operator in parsed_search.get("operators", ())
+          if isinstance(operator.get("raw"), str)
+        ),
+        "semantic_concepts": tuple(parsed_search.get("semantic_concepts", ())),
       }
     return {
       "generated_at": current_time,
@@ -41423,6 +41947,15 @@ def serialize_provider_provenance_scheduler_alert_history(
           payload.get("search_summary", {}).get("max_term_coverage_pct", 0)
         ),
         "phrase_match_count": int(payload.get("search_summary", {}).get("phrase_match_count", 0)),
+        "operator_count": int(payload.get("search_summary", {}).get("operator_count", 0)),
+        "semantic_concept_count": int(
+          payload.get("search_summary", {}).get("semantic_concept_count", 0)
+        ),
+        "negated_term_count": int(payload.get("search_summary", {}).get("negated_term_count", 0)),
+        "parsed_terms": list(payload.get("search_summary", {}).get("parsed_terms", ())),
+        "parsed_phrases": list(payload.get("search_summary", {}).get("parsed_phrases", ())),
+        "parsed_operators": list(payload.get("search_summary", {}).get("parsed_operators", ())),
+        "semantic_concepts": list(payload.get("search_summary", {}).get("semantic_concepts", ())),
       }
       if isinstance(payload.get("search_summary"), dict)
       else None
@@ -41495,11 +42028,17 @@ def serialize_provider_provenance_scheduler_alert_history(
           {
             "score": int(item.get("search_match", {}).get("score", 0)),
             "matched_terms": list(item.get("search_match", {}).get("matched_terms", ())),
+            "matched_phrases": list(item.get("search_match", {}).get("matched_phrases", ())),
             "matched_fields": list(item.get("search_match", {}).get("matched_fields", ())),
             "term_coverage_pct": int(item.get("search_match", {}).get("term_coverage_pct", 0)),
             "phrase_match": bool(item.get("search_match", {}).get("phrase_match", False)),
             "exact_match": bool(item.get("search_match", {}).get("exact_match", False)),
             "highlights": list(item.get("search_match", {}).get("highlights", ())),
+            "semantic_concepts": list(item.get("search_match", {}).get("semantic_concepts", ())),
+            "operator_hits": list(item.get("search_match", {}).get("operator_hits", ())),
+            "lexical_score": int(item.get("search_match", {}).get("lexical_score", 0)),
+            "semantic_score": int(item.get("search_match", {}).get("semantic_score", 0)),
+            "operator_score": int(item.get("search_match", {}).get("operator_score", 0)),
             "ranking_reason": item.get("search_match", {}).get("ranking_reason"),
           }
           if isinstance(item, dict) and isinstance(item.get("search_match"), dict)

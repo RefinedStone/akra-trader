@@ -116,6 +116,9 @@ unclear dataset lineage.
 - that same scheduler occurrence search now also exposes weighted ranking metadata and highlights,
   so incident review can explain why a given lag/failure narrative matched the current query
   before a stitched export is handed to the next operator
+- that search path now also accepts advanced operators and semantic retrieval hints, so an
+  operator can narrow narrative review with queries such as
+  `status:resolved recovered -category:failure` before handing off a stitched report
 - those saved scheduler narrative templates and boards now also support edit, delete, and
   revision-restore workflow, so teams can correct or retire shared review lenses without losing
   the previous incident-handoff snapshot

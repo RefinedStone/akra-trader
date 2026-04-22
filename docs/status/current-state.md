@@ -219,6 +219,9 @@ It is not yet a finished live trading product:
 - that same scheduler occurrence search now also returns weighted retrieval ranking, matched
   fields, and search highlights, so operators can see why one narrative ranked above another
   instead of treating the timeline as a flat substring-filtered list
+- that same scheduler occurrence search now also supports advanced query operators and semantic
+  retrieval over scheduler narrative concepts, so operators can search with filters like
+  `status:resolved recovered -category:failure` instead of relying on raw substring matching alone
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

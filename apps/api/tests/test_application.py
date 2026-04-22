@@ -1933,21 +1933,24 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
     binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
     app=app,
     filters={
-      "search": "healthy",
+      "search": "status:resolved recovered -category:failure",
       "limit": 10,
       "offset": 0,
     },
   )
-  assert search_payload["query"]["search"] == "healthy"
-  assert search_payload["search_summary"]["mode"] == "weighted_field_ranking"
+  assert search_payload["query"]["search"] == "status:resolved recovered -category:failure"
+  assert search_payload["search_summary"]["mode"] == "advanced_query_semantic_ranking"
   assert search_payload["search_summary"]["top_score"] > 0
+  assert search_payload["search_summary"]["operator_count"] == 2
+  assert "recovery" in search_payload["search_summary"]["semantic_concepts"]
   assert search_payload["returned"] >= 1
   assert any(
     item["narrative"]["has_post_resolution_history"]
     for item in search_payload["items"]
   )
   assert search_payload["items"][0]["search_match"]["score"] > 0
-  assert "status_sequence" in search_payload["items"][0]["search_match"]["matched_fields"]
+  assert "status:resolved" in search_payload["items"][0]["search_match"]["operator_hits"]
+  assert "recovery" in search_payload["items"][0]["search_match"]["semantic_concepts"]
 
 
 def test_provider_provenance_scheduler_history_and_analytics_persist(

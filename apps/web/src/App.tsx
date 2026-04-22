@@ -661,7 +661,13 @@ function formatProviderProvenanceSchedulerSearchMatchSummary(
   if (!searchMatch) {
     return null;
   }
-  return `Search score ${searchMatch.score} · ${searchMatch.term_coverage_pct}% coverage · ${searchMatch.matched_fields.join(", ") || "ranked fields"}`;
+  const operatorSummary = searchMatch.operator_hits.length
+    ? ` · ops ${searchMatch.operator_hits.length}`
+    : "";
+  const semanticSummary = searchMatch.semantic_concepts.length
+    ? ` · semantic ${searchMatch.semantic_concepts.join(", ")}`
+    : "";
+  return `Search score ${searchMatch.score} · ${searchMatch.term_coverage_pct}% coverage · ${searchMatch.matched_fields.join(", ") || "ranked fields"}${operatorSummary}${semanticSummary}`;
 }
 
 function buildProviderProvenanceSchedulerAlertWorkflowReason(
@@ -18908,6 +18914,11 @@ export default function App() {
                                         Search ranked · {providerProvenanceSchedulerAlertHistory.search_summary.matched_occurrences} match(es) · top {providerProvenanceSchedulerAlertHistory.search_summary.top_score}
                                       </span>
                                     ) : null}
+                                    {providerProvenanceSchedulerAlertHistory?.search_summary?.operator_count ? (
+                                      <span className="run-filter-summary-chip">
+                                        Operators {providerProvenanceSchedulerAlertHistory.search_summary.operator_count} · semantic {providerProvenanceSchedulerAlertHistory.search_summary.semantic_concept_count}
+                                      </span>
+                                    ) : null}
                                   </div>
                                   <div className="market-data-provenance-history-actions">
                                     <label className="run-form-field">
@@ -18986,7 +18997,7 @@ export default function App() {
                                           }));
                                           setProviderProvenanceSchedulerAlertHistoryOffset(0);
                                         }}
-                                        placeholder="occurrence, symbol, status sequence"
+                                        placeholder='status:resolved recovered -category:failure "lagging -> healthy"'
                                         type="search"
                                         value={providerProvenanceAnalyticsQuery.search_query}
                                       />
@@ -19142,6 +19153,16 @@ export default function App() {
                                                 {alert.search_match?.highlights.length ? (
                                                   <p className="run-lineage-symbol-copy">
                                                     Match {alert.search_match.highlights.join(" · ")}
+                                                  </p>
+                                                ) : null}
+                                                {alert.search_match?.operator_hits.length ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Operators {alert.search_match.operator_hits.join(" · ")}
+                                                  </p>
+                                                ) : null}
+                                                {alert.search_match?.semantic_concepts.length ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Semantic {alert.search_match.semantic_concepts.join(" · ")}
                                                   </p>
                                                 ) : null}
                                                 {alert.search_match?.ranking_reason ? (
