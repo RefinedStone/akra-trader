@@ -1933,16 +1933,22 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
     binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
     app=app,
     filters={
-      "search": "status:resolved recovered -category:failure",
+      "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
       "limit": 10,
       "offset": 0,
     },
   )
-  assert search_payload["query"]["search"] == "status:resolved recovered -category:failure"
-  assert search_payload["search_summary"]["mode"] == "advanced_query_semantic_ranking"
+  assert search_payload["query"]["search"] == "status:resolved AND (recovered OR healthy) AND NOT category:failure"
+  assert search_payload["search_summary"]["mode"] == "full_text_boolean_semantic_ranking"
   assert search_payload["search_summary"]["top_score"] > 0
   assert search_payload["search_summary"]["operator_count"] == 2
+  assert search_payload["search_summary"]["boolean_operator_count"] >= 4
+  assert search_payload["search_summary"]["indexed_occurrence_count"] >= 1
+  assert search_payload["search_summary"]["indexed_term_count"] > 0
   assert "recovery" in search_payload["search_summary"]["semantic_concepts"]
+  assert "AND" in search_payload["search_summary"]["query_plan"]
+  assert "OR" in search_payload["search_summary"]["query_plan"]
+  assert "NOT" in search_payload["search_summary"]["query_plan"]
   assert search_payload["returned"] >= 1
   assert any(
     item["narrative"]["has_post_resolution_history"]

@@ -13,7 +13,6 @@ import io
 import json
 from numbers import Number
 import re
-import shlex
 from threading import Lock
 from typing import Any
 from typing import Callable
@@ -36858,64 +36857,182 @@ class TradingApplication:
         "operators": (),
         "semantic_concepts": (),
         "excluded_semantic_concepts": (),
+        "boolean_operator_count": 0,
+        "query_plan": (),
+        "boolean_tokens": (),
+        "boolean_rpn": (),
       }
     normalized_query = search.strip()
-    try:
-      raw_parts = tuple(shlex.split(normalized_query))
-    except ValueError:
-      raw_parts = tuple(
-        part.strip().strip("\"'")
-        for part in re.findall(r'"[^"]+"|\'[^\']+\'|\S+', normalized_query)
-        if part.strip().strip("\"'")
+    raw_parts = tuple(
+      token
+      for token in re.findall(r'"[^"]+"|\'[^\']+\'|\(|\)|\bAND\b|\bOR\b|\bNOT\b|[^\s()]+', normalized_query, flags=re.IGNORECASE)
+      if token.strip()
+    )
+    boolean_tokens: list[dict[str, Any]] = []
+
+    def build_operand(raw_value: str) -> dict[str, Any] | None:
+      quoted = (
+        len(raw_value) >= 2
+        and raw_value[0] == raw_value[-1]
+        and raw_value[0] in {"\"", "'"}
       )
+      body = raw_value[1:-1] if quoted else raw_value
+      if ":" in body:
+        raw_field, raw_operator_value = body.split(":", 1)
+        normalized_field = cls._normalize_provider_provenance_scheduler_alert_search_operator_field(raw_field)
+        normalized_value = (
+          cls._normalize_provider_provenance_scheduler_alert_search_operator_value(
+            field=normalized_field or "",
+            value=raw_operator_value,
+          )
+          if normalized_field is not None
+          else None
+        )
+        if normalized_field is not None and normalized_value is not None:
+          return {
+            "type": "operand",
+            "operand_type": "operator",
+            "field": normalized_field,
+            "value": normalized_value,
+            "label": f"{normalized_field}:{normalized_value}",
+            "semantic_concept": (
+              normalized_value if normalized_field == "concept" else None
+            ),
+          }
+      normalized_body = cls._normalize_provider_provenance_scheduler_alert_search_text(body)
+      if normalized_body is None:
+        return None
+      return {
+        "type": "operand",
+        "operand_type": "phrase" if quoted or " " in normalized_body else "term",
+        "value": normalized_body,
+        "label": normalized_body,
+        "semantic_concept": cls._normalize_provider_provenance_scheduler_alert_search_semantic_concept(
+          normalized_body
+        ),
+      }
+
+    for raw_part in raw_parts:
+      token = raw_part.strip()
+      if token in {"(", ")"}:
+        boolean_tokens.append({"type": "paren", "value": token})
+        continue
+      upper_token = token.upper()
+      if upper_token in {"AND", "OR", "NOT"}:
+        boolean_tokens.append({"type": "logical", "value": upper_token})
+        continue
+      negation_count = 0
+      while len(token) > 1 and token[0] in {"-", "!"}:
+        negation_count += 1
+        token = token[1:]
+      if token in {"!", "-"}:
+        negation_count += 1
+        token = ""
+      for _ in range(negation_count):
+        boolean_tokens.append({"type": "logical", "value": "NOT"})
+      if not token:
+        continue
+      operand = build_operand(token)
+      if operand is not None:
+        boolean_tokens.append(operand)
+
+    tokens_with_implicit_and: list[dict[str, Any]] = []
+    previous_token: dict[str, Any] | None = None
+    for token in boolean_tokens:
+      current_starts_operand = token["type"] == "operand" or (
+        token["type"] == "logical" and token["value"] == "NOT"
+      ) or (token["type"] == "paren" and token["value"] == "(")
+      previous_ends_operand = previous_token is not None and (
+        previous_token["type"] == "operand"
+        or (previous_token["type"] == "paren" and previous_token["value"] == ")")
+      )
+      if previous_ends_operand and current_starts_operand:
+        tokens_with_implicit_and.append({"type": "logical", "value": "AND", "implicit": True})
+      tokens_with_implicit_and.append(token)
+      previous_token = token
+
+    precedence = {"OR": 1, "AND": 2, "NOT": 3}
+    logical_stack: list[dict[str, Any]] = []
+    rpn_tokens: list[dict[str, Any]] = []
+    for token in tokens_with_implicit_and:
+      if token["type"] == "operand":
+        rpn_tokens.append(token)
+        continue
+      if token["type"] == "paren" and token["value"] == "(":
+        logical_stack.append(token)
+        continue
+      if token["type"] == "paren" and token["value"] == ")":
+        while logical_stack and not (
+          logical_stack[-1]["type"] == "paren" and logical_stack[-1]["value"] == "("
+        ):
+          rpn_tokens.append(logical_stack.pop())
+        if logical_stack and logical_stack[-1]["type"] == "paren":
+          logical_stack.pop()
+        continue
+      if token["type"] == "logical":
+        current_precedence = precedence[token["value"]]
+        right_associative = token["value"] == "NOT"
+        while logical_stack:
+          top = logical_stack[-1]
+          if top["type"] != "logical":
+            break
+          top_precedence = precedence[top["value"]]
+          if top_precedence > current_precedence or (
+            top_precedence == current_precedence and not right_associative
+          ):
+            rpn_tokens.append(logical_stack.pop())
+            continue
+          break
+        logical_stack.append(token)
+    while logical_stack:
+      token = logical_stack.pop()
+      if token["type"] != "paren":
+        rpn_tokens.append(token)
+
     terms: list[str] = []
     phrases: list[str] = []
     excluded_terms: list[str] = []
     excluded_phrases: list[str] = []
     operators: list[dict[str, Any]] = []
-    for part in raw_parts:
-      negated = part.startswith(("-", "!"))
-      body = part[1:] if negated else part
-      if ":" in body:
-        raw_field, raw_value = body.split(":", 1)
-        normalized_field = cls._normalize_provider_provenance_scheduler_alert_search_operator_field(raw_field)
-        normalized_value = cls._normalize_provider_provenance_scheduler_alert_search_operator_value(
-          field=normalized_field or "",
-          value=raw_value,
-        ) if normalized_field is not None else None
-        if normalized_field is not None and normalized_value is not None:
+    excluded_semantic_concepts: list[str] = []
+    semantic_concepts: list[str] = []
+    query_plan: list[str] = []
+    previous_was_not = False
+    for token in tokens_with_implicit_and:
+      if token["type"] == "operand":
+        operand_type = token.get("operand_type")
+        target_terms = excluded_terms if previous_was_not else terms
+        target_phrases = excluded_phrases if previous_was_not else phrases
+        if operand_type == "term":
+          target_terms.append(token["value"])
+        elif operand_type == "phrase":
+          target_phrases.append(token["value"])
+        elif operand_type == "operator":
           operators.append(
             {
-              "field": normalized_field,
-              "value": normalized_value,
-              "negated": negated,
-              "raw": f"{'-' if negated else ''}{normalized_field}:{normalized_value}",
+              "field": token["field"],
+              "value": token["value"],
+              "negated": previous_was_not,
+              "raw": f"{'-' if previous_was_not else ''}{token['label']}",
             }
           )
-          continue
-      normalized_body = cls._normalize_provider_provenance_scheduler_alert_search_text(body)
-      if normalized_body is None:
+        semantic_concept = token.get("semantic_concept")
+        if isinstance(semantic_concept, str):
+          if previous_was_not:
+            excluded_semantic_concepts.append(semantic_concept)
+          else:
+            semantic_concepts.append(semantic_concept)
+        query_plan.append(token["label"])
+        previous_was_not = False
         continue
-      target = excluded_phrases if negated and " " in normalized_body else (
-        excluded_terms if negated else (phrases if " " in normalized_body else terms)
-      )
-      target.append(normalized_body)
-    semantic_concepts = tuple(
-      dict.fromkeys(
-        concept
-        for value in (*terms, *phrases)
-        for concept in (cls._normalize_provider_provenance_scheduler_alert_search_semantic_concept(value),)
-        if concept is not None
-      )
-    )
-    excluded_semantic_concepts = tuple(
-      dict.fromkeys(
-        concept
-        for value in (*excluded_terms, *excluded_phrases)
-        for concept in (cls._normalize_provider_provenance_scheduler_alert_search_semantic_concept(value),)
-        if concept is not None
-      )
-    )
+      if token["type"] == "logical":
+        query_plan.append(token["value"])
+        previous_was_not = token["value"] == "NOT"
+        continue
+      if token["type"] == "paren":
+        query_plan.append(token["value"])
+        previous_was_not = False
+
     return {
       "query": normalized_query,
       "terms": tuple(dict.fromkeys(terms)),
@@ -36923,8 +37040,14 @@ class TradingApplication:
       "excluded_terms": tuple(dict.fromkeys(excluded_terms)),
       "excluded_phrases": tuple(dict.fromkeys(excluded_phrases)),
       "operators": tuple(operators),
-      "semantic_concepts": semantic_concepts,
-      "excluded_semantic_concepts": excluded_semantic_concepts,
+      "semantic_concepts": tuple(dict.fromkeys(semantic_concepts)),
+      "excluded_semantic_concepts": tuple(dict.fromkeys(excluded_semantic_concepts)),
+      "boolean_operator_count": sum(
+        1 for token in tokens_with_implicit_and if token["type"] == "logical"
+      ),
+      "query_plan": tuple(query_plan),
+      "boolean_tokens": tuple(tokens_with_implicit_and),
+      "boolean_rpn": tuple(rpn_tokens),
     }
 
   @classmethod
@@ -37233,42 +37356,176 @@ class TradingApplication:
     return tuple(candidate for candidate in candidates if value in candidate)
 
   @classmethod
-  def _build_provider_provenance_scheduler_alert_occurrence_search_match(
+  def _build_provider_provenance_scheduler_alert_occurrence_search_document(
     cls,
     *,
     row: Mapping[str, Any],
-    search: str | None,
+    document_id: int,
+  ) -> dict[str, Any]:
+    search_fields = cls._build_provider_provenance_scheduler_alert_occurrence_search_fields(row=row)
+    normalized_fields: dict[str, tuple[str, ...]] = {}
+    lexical_terms: list[str] = []
+    for field_name, _, field_values in search_fields:
+      normalized_values = tuple(
+        dict.fromkeys(
+          normalized_value
+          for raw_value in field_values
+          for normalized_value in (
+            cls._normalize_provider_provenance_scheduler_alert_search_text(raw_value),
+          )
+          if normalized_value is not None
+        )
+      )
+      normalized_fields[field_name] = normalized_values
+      for normalized_value in normalized_values:
+        lexical_terms.extend(cls._tokenize_provider_provenance_scheduler_alert_search_query(normalized_value))
+    return {
+      "document_id": document_id,
+      "row": row,
+      "normalized_fields": normalized_fields,
+      "lexical_terms": tuple(dict.fromkeys(lexical_terms)),
+      "operator_fields": cls._build_provider_provenance_scheduler_alert_occurrence_operator_fields(
+        row=row
+      ),
+      "semantic_concepts": cls._build_provider_provenance_scheduler_alert_occurrence_semantic_concepts(
+        row=row
+      ),
+    }
+
+  @classmethod
+  def _build_provider_provenance_scheduler_alert_occurrence_search_index(
+    cls,
+    *,
+    rows: tuple[Mapping[str, Any], ...],
+  ) -> dict[str, Any]:
+    documents = tuple(
+      cls._build_provider_provenance_scheduler_alert_occurrence_search_document(
+        row=row,
+        document_id=index,
+      )
+      for index, row in enumerate(rows)
+    )
+    lexical_postings: dict[str, set[int]] = {}
+    semantic_postings: dict[str, set[int]] = {}
+    for document in documents:
+      document_id = document["document_id"]
+      for term in document["lexical_terms"]:
+        lexical_postings.setdefault(term, set()).add(document_id)
+      for concept in document["semantic_concepts"]:
+        semantic_postings.setdefault(concept, set()).add(document_id)
+    return {
+      "documents": documents,
+      "all_document_ids": frozenset(document["document_id"] for document in documents),
+      "lexical_postings": {term: frozenset(postings) for term, postings in lexical_postings.items()},
+      "semantic_postings": {term: frozenset(postings) for term, postings in semantic_postings.items()},
+      "indexed_term_count": len(lexical_postings),
+    }
+
+  @classmethod
+  def _match_provider_provenance_scheduler_alert_occurrence_operator_document(
+    cls,
+    *,
+    document: Mapping[str, Any],
+    operator: Mapping[str, Any],
+  ) -> tuple[str, ...]:
+    field = operator.get("field")
+    value = operator.get("value")
+    if not isinstance(field, str) or not isinstance(value, str):
+      return ()
+    candidates = document.get("operator_fields", {}).get(field, ())
+    if field in {"category", "status", "facet", "mode", "severity", "concept", "has", "timeframe"}:
+      return tuple(candidate for candidate in candidates if candidate == value)
+    return tuple(candidate for candidate in candidates if value in candidate)
+
+  @classmethod
+  def _evaluate_provider_provenance_scheduler_alert_search_operand(
+    cls,
+    *,
+    index: Mapping[str, Any],
+    operand: Mapping[str, Any],
+  ) -> frozenset[int]:
+    operand_type = operand.get("operand_type")
+    if operand_type == "operator":
+      return frozenset(
+        document["document_id"]
+        for document in index.get("documents", ())
+        if cls._match_provider_provenance_scheduler_alert_occurrence_operator_document(
+          document=document,
+          operator=operand,
+        )
+      )
+    if operand_type == "term":
+      lexical_matches = set(index.get("lexical_postings", {}).get(operand.get("value"), ()))
+      semantic_concept = operand.get("semantic_concept")
+      if isinstance(semantic_concept, str):
+        lexical_matches.update(index.get("semantic_postings", {}).get(semantic_concept, ()))
+      return frozenset(lexical_matches)
+    if operand_type == "phrase":
+      phrase_value = operand.get("value")
+      if not isinstance(phrase_value, str):
+        return frozenset()
+      matched_document_ids: set[int] = set()
+      for document in index.get("documents", ()):
+        if any(
+          phrase_value in normalized_value
+          for normalized_values in document.get("normalized_fields", {}).values()
+          for normalized_value in normalized_values
+        ):
+          matched_document_ids.add(document["document_id"])
+      return frozenset(matched_document_ids)
+    return frozenset()
+
+  @classmethod
+  def _evaluate_provider_provenance_scheduler_alert_search_query(
+    cls,
+    *,
+    index: Mapping[str, Any],
+    parsed_query: Mapping[str, Any],
+  ) -> frozenset[int]:
+    rpn_tokens = tuple(parsed_query.get("boolean_rpn", ()))
+    if not rpn_tokens:
+      return frozenset(index.get("all_document_ids", ()))
+    stack: list[frozenset[int]] = []
+    all_document_ids = frozenset(index.get("all_document_ids", ()))
+    for token in rpn_tokens:
+      if token.get("type") == "operand":
+        stack.append(
+          cls._evaluate_provider_provenance_scheduler_alert_search_operand(
+            index=index,
+            operand=token,
+          )
+        )
+        continue
+      if token.get("type") != "logical":
+        continue
+      operator_value = token.get("value")
+      if operator_value == "NOT":
+        operand = stack.pop() if stack else frozenset()
+        stack.append(all_document_ids.difference(operand))
+        continue
+      right = stack.pop() if stack else frozenset()
+      left = stack.pop() if stack else frozenset()
+      if operator_value == "AND":
+        stack.append(left.intersection(right))
+      elif operator_value == "OR":
+        stack.append(left.union(right))
+    return stack[-1] if stack else frozenset()
+
+  @classmethod
+  def _score_provider_provenance_scheduler_alert_occurrence_search_match(
+    cls,
+    *,
+    row: Mapping[str, Any],
+    parsed_query: Mapping[str, Any],
   ) -> dict[str, Any] | None:
-    if not isinstance(search, str) or not search.strip():
-      return None
-    parsed_query = cls._parse_provider_provenance_scheduler_alert_search_query(search)
     terms = parsed_query["terms"]
     phrases = parsed_query["phrases"]
-    excluded_terms = parsed_query["excluded_terms"]
-    excluded_phrases = parsed_query["excluded_phrases"]
     operators = parsed_query["operators"]
     semantic_query_concepts = parsed_query["semantic_concepts"]
-    if not any((terms, phrases, excluded_terms, excluded_phrases, operators, semantic_query_concepts)):
+    if not any((terms, phrases, operators, semantic_query_concepts)):
       return None
     search_fields = cls._build_provider_provenance_scheduler_alert_occurrence_search_fields(row=row)
-    normalized_field_values = tuple(
-      (field_name, field_weight, raw_value, normalized_value)
-      for field_name, field_weight, field_values in search_fields
-      for raw_value in field_values
-      for normalized_value in (
-        cls._normalize_provider_provenance_scheduler_alert_search_text(raw_value),
-      )
-      if normalized_value is not None
-    )
-    for excluded_fragment in (*excluded_terms, *excluded_phrases):
-      if any(excluded_fragment in normalized_value for _, _, _, normalized_value in normalized_field_values):
-        return None
-    excluded_semantic_concepts = parsed_query["excluded_semantic_concepts"]
     row_semantic_concepts = cls._build_provider_provenance_scheduler_alert_occurrence_semantic_concepts(row=row)
-    if excluded_semantic_concepts and any(
-      concept in row_semantic_concepts for concept in excluded_semantic_concepts
-    ):
-      return None
     matched_terms: set[str] = set()
     matched_phrases: set[str] = set()
     matched_fields: list[str] = []
@@ -37281,16 +37538,14 @@ class TradingApplication:
     field_hits = 0
     operator_hits: list[str] = []
     for operator in operators:
+      if operator.get("negated"):
+        continue
       matched_candidates = cls._match_provider_provenance_scheduler_alert_occurrence_operator(
         row=row,
         operator=operator,
       )
-      if operator.get("negated"):
-        if matched_candidates:
-          return None
-        continue
       if not matched_candidates:
-        return None
+        continue
       operator_label = f"{operator['field']}:{operator['value']}"
       operator_hits.append(operator_label)
       operator_score += 160 + (15 * min(len(matched_candidates), 2))
@@ -37357,10 +37612,6 @@ class TradingApplication:
       semantic_score += 110 * len(semantic_hits)
       if len(highlights) < 3:
         highlights.append(f"semantic: {', '.join(semantic_hits)}")
-    if terms and not matched_terms and not semantic_hits:
-      return None
-    if phrases and not matched_phrases:
-      return None
     score = lexical_score + semantic_score + operator_score
     if score <= 0:
       return None
@@ -37404,6 +37655,28 @@ class TradingApplication:
       "operator_score": operator_score,
       "ranking_reason": " · ".join(ranking_reason_parts),
     }
+
+  @classmethod
+  def _build_provider_provenance_scheduler_alert_occurrence_search_match(
+    cls,
+    *,
+    row: Mapping[str, Any],
+    search: str | None,
+  ) -> dict[str, Any] | None:
+    if not isinstance(search, str) or not search.strip():
+      return None
+    parsed_query = cls._parse_provider_provenance_scheduler_alert_search_query(search)
+    index = cls._build_provider_provenance_scheduler_alert_occurrence_search_index(rows=(row,))
+    matched_document_ids = cls._evaluate_provider_provenance_scheduler_alert_search_query(
+      index=index,
+      parsed_query=parsed_query,
+    )
+    if 0 not in matched_document_ids:
+      return None
+    return cls._score_provider_provenance_scheduler_alert_occurrence_search_match(
+      row=row,
+      parsed_query=parsed_query,
+    )
 
   @staticmethod
   def _build_provider_provenance_scheduler_occurrence_detected_at(
@@ -37672,7 +37945,7 @@ class TradingApplication:
     normalized_search = search.strip() if isinstance(search, str) and search.strip() else None
     normalized_limit = max(1, min(limit, 200))
     normalized_offset = max(offset, 0)
-    filtered_history: list[dict[str, Any]] = []
+    eligible_history: list[dict[str, Any]] = []
     for row in history_rows:
       if normalized_category is not None and row["alert"].category != normalized_category:
         continue
@@ -37697,13 +37970,34 @@ class TradingApplication:
         )
       ):
         continue
-      search_match = self._build_provider_provenance_scheduler_alert_occurrence_search_match(
-        row=row,
-        search=normalized_search,
+      eligible_history.append(row)
+    filtered_history: list[dict[str, Any]] = []
+    parsed_search = (
+      self._parse_provider_provenance_scheduler_alert_search_query(normalized_search)
+      if normalized_search is not None
+      else None
+    )
+    if normalized_search is not None:
+      search_index = self._build_provider_provenance_scheduler_alert_occurrence_search_index(
+        rows=tuple(eligible_history)
       )
-      if normalized_search is not None and search_match is None:
-        continue
-      filtered_history.append({**row, "search_match": search_match})
+      matched_document_ids = self._evaluate_provider_provenance_scheduler_alert_search_query(
+        index=search_index,
+        parsed_query=parsed_search or {},
+      )
+      for matched_document_id in matched_document_ids:
+        if not (0 <= matched_document_id < len(eligible_history)):
+          continue
+        row = eligible_history[matched_document_id]
+        search_match = self._score_provider_provenance_scheduler_alert_occurrence_search_match(
+          row=row,
+          parsed_query=parsed_search or {},
+        )
+        if search_match is None:
+          continue
+        filtered_history.append({**row, "search_match": search_match})
+    else:
+      filtered_history = [{**row, "search_match": None} for row in eligible_history]
     if normalized_search is not None:
       filtered_history = sorted(
         filtered_history,
@@ -37758,10 +38052,9 @@ class TradingApplication:
     )
     search_summary = None
     if normalized_search is not None:
-      parsed_search = self._parse_provider_provenance_scheduler_alert_search_query(normalized_search)
       search_summary = {
         "query": normalized_search,
-        "mode": "advanced_query_semantic_ranking",
+        "mode": "full_text_boolean_semantic_ranking",
         "token_count": len(parsed_search.get("terms", ())) + len(parsed_search.get("phrases", ())),
         "matched_occurrences": total,
         "top_score": max(
@@ -37783,6 +38076,9 @@ class TradingApplication:
         "negated_term_count": len(parsed_search.get("excluded_terms", ()))
         + len(parsed_search.get("excluded_phrases", ()))
         + sum(1 for operator in parsed_search.get("operators", ()) if operator.get("negated")),
+        "boolean_operator_count": int(parsed_search.get("boolean_operator_count", 0)),
+        "indexed_occurrence_count": len(eligible_history),
+        "indexed_term_count": int(search_index.get("indexed_term_count", 0)),
         "parsed_terms": tuple(parsed_search.get("terms", ())),
         "parsed_phrases": tuple(parsed_search.get("phrases", ())),
         "parsed_operators": tuple(
@@ -37791,6 +38087,7 @@ class TradingApplication:
           if isinstance(operator.get("raw"), str)
         ),
         "semantic_concepts": tuple(parsed_search.get("semantic_concepts", ())),
+        "query_plan": tuple(parsed_search.get("query_plan", ())),
       }
     return {
       "generated_at": current_time,
@@ -41952,10 +42249,18 @@ def serialize_provider_provenance_scheduler_alert_history(
           payload.get("search_summary", {}).get("semantic_concept_count", 0)
         ),
         "negated_term_count": int(payload.get("search_summary", {}).get("negated_term_count", 0)),
+        "boolean_operator_count": int(
+          payload.get("search_summary", {}).get("boolean_operator_count", 0)
+        ),
+        "indexed_occurrence_count": int(
+          payload.get("search_summary", {}).get("indexed_occurrence_count", 0)
+        ),
+        "indexed_term_count": int(payload.get("search_summary", {}).get("indexed_term_count", 0)),
         "parsed_terms": list(payload.get("search_summary", {}).get("parsed_terms", ())),
         "parsed_phrases": list(payload.get("search_summary", {}).get("parsed_phrases", ())),
         "parsed_operators": list(payload.get("search_summary", {}).get("parsed_operators", ())),
         "semantic_concepts": list(payload.get("search_summary", {}).get("semantic_concepts", ())),
+        "query_plan": list(payload.get("search_summary", {}).get("query_plan", ())),
       }
       if isinstance(payload.get("search_summary"), dict)
       else None

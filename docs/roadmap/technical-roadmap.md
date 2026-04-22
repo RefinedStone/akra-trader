@@ -167,6 +167,9 @@ creation.
 - that same search surface now also parses advanced query operators and semantic scheduler
   concepts, so future narrative tooling can build on server-side filtered intent retrieval rather
   than a single free-text substring layer
+- that same scheduler search surface now also materializes a dedicated full-text index and boolean
+  query evaluator, so future narrative tooling can build on indexed `AND` / `OR` / `NOT`
+  retrieval instead of re-implementing linear scan matching in each workflow
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

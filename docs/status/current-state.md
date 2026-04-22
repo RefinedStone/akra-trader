@@ -222,6 +222,10 @@ It is not yet a finished live trading product:
 - that same scheduler occurrence search now also supports advanced query operators and semantic
   retrieval over scheduler narrative concepts, so operators can search with filters like
   `status:resolved recovered -category:failure` instead of relying on raw substring matching alone
+- that same scheduler occurrence retrieval now also builds a dedicated full-text index with a
+  boolean query engine, so operators can issue structured searches like
+  `status:resolved AND (recovered OR healthy) AND NOT category:failure` and get ranked results
+  from indexed scheduler narrative documents instead of only linear scan filtering
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

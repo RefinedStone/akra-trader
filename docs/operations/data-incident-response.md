@@ -119,6 +119,9 @@ unclear dataset lineage.
 - that search path now also accepts advanced operators and semantic retrieval hints, so an
   operator can narrow narrative review with queries such as
   `status:resolved recovered -category:failure` before handing off a stitched report
+- that scheduler narrative search now also executes against a dedicated full-text index with
+  boolean query support, so incident review can combine `AND` / `OR` / `NOT` clauses and market
+  context operators before exporting a stitched handoff narrative
 - those saved scheduler narrative templates and boards now also support edit, delete, and
   revision-restore workflow, so teams can correct or retire shared review lenses without losing
   the previous incident-handoff snapshot

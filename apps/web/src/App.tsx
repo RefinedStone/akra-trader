@@ -18916,7 +18916,12 @@ export default function App() {
                                     ) : null}
                                     {providerProvenanceSchedulerAlertHistory?.search_summary?.operator_count ? (
                                       <span className="run-filter-summary-chip">
-                                        Operators {providerProvenanceSchedulerAlertHistory.search_summary.operator_count} · semantic {providerProvenanceSchedulerAlertHistory.search_summary.semantic_concept_count}
+                                        Field ops {providerProvenanceSchedulerAlertHistory.search_summary.operator_count} · boolean {providerProvenanceSchedulerAlertHistory.search_summary.boolean_operator_count} · semantic {providerProvenanceSchedulerAlertHistory.search_summary.semantic_concept_count}
+                                      </span>
+                                    ) : null}
+                                    {providerProvenanceSchedulerAlertHistory?.search_summary ? (
+                                      <span className="run-filter-summary-chip">
+                                        Index {providerProvenanceSchedulerAlertHistory.search_summary.indexed_occurrence_count} occurrence(s) · {providerProvenanceSchedulerAlertHistory.search_summary.indexed_term_count} term(s)
                                       </span>
                                     ) : null}
                                   </div>
@@ -18997,11 +19002,16 @@ export default function App() {
                                           }));
                                           setProviderProvenanceSchedulerAlertHistoryOffset(0);
                                         }}
-                                        placeholder='status:resolved recovered -category:failure "lagging -> healthy"'
+                                        placeholder='status:resolved AND (recovered OR healthy) AND NOT category:failure'
                                         type="search"
                                         value={providerProvenanceAnalyticsQuery.search_query}
                                       />
                                     </label>
+                                    {providerProvenanceSchedulerAlertHistory?.search_summary?.query_plan.length ? (
+                                      <span className="run-lineage-symbol-copy">
+                                        Query plan {providerProvenanceSchedulerAlertHistory.search_summary.query_plan.join(" ")}
+                                      </span>
+                                    ) : null}
                                     <button
                                       className="ghost-button"
                                       disabled={!providerProvenanceSchedulerAlertTimelineItems.length}

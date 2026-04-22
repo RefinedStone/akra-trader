@@ -1318,10 +1318,14 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     operator_count: number;
     semantic_concept_count: number;
     negated_term_count: number;
+    boolean_operator_count: number;
+    indexed_occurrence_count: number;
+    indexed_term_count: number;
     parsed_terms: string[];
     parsed_phrases: string[];
     parsed_operators: string[];
     semantic_concepts: string[];
+    query_plan: string[];
   } | null;
   items: (OperatorAlertEntry & {
     narrative: {
