@@ -455,16 +455,16 @@
       "id": "task-llm-sensitivity-domain-models-benchmark-remediation-utility-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split benchmark utility helpers and remediation result out of domain/models.py",
-      "description": "Finish the remaining `domain/models.py` ownership cleanup by moving `BENCHMARK_ARTIFACT_RUNTIME_CANDIDATE_ID_*`, `extract_benchmark_artifact_runtime_candidate_id`, `is_benchmark_artifact_metadata_key`, and `MarketDataRemediationResult` into a bounded `domain/model_types/benchmark_remediation.py`-style module while keeping `domain/models.py` and `domain/model_types/__init__.py` as compatibility re-export surfaces.",
-      "status": "ready",
+      "description": "Completed the remaining `domain/models.py` ownership cleanup by moving benchmark artifact metadata constants/helpers into `domain/model_types/benchmark_artifact_metadata.py` and `MarketDataRemediationResult` into `domain/model_types/market_data_remediation.py`, while keeping `domain/models.py` and `domain/model_types/__init__.py` as compatibility re-export surfaces only.",
+      "status": "done",
       "base_priority": 84,
       "dynamic_priority_delta": 31,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T00:45:00+09:00",
+      "updated_at": "2026-04-23T11:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says `domain/models.py` now directly owns only the benchmark utility helpers and `MarketDataRemediationResult` after the core run/trading family moved to `run_execution.py`, making this the next bounded and directly executable residual ownership split in the compatibility file.",
-      "priority_reason": "Promoted to ready because there are no remaining open tasks after the just-completed core run/trading extraction, and the residual benchmark/remediation ownership is the clearest next executable step to finish shrinking `domain/models.py` without API surface churn."
+      "direction_relation_note": "The latest main-session reply confirms commit `07d487f` moved benchmark metadata ownership into `benchmark_artifact_metadata.py` and remediation-result ownership into `market_data_remediation.py`, leaving `domain/models.py` with compatibility re-exports only and explicitly stating there is no remaining work in this task scope.",
+      "priority_reason": "Marked done because the main session completed the final residual `domain/models.py` benchmark/remediation split, validated it with `python -m py_compile` plus focused remediation regressions in `test_reference.py`, `test_application.py`, and `test_api.py`, and pushed commit `07d487f` to `origin/main`."
     }
   ]
 }
