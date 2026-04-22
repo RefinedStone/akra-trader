@@ -2379,6 +2379,23 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   bulk_governed_hierarchy_step_template_payload = bulk_governed_hierarchy_step_template_response.json()
   assert bulk_governed_hierarchy_step_template_payload["applied_count"] == 1
 
+  hierarchy_step_template_audit_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/audits",
+    params={
+      "hierarchy_step_template_id": hierarchy_step_template_payload["hierarchy_step_template_id"],
+      "limit": 10,
+    },
+  )
+  assert hierarchy_step_template_audit_response.status_code == 200
+  hierarchy_step_template_audit_payload = hierarchy_step_template_audit_response.json()
+  assert [item["action"] for item in hierarchy_step_template_audit_payload["items"][:5]] == [
+    "updated",
+    "restored",
+    "deleted",
+    "updated",
+    "created",
+  ]
+
   apply_hierarchy_step_template_response = client.post(
     f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_payload['hierarchy_step_template_id']}/apply",
     json={

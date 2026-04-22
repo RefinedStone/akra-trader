@@ -1864,6 +1864,32 @@ export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateR
   history: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionEntry[];
 };
 
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord = {
+  audit_id: string;
+  hierarchy_step_template_id: string;
+  action: string;
+  recorded_at: string;
+  reason: string;
+  detail: string;
+  revision_id?: string | null;
+  source_revision_id?: string | null;
+  name: string;
+  description: string;
+  item_type: "template" | "registry" | string;
+  step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep;
+  origin_catalog_id?: string | null;
+  origin_catalog_name?: string | null;
+  origin_step_id?: string | null;
+  status: "active" | "deleted" | string;
+  actor_tab_id?: string | null;
+  actor_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditListPayload = {
+  items: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord[];
+  total: number;
+};
+
 export type ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep = {
   step_id?: string | null;
   source_template_id?: string | null;

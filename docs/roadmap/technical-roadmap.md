@@ -150,8 +150,8 @@ creation.
   plans, and those captured hierarchies now also support step edit, step revision restore, and
   step bulk-governance workflow; hierarchy steps can now also be promoted into named templates and
   synced across multiple policy catalogs, and those reusable hierarchy-step templates now also
-  support edit/delete/revision-restore plus bulk governance workflow; stitched multi-occurrence
-  narrative artifacts and deeper server-side narrative search are still not built
+  support edit/delete/revision-restore, bulk governance, and shared team audit workflow; stitched
+  multi-occurrence narrative artifacts and deeper server-side narrative search are still not built
 
 ### Remaining work
 

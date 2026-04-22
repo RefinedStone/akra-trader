@@ -44,6 +44,7 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovern
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
@@ -482,6 +483,10 @@ class TradingApplication:
     self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions: dict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord,
+    ] = {}
+    self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord,
     ] = {}
     self._provider_provenance_scheduler_narrative_governance_policy_catalogs: dict[
       str,
@@ -2086,6 +2091,40 @@ class TradingApplication:
       sorted(
         self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.values(),
         key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord:
+    save_record = getattr(
+      self._runs,
+      "save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_record",
+      None,
+    )
+    if callable(save_record):
+      return save_record(record)
+    self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records[
+      record.audit_id
+    ] = record
+    return record
+
+  def _list_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord, ...]:
+    list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records",
+      None,
+    )
+    if callable(list_records):
+      return tuple(list_records())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records.values(),
+        key=lambda record: (record.recorded_at, record.audit_id),
         reverse=True,
       )
     )
@@ -4666,6 +4705,26 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _build_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_detail(
+    *,
+    record: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord,
+    action: str,
+  ) -> str:
+    summary = TradingApplication.format_provider_provenance_scheduler_narrative_governance_hierarchy_step_summary(
+      record.step
+    )
+    origin = record.origin_catalog_name or "ad hoc source"
+    if action == "created":
+      return f"Created hierarchy step template {record.name} from {origin}. {summary}"
+    if action == "updated":
+      return f"Updated hierarchy step template {record.name}. {summary}"
+    if action == "deleted":
+      return f"Deleted hierarchy step template {record.name}."
+    if action == "restored":
+      return f"Restored hierarchy step template {record.name}. {summary}"
+    return f"Recorded hierarchy step template action {action} for {record.name}. {summary}"
+
   def _record_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
     self,
     *,
@@ -4688,13 +4747,39 @@ class TradingApplication:
         actor_tab_label=actor_tab_label,
       )
     )
-    return self._save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_record(
+    updated = self._save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_record(
       replace(
         record,
         current_revision_id=revision.revision_id,
         revision_count=int(record.revision_count or 0) + 1,
       )
     )
+    self._save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_record(
+      ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord(
+        audit_id=f"{updated.hierarchy_step_template_id}:{revision.revision_id}:{action}",
+        hierarchy_step_template_id=updated.hierarchy_step_template_id,
+        action=action,
+        recorded_at=recorded_at,
+        reason=reason.strip() if isinstance(reason, str) and reason.strip() else action,
+        detail=self._build_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_detail(
+          record=updated,
+          action=action,
+        ),
+        revision_id=revision.revision_id,
+        source_revision_id=source_revision_id,
+        name=updated.name,
+        description=updated.description,
+        item_type=updated.item_type,
+        step=updated.step,
+        origin_catalog_id=updated.origin_catalog_id,
+        origin_catalog_name=updated.origin_catalog_name,
+        origin_step_id=updated.origin_step_id,
+        status=updated.status,
+        actor_tab_id=revision.recorded_by_tab_id,
+        actor_tab_label=revision.recorded_by_tab_label,
+      )
+    )
+    return updated
 
   @staticmethod
   def _normalize_provider_provenance_scheduled_report_cadence(
@@ -6930,6 +7015,28 @@ class TradingApplication:
     ]
     return f"{len(steps)} hierarchy step(s): " + ", ".join(parts)
 
+  @staticmethod
+  def format_provider_provenance_scheduler_narrative_governance_hierarchy_step_summary(
+    step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep,
+  ) -> str:
+    item_summary = ", ".join(step.item_names or step.item_ids[:3]) if (step.item_names or step.item_ids) else "all"
+    affixes: list[str] = []
+    if step.name_prefix:
+      affixes.append(f"prefix={step.name_prefix}")
+    if step.name_suffix:
+      affixes.append(f"suffix={step.name_suffix}")
+    if step.description_append:
+      affixes.append("description")
+    if step.template_id:
+      affixes.append(f"template={step.template_id}")
+    if step.clear_template_link:
+      affixes.append("clear-link")
+    affix_summary = f" ({', '.join(affixes)})" if affixes else ""
+    return (
+      f"{step.item_type} {step.action} · {len(step.item_ids)} target(s)"
+      f" [{item_summary}]{affix_summary}"
+    )
+
   def create_provider_provenance_scheduler_narrative_governance_policy_template(
     self,
     *,
@@ -8486,6 +8593,73 @@ class TradingApplication:
       actor_tab_id=actor_tab_id,
       actor_tab_label=actor_tab_label,
     )
+
+  def list_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audits(
+    self,
+    *,
+    hierarchy_step_template_id: str | None = None,
+    action: str | None = None,
+    actor_tab_id: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord, ...]:
+    normalized_hierarchy_step_template_id = (
+      hierarchy_step_template_id.strip()
+      if isinstance(hierarchy_step_template_id, str) and hierarchy_step_template_id.strip()
+      else None
+    )
+    normalized_action = action.strip().lower() if isinstance(action, str) and action.strip() else None
+    normalized_actor_tab_id = (
+      actor_tab_id.strip()
+      if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+      else None
+    )
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord] = []
+    for record in self._list_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records():
+      if (
+        normalized_hierarchy_step_template_id is not None
+        and record.hierarchy_step_template_id != normalized_hierarchy_step_template_id
+      ):
+        continue
+      if normalized_action is not None and record.action != normalized_action:
+        continue
+      if normalized_actor_tab_id is not None and record.actor_tab_id != normalized_actor_tab_id:
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.audit_id,
+          record.hierarchy_step_template_id,
+          record.action,
+          record.reason,
+          record.detail,
+          record.revision_id,
+          record.source_revision_id,
+          record.name,
+          record.description,
+          record.item_type,
+          record.origin_catalog_id,
+          record.origin_catalog_name,
+          record.origin_step_id,
+          record.status,
+          record.actor_tab_id,
+          record.actor_tab_label,
+          record.step.step_id,
+          record.step.source_template_id,
+          record.step.source_template_name,
+          *record.step.item_ids,
+          *record.step.item_names,
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(
+        replace(
+          record,
+          status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+        )
+      )
+    return tuple(filtered[:normalized_limit])
 
   def _find_latest_active_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
     self,
@@ -35927,6 +36101,47 @@ def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_
       )
       for revision in revisions
     ],
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_record(
+  record: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord,
+) -> dict[str, Any]:
+  return {
+    "audit_id": record.audit_id,
+    "hierarchy_step_template_id": record.hierarchy_step_template_id,
+    "action": record.action,
+    "recorded_at": record.recorded_at.isoformat(),
+    "reason": record.reason,
+    "detail": record.detail,
+    "revision_id": record.revision_id,
+    "source_revision_id": record.source_revision_id,
+    "name": record.name,
+    "description": record.description,
+    "item_type": record.item_type,
+    "step": serialize_provider_provenance_scheduler_narrative_governance_plan_hierarchy_step(record.step),
+    "origin_catalog_id": record.origin_catalog_id,
+    "origin_catalog_name": record.origin_catalog_name,
+    "origin_step_id": record.origin_step_id,
+    "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+      record.status
+    ),
+    "actor_tab_id": record.actor_tab_id,
+    "actor_tab_label": record.actor_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list(
+  records: tuple[ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_record(
+        record
+      )
+      for record in records
+    ],
+    "total": len(records),
   }
 
 

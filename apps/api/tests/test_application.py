@@ -15182,6 +15182,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_bulk_governance",
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_list",
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_restore",
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list",
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
@@ -15424,6 +15425,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_restore"
   ].path_param_keys == ("hierarchy_step_template_id", "revision_id")
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list"
+  ].filter_param_specs[0].key == "hierarchy_step_template_id"
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply"
   ].path_param_keys == ("hierarchy_step_template_id",)
@@ -17538,6 +17542,24 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     },
   )
   assert bulk_governed_hierarchy_step_template_payload["applied_count"] == 1
+
+  hierarchy_step_template_audit_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list"
+    ],
+    app=app,
+    filters={
+      "hierarchy_step_template_id": hierarchy_step_template_payload["hierarchy_step_template_id"],
+      "limit": 10,
+    },
+  )
+  assert [item["action"] for item in hierarchy_step_template_audit_payload["items"][:5]] == [
+    "updated",
+    "restored",
+    "deleted",
+    "updated",
+    "created",
+  ]
 
   applied_hierarchy_step_template_payload = execute_standalone_surface_binding(
     binding=bindings_by_key[

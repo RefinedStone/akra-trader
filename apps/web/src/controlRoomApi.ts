@@ -21,6 +21,7 @@ import type {
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditListPayload,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateListPayload,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
@@ -1675,6 +1676,35 @@ export async function listProviderProvenanceSchedulerNarrativeGovernanceHierarch
 ) {
   return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionListPayload>(
     `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/${encodeURIComponent(hierarchyStepTemplateId)}/revisions`,
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAudits(params: {
+  hierarchyStepTemplateId?: string;
+  action?: string;
+  actorTabId?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.hierarchyStepTemplateId?.trim()) {
+    searchParams.set("hierarchy_step_template_id", params.hierarchyStepTemplateId.trim());
+  }
+  if (params.action?.trim()) {
+    searchParams.set("action", params.action.trim());
+  }
+  if (params.actorTabId?.trim()) {
+    searchParams.set("actor_tab_id", params.actorTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 200))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/audits${suffix}`,
   );
 }
 

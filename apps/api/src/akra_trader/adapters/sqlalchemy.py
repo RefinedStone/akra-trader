@@ -33,6 +33,7 @@ from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
@@ -328,6 +329,16 @@ provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revis
   Column("recorded_at", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records = Table(
+  "provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records",
+  metadata,
+  Column("audit_id", String, primary_key=True),
+  Column("hierarchy_step_template_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("actor_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 provider_provenance_scheduler_narrative_governance_plans = Table(
   "provider_provenance_scheduler_narrative_governance_plans",
   metadata,
@@ -432,6 +443,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   )
   _provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord
+  )
+  _provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord
   )
   _provider_provenance_scheduler_narrative_governance_plan_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
@@ -2056,6 +2070,66 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       return None
     return self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_adapter.validate_python(
       row["payload"]
+    )
+
+  def save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord:
+    payload = self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "audit_id": record.audit_id,
+      "hierarchy_step_template_id": record.hierarchy_step_template_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "actor_tab_id": record.actor_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(
+          provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records.c.audit_id
+        ).where(
+          provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records.c.audit_id
+          == record.audit_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records).values(
+            **row
+          )
+        )
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records)
+          .where(
+            provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records.c.audit_id
+            == record.audit_id
+          )
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord, ...]:
+    statement = select(
+      provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records.c.payload
+    ).order_by(
+      provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records.c.recorded_at.desc(),
+      provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records.c.audit_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
     )
 
   def save_provider_provenance_scheduler_narrative_governance_plan(

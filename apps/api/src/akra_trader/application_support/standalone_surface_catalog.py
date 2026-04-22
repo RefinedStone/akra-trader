@@ -2268,6 +2268,72 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("hierarchy_step_template_id", "revision_id"),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_restore",
   )
+  operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/audits",
+    route_name="list_operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audits",
+    response_title="List provider provenance scheduler narrative governance hierarchy step template audits",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list",
+    filter_keys=("hierarchy_step_template_id", "action", "actor_tab_id", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "hierarchy_step_template_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Hierarchy step template ID",
+          description="Filter scheduler governance hierarchy step template audits by template.",
+          examples=("hst_123",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "action",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Action",
+          description="Filter scheduler governance hierarchy step template audits by action.",
+          examples=("updated",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "actor_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Actor tab ID",
+          description="Filter scheduler governance hierarchy step template audits by actor tab identity.",
+          examples=("tab_ops",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search scheduler governance hierarchy step template audits by template, action, actor, or origin.",
+          examples=("cross-catalog",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler governance hierarchy step template audit records to return.",
+          examples=(25,),
+        ),
+      ),
+    ),
+  )
   operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_id}/apply",
@@ -4109,6 +4175,7 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_delete_binding,
     operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_restore_binding,
+    operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_create_binding,

@@ -181,6 +181,10 @@ def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record')(*args, **kwargs)
 
@@ -1158,6 +1162,16 @@ def execute_standalone_surface_binding(
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
         reason=resolved_payload.get("reason", "scheduler_narrative_governance_hierarchy_step_template_revision_restored"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list":
+    return serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list(
+      app.list_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audits(
+        hierarchy_step_template_id=resolved_filters.get("hierarchy_step_template_id"),
+        action=resolved_filters.get("action"),
+        actor_tab_id=resolved_filters.get("actor_tab_id"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply":
