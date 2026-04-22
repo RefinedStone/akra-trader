@@ -442,78 +442,13 @@ class RunRecord:
   notes: list[str] = field(default_factory=list)
 
 
-@dataclass(frozen=True)
-class RunComparisonRun:
-  run_id: str
-  mode: str
-  status: str
-  lane: str
-  strategy_id: str
-  strategy_name: str | None
-  strategy_version: str
-  symbols: tuple[str, ...]
-  timeframe: str
-  started_at: datetime
-  catalog_semantics: StrategyCatalogSemantics = field(default_factory=StrategyCatalogSemantics)
-  ended_at: datetime | None = None
-  reference_id: str | None = None
-  reference_version: str | None = None
-  integration_mode: str | None = None
-  reference: ReferenceSource | None = None
-  working_directory: str | None = None
-  rerun_boundary_id: str | None = None
-  rerun_boundary_state: str = "range_only"
-  dataset_identity: str | None = None
-  experiment: RunExperimentMetadata = field(default_factory=RunExperimentMetadata)
-  external_command: tuple[str, ...] = ()
-  artifact_paths: tuple[str, ...] = ()
-  benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()
-  metrics: dict[str, Any] = field(default_factory=dict)
-  notes: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class RunComparisonMetricRow:
-  key: str
-  label: str
-  unit: str
-  higher_is_better: bool | None = None
-  values: dict[str, float | int | None] = field(default_factory=dict)
-  deltas_vs_baseline: dict[str, float | int | None] = field(default_factory=dict)
-  delta_annotations: dict[str, str] = field(default_factory=dict)
-  annotation: str | None = None
-  best_run_id: str | None = None
-
-
 from akra_trader.domain.model_types.provider_provenance import *
 from akra_trader.domain.model_types.run_surface_contracts import *
+from akra_trader.domain.model_types.run_comparison import *
 from akra_trader.domain.model_types.market_data_status import *
 from akra_trader.domain.model_types.sync_lineage import *
 from akra_trader.domain.model_types.operator_runtime import *
 from akra_trader.domain.model_types.guarded_live import *
-
-@dataclass(frozen=True)
-class RunComparisonNarrative:
-  run_id: str
-  baseline_run_id: str
-  comparison_type: str
-  title: str
-  summary: str
-  bullets: tuple[str, ...] = ()
-  score_breakdown: dict[str, Any] = field(default_factory=dict)
-  rank: int = 0
-  insight_score: float = 0.0
-  is_primary: bool = False
-
-
-@dataclass(frozen=True)
-class RunComparison:
-  requested_run_ids: tuple[str, ...]
-  baseline_run_id: str
-  runs: tuple[RunComparisonRun, ...]
-  metric_rows: tuple[RunComparisonMetricRow, ...]
-  intent: str = "benchmark_validation"
-  narratives: tuple[RunComparisonNarrative, ...] = ()
 
 
 @dataclass(frozen=True)
