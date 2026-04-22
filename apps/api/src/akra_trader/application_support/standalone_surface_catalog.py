@@ -1667,6 +1667,91 @@ def build_standalone_surface_runtime_bindings(
       ),
     ),
   )
+  operator_provider_provenance_scheduler_stitched_report_governance_registry_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_governance_registry_create",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries",
+    route_name="create_operator_provider_provenance_scheduler_stitched_report_governance_registry",
+    response_title="Create provider provenance stitched report governance registry",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_create",
+  )
+  operator_provider_provenance_scheduler_stitched_report_governance_registry_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_governance_registry_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries",
+    route_name="list_operator_provider_provenance_scheduler_stitched_report_governance_registries",
+    response_title="List provider provenance stitched report governance registries",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_list",
+    filter_keys=("search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search stitched report governance registries by name, description, queue slice, or default policy.",
+          examples=("stitched queue",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of stitched report governance registries to return.",
+          examples=(24,),
+        ),
+      ),
+    ),
+  )
+  operator_provider_provenance_scheduler_stitched_report_governance_registry_update_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_governance_registry_update",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries/{registry_id}",
+    route_name="update_operator_provider_provenance_scheduler_stitched_report_governance_registry",
+    response_title="Update provider provenance stitched report governance registry",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_update",
+    methods=("PATCH",),
+    path_param_keys=("registry_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_update",
+  )
+  operator_provider_provenance_scheduler_stitched_report_governance_registry_delete_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_governance_registry_delete",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries/{registry_id}/delete",
+    route_name="delete_operator_provider_provenance_scheduler_stitched_report_governance_registry",
+    response_title="Delete provider provenance stitched report governance registry",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_delete",
+    methods=("POST",),
+    path_param_keys=("registry_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_delete",
+  )
+  operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries/{registry_id}/revisions",
+    route_name="list_operator_provider_provenance_scheduler_stitched_report_governance_registry_revisions",
+    response_title="List provider provenance stitched report governance registry revisions",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list",
+    path_param_keys=("registry_id",),
+  )
+  operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries/{registry_id}/revisions/{revision_id}/restore",
+    route_name="restore_operator_provider_provenance_scheduler_stitched_report_governance_registry_revision",
+    response_title="Restore provider provenance stitched report governance registry revision",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore",
+    methods=("POST",),
+    path_param_keys=("registry_id", "revision_id"),
+    request_payload_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore",
+  )
   operator_provider_provenance_scheduler_narrative_template_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_template_create",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates",
@@ -4447,6 +4532,12 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_stitched_report_view_revision_list_binding,
     operator_provider_provenance_scheduler_stitched_report_view_revision_restore_binding,
     operator_provider_provenance_scheduler_stitched_report_view_audit_list_binding,
+    operator_provider_provenance_scheduler_stitched_report_governance_registry_create_binding,
+    operator_provider_provenance_scheduler_stitched_report_governance_registry_list_binding,
+    operator_provider_provenance_scheduler_stitched_report_governance_registry_update_binding,
+    operator_provider_provenance_scheduler_stitched_report_governance_registry_delete_binding,
+    operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list_binding,
+    operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore_binding,
     operator_provider_provenance_scheduler_narrative_template_create_binding,
     operator_provider_provenance_scheduler_narrative_template_list_binding,
     operator_provider_provenance_scheduler_narrative_template_update_binding,

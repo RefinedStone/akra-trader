@@ -137,6 +137,10 @@ creation.
 - those saved stitched report views now also have stitched-report-specific approval-queue and
   policy-catalog surfaces, so their saved-view governance can be reviewed and defaulted in place
   rather than only through the broader shared scheduler governance workspace
+- that stitched-report governance layer now also has a stitched-report-only registry and
+  lifecycle surface, so stitched queue slices plus default policy bundles can be saved,
+  reapplied, deleted, and revision-restored as dedicated stitched governance objects instead of
+  only as filters over the shared scheduler governance catalog
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand

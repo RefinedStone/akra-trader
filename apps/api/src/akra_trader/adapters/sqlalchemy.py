@@ -33,6 +33,8 @@ from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRevisionRecord
@@ -220,6 +222,25 @@ provider_provenance_scheduler_stitched_report_view_audit_records = Table(
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("view_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_stitched_report_governance_registries = Table(
+  "provider_provenance_scheduler_stitched_report_governance_registries",
+  metadata,
+  Column("registry_id", String, primary_key=True),
+  Column("name", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_stitched_report_governance_registry_revisions = Table(
+  "provider_provenance_scheduler_stitched_report_governance_registry_revisions",
+  metadata,
+  Column("revision_id", String, primary_key=True),
+  Column("registry_id", String, nullable=False, index=True),
   Column("action", String, nullable=False, index=True),
   Column("recorded_at", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
@@ -445,6 +466,12 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   )
   _provider_provenance_scheduler_stitched_report_view_audit_adapter = TypeAdapter(
     ProviderProvenanceSchedulerStitchedReportViewAuditRecord
+  )
+  _provider_provenance_scheduler_stitched_report_governance_registry_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord
+  )
+  _provider_provenance_scheduler_stitched_report_governance_registry_revision_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord
   )
   _provider_provenance_scheduled_report_adapter = TypeAdapter(ProviderProvenanceScheduledReportRecord)
   _provider_provenance_scheduler_narrative_template_adapter = TypeAdapter(
@@ -1411,6 +1438,133 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         row["payload"]
       )
       for row in rows
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_governance_registry(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    payload = self._provider_provenance_scheduler_stitched_report_governance_registry_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "registry_id": record.registry_id,
+      "name": record.name,
+      "status": record.status,
+      "updated_at": record.updated_at.isoformat(),
+      "created_by_tab_id": record.created_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_governance_registries.c.registry_id).where(
+          provider_provenance_scheduler_stitched_report_governance_registries.c.registry_id == record.registry_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_stitched_report_governance_registries).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_stitched_report_governance_registries)
+          .where(provider_provenance_scheduler_stitched_report_governance_registries.c.registry_id == record.registry_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_registries(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord, ...]:
+    statement = select(provider_provenance_scheduler_stitched_report_governance_registries.c.payload).order_by(
+      provider_provenance_scheduler_stitched_report_governance_registries.c.updated_at.desc(),
+      provider_provenance_scheduler_stitched_report_governance_registries.c.registry_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_stitched_report_governance_registry_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_registry(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_governance_registries.c.payload).where(
+          provider_provenance_scheduler_stitched_report_governance_registries.c.registry_id == registry_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_stitched_report_governance_registry_adapter.validate_python(
+      row["payload"]
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord:
+    payload = self._provider_provenance_scheduler_stitched_report_governance_registry_revision_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "revision_id": record.revision_id,
+      "registry_id": record.registry_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_governance_registry_revisions.c.revision_id).where(
+          provider_provenance_scheduler_stitched_report_governance_registry_revisions.c.revision_id == record.revision_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_stitched_report_governance_registry_revisions).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_stitched_report_governance_registry_revisions)
+          .where(provider_provenance_scheduler_stitched_report_governance_registry_revisions.c.revision_id == record.revision_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_registry_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord, ...]:
+    statement = select(provider_provenance_scheduler_stitched_report_governance_registry_revisions.c.payload).order_by(
+      provider_provenance_scheduler_stitched_report_governance_registry_revisions.c.recorded_at.desc(),
+      provider_provenance_scheduler_stitched_report_governance_registry_revisions.c.revision_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_stitched_report_governance_registry_revision_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_governance_registry_revisions.c.payload).where(
+          provider_provenance_scheduler_stitched_report_governance_registry_revisions.c.revision_id == revision_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_stitched_report_governance_registry_revision_adapter.validate_python(
+      row["payload"]
     )
 
   def save_provider_provenance_scheduled_report(
@@ -2641,6 +2795,13 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_provider_provenance_scheduler_stitched_report_view_audit_records_view_id", "view_id"),
         ("ix_provider_provenance_scheduler_stitched_report_view_audit_records_action", "action"),
         ("ix_provider_provenance_scheduler_stitched_report_view_audit_records_recorded_at", "recorded_at"),
+        ("ix_provider_provenance_scheduler_stitched_report_governance_registries_name", "name"),
+        ("ix_provider_provenance_scheduler_stitched_report_governance_registries_status", "status"),
+        ("ix_provider_provenance_scheduler_stitched_report_governance_registries_updated_at", "updated_at"),
+        ("ix_provider_provenance_scheduler_stitched_report_governance_registries_created_by_tab_id", "created_by_tab_id"),
+        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_revisions_registry_id", "registry_id"),
+        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_revisions_action", "action"),
+        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_revisions_recorded_at", "recorded_at"),
         ("ix_provider_provenance_scheduled_reports_name", "name"),
         ("ix_provider_provenance_scheduled_reports_status", "status"),
         ("ix_provider_provenance_scheduled_reports_cadence", "cadence"),
@@ -2686,6 +2847,10 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
           if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_view_revisions_")
           else "provider_provenance_scheduler_stitched_report_view_audit_records"
           if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_view_audit_records_")
+          else "provider_provenance_scheduler_stitched_report_governance_registries"
+          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_governance_registries_")
+          else "provider_provenance_scheduler_stitched_report_governance_registry_revisions"
+          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_governance_registry_revisions_")
           else "provider_provenance_analytics_presets"
           if index_name.startswith("ix_provider_provenance_analytics_presets_")
           else

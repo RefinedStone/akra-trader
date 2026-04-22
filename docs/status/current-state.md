@@ -191,6 +191,10 @@ It is not yet a finished live trading product:
 - those saved stitched report views now also expose their own approval-queue slice and stitched
   report policy-catalog surface, so operators can review saved-view governance plans and apply
   stitched-specific queue defaults without jumping back to the generic scheduler governance panel
+- that stitched-report governance workspace now also has a stitched-report-only registry and
+  revision lifecycle layer, so teams can save, re-apply, delete, and restore dedicated queue
+  slices plus default policy bundles without treating stitched-report governance as a filtered
+  view of the shared policy catalog alone
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

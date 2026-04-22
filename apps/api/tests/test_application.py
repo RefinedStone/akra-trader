@@ -15242,6 +15242,12 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_stitched_report_view_revision_list",
     "operator_provider_provenance_scheduler_stitched_report_view_revision_restore",
     "operator_provider_provenance_scheduler_stitched_report_view_audit_list",
+    "operator_provider_provenance_scheduler_stitched_report_governance_registry_create",
+    "operator_provider_provenance_scheduler_stitched_report_governance_registry_list",
+    "operator_provider_provenance_scheduler_stitched_report_governance_registry_update",
+    "operator_provider_provenance_scheduler_stitched_report_governance_registry_delete",
+    "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list",
+    "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore",
     "operator_provider_provenance_scheduler_narrative_template_create",
     "operator_provider_provenance_scheduler_narrative_template_list",
     "operator_provider_provenance_scheduler_narrative_template_update",
@@ -15449,6 +15455,25 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_audit_list"].route_path.endswith(
     "/scheduler-stitched-report-views/audits"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_create"].methods == (
+    "POST",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_list"].filter_param_specs[0].key == (
+    "search"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_update"].methods == (
+    "PATCH",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_delete"].path_param_keys == (
+    "registry_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list"].route_path.endswith(
+    "/scheduler-stitched-report-governance-registries/{registry_id}/revisions"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore"].path_param_keys == (
+    "registry_id",
+    "revision_id",
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"].methods == ("POST",)
   assert (
@@ -16830,6 +16855,104 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert stitched_report_view_audit_payload["items"][0]["action"] == "updated"
   assert stitched_report_view_audit_payload["items"][0]["actor_tab_id"] == "tab_ops"
   assert "Shift /" in stitched_report_view_audit_payload["items"][0]["detail"]
+
+  stitched_governance_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_create"],
+    app=app,
+    request_payload={
+      "name": "Lag stitched governance bundle",
+      "description": "Dedicated stitched-report queue slice and defaults.",
+      "queue_view": {
+        "queue_state": "pending_approval",
+        "item_type": "stitched_report_view",
+        "approval_lane": "ops",
+        "approval_priority": "high",
+        "search": "lag recovery",
+        "sort": "updated_desc",
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert stitched_governance_registry_payload["status"] == "active"
+  assert stitched_governance_registry_payload["queue_view"]["item_type"] == "stitched_report_view"
+  assert stitched_governance_registry_payload["revision_count"] == 1
+
+  stitched_governance_registry_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_list"],
+    app=app,
+    filters={"search": "lag recovery", "limit": 10},
+  )
+  assert stitched_governance_registry_list_payload["total"] == 1
+  assert stitched_governance_registry_list_payload["items"][0]["registry_id"] == stitched_governance_registry_payload["registry_id"]
+
+  updated_stitched_governance_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_update"],
+    app=app,
+    path_params={"registry_id": stitched_governance_registry_payload["registry_id"]},
+    request_payload={
+      "name": "Lag stitched governance bundle v2",
+      "description": "Dedicated stitched-report queue slice and defaults v2.",
+      "queue_view": {
+        "queue_state": "ready_to_apply",
+        "item_type": "stitched_report_view",
+        "approval_lane": "ops",
+        "approval_priority": "critical",
+        "search": "lag recovery reviewed",
+        "sort": "created_desc",
+      },
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_stitched_report_governance_registry_manual_edit",
+    },
+  )
+  assert updated_stitched_governance_registry_payload["name"] == "Lag stitched governance bundle v2"
+  assert updated_stitched_governance_registry_payload["queue_view"]["queue_state"] == "ready_to_apply"
+  assert updated_stitched_governance_registry_payload["revision_count"] == 2
+
+  stitched_governance_registry_revision_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list"],
+    app=app,
+    path_params={"registry_id": stitched_governance_registry_payload["registry_id"]},
+  )
+  assert stitched_governance_registry_revision_payload["registry"]["registry_id"] == stitched_governance_registry_payload["registry_id"]
+  assert [item["action"] for item in stitched_governance_registry_revision_payload["history"][:2]] == [
+    "updated",
+    "created",
+  ]
+  created_stitched_governance_registry_revision_id = (
+    stitched_governance_registry_revision_payload["history"][-1]["revision_id"]
+  )
+
+  deleted_stitched_governance_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_delete"],
+    app=app,
+    path_params={"registry_id": stitched_governance_registry_payload["registry_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_stitched_report_governance_registry_deleted_from_control_room",
+    },
+  )
+  assert deleted_stitched_governance_registry_payload["status"] == "deleted"
+  assert deleted_stitched_governance_registry_payload["revision_count"] == 3
+
+  restored_stitched_governance_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore"],
+    app=app,
+    path_params={
+      "registry_id": stitched_governance_registry_payload["registry_id"],
+      "revision_id": created_stitched_governance_registry_revision_id,
+    },
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_stitched_report_governance_registry_revision_restore_from_control_room",
+    },
+  )
+  assert restored_stitched_governance_registry_payload["status"] == "active"
+  assert restored_stitched_governance_registry_payload["name"] == "Lag stitched governance bundle"
+  assert restored_stitched_governance_registry_payload["revision_count"] == 4
 
   template_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"],

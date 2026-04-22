@@ -311,6 +311,39 @@ class OperatorProviderProvenanceSchedulerStitchedReportViewRevisionRestoreReques
   reason: str = "scheduler_stitched_report_view_revision_restored"
 
 
+class OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryCreateRequest(BaseModel):
+  name: str
+  description: str = ""
+  queue_view: dict[str, Any] = Field(default_factory=dict)
+  default_policy_template_id: str | None = None
+  default_policy_catalog_id: str | None = None
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryUpdateRequest(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  queue_view: dict[str, Any] | None = None
+  default_policy_template_id: str | None = None
+  default_policy_catalog_id: str | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_stitched_report_governance_registry_updated"
+
+
+class OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryDeleteRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_stitched_report_governance_registry_deleted"
+
+
+class OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRestoreRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_stitched_report_governance_registry_revision_restored"
+
+
 class OperatorProviderProvenanceSchedulerNarrativeTemplateCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -758,6 +791,22 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_stitched_report_view_revision_restore": (
     OperatorProviderProvenanceSchedulerStitchedReportViewRevisionRestoreRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_stitched_report_governance_registry_create": (
+    OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryCreateRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_stitched_report_governance_registry_update": (
+    OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryUpdateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_stitched_report_governance_registry_delete": (
+    OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryDeleteRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore": (
+    OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRestoreRequest,
     {},
   ),
   "operator_provider_provenance_scheduler_narrative_template_create": (

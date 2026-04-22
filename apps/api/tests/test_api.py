@@ -646,6 +646,37 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "limit",
     "app",
   )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_stitched_report_governance_registry"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_stitched_report_governance_registries"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["update_operator_provider_provenance_scheduler_stitched_report_governance_registry"].endpoint).parameters) == (
+    "registry_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["delete_operator_provider_provenance_scheduler_stitched_report_governance_registry"].endpoint).parameters) == (
+    "registry_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_stitched_report_governance_registry_revisions"].endpoint).parameters) == (
+    "registry_id",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["restore_operator_provider_provenance_scheduler_stitched_report_governance_registry_revision"].endpoint).parameters) == (
+    "registry_id",
+    "revision_id",
+    "request",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_narrative_template"].endpoint).parameters) == (
     "request",
     "app",

@@ -133,6 +133,18 @@ def serialize_provider_provenance_scheduler_stitched_report_view_audit_list(*arg
   return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_view_audit_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_stitched_report_governance_registry_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_governance_registry_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_stitched_report_governance_registry_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_governance_registry_list')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_stitched_report_governance_registry_revision_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_governance_registry_revision_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduler_narrative_template_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_record')(*args, **kwargs)
 
@@ -797,6 +809,68 @@ def execute_standalone_surface_binding(
         actor_tab_id=resolved_filters.get("actor_tab_id"),
         search=resolved_filters.get("search"),
         limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_registry_create":
+    return serialize_provider_provenance_scheduler_stitched_report_governance_registry_record(
+      app.create_provider_provenance_scheduler_stitched_report_governance_registry(
+        name=resolved_payload["name"],
+        description=resolved_payload.get("description") or "",
+        queue_view=resolved_payload.get("queue_view"),
+        default_policy_template_id=resolved_payload.get("default_policy_template_id"),
+        default_policy_catalog_id=resolved_payload.get("default_policy_catalog_id"),
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_registry_list":
+    return serialize_provider_provenance_scheduler_stitched_report_governance_registry_list(
+      app.list_provider_provenance_scheduler_stitched_report_governance_registries(
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_registry_update":
+    return serialize_provider_provenance_scheduler_stitched_report_governance_registry_record(
+      app.update_provider_provenance_scheduler_stitched_report_governance_registry(
+        resolved_path_params["registry_id"],
+        name=resolved_payload.get("name"),
+        description=resolved_payload.get("description"),
+        queue_view=resolved_payload.get("queue_view"),
+        default_policy_template_id=resolved_payload.get("default_policy_template_id"),
+        default_policy_catalog_id=resolved_payload.get("default_policy_catalog_id"),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_stitched_report_governance_registry_updated"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_registry_delete":
+    return serialize_provider_provenance_scheduler_stitched_report_governance_registry_record(
+      app.delete_provider_provenance_scheduler_stitched_report_governance_registry(
+        resolved_path_params["registry_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_stitched_report_governance_registry_deleted"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list":
+    registry = app.get_provider_provenance_scheduler_stitched_report_governance_registry(
+      resolved_path_params["registry_id"]
+    )
+    return serialize_provider_provenance_scheduler_stitched_report_governance_registry_revision_list(
+      registry,
+      app.list_provider_provenance_scheduler_stitched_report_governance_registry_revisions(
+        resolved_path_params["registry_id"]
+      ),
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore":
+    return serialize_provider_provenance_scheduler_stitched_report_governance_registry_record(
+      app.restore_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+        resolved_path_params["registry_id"],
+        resolved_path_params["revision_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_stitched_report_governance_registry_revision_restored"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_create":

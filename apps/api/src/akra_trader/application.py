@@ -35,6 +35,8 @@ from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRevisionRecord
@@ -462,6 +464,14 @@ class TradingApplication:
     self._provider_provenance_scheduler_stitched_report_view_audit_records: dict[
       str,
       ProviderProvenanceSchedulerStitchedReportViewAuditRecord,
+    ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_registries: dict[
+      str,
+      ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+    ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_registry_revisions: dict[
+      str,
+      ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord,
     ] = {}
     self._provider_provenance_scheduled_reports: dict[str, ProviderProvenanceScheduledReportRecord] = {}
     self._provider_provenance_scheduler_narrative_templates: dict[
@@ -1812,6 +1822,98 @@ class TradingApplication:
       sorted(
         self._provider_provenance_scheduler_stitched_report_view_audit_records.values(),
         key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_stitched_report_governance_registry_record(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    save_registry = getattr(
+      self._runs,
+      "save_provider_provenance_scheduler_stitched_report_governance_registry",
+      None,
+    )
+    if callable(save_registry):
+      return save_registry(record)
+    self._provider_provenance_scheduler_stitched_report_governance_registries[record.registry_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_stitched_report_governance_registry_record(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord | None:
+    get_registry = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_stitched_report_governance_registry",
+      None,
+    )
+    if callable(get_registry):
+      return get_registry(registry_id)
+    return self._provider_provenance_scheduler_stitched_report_governance_registries.get(registry_id)
+
+  def _list_provider_provenance_scheduler_stitched_report_governance_registry_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord, ...]:
+    list_registries = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_registries",
+      None,
+    )
+    if callable(list_registries):
+      return tuple(list_registries())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_registries.values(),
+        key=lambda record: (record.updated_at, record.registry_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_stitched_report_governance_registry_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord:
+    save_revision = getattr(
+      self._runs,
+      "save_provider_provenance_scheduler_stitched_report_governance_registry_revision",
+      None,
+    )
+    if callable(save_revision):
+      return save_revision(record)
+    self._provider_provenance_scheduler_stitched_report_governance_registry_revisions[record.revision_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_stitched_report_governance_registry_revision_record(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord | None:
+    get_revision = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_stitched_report_governance_registry_revision",
+      None,
+    )
+    if callable(get_revision):
+      return get_revision(revision_id)
+    return self._provider_provenance_scheduler_stitched_report_governance_registry_revisions.get(
+      revision_id
+    )
+
+  def _list_provider_provenance_scheduler_stitched_report_governance_registry_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord, ...]:
+    list_revisions = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_registry_revisions",
+      None,
+    )
+    if callable(list_revisions):
+      return tuple(list_revisions())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_registry_revisions.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
         reverse=True,
       )
     )
@@ -4524,6 +4626,103 @@ class TradingApplication:
     )
     return updated
 
+  def _normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+    self,
+    queue_view: dict[str, Any] | None,
+  ) -> dict[str, Any]:
+    normalized = self._normalize_provider_provenance_scheduler_narrative_governance_queue_view_payload(
+      queue_view
+    )
+    if not isinstance(normalized, dict):
+      return {}
+    normalized["item_type"] = "stitched_report_view"
+    return normalized
+
+  def _build_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+    self,
+    *,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+    action: str,
+    reason: str,
+    recorded_at: datetime,
+    source_revision_id: str | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord:
+    revision_count = sum(
+      1
+      for revision in self._list_provider_provenance_scheduler_stitched_report_governance_registry_revision_records()
+      if revision.registry_id == record.registry_id
+    )
+    return ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord(
+      revision_id=f"{record.registry_id}:r{revision_count + 1:04d}",
+      registry_id=record.registry_id,
+      action=action,
+      reason=reason.strip() if isinstance(reason, str) and reason.strip() else action,
+      name=record.name,
+      description=record.description,
+      queue_view=deepcopy(record.queue_view),
+      default_policy_template_id=record.default_policy_template_id,
+      default_policy_template_name=record.default_policy_template_name,
+      default_policy_catalog_id=record.default_policy_catalog_id,
+      default_policy_catalog_name=record.default_policy_catalog_name,
+      status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+      recorded_at=recorded_at,
+      source_revision_id=source_revision_id,
+      recorded_by_tab_id=(
+        actor_tab_id.strip()
+        if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+        else None
+      ),
+      recorded_by_tab_label=(
+        actor_tab_label.strip()
+        if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+        else None
+      ),
+    )
+
+  def _record_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+    self,
+    *,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+    action: str,
+    reason: str,
+    recorded_at: datetime,
+    source_revision_id: str | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    revision = self._save_provider_provenance_scheduler_stitched_report_governance_registry_revision_record(
+      self._build_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+        record=record,
+        action=action,
+        reason=reason,
+        recorded_at=recorded_at,
+        source_revision_id=source_revision_id,
+        actor_tab_id=actor_tab_id,
+        actor_tab_label=actor_tab_label,
+      )
+    )
+    return self._save_provider_provenance_scheduler_stitched_report_governance_registry_record(
+      replace(
+        record,
+        current_revision_id=revision.revision_id,
+        revision_count=int(record.revision_count or 0) + 1,
+      )
+    )
+
+  def _find_latest_active_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord | None:
+    for revision in self._list_provider_provenance_scheduler_stitched_report_governance_registry_revision_records():
+      if revision.registry_id != registry_id:
+        continue
+      if self._normalize_provider_provenance_scheduler_narrative_record_status(revision.status) != "active":
+        continue
+      return revision
+    return None
+
   def _build_provider_provenance_scheduler_narrative_template_revision(
     self,
     *,
@@ -6227,6 +6426,353 @@ class TradingApplication:
         )
       )
     return tuple(filtered[:normalized_limit])
+
+  def create_provider_provenance_scheduler_stitched_report_governance_registry(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    queue_view: dict[str, Any] | None = None,
+    default_policy_template_id: str | None = None,
+    default_policy_catalog_id: str | None = None,
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    now = self._clock()
+    (
+      resolved_policy_catalog,
+      resolved_policy_template,
+      _resolved_lane,
+      _resolved_priority,
+      _resolved_guidance,
+    ) = self._resolve_provider_provenance_scheduler_narrative_governance_policy_layer(
+      item_type="stitched_report_view",
+      action="update",
+      policy_catalog_id=default_policy_catalog_id,
+      policy_template_id=default_policy_template_id,
+    )
+    record = ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord(
+      registry_id=uuid4().hex[:12],
+      name=self._normalize_provider_provenance_workspace_name(
+        name,
+        field_name="scheduler stitched report governance registry name",
+      ),
+      description=description.strip() if isinstance(description, str) else "",
+      queue_view=self._normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+        queue_view
+      ),
+      default_policy_template_id=(
+        resolved_policy_template.policy_template_id
+        if resolved_policy_template is not None
+        else None
+      ),
+      default_policy_template_name=(
+        resolved_policy_template.name
+        if resolved_policy_template is not None
+        else None
+      ),
+      default_policy_catalog_id=(
+        resolved_policy_catalog.catalog_id
+        if resolved_policy_catalog is not None
+        else None
+      ),
+      default_policy_catalog_name=(
+        resolved_policy_catalog.name
+        if resolved_policy_catalog is not None
+        else None
+      ),
+      created_at=now,
+      updated_at=now,
+      created_by_tab_id=(
+        created_by_tab_id.strip()
+        if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+        else None
+      ),
+      created_by_tab_label=(
+        created_by_tab_label.strip()
+        if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+        else None
+      ),
+    )
+    return self._record_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+      record=record,
+      action="created",
+      reason="scheduler_stitched_report_governance_registry_created",
+      recorded_at=now,
+      actor_tab_id=record.created_by_tab_id,
+      actor_tab_label=record.created_by_tab_label,
+    )
+
+  def list_provider_provenance_scheduler_stitched_report_governance_registries(
+    self,
+    *,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord, ...]:
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord] = []
+    for record in self._list_provider_provenance_scheduler_stitched_report_governance_registry_records():
+      normalized_queue_view = self._normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+        record.queue_view
+      )
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.registry_id,
+          record.name,
+          record.description,
+          record.status,
+          record.default_policy_template_id,
+          record.default_policy_template_name,
+          record.default_policy_catalog_id,
+          record.default_policy_catalog_name,
+          normalized_queue_view.get("queue_state"),
+          normalized_queue_view.get("item_type"),
+          normalized_queue_view.get("approval_lane"),
+          normalized_queue_view.get("approval_priority"),
+          normalized_queue_view.get("policy_template_id"),
+          normalized_queue_view.get("policy_catalog_id"),
+          normalized_queue_view.get("search"),
+          normalized_queue_view.get("sort"),
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(
+        replace(
+          record,
+          status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+          queue_view=normalized_queue_view,
+        )
+      )
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_scheduler_stitched_report_governance_registry(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    normalized_registry_id = registry_id.strip()
+    if not normalized_registry_id:
+      raise LookupError("Provider provenance stitched report governance registry not found.")
+    record = self._load_provider_provenance_scheduler_stitched_report_governance_registry_record(
+      normalized_registry_id
+    )
+    if record is None:
+      raise LookupError("Provider provenance stitched report governance registry not found.")
+    return replace(
+      record,
+      status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+      queue_view=self._normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+        record.queue_view
+      ),
+    )
+
+  def update_provider_provenance_scheduler_stitched_report_governance_registry(
+    self,
+    registry_id: str,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    queue_view: dict[str, Any] | None = None,
+    default_policy_template_id: str | None = None,
+    default_policy_catalog_id: str | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_stitched_report_governance_registry_updated",
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    current = self.get_provider_provenance_scheduler_stitched_report_governance_registry(registry_id)
+    if current.status == "deleted":
+      raise RuntimeError(
+        "Deleted stitched report governance registries must be restored from a revision before editing."
+      )
+    (
+      resolved_policy_catalog,
+      resolved_policy_template,
+      _resolved_lane,
+      _resolved_priority,
+      _resolved_guidance,
+    ) = self._resolve_provider_provenance_scheduler_narrative_governance_policy_layer(
+      item_type="stitched_report_view",
+      action="update",
+      policy_catalog_id=(
+        default_policy_catalog_id
+        if isinstance(default_policy_catalog_id, str)
+        else current.default_policy_catalog_id
+      ),
+      policy_template_id=(
+        default_policy_template_id
+        if isinstance(default_policy_template_id, str)
+        else current.default_policy_template_id
+      ),
+    )
+    updated_name = (
+      self._normalize_provider_provenance_workspace_name(
+        name,
+        field_name="scheduler stitched report governance registry name",
+      )
+      if isinstance(name, str)
+      else current.name
+    )
+    updated_description = (
+      description.strip()
+      if isinstance(description, str)
+      else current.description
+    )
+    updated_queue_view = (
+      self._normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+        queue_view
+      )
+      if isinstance(queue_view, dict)
+      else current.queue_view
+    )
+    updated_default_policy_template_id = (
+      resolved_policy_template.policy_template_id
+      if resolved_policy_template is not None
+      else None
+    )
+    updated_default_policy_template_name = (
+      resolved_policy_template.name
+      if resolved_policy_template is not None
+      else None
+    )
+    updated_default_policy_catalog_id = (
+      resolved_policy_catalog.catalog_id
+      if resolved_policy_catalog is not None
+      else None
+    )
+    updated_default_policy_catalog_name = (
+      resolved_policy_catalog.name
+      if resolved_policy_catalog is not None
+      else None
+    )
+    if (
+      updated_name == current.name
+      and updated_description == current.description
+      and updated_queue_view == current.queue_view
+      and updated_default_policy_template_id == current.default_policy_template_id
+      and updated_default_policy_template_name == current.default_policy_template_name
+      and updated_default_policy_catalog_id == current.default_policy_catalog_id
+      and updated_default_policy_catalog_name == current.default_policy_catalog_name
+    ):
+      return current
+    updated = replace(
+      current,
+      name=updated_name,
+      description=updated_description,
+      queue_view=updated_queue_view,
+      default_policy_template_id=updated_default_policy_template_id,
+      default_policy_template_name=updated_default_policy_template_name,
+      default_policy_catalog_id=updated_default_policy_catalog_id,
+      default_policy_catalog_name=updated_default_policy_catalog_name,
+      updated_at=self._clock(),
+    )
+    return self._record_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+      record=updated,
+      action="updated",
+      reason=reason,
+      recorded_at=updated.updated_at,
+      source_revision_id=current.current_revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
+    )
+
+  def delete_provider_provenance_scheduler_stitched_report_governance_registry(
+    self,
+    registry_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_stitched_report_governance_registry_deleted",
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    current = self.get_provider_provenance_scheduler_stitched_report_governance_registry(registry_id)
+    if current.status == "deleted":
+      return current
+    deleted_at = self._clock()
+    deleted = replace(
+      current,
+      status="deleted",
+      updated_at=deleted_at,
+      deleted_at=deleted_at,
+      deleted_by_tab_id=(
+        actor_tab_id.strip()
+        if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+        else None
+      ),
+      deleted_by_tab_label=(
+        actor_tab_label.strip()
+        if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+        else None
+      ),
+    )
+    return self._record_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+      record=deleted,
+      action="deleted",
+      reason=reason,
+      recorded_at=deleted_at,
+      source_revision_id=current.current_revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
+    )
+
+  def list_provider_provenance_scheduler_stitched_report_governance_registry_revisions(
+    self,
+    registry_id: str,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord, ...]:
+    current = self.get_provider_provenance_scheduler_stitched_report_governance_registry(registry_id)
+    revisions = [
+      replace(
+        revision,
+        status=self._normalize_provider_provenance_scheduler_narrative_record_status(revision.status),
+        queue_view=self._normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+          revision.queue_view
+        ),
+      )
+      for revision in self._list_provider_provenance_scheduler_stitched_report_governance_registry_revision_records()
+      if revision.registry_id == current.registry_id
+    ]
+    return tuple(revisions)
+
+  def restore_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+    self,
+    registry_id: str,
+    revision_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_stitched_report_governance_registry_revision_restored",
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    current = self.get_provider_provenance_scheduler_stitched_report_governance_registry(registry_id)
+    revision = self._load_provider_provenance_scheduler_stitched_report_governance_registry_revision_record(
+      revision_id.strip()
+    )
+    if revision is None or revision.registry_id != current.registry_id:
+      raise LookupError("Provider provenance stitched report governance registry revision not found.")
+    restored_at = self._clock()
+    restored = replace(
+      current,
+      name=revision.name,
+      description=revision.description,
+      queue_view=self._normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+        revision.queue_view
+      ),
+      default_policy_template_id=revision.default_policy_template_id,
+      default_policy_template_name=revision.default_policy_template_name,
+      default_policy_catalog_id=revision.default_policy_catalog_id,
+      default_policy_catalog_name=revision.default_policy_catalog_name,
+      status="active",
+      updated_at=restored_at,
+      deleted_at=None,
+      deleted_by_tab_id=None,
+      deleted_by_tab_label=None,
+    )
+    return self._record_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+      record=restored,
+      action="restored",
+      reason=reason,
+      recorded_at=restored_at,
+      source_revision_id=revision.revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
+    )
 
   def create_provider_provenance_scheduler_narrative_template(
     self,
@@ -38304,6 +38850,105 @@ def serialize_provider_provenance_scheduler_stitched_report_view_audit_list(
       for record in records
     ],
     "total": len(records),
+  }
+
+
+def serialize_provider_provenance_scheduler_stitched_report_governance_registry_record(
+  record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+) -> dict[str, Any]:
+  normalized_queue_view = (
+    TradingApplication._normalize_provider_provenance_scheduler_narrative_governance_queue_view_payload(
+      record.queue_view
+    )
+  )
+  if isinstance(normalized_queue_view, dict):
+    normalized_queue_view["item_type"] = "stitched_report_view"
+  else:
+    normalized_queue_view = {"item_type": "stitched_report_view"}
+  return {
+    "registry_id": record.registry_id,
+    "name": record.name,
+    "description": record.description,
+    "queue_view": deepcopy(normalized_queue_view),
+    "default_policy_template_id": record.default_policy_template_id,
+    "default_policy_template_name": record.default_policy_template_name,
+    "default_policy_catalog_id": record.default_policy_catalog_id,
+    "default_policy_catalog_name": record.default_policy_catalog_name,
+    "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+      record.status
+    ),
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "current_revision_id": record.current_revision_id,
+    "revision_count": int(record.revision_count),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+    "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
+    "deleted_by_tab_id": record.deleted_by_tab_id,
+    "deleted_by_tab_label": record.deleted_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_stitched_report_governance_registry_list(
+  records: tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduler_stitched_report_governance_registry_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
+def serialize_provider_provenance_scheduler_stitched_report_governance_registry_revision_record(
+  record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord,
+) -> dict[str, Any]:
+  normalized_queue_view = (
+    TradingApplication._normalize_provider_provenance_scheduler_narrative_governance_queue_view_payload(
+      record.queue_view
+    )
+  )
+  if isinstance(normalized_queue_view, dict):
+    normalized_queue_view["item_type"] = "stitched_report_view"
+  else:
+    normalized_queue_view = {"item_type": "stitched_report_view"}
+  return {
+    "revision_id": record.revision_id,
+    "registry_id": record.registry_id,
+    "action": record.action,
+    "reason": record.reason,
+    "source_revision_id": record.source_revision_id,
+    "name": record.name,
+    "description": record.description,
+    "queue_view": deepcopy(normalized_queue_view),
+    "default_policy_template_id": record.default_policy_template_id,
+    "default_policy_template_name": record.default_policy_template_name,
+    "default_policy_catalog_id": record.default_policy_catalog_id,
+    "default_policy_catalog_name": record.default_policy_catalog_name,
+    "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+      record.status
+    ),
+    "recorded_at": record.recorded_at.isoformat(),
+    "recorded_by_tab_id": record.recorded_by_tab_id,
+    "recorded_by_tab_label": record.recorded_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_stitched_report_governance_registry_revision_list(
+  record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+  revisions: tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "registry": serialize_provider_provenance_scheduler_stitched_report_governance_registry_record(
+      record
+    ),
+    "history": [
+      serialize_provider_provenance_scheduler_stitched_report_governance_registry_revision_record(
+        revision
+      )
+      for revision in revisions
+    ],
   }
 
 

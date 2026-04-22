@@ -56,6 +56,7 @@ import {
   createProviderProvenanceAnalyticsPreset,
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
+  createProviderProvenanceSchedulerStitchedReportGovernanceRegistry,
   createProviderProvenanceSchedulerStitchedReportView,
   createProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy,
@@ -111,6 +112,8 @@ import {
   listProviderProvenanceExportJobs,
   listProviderProvenanceSchedulerAlertHistory,
   listProviderProvenanceSchedulerHealthHistory,
+  listProviderProvenanceSchedulerStitchedReportGovernanceRegistries,
+  listProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisions,
   listProviderProvenanceSchedulerStitchedReportViewAudits,
   listProviderProvenanceSchedulerStitchedReportViewRevisions,
   listProviderProvenanceScheduledReports,
@@ -124,6 +127,7 @@ import {
   restoreProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevision,
   restoreProviderProvenanceSchedulerNarrativeRegistryRevision,
+  restoreProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevision,
   restoreProviderProvenanceSchedulerStitchedReportViewRevision,
   restoreProviderProvenanceSchedulerNarrativeTemplateRevision,
   revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
@@ -141,9 +145,11 @@ import {
   updateProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   updateProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   updateProviderProvenanceSchedulerNarrativeRegistryEntry,
+  updateProviderProvenanceSchedulerStitchedReportGovernanceRegistry,
   updateProviderProvenanceSchedulerStitchedReportView,
   updateProviderProvenanceSchedulerNarrativeTemplate,
   updateProviderProvenanceExportJobPolicy,
+  deleteProviderProvenanceSchedulerStitchedReportGovernanceRegistry,
 } from "./controlRoomApi";
 
 
@@ -345,6 +351,9 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
+  ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionEntry,
+  ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionListPayload,
   ProviderProvenanceSchedulerStitchedReportViewAuditRecord,
   ProviderProvenanceSchedulerStitchedReportViewEntry,
   ProviderProvenanceSchedulerStitchedReportViewRevisionEntry,
@@ -659,6 +668,21 @@ const defaultProviderProvenanceWorkspaceDraft = {
   name: "",
   description: "",
 };
+
+type ProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraftState = {
+  name: string;
+  description: string;
+  default_policy_template_id: string;
+  default_policy_catalog_id: string;
+};
+
+const defaultProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft:
+  ProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraftState = {
+    name: "",
+    description: "",
+    default_policy_template_id: "",
+    default_policy_catalog_id: "",
+  };
 
 const KEEP_CURRENT_BULK_GOVERNANCE_VALUE = "__keep_current__";
 const CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE = "__clear_template_link__";
@@ -2913,6 +2937,33 @@ function buildProviderProvenanceSchedulerNarrativeGovernanceQueueFilterStateFrom
   };
 }
 
+function buildProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterStateFromView(
+  queueView: Partial<ProviderProvenanceSchedulerNarrativeGovernanceQueueView> | null | undefined,
+): ProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterState {
+  const normalized = normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueView(queueView);
+  return {
+    queue_state:
+      normalized?.queue_state === "pending_approval"
+      || normalized?.queue_state === "ready_to_apply"
+      || normalized?.queue_state === "completed"
+        ? normalized.queue_state
+        : ALL_FILTER_VALUE,
+    approval_lane: normalized?.approval_lane ?? ALL_FILTER_VALUE,
+    approval_priority: normalized?.approval_priority ?? ALL_FILTER_VALUE,
+    policy_template_id:
+      typeof normalized?.policy_template_id === "string"
+        ? normalized.policy_template_id
+        : ALL_FILTER_VALUE,
+    policy_catalog_id:
+      typeof normalized?.policy_catalog_id === "string"
+        ? normalized.policy_catalog_id
+        : ALL_FILTER_VALUE,
+    search: normalized?.search ?? "",
+    sort:
+      normalized?.sort ?? DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
+  };
+}
+
 function buildProviderProvenanceSchedulerNarrativeGovernanceQueueViewPayload(
   filter: ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState,
   sourceTemplateNameMap: Map<string, string>,
@@ -2954,6 +3005,25 @@ function buildProviderProvenanceSchedulerNarrativeGovernanceQueueViewPayload(
     normalized.sort = normalizedSort;
   }
   return normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueView(normalized);
+}
+
+function buildProviderProvenanceSchedulerStitchedReportGovernanceQueueViewPayload(
+  filter: ProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterState,
+): ProviderProvenanceSchedulerNarrativeGovernanceQueueView | null {
+  return buildProviderProvenanceSchedulerNarrativeGovernanceQueueViewPayload(
+    {
+      queue_state: filter.queue_state,
+      item_type: "stitched_report_view",
+      approval_lane: filter.approval_lane,
+      approval_priority: filter.approval_priority,
+      policy_template_id: filter.policy_template_id,
+      policy_catalog_id: filter.policy_catalog_id,
+      source_hierarchy_step_template_id: ALL_FILTER_VALUE,
+      search: filter.search,
+      sort: filter.sort,
+    },
+    new Map<string, string>(),
+  );
 }
 
 function formatProviderProvenanceSchedulerNarrativeGovernanceQueueSortLabel(sort: string) {
@@ -4002,6 +4072,28 @@ export default function App() {
     useState<string | null>(null);
   const [providerProvenanceSchedulerStitchedReportGovernanceCatalogSearch, setProviderProvenanceSchedulerStitchedReportGovernanceCatalogSearch] =
     useState("");
+  const [providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft, setProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft] =
+    useState<ProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraftState>(
+      defaultProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft,
+    );
+  const [editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId, setEditingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerStitchedReportGovernanceRegistries, setProviderProvenanceSchedulerStitchedReportGovernanceRegistries] =
+    useState<ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry[]>([]);
+  const [providerProvenanceSchedulerStitchedReportGovernanceRegistriesLoading, setProviderProvenanceSchedulerStitchedReportGovernanceRegistriesLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerStitchedReportGovernanceRegistriesError, setProviderProvenanceSchedulerStitchedReportGovernanceRegistriesError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerStitchedReportGovernanceRegistrySearch, setProviderProvenanceSchedulerStitchedReportGovernanceRegistrySearch] =
+    useState("");
+  const [selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId, setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory, setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory] =
+    useState<ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionListPayload | null>(null);
+  const [providerProvenanceSchedulerStitchedReportGovernanceRegistryHistoryLoading, setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError, setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError] =
+    useState<string | null>(null);
   const [providerProvenanceScheduledReports, setProviderProvenanceScheduledReports] =
     useState<ProviderProvenanceScheduledReportEntry[]>([]);
   const [providerProvenanceScheduledReportsLoading, setProviderProvenanceScheduledReportsLoading] =
@@ -4467,6 +4559,34 @@ export default function App() {
     [
       providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs,
       stitchedReportGovernanceCatalogSearchNormalized,
+    ],
+  );
+  const stitchedReportGovernanceRegistrySearchNormalized = useMemo(
+    () => providerProvenanceSchedulerStitchedReportGovernanceRegistrySearch.trim().toLowerCase(),
+    [providerProvenanceSchedulerStitchedReportGovernanceRegistrySearch],
+  );
+  const filteredProviderProvenanceSchedulerStitchedReportGovernanceRegistries = useMemo(
+    () =>
+      providerProvenanceSchedulerStitchedReportGovernanceRegistries.filter((entry) => {
+        if (!stitchedReportGovernanceRegistrySearchNormalized) {
+          return true;
+        }
+        const searchValues = [
+          entry.registry_id,
+          entry.name,
+          entry.description,
+          entry.status,
+          entry.default_policy_template_name ?? "",
+          entry.default_policy_catalog_name ?? "",
+          formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary(entry.queue_view) ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return searchValues.includes(stitchedReportGovernanceRegistrySearchNormalized);
+      }),
+    [
+      providerProvenanceSchedulerStitchedReportGovernanceRegistries,
+      stitchedReportGovernanceRegistrySearchNormalized,
     ],
   );
   const selectedProviderProvenanceSchedulerExportEntry = useMemo(
@@ -7142,6 +7262,202 @@ export default function App() {
     }
   }
 
+  function resetProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft() {
+    setEditingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId(null);
+    setProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft(
+      defaultProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft,
+    );
+  }
+
+  async function saveCurrentProviderProvenanceSchedulerStitchedReportGovernanceRegistry() {
+    if (!providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.name.trim()) {
+      setProviderProvenanceWorkspaceFeedback("Enter a stitched governance registry name before saving this workspace.");
+      return;
+    }
+    try {
+      const queueView = buildProviderProvenanceSchedulerStitchedReportGovernanceQueueViewPayload(
+        providerProvenanceSchedulerStitchedReportGovernanceQueueFilter,
+      );
+      const resolvedDefaultPolicyTemplateId = editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId
+        ? providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.default_policy_template_id
+        : (
+            providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.default_policy_template_id
+            || providerProvenanceSchedulerStitchedReportViewGovernancePolicyTemplateId
+          );
+      const resolvedDefaultPolicyCatalogId = editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId
+        ? providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.default_policy_catalog_id
+        : (
+            providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.default_policy_catalog_id
+            || (
+              providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_catalog_id !== ALL_FILTER_VALUE
+                ? providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_catalog_id
+                : ""
+            )
+          );
+      const savedRegistry = editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId
+        ? await updateProviderProvenanceSchedulerStitchedReportGovernanceRegistry({
+            registryId: editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId,
+            name: providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.name.trim(),
+            description: providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.description.trim(),
+            queueView: queueView ?? undefined,
+            defaultPolicyTemplateId: resolvedDefaultPolicyTemplateId,
+            defaultPolicyCatalogId: resolvedDefaultPolicyCatalogId,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+            reason: "scheduler_stitched_report_governance_registry_manual_edit",
+          })
+        : await createProviderProvenanceSchedulerStitchedReportGovernanceRegistry({
+            name: providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.name.trim(),
+            description: providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.description.trim(),
+            queueView: queueView ?? undefined,
+            defaultPolicyTemplateId: resolvedDefaultPolicyTemplateId,
+            defaultPolicyCatalogId: resolvedDefaultPolicyCatalogId,
+            createdByTabId: comparisonHistoryTabIdentity.tabId,
+            createdByTabLabel: comparisonHistoryTabIdentity.label,
+          });
+      resetProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft();
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId === savedRegistry.registry_id) {
+        const history = await listProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisions(
+          savedRegistry.registry_id,
+        );
+        setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(history);
+        setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError(null);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        `${editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId ? "Updated" : "Saved"} stitched governance registry ${savedRegistry.name}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Stitched governance registry save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  function applyProviderProvenanceSchedulerStitchedReportGovernanceRegistry(
+    entry: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
+  ) {
+    setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter(
+      buildProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterStateFromView(entry.queue_view),
+    );
+    setProviderProvenanceSchedulerStitchedReportViewGovernancePolicyTemplateId(
+      entry.default_policy_template_id ?? "",
+    );
+    setProviderProvenanceWorkspaceFeedback(
+      `Applied stitched governance registry ${entry.name} to the dedicated queue and stitched-report policy defaults.`,
+    );
+  }
+
+  function editProviderProvenanceSchedulerStitchedReportGovernanceRegistry(
+    entry: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
+  ) {
+    if (entry.status !== "active") {
+      setProviderProvenanceWorkspaceFeedback("Restore a stitched governance registry revision before editing a deleted registry.");
+      return;
+    }
+    setEditingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId(entry.registry_id);
+    setProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft({
+      name: entry.name,
+      description: entry.description,
+      default_policy_template_id: entry.default_policy_template_id ?? "",
+      default_policy_catalog_id: entry.default_policy_catalog_id ?? "",
+    });
+  }
+
+  async function deleteProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry(
+    entry: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
+  ) {
+    if (entry.status !== "active") {
+      setProviderProvenanceWorkspaceFeedback("The selected stitched governance registry is already deleted.");
+      return;
+    }
+    if (!window.confirm(`Delete stitched governance registry ${entry.name}?`)) {
+      return;
+    }
+    try {
+      const deleted = await deleteProviderProvenanceSchedulerStitchedReportGovernanceRegistry({
+        registryId: entry.registry_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_stitched_report_governance_registry_deleted_from_control_room",
+      });
+      if (editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId === entry.registry_id) {
+        resetProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft();
+      }
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId === entry.registry_id) {
+        const history = await listProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisions(
+          entry.registry_id,
+        );
+        setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(history);
+        setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError(null);
+      }
+      setProviderProvenanceWorkspaceFeedback(`Deleted stitched governance registry ${deleted.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Stitched governance registry delete failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function toggleProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(
+    registryId: string,
+  ) {
+    if (
+      selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId === registryId
+      && selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory
+    ) {
+      setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId(null);
+      setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(null);
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError(null);
+      return;
+    }
+    setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId(registryId);
+    setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(null);
+    setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryLoading(true);
+    setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError(null);
+    try {
+      const payload = await listProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisions(
+        registryId,
+      );
+      setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(payload);
+    } catch (error) {
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError(
+        (error as Error).message,
+      );
+    } finally {
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryLoading(false);
+    }
+  }
+
+  async function restoreProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryRevision(
+    entry: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionEntry,
+  ) {
+    try {
+      const restored = await restoreProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevision({
+        registryId: entry.registry_id,
+        revisionId: entry.revision_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_stitched_report_governance_registry_revision_restore_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const history = await listProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisions(
+        entry.registry_id,
+      );
+      setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId(entry.registry_id);
+      setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(history);
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError(null);
+      setProviderProvenanceWorkspaceFeedback(
+        `Restored stitched governance registry ${restored.name} from revision ${entry.revision_id}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Stitched governance registry restore failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
   async function shareProviderProvenanceSchedulerStitchedNarrativeReportView(
     entry: ProviderProvenanceSchedulerStitchedReportViewEntry,
   ) {
@@ -7596,6 +7912,7 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading(true);
     setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(true);
     setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading(true);
+    setProviderProvenanceSchedulerStitchedReportGovernanceRegistriesLoading(true);
     setProviderProvenanceScheduledReportsLoading(true);
     setProviderProvenanceAnalyticsPresetsError(null);
     setProviderProvenanceDashboardViewsError(null);
@@ -7609,6 +7926,7 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError(null);
     setProviderProvenanceSchedulerNarrativeGovernancePlansError(null);
     setProviderProvenanceSchedulerStitchedReportGovernancePlansError(null);
+    setProviderProvenanceSchedulerStitchedReportGovernanceRegistriesError(null);
     setProviderProvenanceScheduledReportsError(null);
     try {
       const [
@@ -7622,6 +7940,7 @@ export default function App() {
         governanceHierarchyStepTemplateAuditPayload,
         governancePolicyTemplateAuditPayload,
         governancePolicyCatalogAuditPayload,
+        stitchedGovernanceRegistryPayload,
         reportPayload,
       ] = await Promise.all([
         listProviderProvenanceAnalyticsPresets({ limit: 24 }),
@@ -7680,6 +7999,7 @@ export default function App() {
               || undefined,
           limit: 24,
         }),
+        listProviderProvenanceSchedulerStitchedReportGovernanceRegistries({ limit: 24 }),
         listProviderProvenanceScheduledReports({ limit: 24 }),
       ]);
       setProviderProvenanceAnalyticsPresets(presetPayload.items);
@@ -7699,6 +8019,9 @@ export default function App() {
       );
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits(
         governancePolicyCatalogAuditPayload.items,
+      );
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistries(
+        stitchedGovernanceRegistryPayload.items,
       );
       setProviderProvenanceScheduledReports(reportPayload.items);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds((current) =>
@@ -7724,6 +8047,11 @@ export default function App() {
         )
           ? current
           : governanceHierarchyStepTemplatePayload.items[0]?.hierarchy_step_template_id ?? null,
+      );
+      setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId((current) =>
+        stitchedGovernanceRegistryPayload.items.some((entry) => entry.registry_id === current)
+          ? current
+          : stitchedGovernanceRegistryPayload.items[0]?.registry_id ?? null,
       );
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds((current) => {
         const selectedCatalog = governancePolicyCatalogPayload.items.find(
@@ -7835,6 +8163,24 @@ export default function App() {
         setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(null);
         setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
       }
+      if (
+        selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId
+        && !stitchedGovernanceRegistryPayload.items.some(
+          (entry) => entry.registry_id === selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId,
+        )
+      ) {
+        setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId(null);
+        setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(null);
+        setProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError(null);
+      }
+      if (
+        editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId
+        && !stitchedGovernanceRegistryPayload.items.some(
+          (entry) => entry.registry_id === editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId,
+        )
+      ) {
+        resetProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft();
+      }
       setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => (
         current.template_id
         && !templatePayload.items.some((entry) => entry.template_id === current.template_id)
@@ -7872,6 +8218,7 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits([]);
       setProviderProvenanceSchedulerNarrativeGovernancePlans([]);
       setProviderProvenanceScheduledReports([]);
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistries([]);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds([]);
@@ -7897,6 +8244,8 @@ export default function App() {
       setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeRegistryId(null);
       setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(null);
+      setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId(null);
+      setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(null);
@@ -7915,6 +8264,7 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePlansError(message);
       setProviderProvenanceSchedulerStitchedReportGovernancePlansError(message);
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistriesError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(false);
       setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading(false);
       setProviderProvenanceScheduledReportsError(message);
@@ -7930,6 +8280,7 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading(false);
       setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading(false);
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistriesLoading(false);
       setProviderProvenanceScheduledReportsLoading(false);
     }
   }
@@ -19327,6 +19678,319 @@ export default function App() {
                                     ) : (
                                       <p className="empty-state">No stitched report policy catalogs match the current search.</p>
                                     )}
+                                  </div>
+                                  <div className="market-data-provenance-shared-history">
+                                    <div className="market-data-provenance-history-head">
+                                      <strong>Stitched report governance registries</strong>
+                                      <p>
+                                        Save the stitched-report-only approval queue slice and default policy layer as
+                                        a dedicated lifecycle object, then reapply or restore it without reopening the
+                                        shared governance workspace.
+                                      </p>
+                                    </div>
+                                    <div className="filter-bar">
+                                      <label>
+                                        <span>Name</span>
+                                        <input
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft((current) => ({
+                                              ...current,
+                                              name: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="Lag stitched governance"
+                                          type="text"
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.name}
+                                        />
+                                      </label>
+                                      <label>
+                                        <span>Description</span>
+                                        <input
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft((current) => ({
+                                              ...current,
+                                              description: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="Queue slice and default policy bundle"
+                                          type="text"
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.description}
+                                        />
+                                      </label>
+                                      <label>
+                                        <span>Default policy template</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft((current) => ({
+                                              ...current,
+                                              default_policy_template_id: event.target.value,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.default_policy_template_id}
+                                        >
+                                          <option value="">No default policy template</option>
+                                          {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
+                                            .filter((entry) =>
+                                              providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+                                                entry.item_type_scope,
+                                                "stitched_report_view",
+                                              ),
+                                            )
+                                            .map((entry) => (
+                                              <option key={entry.policy_template_id} value={entry.policy_template_id}>
+                                                {entry.name}
+                                              </option>
+                                            ))}
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Default policy catalog</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft((current) => ({
+                                              ...current,
+                                              default_policy_catalog_id: event.target.value,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceRegistryDraft.default_policy_catalog_id}
+                                        >
+                                          <option value="">No default policy catalog</option>
+                                          {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.map((entry) => (
+                                            <option key={entry.catalog_id} value={entry.catalog_id}>
+                                              {entry.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      <div className="market-data-provenance-history-actions">
+                                        <button
+                                          className="ghost-button"
+                                          onClick={() => {
+                                            void saveCurrentProviderProvenanceSchedulerStitchedReportGovernanceRegistry();
+                                          }}
+                                          type="button"
+                                        >
+                                          {editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId
+                                            ? "Update registry"
+                                            : "Save registry"}
+                                        </button>
+                                        {editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId ? (
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => {
+                                              resetProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft();
+                                            }}
+                                            type="button"
+                                          >
+                                            Cancel edit
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                    <div className="filter-bar">
+                                      <label>
+                                        <span>Search</span>
+                                        <input
+                                          onChange={(event) => {
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceRegistrySearch(
+                                              event.target.value,
+                                            );
+                                          }}
+                                          placeholder="registry, queue, policy"
+                                          type="text"
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceRegistrySearch}
+                                        />
+                                      </label>
+                                    </div>
+                                    {providerProvenanceSchedulerStitchedReportGovernanceRegistriesLoading ? (
+                                      <p className="empty-state">Loading stitched governance registries…</p>
+                                    ) : null}
+                                    {providerProvenanceSchedulerStitchedReportGovernanceRegistriesError ? (
+                                      <p className="market-data-workflow-feedback">
+                                        Stitched governance registries failed: {providerProvenanceSchedulerStitchedReportGovernanceRegistriesError}
+                                      </p>
+                                    ) : null}
+                                    {filteredProviderProvenanceSchedulerStitchedReportGovernanceRegistries.length ? (
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Registry</th>
+                                            <th>Queue slice</th>
+                                            <th>Action</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {filteredProviderProvenanceSchedulerStitchedReportGovernanceRegistries.map((entry) => (
+                                            <tr key={`provider-scheduler-stitched-governance-registry-${entry.registry_id}`}>
+                                              <td>
+                                                <strong>{entry.name}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(entry.status)} · revisions {entry.revision_count}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.description || "No stitched governance registry description recorded."}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.default_policy_template_name ?? "No default policy template"}
+                                                  {entry.default_policy_catalog_name
+                                                    ? ` · ${entry.default_policy_catalog_name}`
+                                                    : ""}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <strong>
+                                                  {formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary(
+                                                    entry.queue_view,
+                                                  ) ?? "All stitched governance plans"}
+                                                </strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  Saved {formatTimestamp(entry.updated_at)}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.created_by_tab_label ?? entry.created_by_tab_id ?? "unknown tab"}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <div className="market-data-provenance-history-actions">
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      applyProviderProvenanceSchedulerStitchedReportGovernanceRegistry(entry);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Apply
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      editProviderProvenanceSchedulerStitchedReportGovernanceRegistry(entry);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Edit
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void toggleProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(
+                                                        entry.registry_id,
+                                                      );
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId === entry.registry_id
+                                                      && selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory
+                                                      ? "Hide versions"
+                                                      : "Versions"}
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    disabled={entry.status !== "active"}
+                                                    onClick={() => {
+                                                      void deleteProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry(
+                                                        entry,
+                                                      );
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Delete
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : (
+                                      !providerProvenanceSchedulerStitchedReportGovernanceRegistriesLoading
+                                        ? <p className="empty-state">No stitched governance registries match the current search.</p>
+                                        : null
+                                    )}
+                                    {providerProvenanceSchedulerStitchedReportGovernanceRegistryHistoryLoading ? (
+                                      <p className="empty-state">Loading stitched governance registry history…</p>
+                                    ) : null}
+                                    {providerProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError ? (
+                                      <p className="market-data-workflow-feedback">
+                                        Registry history failed: {providerProvenanceSchedulerStitchedReportGovernanceRegistryHistoryError}
+                                      </p>
+                                    ) : null}
+                                    {selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory ? (
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Recorded</th>
+                                            <th>Snapshot</th>
+                                            <th>Action</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory.history.map((entry) => (
+                                            <tr key={`provider-scheduler-stitched-governance-registry-revision-${entry.revision_id}`}>
+                                              <td>
+                                                <strong>{formatTimestamp(entry.recorded_at)}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(entry.action)} · {formatWorkflowToken(entry.status)}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.recorded_by_tab_label ?? entry.recorded_by_tab_id ?? "unknown tab"}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <strong>{entry.name}</strong>
+                                                <p className="run-lineage-symbol-copy">{entry.description || "No description recorded."}</p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary(
+                                                    entry.queue_view,
+                                                  ) ?? "All stitched governance plans"}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.default_policy_template_name ?? "No default policy template"}
+                                                  {entry.default_policy_catalog_name
+                                                    ? ` · ${entry.default_policy_catalog_name}`
+                                                    : ""}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <div className="market-data-provenance-history-actions">
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      applyProviderProvenanceSchedulerStitchedReportGovernanceRegistry(
+                                                        {
+                                                          ...selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory.registry,
+                                                          name: entry.name,
+                                                          description: entry.description,
+                                                          queue_view: entry.queue_view,
+                                                          default_policy_template_id: entry.default_policy_template_id,
+                                                          default_policy_template_name: entry.default_policy_template_name,
+                                                          default_policy_catalog_id: entry.default_policy_catalog_id,
+                                                          default_policy_catalog_name: entry.default_policy_catalog_name,
+                                                        },
+                                                      );
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Apply snapshot
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      void restoreProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryRevision(
+                                                        entry,
+                                                      );
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Restore revision
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : null}
                                   </div>
                                   <div className="market-data-provenance-history-head">
                                     <strong>Shared scheduler exports</strong>

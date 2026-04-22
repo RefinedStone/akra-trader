@@ -973,6 +973,48 @@ class ProviderProvenanceSchedulerStitchedReportViewAuditRecord:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+  registry_id: str
+  name: str
+  description: str = ""
+  queue_view: dict[str, Any] = field(default_factory=dict)
+  default_policy_template_id: str | None = None
+  default_policy_template_name: str | None = None
+  default_policy_catalog_id: str | None = None
+  default_policy_catalog_name: str | None = None
+  status: str = "active"
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  current_revision_id: str | None = None
+  revision_count: int = 0
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+  deleted_at: datetime | None = None
+  deleted_by_tab_id: str | None = None
+  deleted_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord:
+  revision_id: str
+  registry_id: str
+  action: str
+  reason: str
+  name: str
+  description: str = ""
+  queue_view: dict[str, Any] = field(default_factory=dict)
+  default_policy_template_id: str | None = None
+  default_policy_template_name: str | None = None
+  default_policy_catalog_id: str | None = None
+  default_policy_catalog_name: str | None = None
+  status: str = "active"
+  recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  source_revision_id: str | None = None
+  recorded_by_tab_id: str | None = None
+  recorded_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceScheduledReportRecord:
   report_id: str
   name: str

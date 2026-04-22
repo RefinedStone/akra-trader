@@ -89,6 +89,10 @@ unclear dataset lineage.
   stitched-report policy catalog surface, so shift leads can review and stage saved-view
   governance directly from the stitched report workspace instead of pivoting through the generic
   scheduler governance controls first
+- that stitched-report governance workspace now also has its own saved registry and revision
+  lifecycle layer, so shift leads can persist a stitched-only queue slice plus default policy
+  bundle and later re-apply or restore it during handoff without reopening the generic shared
+  catalog workflow first
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

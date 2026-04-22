@@ -32,6 +32,8 @@ from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRevisionRecord
@@ -308,6 +310,14 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_scheduler_stitched_report_view_audit_records: OrderedDict[
       str,
       ProviderProvenanceSchedulerStitchedReportViewAuditRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_registries: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_registry_revisions: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord,
     ] = OrderedDict()
     self._provider_provenance_scheduled_reports: OrderedDict[str, ProviderProvenanceScheduledReportRecord] = OrderedDict()
     self._provider_provenance_scheduler_narrative_templates: OrderedDict[
@@ -836,6 +846,58 @@ class InMemoryRunRepository(RunRepositoryPort):
         key=lambda record: (record.recorded_at, record.audit_id),
         reverse=True,
       )
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_governance_registry(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_registries[record.registry_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_registries(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_registries.values(),
+        key=lambda record: (record.updated_at, record.registry_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_registry(
+    self,
+    registry_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord | None:
+    return self._provider_provenance_scheduler_stitched_report_governance_registries.get(
+      registry_id
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_registry_revisions[record.revision_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_registry_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_registry_revisions.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord | None:
+    return self._provider_provenance_scheduler_stitched_report_governance_registry_revisions.get(
+      revision_id
     )
 
   def save_provider_provenance_scheduled_report(
