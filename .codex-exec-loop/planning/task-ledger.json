@@ -898,18 +898,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add edit, delete, and version workflows for saved stitched report views",
       "description": "Extend the newly shipped saved stitched report view surface beyond create, list, and apply by adding edit, delete, and version-aware management workflows so operators can safely maintain named stitched narrative views instead of only accumulating immutable saved slices.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 77,
       "dynamic_priority_delta": 26,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:20:00+09:00",
+      "updated_at": "2026-04-22T19:30:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-stitched-report-product-surface"
       ],
-      "direction_relation_note": "The latest main-session reply says saved stitched report views now support create or list or apply or copy or download or share, but this dedicated surface still lacks edit or delete or versioning layers.",
-      "priority_reason": "Promoted to ready because the latest main-session reply names stitched report surface management depth as the nearest executable continuation, while deeper server-side scheduler narrative search remains the larger separate unfinished area."
+      "direction_relation_note": "Completed on main in commit 4b8c228 with stitched report saved views now supporting update, delete, revision history, and revision restore across backend persistence, standalone surfaces, control-room consumers, and operator docs.",
+      "priority_reason": "Closed after backend lifecycle persistence, control-room management flows, targeted pytest coverage, compileall verification, web typecheck or build, commit, and push all landed; the main-session reply now leaves bulk governance or team audit for this surface plus deeper server-side scheduler narrative search as the remaining follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-stitched-report-governance-audit-layer",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add bulk governance and team audit workflows for saved stitched report views",
+      "description": "Extend the stitched report saved-view surface beyond per-view lifecycle management by adding bulk governance actions, team-shared audit visibility, and operator-safe review workflows so saved stitched report views can be governed as a dedicated surface instead of only edited one record at a time.",
+      "status": "ready",
+      "base_priority": 78,
+      "dynamic_priority_delta": 27,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T19:30:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-stitched-report-saved-view-management"
+      ],
+      "direction_relation_note": "The latest main-session reply says saved stitched report views now have full lifecycle workflow, but this dedicated surface still does not have its own bulk governance or team audit layer.",
+      "priority_reason": "Promoted to ready because the operator explicitly wants the next queued task, and this is the closest executable continuation named by the latest main-session reply; broader scheduler narrative search remains separate larger-scope follow-up work."
     },
     {
       "id": "task-b1-provider-market-context-hierarchy-step-template-queue-view-workspace",
@@ -1065,7 +1083,7 @@
       "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:20:00+09:00",
+      "updated_at": "2026-04-22T19:30:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
@@ -1073,8 +1091,8 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-templates",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 1019d88 still calls out deeper server-side scheduler narrative search as the larger unfinished area even after the dedicated saved stitched report view surface shipped.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the newly explicit stitched report saved-view management layer so builtin next-task follows the main-session continuation order before tackling the broader server-side search expansion."
+      "direction_relation_note": "The latest main-session reply after commit 4b8c228 still calls out deeper server-side scheduler narrative search as the larger unchanged open area even after stitched report saved-view lifecycle workflows shipped.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the newly explicit stitched report bulk-governance or audit gap so builtin next-task advances through the nearest dedicated-surface continuation before taking on the broader search expansion."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
