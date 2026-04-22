@@ -212,6 +212,9 @@ It is not yet a finished live trading product:
 - those hierarchy steps can now also be promoted into named reusable step templates and pushed back
   across multiple policy catalogs, so cross-catalog governance no longer depends on recapturing the
   same hierarchy step in every catalog by hand
+- those hierarchy-step templates now also support edit/delete/revision restore and bulk governance,
+  so the cross-catalog step library can be corrected, retired, or reinstated without recreating
+  each reusable step from an active policy catalog
 
 ### Operator discipline baseline
 

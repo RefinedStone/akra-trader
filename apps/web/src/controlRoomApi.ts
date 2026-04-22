@@ -22,6 +22,7 @@ import type {
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateListPayload,
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogListPayload,
@@ -1558,6 +1559,142 @@ export async function listProviderProvenanceSchedulerNarrativeGovernanceHierarch
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateListPayload>(
     `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates${suffix}`,
+  );
+}
+
+export async function updateProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(params: {
+  hierarchyStepTemplateId: string;
+  name?: string;
+  description?: string;
+  itemIds?: string[];
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  queryPatch?: Record<string, unknown>;
+  layoutPatch?: Record<string, unknown>;
+  templateId?: string;
+  clearTemplateLink?: boolean;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/${encodeURIComponent(params.hierarchyStepTemplateId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(params.name !== undefined ? { name: params.name } : {}),
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...(params.itemIds !== undefined ? { item_ids: params.itemIds } : {}),
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend !== undefined
+          ? { description_append: params.descriptionAppend }
+          : {}),
+        ...(params.queryPatch !== undefined ? { query_patch: params.queryPatch } : {}),
+        ...(params.layoutPatch !== undefined ? { layout_patch: params.layoutPatch } : {}),
+        ...(params.templateId !== undefined ? { template_id: params.templateId } : {}),
+        ...(params.clearTemplateLink !== undefined ? { clear_template_link: params.clearTemplateLink } : {}),
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function deleteProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(params: {
+  hierarchyStepTemplateId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/${encodeURIComponent(params.hierarchyStepTemplateId)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernance(params: {
+  action: "delete" | "restore" | "update";
+  hierarchyStepTemplateIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  itemIds?: string[];
+  stepNamePrefix?: string;
+  stepNameSuffix?: string;
+  stepDescriptionAppend?: string;
+  queryPatch?: Record<string, unknown>;
+  layoutPatch?: Record<string, unknown>;
+  templateId?: string;
+  clearTemplateLink?: boolean;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/bulk-governance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: params.action,
+        hierarchy_step_template_ids: params.hierarchyStepTemplateIds,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend !== undefined
+          ? { description_append: params.descriptionAppend }
+          : {}),
+        ...(params.itemIds !== undefined ? { item_ids: params.itemIds } : {}),
+        ...(params.stepNamePrefix !== undefined ? { step_name_prefix: params.stepNamePrefix } : {}),
+        ...(params.stepNameSuffix !== undefined ? { step_name_suffix: params.stepNameSuffix } : {}),
+        ...(params.stepDescriptionAppend !== undefined
+          ? { step_description_append: params.stepDescriptionAppend }
+          : {}),
+        ...(params.queryPatch !== undefined ? { query_patch: params.queryPatch } : {}),
+        ...(params.layoutPatch !== undefined ? { layout_patch: params.layoutPatch } : {}),
+        ...(params.templateId !== undefined ? { template_id: params.templateId } : {}),
+        ...(params.clearTemplateLink !== undefined ? { clear_template_link: params.clearTemplateLink } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisions(
+  hierarchyStepTemplateId: string,
+) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/${encodeURIComponent(hierarchyStepTemplateId)}/revisions`,
+  );
+}
+
+export async function restoreProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevision(params: {
+  hierarchyStepTemplateId: string;
+  revisionId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/${encodeURIComponent(params.hierarchyStepTemplateId)}/revisions/${encodeURIComponent(params.revisionId)}/restore`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
   );
 }
 

@@ -1197,10 +1197,40 @@ class ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord:
   origin_catalog_id: str | None = None
   origin_catalog_name: str | None = None
   origin_step_id: str | None = None
+  status: str = "active"
   created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  current_revision_id: str | None = None
+  revision_count: int = 0
   created_by_tab_id: str | None = None
   created_by_tab_label: str | None = None
+  deleted_at: datetime | None = None
+  deleted_by_tab_id: str | None = None
+  deleted_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord:
+  revision_id: str
+  hierarchy_step_template_id: str
+  action: str
+  reason: str
+  name: str
+  description: str = ""
+  item_type: str = "template"
+  step: "ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep" = field(
+    default_factory=lambda: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep(
+      item_type="template"
+    )
+  )
+  origin_catalog_id: str | None = None
+  origin_catalog_name: str | None = None
+  origin_step_id: str | None = None
+  status: str = "active"
+  recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  source_revision_id: str | None = None
+  recorded_by_tab_id: str | None = None
+  recorded_by_tab_label: str | None = None
 
 
 @dataclass(frozen=True)

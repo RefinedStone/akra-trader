@@ -107,6 +107,9 @@ unclear dataset lineage.
 - those same hierarchy steps can now be saved as named step templates and reapplied across several
   policy catalogs, so cross-catalog handoffs can sync one reviewed governance step into multiple
   queue catalogs without rebuilding it one catalog at a time
+- those hierarchy-step templates now also have their own edit/delete/revision-restore and bulk
+  governance workflow, so the reusable cross-catalog step library can be cleaned up or recovered
+  without re-exporting the same hierarchy step from a live catalog
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

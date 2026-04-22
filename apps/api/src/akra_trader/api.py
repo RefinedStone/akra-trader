@@ -504,6 +504,61 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplat
   reason: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateUpdateRequest(
+  BaseModel
+):
+  name: str | None = None
+  description: str | None = None
+  item_ids: list[str] | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  query_patch: dict[str, Any] | None = None
+  layout_patch: dict[str, Any] | None = None
+  template_id: str | None = None
+  clear_template_link: bool | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_hierarchy_step_template_updated"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDeleteRequest(
+  BaseModel
+):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_hierarchy_step_template_deleted"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRestoreRequest(
+  BaseModel
+):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_hierarchy_step_template_revision_restored"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernanceRequest(
+  BaseModel
+):
+  action: str
+  hierarchy_step_template_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  item_ids: list[str] | None = None
+  step_name_prefix: str | None = None
+  step_name_suffix: str | None = None
+  step_description_append: str | None = None
+  query_patch: dict[str, Any] | None = None
+  layout_patch: dict[str, Any] | None = None
+  template_id: str | None = None
+  clear_template_link: bool | None = None
+
+
 class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest(BaseModel):
   item_type: str
   item_ids: list[str] = Field(default_factory=list)
@@ -686,6 +741,22 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create": (
     OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateCreateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_update": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateUpdateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_delete": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDeleteRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_bulk_governance": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernanceRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_restore": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRestoreRequest,
     {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply": (

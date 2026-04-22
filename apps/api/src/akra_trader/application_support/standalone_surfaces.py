@@ -177,6 +177,10 @@ def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record')(*args, **kwargs)
 
@@ -1086,6 +1090,74 @@ def execute_standalone_surface_binding(
         item_type=resolved_filters.get("item_type"),
         search=resolved_filters.get("search"),
         limit=resolved_filters.get("limit", 20),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_bulk_governance":
+    return serialize_provider_provenance_scheduler_narrative_bulk_governance_result(
+      app.bulk_govern_provider_provenance_scheduler_narrative_governance_hierarchy_step_templates(
+        resolved_payload.get("hierarchy_step_template_ids", ()),
+        action=resolved_payload.get("action", ""),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        item_ids=resolved_payload.get("item_ids"),
+        step_name_prefix=resolved_payload.get("step_name_prefix"),
+        step_name_suffix=resolved_payload.get("step_name_suffix"),
+        step_description_append=resolved_payload.get("step_description_append"),
+        query_patch=resolved_payload.get("query_patch"),
+        layout_patch=resolved_payload.get("layout_patch"),
+        template_id=resolved_payload.get("template_id"),
+        clear_template_link=resolved_payload.get("clear_template_link"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_update":
+    return serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_record(
+      app.update_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+        resolved_path_params["hierarchy_step_template_id"],
+        name=resolved_payload.get("name"),
+        description=resolved_payload.get("description"),
+        item_ids=resolved_payload.get("item_ids"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        query_patch=resolved_payload.get("query_patch"),
+        layout_patch=resolved_payload.get("layout_patch"),
+        template_id=resolved_payload.get("template_id"),
+        clear_template_link=resolved_payload.get("clear_template_link"),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_governance_hierarchy_step_template_updated"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_delete":
+    return serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_record(
+      app.delete_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+        resolved_path_params["hierarchy_step_template_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_governance_hierarchy_step_template_deleted"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_list":
+    return serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_list(
+      app.get_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+        resolved_path_params["hierarchy_step_template_id"]
+      ),
+      app.list_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions(
+        resolved_path_params["hierarchy_step_template_id"]
+      ),
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_restore":
+    return serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_record(
+      app.restore_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
+        resolved_path_params["hierarchy_step_template_id"],
+        resolved_path_params["revision_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_governance_hierarchy_step_template_revision_restored"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply":

@@ -1823,15 +1823,45 @@ export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate 
   origin_catalog_id?: string | null;
   origin_catalog_name?: string | null;
   origin_step_id?: string | null;
+  status: "active" | "deleted" | string;
   created_at: string;
   updated_at: string;
+  current_revision_id?: string | null;
+  revision_count: number;
   created_by_tab_id?: string | null;
   created_by_tab_label?: string | null;
+  deleted_at?: string | null;
+  deleted_by_tab_id?: string | null;
+  deleted_by_tab_label?: string | null;
 };
 
 export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateListPayload = {
   items: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate[];
   total: number;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionEntry = {
+  revision_id: string;
+  hierarchy_step_template_id: string;
+  action: string;
+  reason: string;
+  name: string;
+  description: string;
+  item_type: "template" | "registry" | string;
+  step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep;
+  origin_catalog_id?: string | null;
+  origin_catalog_name?: string | null;
+  origin_step_id?: string | null;
+  status: "active" | "deleted" | string;
+  recorded_at: string;
+  source_revision_id?: string | null;
+  recorded_by_tab_id?: string | null;
+  recorded_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionListPayload = {
+  current: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate;
+  history: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionEntry[];
 };
 
 export type ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep = {

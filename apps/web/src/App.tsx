@@ -66,6 +66,7 @@ import {
   approveProviderProvenanceExportJob,
   applyProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   deleteProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  deleteProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   deleteProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   deleteProviderProvenanceSchedulerNarrativeRegistryEntry,
   deleteProviderProvenanceSchedulerNarrativeTemplate,
@@ -87,6 +88,7 @@ import {
   listProviderProvenanceAnalyticsPresets,
   listProviderProvenanceDashboardViews,
   listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates,
+  listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisions,
   listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits,
   listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogs,
   listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions,
@@ -112,6 +114,7 @@ import {
   resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevision,
+  restoreProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevision,
   restoreProviderProvenanceSchedulerNarrativeRegistryRevision,
   restoreProviderProvenanceSchedulerNarrativeTemplateRevision,
@@ -119,11 +122,13 @@ import {
   runProviderProvenanceSchedulerNarrativeGovernancePlanBatchAction,
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance,
+  runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernance,
   stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   runDueProviderProvenanceScheduledReports,
   runProviderProvenanceScheduledReport,
   updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep,
   updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  updateProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   updateProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   updateProviderProvenanceSchedulerNarrativeRegistryEntry,
   updateProviderProvenanceSchedulerNarrativeTemplate,
@@ -334,6 +339,8 @@ import type {
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionEntry,
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry,
@@ -806,12 +813,57 @@ const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarch
 type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraftState = {
   name: string;
   description: string;
+  item_ids_text: string;
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  query_patch: string;
+  layout_patch: string;
+  template_id: string;
+  clear_template_link: boolean;
 };
 
 const defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft:
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraftState = {
     name: "",
     description: "",
+    item_ids_text: "",
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    query_patch: "",
+    layout_patch: "",
+    template_id: "",
+    clear_template_link: false,
+  };
+
+type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  item_ids_text: string;
+  step_name_prefix: string;
+  step_name_suffix: string;
+  step_description_append: string;
+  query_patch: string;
+  layout_patch: string;
+  template_id: string;
+  clear_template_link: boolean;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft:
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    item_ids_text: "",
+    step_name_prefix: "",
+    step_name_suffix: "",
+    step_description_append: "",
+    query_patch: "",
+    layout_patch: "",
+    template_id: "",
+    clear_template_link: false,
   };
 
 type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersionEntry = {
@@ -3447,6 +3499,18 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplatesError, setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplatesError] =
     useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds, setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds] =
+    useState<string[]>([]);
+  const [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction, setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction] =
+    useState<"delete" | "restore" | "update" | null>(null);
+  const [editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId, setEditingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory, setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionListPayload | null>(null);
+  const [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryLoading, setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError, setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError] =
+    useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds, setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds] =
     useState<string[]>([]);
   const [providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction, setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction] =
@@ -3490,6 +3554,10 @@ export default function App() {
   const [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft, setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft] =
     useState<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraftState>(
       defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft,
+    );
+  const [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft, setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraftState>(
+      defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft,
     );
   const [selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId, setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId] =
     useState<string | null>(null);
@@ -3830,6 +3898,10 @@ export default function App() {
     () => new Set(selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds),
     [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds],
   );
+  const selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIdSet = useMemo(
+    () => new Set(selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds),
+    [selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds],
+  );
   const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps = useMemo(
     () => selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog?.hierarchy_steps ?? [],
     [selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog],
@@ -3854,6 +3926,18 @@ export default function App() {
     [
       providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates,
       selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId,
+    ],
+  );
+  const selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateEntries = useMemo(
+    () =>
+      providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.filter((entry) =>
+        selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIdSet.has(
+          entry.hierarchy_step_template_id,
+        ),
+      ),
+    [
+      providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates,
+      selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIdSet,
     ],
   );
   const selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersions = useMemo<
@@ -6558,6 +6642,13 @@ export default function App() {
           governancePolicyCatalogPayload.items.some((entry) => entry.catalog_id === catalogId),
         ),
       );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds((current) =>
+        current.filter((hierarchyStepTemplateId) =>
+          governanceHierarchyStepTemplatePayload.items.some(
+            (entry) => entry.hierarchy_step_template_id === hierarchyStepTemplateId,
+          ),
+        ),
+      );
       setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId((current) =>
         governanceHierarchyStepTemplatePayload.items.some(
           (entry) => entry.hierarchy_step_template_id === current,
@@ -6608,6 +6699,19 @@ export default function App() {
         setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId(null);
         setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateHistory(null);
         setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateHistoryError(null);
+      }
+      if (
+        selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId
+        && !governanceHierarchyStepTemplatePayload.items.some(
+          (entry) =>
+            entry.hierarchy_step_template_id
+            === selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId,
+        )
+      ) {
+        setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(null);
+        setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(null);
+        setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError(null);
+        resetProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft();
       }
       if (
         selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId
@@ -6707,7 +6811,9 @@ export default function App() {
       setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds([]);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateId(null);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
@@ -6725,6 +6831,7 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogsError(message);
       setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplatesError(message);
+      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePlansError(message);
@@ -7009,6 +7116,7 @@ export default function App() {
   }
 
   function resetProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft() {
+    setEditingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(null);
     setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft(
       defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft,
     );
@@ -7021,6 +7129,26 @@ export default function App() {
       current.includes(stepId)
         ? current.filter((candidate) => candidate !== stepId)
         : [...current, stepId],
+    );
+  }
+
+  function toggleProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateSelection(
+    hierarchyStepTemplateId: string,
+  ) {
+    setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds((current) =>
+      current.includes(hierarchyStepTemplateId)
+        ? current.filter((candidate) => candidate !== hierarchyStepTemplateId)
+        : [...current, hierarchyStepTemplateId],
+    );
+  }
+
+  function toggleAllProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateSelections() {
+    setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds((current) =>
+      current.length === providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.length
+        ? []
+        : providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.map(
+            (entry) => entry.hierarchy_step_template_id,
+          ),
     );
   }
 
@@ -8075,18 +8203,223 @@ export default function App() {
     );
   }
 
+  function editProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(
+    entry: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
+  ) {
+    if (entry.status !== "active") {
+      setProviderProvenanceWorkspaceFeedback(
+        "Restore a hierarchy step template revision before editing a deleted template.",
+      );
+      return;
+    }
+    setEditingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(
+      entry.hierarchy_step_template_id,
+    );
+    setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(
+      entry.hierarchy_step_template_id,
+    );
+    setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft({
+      name: entry.name,
+      description: entry.description,
+      item_ids_text: entry.step.item_ids.join(", "),
+      name_prefix: entry.step.name_prefix ?? "",
+      name_suffix: entry.step.name_suffix ?? "",
+      description_append: entry.step.description_append ?? "",
+      query_patch: Object.keys(entry.step.query_patch ?? {}).length
+        ? JSON.stringify(entry.step.query_patch, null, 2)
+        : "",
+      layout_patch: Object.keys(entry.step.layout_patch ?? {}).length
+        ? JSON.stringify(entry.step.layout_patch, null, 2)
+        : "",
+      template_id: entry.step.template_id ?? "",
+      clear_template_link: entry.step.clear_template_link,
+    });
+    setProviderProvenanceWorkspaceFeedback(`Editing hierarchy step template ${entry.name}.`);
+  }
+
+  async function toggleProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(
+    hierarchyStepTemplateId: string,
+  ) {
+    if (
+      selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId === hierarchyStepTemplateId
+      && selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory
+    ) {
+      setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(null);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(null);
+      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError(null);
+      return;
+    }
+    setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(hierarchyStepTemplateId);
+    setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(null);
+    setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryLoading(true);
+    setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError(null);
+    try {
+      const payload = await listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisions(
+        hierarchyStepTemplateId,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(payload);
+    } catch (error) {
+      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError(
+        (error as Error).message,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryLoading(false);
+    }
+  }
+
+  async function restoreProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryRevision(
+    entry: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionEntry,
+  ) {
+    try {
+      const restored = await restoreProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevision({
+        hierarchyStepTemplateId: entry.hierarchy_step_template_id,
+        revisionId: entry.revision_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_hierarchy_step_template_restore_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const history = await listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisions(
+        entry.hierarchy_step_template_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(
+        entry.hierarchy_step_template_id,
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(history);
+      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError(null);
+      setProviderProvenanceWorkspaceFeedback(
+        `Restored hierarchy step template ${restored.name} from revision ${entry.revision_id}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Hierarchy step template restore failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function removeProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(
+    entry: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
+  ) {
+    if (entry.status === "deleted") {
+      setProviderProvenanceWorkspaceFeedback(`Hierarchy step template ${entry.name} is already deleted.`);
+      return;
+    }
+    if (typeof window !== "undefined" && !window.confirm(`Delete hierarchy step template ${entry.name}?`)) {
+      return;
+    }
+    try {
+      await deleteProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate({
+        hierarchyStepTemplateId: entry.hierarchy_step_template_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_hierarchy_step_template_deleted_from_control_room",
+      });
+      if (
+        editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId
+        === entry.hierarchy_step_template_id
+      ) {
+        resetProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft();
+      }
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (
+        selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId
+        === entry.hierarchy_step_template_id
+      ) {
+        const history = await listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisions(
+          entry.hierarchy_step_template_id,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(history);
+      }
+      setProviderProvenanceWorkspaceFeedback(`Deleted hierarchy step template ${entry.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Hierarchy step template delete failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
   async function saveProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateFromStep(
     step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep,
   ) {
-    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog) {
-      setProviderProvenanceWorkspaceFeedback("Open a governance policy catalog row first.");
-      return;
-    }
     if (!providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.name.trim()) {
       setProviderProvenanceWorkspaceFeedback("Enter a hierarchy step template name before saving it.");
       return;
     }
     try {
+      if (editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId) {
+        const itemIds = Array.from(
+          new Set(
+            providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.item_ids_text
+              .split(",")
+              .map((value) => value.trim())
+              .filter(Boolean),
+          ),
+        );
+        if (!itemIds.length) {
+          setProviderProvenanceWorkspaceFeedback(
+            "Hierarchy step templates must target at least one template or registry entry.",
+          );
+          return;
+        }
+        const currentTemplate = providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.find(
+          (entry) =>
+            entry.hierarchy_step_template_id
+            === editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId,
+        );
+        if (!currentTemplate) {
+          setProviderProvenanceWorkspaceFeedback("The hierarchy step template is no longer available.");
+          return;
+        }
+        const updatedTemplate = await updateProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate({
+          hierarchyStepTemplateId: editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId,
+          name: providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.name.trim(),
+          description: providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.description.trim(),
+          itemIds,
+          namePrefix: providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.name_prefix,
+          nameSuffix: providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.name_suffix,
+          descriptionAppend:
+            providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.description_append,
+          queryPatch: parseJsonObjectInput(
+            providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.query_patch,
+          ),
+          layoutPatch:
+            currentTemplate.item_type === "registry"
+              ? parseJsonObjectInput(
+                  providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.layout_patch,
+                )
+              : undefined,
+          templateId:
+            currentTemplate.item_type === "registry"
+            && providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.template_id.trim()
+              ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.template_id.trim()
+              : undefined,
+          clearTemplateLink:
+            currentTemplate.item_type === "registry"
+              ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.clear_template_link
+              : undefined,
+          actorTabId: comparisonHistoryTabIdentity.tabId,
+          actorTabLabel: comparisonHistoryTabIdentity.label,
+          reason: "scheduler_narrative_governance_hierarchy_step_template_update_from_control_room",
+        });
+        await loadProviderProvenanceWorkspaceRegistry();
+        const history = await listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisions(
+          updatedTemplate.hierarchy_step_template_id,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(
+          updatedTemplate.hierarchy_step_template_id,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(history);
+        setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError(null);
+        resetProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft();
+        setProviderProvenanceWorkspaceFeedback(
+          `Updated hierarchy step template ${updatedTemplate.name}.`,
+        );
+        return;
+      }
+      if (!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog) {
+        setProviderProvenanceWorkspaceFeedback("Open a governance policy catalog row first.");
+        return;
+      }
       const savedTemplate = await createProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate({
         name: providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.name.trim(),
         description: providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.description.trim(),
@@ -8124,6 +8457,99 @@ export default function App() {
       setProviderProvenanceWorkspaceFeedback(
         `Hierarchy step template save failed: ${(error as Error).message}`,
       );
+    }
+  }
+
+  async function runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction(
+    action: "delete" | "restore" | "update",
+  ) {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more hierarchy step templates first.");
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction(action);
+    try {
+      const itemIds = action === "update"
+        && providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.item_ids_text.trim()
+          ? Array.from(
+              new Set(
+                providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.item_ids_text
+                  .split(",")
+                  .map((value) => value.trim())
+                  .filter(Boolean),
+              ),
+            )
+          : undefined;
+      const result = await runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernance({
+        action,
+        hierarchyStepTemplateIds: selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: `scheduler_narrative_governance_hierarchy_step_template_bulk_${action}_from_control_room`,
+        namePrefix:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.name_prefix
+            : undefined,
+        nameSuffix:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.name_suffix
+            : undefined,
+        descriptionAppend:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.description_append
+            : undefined,
+        itemIds,
+        stepNamePrefix:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.step_name_prefix
+            : undefined,
+        stepNameSuffix:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.step_name_suffix
+            : undefined,
+        stepDescriptionAppend:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.step_description_append
+            : undefined,
+        queryPatch:
+          action === "update"
+            ? parseJsonObjectInput(
+                providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.query_patch,
+              )
+            : undefined,
+        layoutPatch:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.layout_patch.trim()
+            ? parseJsonObjectInput(
+                providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.layout_patch,
+              )
+            : undefined,
+        templateId:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.template_id.trim()
+            ? providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.template_id.trim()
+            : undefined,
+        clearTemplateLink:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.clear_template_link
+            ? true
+            : undefined,
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (action === "update") {
+        setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft(
+          defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft,
+        );
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Hierarchy step template bulk ${action} failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction(null);
     }
   }
 
@@ -12449,7 +12875,7 @@ export default function App() {
                                     <div className="market-data-provenance-shared-history">
                                       <div className="market-data-provenance-history-head">
                                         <strong>Named hierarchy step templates</strong>
-                                        <p>Promote a captured hierarchy step into a reusable template and apply it across selected policy catalogs.</p>
+                                        <p>Promote a captured hierarchy step into a reusable template, version it, and bulk-govern it across policy catalogs.</p>
                                       </div>
                                       <div className="filter-bar">
                                         <label>
@@ -12481,22 +12907,43 @@ export default function App() {
                                           />
                                         </label>
                                         <label>
-                                          <span>Selected step</span>
+                                          <span>Current source</span>
                                           <strong className="comparison-history-export-copy">
-                                            {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep
-                                              ? formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(
-                                                  selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep,
-                                                )
-                                              : "No step selected"}
+                                            {editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId
+                                              ? selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate
+                                                ? `${selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate.name} · ${formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(
+                                                    selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate.step,
+                                                  )}`
+                                                : "Template no longer selected"
+                                              : selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep
+                                                ? formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(
+                                                    selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep,
+                                                  )
+                                                : "No step selected"}
                                           </strong>
                                         </label>
                                         <label>
                                           <span>Action</span>
                                           <button
                                             className="ghost-button"
-                                            disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep}
+                                            disabled={
+                                              !editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId
+                                              && !selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep
+                                            }
                                             onClick={() => {
-                                              if (selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep) {
+                                              if (editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId) {
+                                                void saveProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateFromStep(
+                                                  selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate?.step ?? {
+                                                    item_type: "template",
+                                                    action: "update",
+                                                    item_ids: [],
+                                                    item_names: [],
+                                                    query_patch: {},
+                                                    layout_patch: {},
+                                                    clear_template_link: false,
+                                                  },
+                                                );
+                                              } else if (selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep) {
                                                 void saveProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateFromStep(
                                                   selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep,
                                                 );
@@ -12504,7 +12951,9 @@ export default function App() {
                                             }}
                                             type="button"
                                           >
-                                            Save selected step
+                                            {editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId
+                                              ? "Save template"
+                                              : "Save selected step"}
                                           </button>
                                         </label>
                                         <label>
@@ -12516,6 +12965,361 @@ export default function App() {
                                           >
                                             Clear draft
                                           </button>
+                                        </label>
+                                      </div>
+                                      {editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId
+                                      && selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate ? (
+                                        <>
+                                          <div className="filter-bar">
+                                            <label>
+                                              <span>Targets</span>
+                                              <input
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft((current) => ({
+                                                    ...current,
+                                                    item_ids_text: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder="id_1, id_2"
+                                                type="text"
+                                                value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.item_ids_text}
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Step name prefix</span>
+                                              <input
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft((current) => ({
+                                                    ...current,
+                                                    name_prefix: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder="Reviewed / "
+                                                type="text"
+                                                value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.name_prefix}
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Step name suffix</span>
+                                              <input
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft((current) => ({
+                                                    ...current,
+                                                    name_suffix: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder=" / approved"
+                                                type="text"
+                                                value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.name_suffix}
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Step description</span>
+                                              <input
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft((current) => ({
+                                                    ...current,
+                                                    description_append: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder="shared governance note"
+                                                type="text"
+                                                value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.description_append}
+                                              />
+                                            </label>
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate.item_type === "registry" ? (
+                                              <>
+                                                <label>
+                                                  <span>Template link</span>
+                                                  <select
+                                                    onChange={(event) =>
+                                                      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft((current) => ({
+                                                        ...current,
+                                                        template_id: event.target.value,
+                                                      }))
+                                                    }
+                                                    value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.template_id}
+                                                  >
+                                                    <option value="">No explicit template link</option>
+                                                    {providerProvenanceSchedulerNarrativeTemplates.map((entry) => (
+                                                      <option key={entry.template_id} value={entry.template_id}>
+                                                        {entry.name}
+                                                      </option>
+                                                    ))}
+                                                  </select>
+                                                </label>
+                                                <label>
+                                                  <span>Clear link</span>
+                                                  <input
+                                                    checked={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.clear_template_link}
+                                                    onChange={(event) =>
+                                                      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft((current) => ({
+                                                        ...current,
+                                                        clear_template_link: event.target.checked,
+                                                      }))
+                                                    }
+                                                    type="checkbox"
+                                                  />
+                                                </label>
+                                              </>
+                                            ) : null}
+                                          </div>
+                                          <div className="filter-bar">
+                                            <label>
+                                              <span>Query patch</span>
+                                              <textarea
+                                                onChange={(event) =>
+                                                  setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft((current) => ({
+                                                    ...current,
+                                                    query_patch: event.target.value,
+                                                  }))
+                                                }
+                                                placeholder='{"scheduler_alert_status":"resolved"}'
+                                                rows={4}
+                                                value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.query_patch}
+                                              />
+                                            </label>
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate.item_type === "registry" ? (
+                                              <label>
+                                                <span>Layout patch</span>
+                                                <textarea
+                                                  onChange={(event) =>
+                                                    setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft((current) => ({
+                                                      ...current,
+                                                      layout_patch: event.target.value,
+                                                    }))
+                                                  }
+                                                  placeholder='{"show_recent_exports":true}'
+                                                  rows={4}
+                                                  value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft.layout_patch}
+                                                />
+                                              </label>
+                                            ) : null}
+                                          </div>
+                                        </>
+                                      ) : null}
+                                      <div className="filter-bar">
+                                        <label>
+                                          <span>Selection</span>
+                                          <button
+                                            className="ghost-button"
+                                            disabled={!providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.length}
+                                            onClick={toggleAllProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateSelections}
+                                            type="button"
+                                          >
+                                            {selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length
+                                              === providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.length
+                                              && providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.length
+                                                ? "Clear all"
+                                                : "Select all"}
+                                          </button>
+                                        </label>
+                                        <label>
+                                          <span>Bulk name prefix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                name_prefix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="Reviewed / "
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.name_prefix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Bulk name suffix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                name_suffix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder=" / staged"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.name_suffix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Bulk description</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                description_append: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="team rollout"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.description_append}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Bulk targets</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                item_ids_text: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="optional override ids"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.item_ids_text}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <button
+                                            className="ghost-button"
+                                            disabled={!selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length}
+                                            onClick={() => {
+                                              void runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction("delete");
+                                            }}
+                                            type="button"
+                                          >
+                                            {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction === "delete"
+                                              ? "Deleting…"
+                                              : "Delete selected"}
+                                          </button>
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <button
+                                            className="ghost-button"
+                                            disabled={!selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length}
+                                            onClick={() => {
+                                              void runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction("restore");
+                                            }}
+                                            type="button"
+                                          >
+                                            {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction === "restore"
+                                              ? "Restoring…"
+                                              : "Restore selected"}
+                                          </button>
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <button
+                                            className="ghost-button"
+                                            disabled={!selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length}
+                                            onClick={() => {
+                                              void runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction("update");
+                                            }}
+                                            type="button"
+                                          >
+                                            {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction === "update"
+                                              ? "Updating…"
+                                              : "Update selected"}
+                                          </button>
+                                        </label>
+                                      </div>
+                                      <div className="filter-bar">
+                                        <label>
+                                          <span>Bulk step prefix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                step_name_prefix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="Reviewed / "
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.step_name_prefix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Bulk step suffix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                step_name_suffix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder=" / approved"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.step_name_suffix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Bulk step description</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                step_description_append: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="shared patch note"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.step_description_append}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Bulk template link</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                template_id: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.template_id}
+                                          >
+                                            <option value="">Keep current link</option>
+                                            {providerProvenanceSchedulerNarrativeTemplates.map((entry) => (
+                                              <option key={entry.template_id} value={entry.template_id}>
+                                                {entry.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Clear link</span>
+                                          <input
+                                            checked={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.clear_template_link}
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                clear_template_link: event.target.checked,
+                                              }))
+                                            }
+                                            type="checkbox"
+                                          />
+                                        </label>
+                                      </div>
+                                      <div className="filter-bar">
+                                        <label>
+                                          <span>Bulk query patch</span>
+                                          <textarea
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                query_patch: event.target.value,
+                                              }))
+                                            }
+                                            placeholder='{"scheduler_alert_status":"resolved"}'
+                                            rows={3}
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.query_patch}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Bulk layout patch</span>
+                                          <textarea
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                layout_patch: event.target.value,
+                                              }))
+                                            }
+                                            placeholder='{"show_recent_exports":true}'
+                                            rows={3}
+                                            value={providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft.layout_patch}
+                                          />
                                         </label>
                                       </div>
                                       <p className="run-lineage-symbol-copy">
@@ -12535,6 +13339,7 @@ export default function App() {
                                         <table className="data-table">
                                           <thead>
                                             <tr>
+                                              <th aria-label="Select template">Sel</th>
                                               <th>Template</th>
                                               <th>Origin</th>
                                               <th>Action</th>
@@ -12544,12 +13349,27 @@ export default function App() {
                                             {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.map((entry) => (
                                               <tr key={entry.hierarchy_step_template_id}>
                                                 <td>
+                                                  <input
+                                                    checked={selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIdSet.has(entry.hierarchy_step_template_id)}
+                                                    onChange={() => {
+                                                      toggleProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateSelection(
+                                                        entry.hierarchy_step_template_id,
+                                                      );
+                                                    }}
+                                                    type="checkbox"
+                                                  />
+                                                </td>
+                                                <td>
                                                   <strong>{entry.name}</strong>
                                                   <p className="run-lineage-symbol-copy">
                                                     {entry.description || "No description."}
                                                   </p>
                                                   <p className="run-lineage-symbol-copy">
                                                     {formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(entry.step)}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatWorkflowToken(entry.status)} · revision {entry.revision_count}
+                                                    {entry.current_revision_id ? ` · ${shortenIdentifier(entry.current_revision_id, 10)}` : ""}
                                                   </p>
                                                   <p className="run-lineage-symbol-copy">
                                                     {entry.created_by_tab_label ?? entry.created_by_tab_id ?? "unknown tab"} · updated {formatTimestamp(entry.updated_at)}
@@ -12584,6 +13404,30 @@ export default function App() {
                                                     </button>
                                                     <button
                                                       className="ghost-button"
+                                                      disabled={entry.status !== "active"}
+                                                      onClick={() => {
+                                                        editProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(
+                                                          entry,
+                                                        );
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Edit
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() => {
+                                                        void toggleProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(
+                                                          entry.hierarchy_step_template_id,
+                                                        );
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Versions
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={entry.status !== "active"}
                                                       onClick={() => {
                                                         void applyProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateToCatalogs(
                                                           entry,
@@ -12592,6 +13436,18 @@ export default function App() {
                                                       type="button"
                                                     >
                                                       Apply to selected catalogs
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={entry.status !== "active"}
+                                                      onClick={() => {
+                                                        void removeProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(
+                                                          entry,
+                                                        );
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Delete
                                                     </button>
                                                   </div>
                                                 </td>
@@ -12603,11 +13459,106 @@ export default function App() {
                                         <p className="empty-state">No hierarchy step templates saved yet.</p>
                                       )}
                                       {selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate ? (
-                                        <p className="run-lineage-symbol-copy">
-                                          Selected template: {selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate.name} · {formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(
-                                            selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate.step,
+                                        <div className="market-data-provenance-shared-history">
+                                          <div className="market-data-provenance-history-head">
+                                            <strong>Template versions</strong>
+                                            <p>Stage a prior snapshot into the editor or restore a specific revision.</p>
+                                          </div>
+                                          {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryLoading ? (
+                                            <p className="empty-state">Loading hierarchy step template revisions…</p>
+                                          ) : null}
+                                          {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError ? (
+                                            <p className="market-data-workflow-feedback">
+                                              Hierarchy step template revision load failed: {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryError}
+                                            </p>
+                                          ) : null}
+                                          {selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory ? (
+                                            <table className="data-table">
+                                              <thead>
+                                                <tr>
+                                                  <th>Revision</th>
+                                                  <th>Template</th>
+                                                  <th>Action</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory.history.map((entry) => (
+                                                  <tr key={entry.revision_id}>
+                                                    <td>
+                                                      <strong>{entry.revision_id}</strong>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {entry.reason}
+                                                      </p>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {formatTimestamp(entry.recorded_at)}
+                                                      </p>
+                                                    </td>
+                                                    <td>
+                                                      <strong>{entry.name}</strong>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary(entry.step)}
+                                                      </p>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {formatWorkflowToken(entry.status)}
+                                                        {entry.source_revision_id ? ` · from ${shortenIdentifier(entry.source_revision_id, 10)}` : ""}
+                                                      </p>
+                                                    </td>
+                                                    <td>
+                                                      <div className="market-data-provenance-history-actions">
+                                                        <button
+                                                          className="ghost-button"
+                                                          onClick={() => {
+                                                            setEditingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(
+                                                              entry.hierarchy_step_template_id,
+                                                            );
+                                                            setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(
+                                                              entry.hierarchy_step_template_id,
+                                                            );
+                                                            setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft({
+                                                              name: entry.name,
+                                                              description: entry.description,
+                                                              item_ids_text: entry.step.item_ids.join(", "),
+                                                              name_prefix: entry.step.name_prefix ?? "",
+                                                              name_suffix: entry.step.name_suffix ?? "",
+                                                              description_append: entry.step.description_append ?? "",
+                                                              query_patch: Object.keys(entry.step.query_patch ?? {}).length
+                                                                ? JSON.stringify(entry.step.query_patch, null, 2)
+                                                                : "",
+                                                              layout_patch: Object.keys(entry.step.layout_patch ?? {}).length
+                                                                ? JSON.stringify(entry.step.layout_patch, null, 2)
+                                                                : "",
+                                                              template_id: entry.step.template_id ?? "",
+                                                              clear_template_link: entry.step.clear_template_link,
+                                                            });
+                                                            setProviderProvenanceWorkspaceFeedback(
+                                                              `Hierarchy step template revision ${entry.revision_id} staged in the editor.`,
+                                                            );
+                                                          }}
+                                                          type="button"
+                                                        >
+                                                          Stage draft
+                                                        </button>
+                                                        <button
+                                                          className="ghost-button"
+                                                          onClick={() => {
+                                                            void restoreProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistoryRevision(
+                                                              entry,
+                                                            );
+                                                          }}
+                                                          type="button"
+                                                        >
+                                                          Restore revision
+                                                        </button>
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          ) : (
+                                            <p className="empty-state">Select a hierarchy step template row and open Versions to inspect revisions.</p>
                                           )}
-                                        </p>
+                                        </div>
                                       ) : null}
                                     </div>
                                     <div className="market-data-provenance-shared-history">

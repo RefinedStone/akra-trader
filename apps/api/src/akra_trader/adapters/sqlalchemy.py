@@ -34,6 +34,7 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
@@ -318,6 +319,15 @@ provider_provenance_scheduler_narrative_governance_hierarchy_step_templates = Ta
   Column("created_by_tab_id", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions = Table(
+  "provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions",
+  metadata,
+  Column("revision_id", String, primary_key=True),
+  Column("hierarchy_step_template_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
 provider_provenance_scheduler_narrative_governance_plans = Table(
   "provider_provenance_scheduler_narrative_governance_plans",
   metadata,
@@ -419,6 +429,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   )
   _provider_provenance_scheduler_narrative_governance_hierarchy_step_template_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
+  )
+  _provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord
   )
   _provider_provenance_scheduler_narrative_governance_plan_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
@@ -1964,6 +1977,84 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
     if row is None:
       return None
     return self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_adapter.validate_python(
+      row["payload"]
+    )
+
+  def save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord:
+    payload = self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "revision_id": record.revision_id,
+      "hierarchy_step_template_id": record.hierarchy_step_template_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(
+          provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.c.revision_id
+        ).where(
+          provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.c.revision_id
+          == record.revision_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions).values(
+            **row
+          )
+        )
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions)
+          .where(
+            provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.c.revision_id
+            == record.revision_id
+          )
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord, ...]:
+    statement = select(
+      provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.c.payload
+    ).order_by(
+      provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.c.recorded_at.desc(),
+      provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.c.revision_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(
+          provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.c.payload
+        ).where(
+          provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions.c.revision_id
+          == revision_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_adapter.validate_python(
       row["payload"]
     )
 

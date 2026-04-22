@@ -2308,6 +2308,76 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
     hierarchy_step_template_list_payload["items"][0]["hierarchy_step_template_id"]
     == hierarchy_step_template_payload["hierarchy_step_template_id"]
   )
+  assert hierarchy_step_template_list_payload["items"][0]["revision_count"] == 1
+
+  updated_hierarchy_step_template_response = client.patch(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_payload['hierarchy_step_template_id']}",
+    json={
+      "description": "Reusable hierarchy step for reviewed template governance sync.",
+      "name_suffix": " / reviewed",
+      "query_patch": {
+        "scheduler_alert_status": "resolved",
+      },
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "update_hierarchy_step_template",
+    },
+  )
+  assert updated_hierarchy_step_template_response.status_code == 200
+  updated_hierarchy_step_template_payload = updated_hierarchy_step_template_response.json()
+  assert updated_hierarchy_step_template_payload["revision_count"] == 2
+  assert updated_hierarchy_step_template_payload["step"]["name_suffix"] == " / reviewed"
+
+  hierarchy_step_template_revision_response = client.get(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_payload['hierarchy_step_template_id']}/revisions",
+  )
+  assert hierarchy_step_template_revision_response.status_code == 200
+  hierarchy_step_template_revision_payload = hierarchy_step_template_revision_response.json()
+  assert hierarchy_step_template_revision_payload["current"]["hierarchy_step_template_id"] == (
+    hierarchy_step_template_payload["hierarchy_step_template_id"]
+  )
+  assert hierarchy_step_template_revision_payload["history"][0]["action"] == "updated"
+
+  deleted_hierarchy_step_template_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_payload['hierarchy_step_template_id']}/delete",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "delete_hierarchy_step_template",
+    },
+  )
+  assert deleted_hierarchy_step_template_response.status_code == 200
+  deleted_hierarchy_step_template_payload = deleted_hierarchy_step_template_response.json()
+  assert deleted_hierarchy_step_template_payload["status"] == "deleted"
+
+  restored_hierarchy_step_template_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_payload['hierarchy_step_template_id']}/revisions/{hierarchy_step_template_revision_payload['history'][0]['revision_id']}/restore",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "restore_hierarchy_step_template_revision",
+    },
+  )
+  assert restored_hierarchy_step_template_response.status_code == 200
+  restored_hierarchy_step_template_payload = restored_hierarchy_step_template_response.json()
+  assert restored_hierarchy_step_template_payload["status"] == "active"
+  assert restored_hierarchy_step_template_payload["revision_count"] == 4
+
+  bulk_governed_hierarchy_step_template_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/bulk-governance",
+    json={
+      "action": "update",
+      "hierarchy_step_template_ids": [hierarchy_step_template_payload["hierarchy_step_template_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_update_hierarchy_step_template",
+      "name_suffix": " / bulk",
+      "step_name_prefix": "Reviewed / ",
+    },
+  )
+  assert bulk_governed_hierarchy_step_template_response.status_code == 200
+  bulk_governed_hierarchy_step_template_payload = bulk_governed_hierarchy_step_template_response.json()
+  assert bulk_governed_hierarchy_step_template_payload["applied_count"] == 1
 
   apply_hierarchy_step_template_response = client.post(
     f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_payload['hierarchy_step_template_id']}/apply",
@@ -2339,6 +2409,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
     primary_template_backed_step["source_template_id"]
     == hierarchy_step_template_payload["hierarchy_step_template_id"]
   )
+  assert primary_template_backed_step["name_prefix"] == "Reviewed / "
 
   refreshed_secondary_catalog_response = client.get(
     f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{secondary_governance_policy_catalog_payload['catalog_id']}/revisions",
