@@ -465,6 +465,66 @@
       "source_turn_id": null,
       "direction_relation_note": "The latest main-session reply confirms commit `07d487f` moved benchmark metadata ownership into `benchmark_artifact_metadata.py` and remediation-result ownership into `market_data_remediation.py`, leaving `domain/models.py` with compatibility re-exports only and explicitly stating there is no remaining work in this task scope.",
       "priority_reason": "Marked done because the main session completed the final residual `domain/models.py` benchmark/remediation split, validated it with `python -m py_compile` plus focused remediation regressions in `test_reference.py`, `test_application.py`, and `test_api.py`, and pushed commit `07d487f` to `origin/main`."
+    },
+    {
+      "id": "task-llm-sensitivity-app-provider-provenance-workspace-route-extraction",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Extract provider-provenance workspace route ownership out of App.tsx",
+      "description": "Move the provider-provenance and search-moderation workspace state, dense JSX, and direct `controlRoomApi`/`controlRoomDefinitions` usage out of `apps/web/src/App.tsx` into a feature-owned route module so `App.tsx` stops owning that bounded flow directly.",
+      "status": "ready",
+      "base_priority": 97,
+      "dynamic_priority_delta": 33,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T00:23:01+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The queue was re-opened because `llm-sensitivity-decomposition` still lists `App.tsx` and remaining feature consumers of the control-room barrels as primary pressure points, and the current file still directly owns a massive provider-provenance/search-moderation import surface.",
+      "priority_reason": "Highest-priority next step because `apps/web/src/App.tsx` remains the biggest frontend compatibility hotspot at 38k+ lines and still directly wires provider-provenance/search-moderation APIs, definitions, state, and JSX despite the direction calling for feature-owned modules instead of the top-level route entrypoint."
+    },
+    {
+      "id": "task-llm-sensitivity-control-room-provider-provenance-api-module-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split provider-provenance API families behind narrower controlRoomApi modules",
+      "description": "Decompose `apps/web/src/controlRoomApi/providerProvenance.ts` into bounded feature-owned API modules for narrative governance, stitched-report governance, search moderation, exports, and scheduled reports while keeping `controlRoomApi.ts` import-stable as a barrel.",
+      "status": "proposed",
+      "base_priority": 90,
+      "dynamic_priority_delta": 18,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T00:23:01+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The detail doc says compatibility barrels should remain import-stable while real ownership moves into bounded modules, and the current provider-provenance API file is still the single direct owner for multiple unrelated bounded flows.",
+      "priority_reason": "Kept as follow-up rather than queue head because the route extraction can proceed first, but this API split is still needed to stop future work from defaulting back into a monolithic provider-provenance control-room client file."
+    },
+    {
+      "id": "task-llm-sensitivity-control-room-provider-provenance-definition-family-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split provider-provenance and query-builder type families behind narrower controlRoomDefinitions modules",
+      "description": "Break `apps/web/src/controlRoomDefinitions/providerProvenance.ts` into bounded type/constant modules so provider-provenance, search-moderation, replay-link, and comparison-history consumers can import direct ownership modules while `controlRoomDefinitions.ts` stays as the compatibility barrel.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 17,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T00:23:01+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The direction explicitly calls out moving query-builder and provider-provenance consumers toward feature-owned modules instead of the top-level control-room barrels, and `App.tsx` still imports a very large type/constant surface from `controlRoomDefinitions.ts`.",
+      "priority_reason": "Queued as a proposal because it complements the route extraction and addresses the remaining barrel pressure, but it is safer to let the route-owned boundary settle before choosing the exact type-family split points."
+    },
+    {
+      "id": "task-data-trust-operator-lineage-guidance-retention-drill-pack",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Define operator lineage guidance, retention policy, and drill validation pack",
+      "description": "Turn the data-trust lane's documented immediate gaps into an executable operator-facing pack covering lineage action guidance, escalation rules, lineage-history and ingestion-job retention expectations, and data-boundary incident drill validation.",
+      "status": "proposed",
+      "base_priority": 78,
+      "dynamic_priority_delta": 14,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T00:23:01+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The `data-trust-and-lineage` detail doc still lists operator-facing lineage action guidance, retention policy, and drill/runbook validation as immediate gaps, but the ledger had no follow-up task representing that work.",
+      "priority_reason": "Left proposed because the operator request for this turn was to re-evaluate the empty queue and choose the most immediate executable head; the frontend decomposition hotspot is clearer for immediate execution, while this data-trust pack remains a valid next proposal under the active direction."
     }
   ]
 }
