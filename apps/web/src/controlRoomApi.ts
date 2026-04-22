@@ -18,8 +18,10 @@ import type {
   ProviderProvenanceSchedulerSearchDashboardPayload,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanEntry,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanListPayload,
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditListPayload,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyListPayload,
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionListPayload,
   ProviderProvenanceSchedulerSearchModerationPlanEntry,
   ProviderProvenanceSchedulerSearchModerationPlanListPayload,
   ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditListPayload,
@@ -1044,6 +1046,187 @@ export async function listProviderProvenanceSchedulerSearchModerationCatalogGove
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyListPayload>(
     `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies${suffix}`,
+  );
+}
+
+export async function updateProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicy(params: {
+  governancePolicyId: string;
+  name?: string | null;
+  description?: string | null;
+  actionScope?: "any" | "update" | "delete" | "restore";
+  requireApprovalNote?: boolean;
+  guidance?: string | null;
+  namePrefix?: string | null;
+  nameSuffix?: string | null;
+  descriptionAppend?: string | null;
+  defaultModerationStatus?: "pending" | "approved" | "rejected";
+  governanceView?: string;
+  windowDays?: number;
+  stalePendingHours?: number;
+  minimumScore?: number;
+  requireNote?: boolean;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string | null;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/${encodeURIComponent(params.governancePolicyId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(params.name !== undefined ? { name: params.name } : {}),
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...(params.actionScope ? { action_scope: params.actionScope } : {}),
+        ...(params.requireApprovalNote !== undefined ? { require_approval_note: params.requireApprovalNote } : {}),
+        ...(params.guidance !== undefined ? { guidance: params.guidance } : {}),
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend !== undefined ? { description_append: params.descriptionAppend } : {}),
+        ...(params.defaultModerationStatus ? { default_moderation_status: params.defaultModerationStatus } : {}),
+        ...(params.governanceView ? { governance_view: params.governanceView } : {}),
+        ...(typeof params.windowDays === "number" && Number.isFinite(params.windowDays)
+          ? { window_days: params.windowDays }
+          : {}),
+        ...(typeof params.stalePendingHours === "number" && Number.isFinite(params.stalePendingHours)
+          ? { stale_pending_hours: params.stalePendingHours }
+          : {}),
+        ...(typeof params.minimumScore === "number" && Number.isFinite(params.minimumScore)
+          ? { minimum_score: params.minimumScore }
+          : {}),
+        ...(params.requireNote !== undefined ? { require_note: params.requireNote } : {}),
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function deleteProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicy(params: {
+  governancePolicyId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string | null;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/${encodeURIComponent(params.governancePolicyId)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        actor_tab_id: params.actorTabId?.trim() || null,
+        actor_tab_label: params.actorTabLabel?.trim() || null,
+        reason: params.reason?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisions(
+  governancePolicyId: string,
+) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/${encodeURIComponent(governancePolicyId)}/revisions`,
+  );
+}
+
+export async function restoreProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevision(params: {
+  governancePolicyId: string;
+  revisionId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string | null;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/${encodeURIComponent(params.governancePolicyId)}/revisions/${encodeURIComponent(params.revisionId)}/restore`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        actor_tab_id: params.actorTabId?.trim() || null,
+        actor_tab_label: params.actorTabLabel?.trim() || null,
+        reason: params.reason?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAudits(params: {
+  governancePolicyId?: string;
+  action?: string;
+  actorTabId?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.governancePolicyId?.trim()) {
+    searchParams.set("governance_policy_id", params.governancePolicyId.trim());
+  }
+  if (params.action?.trim()) {
+    searchParams.set("action", params.action.trim());
+  }
+  if (params.actorTabId?.trim()) {
+    searchParams.set("actor_tab_id", params.actorTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/audits${suffix}`,
+  );
+}
+
+export async function bulkGovernProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicies(params: {
+  action: "update" | "delete" | "restore";
+  governancePolicyIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string | null;
+  namePrefix?: string | null;
+  nameSuffix?: string | null;
+  descriptionAppend?: string | null;
+  defaultModerationStatus?: "pending" | "approved" | "rejected";
+  governanceView?: string;
+  windowDays?: number;
+  stalePendingHours?: number;
+  minimumScore?: number;
+  requireNote?: boolean;
+  actionScope?: "any" | "update" | "delete" | "restore";
+  requireApprovalNote?: boolean;
+  guidance?: string | null;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/bulk-governance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: params.action,
+        governance_policy_ids: params.governancePolicyIds,
+        actor_tab_id: params.actorTabId?.trim() || null,
+        actor_tab_label: params.actorTabLabel?.trim() || null,
+        reason: params.reason?.trim() || null,
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend !== undefined ? { description_append: params.descriptionAppend } : {}),
+        ...(params.defaultModerationStatus ? { default_moderation_status: params.defaultModerationStatus } : {}),
+        ...(params.governanceView ? { governance_view: params.governanceView } : {}),
+        ...(typeof params.windowDays === "number" && Number.isFinite(params.windowDays)
+          ? { window_days: params.windowDays }
+          : {}),
+        ...(typeof params.stalePendingHours === "number" && Number.isFinite(params.stalePendingHours)
+          ? { stale_pending_hours: params.stalePendingHours }
+          : {}),
+        ...(typeof params.minimumScore === "number" && Number.isFinite(params.minimumScore)
+          ? { minimum_score: params.minimumScore }
+          : {}),
+        ...(params.requireNote !== undefined ? { require_note: params.requireNote } : {}),
+        ...(params.actionScope ? { action_scope: params.actionScope } : {}),
+        ...(params.requireApprovalNote !== undefined ? { require_approval_note: params.requireApprovalNote } : {}),
+        ...(params.guidance !== undefined ? { guidance: params.guidance } : {}),
+      }),
+    },
   );
 }
 

@@ -2276,6 +2276,32 @@ def test_provider_provenance_scheduler_search_moderation_catalog_governance_flow
     governance_policies["items"][0]["governance_policy_id"]
     == governance_policy["governance_policy_id"]
   )
+  assert governance_policies["items"][0]["revision_count"] == 1
+
+  updated_governance_policy = (
+    app.update_provider_provenance_scheduler_search_moderation_catalog_governance_policy(
+      governance_policy["governance_policy_id"],
+      guidance="Updated moderation governance note.",
+      minimum_score=220,
+      actor_tab_id="control-room",
+      actor_tab_label="Control room",
+    )
+  )
+  assert updated_governance_policy["minimum_score"] == 220
+
+  governance_policy_revisions = (
+    app.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions(
+      governance_policy["governance_policy_id"]
+    )
+  )
+  assert len(governance_policy_revisions["history"]) == 2
+
+  governance_policy_audits = (
+    app.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits(
+      governance_policy_id=governance_policy["governance_policy_id"]
+    )
+  )
+  assert governance_policy_audits["total"] >= 2
 
   staged_plan = app.stage_provider_provenance_scheduler_search_moderation_catalog_governance_plan(
     catalog_ids=(catalog["catalog_id"],),
@@ -2289,7 +2315,7 @@ def test_provider_provenance_scheduler_search_moderation_catalog_governance_flow
   assert staged_plan["preview_count"] == 1
   assert staged_plan["preview_items"][0]["outcome"] == "changed"
   assert "description" in staged_plan["preview_items"][0]["changed_fields"]
-  assert staged_plan["preview_items"][0]["proposed_snapshot"]["minimum_score"] == 180
+  assert staged_plan["preview_items"][0]["proposed_snapshot"]["minimum_score"] == 220
 
   queued_plans = app.list_provider_provenance_scheduler_search_moderation_catalog_governance_plans(
     queue_state="pending_approval",
@@ -2318,9 +2344,39 @@ def test_provider_provenance_scheduler_search_moderation_catalog_governance_flow
   assert applied_plan["applied_result"]["applied_count"] == 1
 
   updated_catalog = app.list_provider_provenance_scheduler_search_moderation_policy_catalogs()["items"][0]
-  assert updated_catalog["minimum_score"] == 180
+  assert updated_catalog["minimum_score"] == 220
   assert updated_catalog["require_note"] is True
   assert updated_catalog["description"].endswith("Reviewed by governance queue.")
+
+  bulk_deleted = (
+    app.bulk_govern_provider_provenance_scheduler_search_moderation_catalog_governance_policies(
+      governance_policy_ids=(governance_policy["governance_policy_id"],),
+      action="delete",
+      actor_tab_id="control-room",
+      actor_tab_label="Control room",
+    )
+  )
+  assert bulk_deleted.applied_count == 1
+
+  deleted_policy = app.list_provider_provenance_scheduler_search_moderation_catalog_governance_policies()[
+    "items"
+  ][0]
+  assert deleted_policy["status"] == "deleted"
+
+  bulk_restored = (
+    app.bulk_govern_provider_provenance_scheduler_search_moderation_catalog_governance_policies(
+      governance_policy_ids=(governance_policy["governance_policy_id"],),
+      action="restore",
+      actor_tab_id="control-room",
+      actor_tab_label="Control room",
+    )
+  )
+  assert bulk_restored.applied_count == 1
+
+  restored_policy = app.list_provider_provenance_scheduler_search_moderation_catalog_governance_policies()[
+    "items"
+  ][0]
+  assert restored_policy["status"] == "active"
 
 
 def test_provider_provenance_scheduler_history_and_analytics_persist(

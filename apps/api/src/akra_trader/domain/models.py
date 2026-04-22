@@ -1802,6 +1802,7 @@ class ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord:
   name: str
   description: str = ""
   scheduler_key: str = "provider_provenance_reports"
+  status: str = "active"
   action_scope: str = "any"
   require_approval_note: bool = False
   guidance: str | None = None
@@ -1814,8 +1815,66 @@ class ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord:
   stale_pending_hours: int = 24
   minimum_score: int = 0
   require_note: bool = False
+  current_revision_id: str | None = None
+  revision_count: int = 0
   created_by_tab_id: str | None = None
   created_by_tab_label: str | None = None
+  deleted_at: datetime | None = None
+  deleted_by_tab_id: str | None = None
+  deleted_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
+  revision_id: str
+  governance_policy_id: str
+  action: str
+  reason: str
+  name: str
+  description: str = ""
+  scheduler_key: str = "provider_provenance_reports"
+  status: str = "active"
+  action_scope: str = "any"
+  require_approval_note: bool = False
+  guidance: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  default_moderation_status: str = "approved"
+  governance_view: str = "pending_queue"
+  window_days: int = 30
+  stale_pending_hours: int = 24
+  minimum_score: int = 0
+  require_note: bool = False
+  recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  source_revision_id: str | None = None
+  recorded_by_tab_id: str | None = None
+  recorded_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord:
+  audit_id: str
+  governance_policy_id: str
+  action: str
+  recorded_at: datetime
+  reason: str
+  detail: str
+  scheduler_key: str = "provider_provenance_reports"
+  revision_id: str | None = None
+  source_revision_id: str | None = None
+  name: str = ""
+  status: str = "active"
+  action_scope: str = "any"
+  require_approval_note: bool = False
+  default_moderation_status: str = "approved"
+  governance_view: str = "pending_queue"
+  window_days: int = 30
+  stale_pending_hours: int = 24
+  minimum_score: int = 0
+  require_note: bool = False
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
 
 
 @dataclass(frozen=True)

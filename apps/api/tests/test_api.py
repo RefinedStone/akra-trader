@@ -5397,6 +5397,35 @@ def test_scheduler_search_moderation_catalog_governance_routes(
       governance_policy_list_payload["items"][0]["governance_policy_id"]
       == governance_policy_payload["governance_policy_id"]
     )
+    assert governance_policy_list_payload["items"][0]["revision_count"] == 1
+
+    governance_policy_update_response = client.patch(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/{governance_policy_payload['governance_policy_id']}",
+      json={
+        "guidance": "Updated moderation governance note.",
+        "minimum_score": 220,
+        "actor_tab_id": "control-room",
+        "actor_tab_label": "Control room",
+      },
+    )
+    assert governance_policy_update_response.status_code == 200
+    governance_policy_update_payload = governance_policy_update_response.json()
+    assert governance_policy_update_payload["minimum_score"] == 220
+
+    governance_policy_revision_response = client.get(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/{governance_policy_payload['governance_policy_id']}/revisions"
+    )
+    assert governance_policy_revision_response.status_code == 200
+    governance_policy_revision_payload = governance_policy_revision_response.json()
+    assert len(governance_policy_revision_payload["history"]) == 2
+
+    governance_policy_audit_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/audits",
+      params={"governance_policy_id": governance_policy_payload["governance_policy_id"]},
+    )
+    assert governance_policy_audit_response.status_code == 200
+    governance_policy_audit_payload = governance_policy_audit_response.json()
+    assert governance_policy_audit_payload["total"] >= 2
 
     stage_response = client.post(
       "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-plans",
@@ -5415,7 +5444,7 @@ def test_scheduler_search_moderation_catalog_governance_routes(
     assert stage_payload["preview_count"] == 1
     assert stage_payload["preview_items"][0]["outcome"] == "changed"
     assert "description" in stage_payload["preview_items"][0]["changed_fields"]
-    assert stage_payload["preview_items"][0]["proposed_snapshot"]["minimum_score"] == 180
+    assert stage_payload["preview_items"][0]["proposed_snapshot"]["minimum_score"] == 220
 
     queue_response = client.get(
       "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-plans",
@@ -5454,12 +5483,42 @@ def test_scheduler_search_moderation_catalog_governance_routes(
     assert apply_payload["queue_state"] == "completed"
     assert apply_payload["applied_result"]["applied_count"] == 1
 
+    governance_policy_bulk_delete_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/bulk-governance",
+      json={
+        "action": "delete",
+        "governance_policy_ids": [governance_policy_payload["governance_policy_id"]],
+        "actor_tab_id": "control-room",
+        "actor_tab_label": "Control room",
+      },
+    )
+    assert governance_policy_bulk_delete_response.status_code == 200
+    assert governance_policy_bulk_delete_response.json()["applied_count"] == 1
+
+    governance_policy_after_delete = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies",
+    )
+    assert governance_policy_after_delete.status_code == 200
+    assert governance_policy_after_delete.json()["items"][0]["status"] == "deleted"
+
+    governance_policy_bulk_restore_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/bulk-governance",
+      json={
+        "action": "restore",
+        "governance_policy_ids": [governance_policy_payload["governance_policy_id"]],
+        "actor_tab_id": "control-room",
+        "actor_tab_label": "Control room",
+      },
+    )
+    assert governance_policy_bulk_restore_response.status_code == 200
+    assert governance_policy_bulk_restore_response.json()["applied_count"] == 1
+
     updated_catalog_response = client.get(
       "/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
     )
     assert updated_catalog_response.status_code == 200
     updated_catalog_payload = updated_catalog_response.json()["items"][0]
-    assert updated_catalog_payload["minimum_score"] == 180
+    assert updated_catalog_payload["minimum_score"] == 220
     assert updated_catalog_payload["require_note"] is True
     assert updated_catalog_payload["description"].endswith("Reviewed by governance queue.")
 

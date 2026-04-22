@@ -145,6 +145,9 @@ unclear dataset lineage.
   approval queue for catalog lifecycle changes, so teams can preview, approve, and apply search
   moderation catalog updates behind saved governance defaults before those defaults start driving
   future moderation plans
+- those moderation-catalog governance policies now also expose revision history, team audit, and
+  bulk governance, so reusable catalog-lifecycle rules can be patched, retired, or restored with
+  the same operational traceability as the moderation catalog assets they govern
 - that same retrieval path now also emits cross-occurrence semantic/vector clusters, so a handoff
   can start from grouped recovery or failure narratives instead of only a flat ranked result set
   from scratch before ranking results

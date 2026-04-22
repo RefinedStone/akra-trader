@@ -1668,6 +1668,7 @@ export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEn
   scheduler_key: string;
   name: string;
   description: string;
+  status: string;
   action_scope: string;
   require_approval_note: boolean;
   guidance?: string | null;
@@ -1680,8 +1681,13 @@ export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEn
   stale_pending_hours: number;
   minimum_score: number;
   require_note: boolean;
+  current_revision_id?: string | null;
+  revision_count: number;
   created_by_tab_id?: string | null;
   created_by_tab_label?: string | null;
+  deleted_at?: string | null;
+  deleted_by_tab_id?: string | null;
+  deleted_by_tab_label?: string | null;
 };
 
 export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyListPayload = {
@@ -1696,6 +1702,67 @@ export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyLi
   };
   total: number;
   items: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry[];
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionEntry = {
+  revision_id: string;
+  governance_policy_id: string;
+  action: string;
+  reason: string;
+  name: string;
+  description: string;
+  scheduler_key: string;
+  status: string;
+  action_scope: string;
+  require_approval_note: boolean;
+  guidance?: string | null;
+  name_prefix?: string | null;
+  name_suffix?: string | null;
+  description_append?: string | null;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+  recorded_at: string;
+  source_revision_id?: string | null;
+  recorded_by_tab_id?: string | null;
+  recorded_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionListPayload = {
+  policy: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry;
+  history: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionEntry[];
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord = {
+  audit_id: string;
+  governance_policy_id: string;
+  action: string;
+  recorded_at: string;
+  reason: string;
+  detail: string;
+  scheduler_key: string;
+  revision_id?: string | null;
+  source_revision_id?: string | null;
+  name: string;
+  status: string;
+  action_scope: string;
+  require_approval_note: boolean;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+  actor_tab_id?: string | null;
+  actor_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditListPayload = {
+  items: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord[];
+  total: number;
 };
 
 export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPreviewItem = {

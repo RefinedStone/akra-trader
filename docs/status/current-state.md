@@ -253,6 +253,9 @@ It is not yet a finished live trading product:
   dedicated staged approval queue for catalog lifecycle changes, so teams can preview, approve,
   and apply moderation-catalog updates behind saved governance defaults instead of mutating those
   reusable search-governance assets directly
+- those moderation-catalog governance policies now also support edit, delete, revision restore,
+  team audit, and bulk governance, so reusable catalog-lifecycle defaults can evolve with the
+  same traceability and batch control already expected from the moderation catalog layer
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

@@ -29,6 +29,8 @@ from akra_trader.domain.models import (
 )
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionRecord
@@ -351,6 +353,7 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalog_gov
     created_at=now,
     updated_at=now,
     name="Stage catalog changes with note",
+    status="active",
     action_scope="update",
     require_approval_note=True,
     guidance="Require a note before applying moderation catalog changes.",
@@ -361,8 +364,53 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalog_gov
     stale_pending_hours=24,
     minimum_score=200,
     require_note=True,
+    current_revision_id="gov-policy-1:r0001",
+    revision_count=1,
     created_by_tab_id="control-room",
     created_by_tab_label="Control room",
+  )
+  revision_record = ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord(
+    revision_id="gov-policy-1:r0001",
+    governance_policy_id="gov-policy-1",
+    action="created",
+    reason="scheduler_search_moderation_catalog_governance_policy_created",
+    name="Stage catalog changes with note",
+    description="Reusable governance defaults for moderation policy catalogs.",
+    status="active",
+    action_scope="update",
+    require_approval_note=True,
+    guidance="Require a note before applying moderation catalog changes.",
+    description_append=" Reviewed by governance queue.",
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=30,
+    stale_pending_hours=24,
+    minimum_score=200,
+    require_note=True,
+    recorded_at=now,
+    recorded_by_tab_id="control-room",
+    recorded_by_tab_label="Control room",
+  )
+  audit_record = ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord(
+    audit_id="gov-audit-1",
+    governance_policy_id="gov-policy-1",
+    action="created",
+    recorded_at=now,
+    reason="scheduler_search_moderation_catalog_governance_policy_created",
+    detail="Created moderation governance policy Stage catalog changes with note for update actions.",
+    revision_id="gov-policy-1:r0001",
+    name="Stage catalog changes with note",
+    status="active",
+    action_scope="update",
+    require_approval_note=True,
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=30,
+    stale_pending_hours=24,
+    minimum_score=200,
+    require_note=True,
+    actor_tab_id="control-room",
+    actor_tab_label="Control room",
   )
   plan_record = ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord(
     plan_id="gov-plan-1",
@@ -435,21 +483,39 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalog_gov
     saved_policy = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record(
       policy_record
     )
+    saved_revision = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+      revision_record
+    )
+    saved_audit = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+      audit_record
+    )
     saved_plan = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
       plan_record
     )
     listed_policies = (
       backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records()
     )
+    listed_revisions = (
+      backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records()
+    )
+    listed_audits = (
+      backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records()
+    )
     listed_plans = (
       backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records()
     )
 
   assert saved_policy.governance_policy_id == "gov-policy-1"
+  assert saved_revision.revision_id == "gov-policy-1:r0001"
+  assert saved_audit.audit_id == "gov-audit-1"
   assert saved_plan.plan_id == "gov-plan-1"
   assert len(listed_policies) == 1
   assert listed_policies[0].require_approval_note is True
   assert listed_policies[0].description_append == " Reviewed by governance queue."
+  assert len(listed_revisions) == 1
+  assert listed_revisions[0].action == "created"
+  assert len(listed_audits) == 1
+  assert listed_audits[0].actor_tab_id == "control-room"
   assert len(listed_plans) == 1
   assert listed_plans[0].queue_state == "ready_to_apply"
   assert listed_plans[0].preview_items[0].changed_fields == ("minimum_score", "require_note")

@@ -196,6 +196,9 @@ creation.
   plus a staged approval queue for catalog lifecycle changes, so future scheduler search quality
   work can gate moderation-catalog updates behind preview, approval, and apply steps instead of
   mutating those reusable defaults directly
+- those moderation-catalog governance policies now also have lifecycle, audit, and bulk-governance
+  controls, so reusable catalog-lifecycle rules can evolve with revision restore and team-visible
+  change history instead of remaining create/list-only governance presets
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

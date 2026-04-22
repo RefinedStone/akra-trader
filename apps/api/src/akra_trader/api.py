@@ -378,6 +378,58 @@ class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicy
   created_by_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyUpdateRequest(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  action_scope: str | None = None
+  require_approval_note: bool | None = None
+  guidance: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  default_moderation_status: str | None = None
+  governance_view: str | None = None
+  window_days: int | None = None
+  stale_pending_hours: int | None = None
+  minimum_score: int | None = None
+  require_note: bool | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDeleteRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRestoreRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyBulkGovernanceRequest(BaseModel):
+  action: str
+  governance_policy_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  default_moderation_status: str | None = None
+  governance_view: str | None = None
+  window_days: int | None = None
+  stale_pending_hours: int | None = None
+  minimum_score: int | None = None
+  require_note: bool | None = None
+  action_scope: str | None = None
+  require_approval_note: bool | None = None
+  guidance: str | None = None
+
+
 class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanStageRequest(BaseModel):
   catalog_ids: list[str] = Field(default_factory=list)
   action: str
@@ -2743,6 +2795,207 @@ def create_router(container: Container) -> APIRouter:
     methods=["GET"],
     name="list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policies",
     summary="List reusable governance policies for moderation policy catalogs",
+  )
+
+  def update_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy(
+    governance_policy_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyUpdateRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.update_provider_provenance_scheduler_search_moderation_catalog_governance_policy(
+        governance_policy_id,
+        name=request.name,
+        description=request.description,
+        action_scope=request.action_scope,
+        require_approval_note=request.require_approval_note,
+        guidance=request.guidance,
+        name_prefix=request.name_prefix,
+        name_suffix=request.name_suffix,
+        description_append=request.description_append,
+        default_moderation_status=request.default_moderation_status,
+        governance_view=request.governance_view,
+        window_days=request.window_days,
+        stale_pending_hours=request.stale_pending_hours,
+        minimum_score=request.minimum_score,
+        require_note=request.require_note,
+        actor_tab_id=request.actor_tab_id,
+        actor_tab_label=request.actor_tab_label,
+        reason=(
+          request.reason
+          if isinstance(request.reason, str) and request.reason.strip()
+          else "scheduler_search_moderation_catalog_governance_policy_updated"
+        ),
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/{governance_policy_id}",
+    update_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy,
+    methods=["PATCH"],
+    name="update_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy",
+    summary="Update a reusable governance policy for moderation policy catalogs",
+  )
+
+  def delete_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy(
+    governance_policy_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDeleteRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.delete_provider_provenance_scheduler_search_moderation_catalog_governance_policy(
+        governance_policy_id,
+        actor_tab_id=request.actor_tab_id,
+        actor_tab_label=request.actor_tab_label,
+        reason=(
+          request.reason
+          if isinstance(request.reason, str) and request.reason.strip()
+          else "scheduler_search_moderation_catalog_governance_policy_deleted"
+        ),
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/{governance_policy_id}/delete",
+    delete_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy,
+    methods=["POST"],
+    name="delete_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy",
+    summary="Delete a reusable governance policy for moderation policy catalogs",
+  )
+
+  def list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions(
+    governance_policy_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions(
+        governance_policy_id
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/{governance_policy_id}/revisions",
+    list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions,
+    methods=["GET"],
+    name="list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions",
+    summary="List moderation catalog governance policy revisions",
+  )
+
+  def restore_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision(
+    governance_policy_id: str,
+    revision_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRestoreRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.restore_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision(
+        governance_policy_id,
+        revision_id,
+        actor_tab_id=request.actor_tab_id,
+        actor_tab_label=request.actor_tab_label,
+        reason=(
+          request.reason
+          if isinstance(request.reason, str) and request.reason.strip()
+          else "scheduler_search_moderation_catalog_governance_policy_revision_restored"
+        ),
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/{governance_policy_id}/revisions/{revision_id}/restore",
+    restore_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision,
+    methods=["POST"],
+    name="restore_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision",
+    summary="Restore a moderation catalog governance policy revision",
+  )
+
+  def list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits(
+    governance_policy_id: str | None = None,
+    action: str | None = None,
+    actor_tab_id: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return app.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits(
+      governance_policy_id=governance_policy_id,
+      action=action,
+      actor_tab_id=actor_tab_id,
+      search=search,
+      limit=limit,
+    )
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/audits",
+    list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits,
+    methods=["GET"],
+    name="list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+    summary="List moderation catalog governance policy audit records",
+  )
+
+  def bulk_govern_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policies(
+    request: OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyBulkGovernanceRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      result = app.bulk_govern_provider_provenance_scheduler_search_moderation_catalog_governance_policies(
+        governance_policy_ids=request.governance_policy_ids,
+        action=request.action,
+        actor_tab_id=request.actor_tab_id,
+        actor_tab_label=request.actor_tab_label,
+        reason=request.reason,
+        name_prefix=request.name_prefix,
+        name_suffix=request.name_suffix,
+        description_append=request.description_append,
+        default_moderation_status=request.default_moderation_status,
+        governance_view=request.governance_view,
+        window_days=request.window_days,
+        stale_pending_hours=request.stale_pending_hours,
+        minimum_score=request.minimum_score,
+        require_note=request.require_note,
+        action_scope=request.action_scope,
+        require_approval_note=request.require_approval_note,
+        guidance=request.guidance,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+      "item_type": result.item_type,
+      "action": result.action,
+      "reason": result.reason,
+      "requested_count": result.requested_count,
+      "applied_count": result.applied_count,
+      "skipped_count": result.skipped_count,
+      "failed_count": result.failed_count,
+      "results": tuple(
+        {
+          "item_id": entry.item_id,
+          "item_name": entry.item_name,
+          "outcome": entry.outcome,
+          "status": entry.status,
+          "current_revision_id": entry.current_revision_id,
+          "message": entry.message,
+        }
+        for entry in result.results
+      ),
+    }
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies/bulk-governance",
+    bulk_govern_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policies,
+    methods=["POST"],
+    name="bulk_govern_operator_provider_provenance_scheduler_search_moderation_catalog_governance_policies",
+    summary="Bulk govern moderation catalog governance policies",
   )
 
   def stage_operator_provider_provenance_scheduler_search_moderation_catalog_governance_plan(

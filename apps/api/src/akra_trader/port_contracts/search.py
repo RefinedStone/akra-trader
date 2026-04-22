@@ -7,6 +7,8 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentR
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
@@ -104,6 +106,24 @@ class ProviderProvenanceSchedulerSearchBackendPort(Protocol):
   def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord, ...]: ...
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord: ...
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord, ...]: ...
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord: ...
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord, ...]: ...
 
   def save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
     self,

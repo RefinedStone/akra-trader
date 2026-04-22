@@ -30,6 +30,8 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentR
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
@@ -138,7 +140,32 @@ provider_provenance_scheduler_search_moderation_catalog_governance_policies = Ta
   Column("scheduler_key", String, nullable=False, index=True),
   Column("created_at", String, nullable=False, index=True),
   Column("updated_at", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
   Column("action_scope", String, nullable=False, index=True),
+  Column("name", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions = Table(
+  "provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions",
+  metadata,
+  Column("revision_id", String, primary_key=True),
+  Column("governance_policy_id", String, nullable=False, index=True),
+  Column("scheduler_key", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits = Table(
+  "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+  metadata,
+  Column("audit_id", String, primary_key=True),
+  Column("governance_policy_id", String, nullable=False, index=True),
+  Column("scheduler_key", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("actor_tab_id", String, nullable=True, index=True),
   Column("name", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
 )
@@ -213,6 +240,14 @@ class _SchedulerSearchModerationCatalogGovernancePolicyListResponse(BaseModel):
   items: list[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord]
 
 
+class _SchedulerSearchModerationCatalogGovernancePolicyRevisionListResponse(BaseModel):
+  items: list[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord]
+
+
+class _SchedulerSearchModerationCatalogGovernancePolicyAuditListResponse(BaseModel):
+  items: list[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord]
+
+
 class _SchedulerSearchModerationCatalogGovernancePlanListResponse(BaseModel):
   items: list[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord]
 
@@ -256,6 +291,14 @@ class InMemoryProviderProvenanceSchedulerSearchStore:
     self._moderation_catalog_governance_policy_records: OrderedDict[
       str,
       ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord,
+    ] = OrderedDict()
+    self._moderation_catalog_governance_policy_revision_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
+    ] = OrderedDict()
+    self._moderation_catalog_governance_policy_audit_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
     ] = OrderedDict()
     self._moderation_catalog_governance_plan_records: OrderedDict[
       str,
@@ -451,6 +494,42 @@ class InMemoryProviderProvenanceSchedulerSearchStore:
       )
     )
 
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
+    self._moderation_catalog_governance_policy_revision_records[record.revision_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord, ...]:
+    return tuple(
+      sorted(
+        self._moderation_catalog_governance_policy_revision_records.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord:
+    self._moderation_catalog_governance_policy_audit_records[record.audit_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord, ...]:
+    return tuple(
+      sorted(
+        self._moderation_catalog_governance_policy_audit_records.values(),
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
   def save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
     self,
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord,
@@ -488,6 +567,12 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
   )
   _moderation_catalog_governance_policy_record_adapter = TypeAdapter(
     ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
+  )
+  _moderation_catalog_governance_policy_revision_record_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord
+  )
+  _moderation_catalog_governance_policy_audit_record_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord
   )
   _moderation_catalog_governance_plan_record_adapter = TypeAdapter(
     ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
@@ -882,6 +967,7 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
       "scheduler_key": record.scheduler_key,
       "created_at": record.created_at.isoformat(),
       "updated_at": record.updated_at.isoformat(),
+      "status": record.status,
       "action_scope": record.action_scope,
       "name": record.name,
       "payload": payload,
@@ -923,6 +1009,132 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
       rows = connection.execute(statement).mappings().all()
     return tuple(
       self._moderation_catalog_governance_policy_record_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
+    payload = self._moderation_catalog_governance_policy_revision_record_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "revision_id": record.revision_id,
+      "governance_policy_id": record.governance_policy_id,
+      "scheduler_key": record.scheduler_key,
+      "recorded_at": record.recorded_at.isoformat(),
+      "action": record.action,
+      "status": record.status,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(
+          provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions.c.revision_id
+        ).where(
+          provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions.c.revision_id
+          == record.revision_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(
+            provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions
+          ).values(**row)
+        )
+      else:
+        connection.execute(
+          update(
+            provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions
+          )
+          .where(
+            provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions.c.revision_id
+            == record.revision_id
+          )
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord, ...]:
+    statement = select(
+      provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions.c.payload
+    ).order_by(
+      provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions.c.recorded_at.desc(),
+      provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions.c.revision_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._moderation_catalog_governance_policy_revision_record_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
+    )
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord:
+    payload = self._moderation_catalog_governance_policy_audit_record_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "audit_id": record.audit_id,
+      "governance_policy_id": record.governance_policy_id,
+      "scheduler_key": record.scheduler_key,
+      "recorded_at": record.recorded_at.isoformat(),
+      "action": record.action,
+      "status": record.status,
+      "actor_tab_id": record.actor_tab_id,
+      "name": record.name,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(
+          provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits.c.audit_id
+        ).where(
+          provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits.c.audit_id
+          == record.audit_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(
+            provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits
+          ).values(**row)
+        )
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits)
+          .where(
+            provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits.c.audit_id
+            == record.audit_id
+          )
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord, ...]:
+    statement = select(
+      provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits.c.payload
+    ).order_by(
+      provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits.c.recorded_at.desc(),
+      provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits.c.audit_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._moderation_catalog_governance_policy_audit_record_adapter.validate_python(
+        row["payload"]
+      )
       for row in rows
     )
 
@@ -995,6 +1207,8 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
         "provider_provenance_scheduler_search_moderation_policy_catalog_audits",
         "provider_provenance_scheduler_search_moderation_plans",
         "provider_provenance_scheduler_search_moderation_catalog_governance_policies",
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions",
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
         "provider_provenance_scheduler_search_moderation_catalog_governance_plans",
       )
     }
@@ -1201,12 +1415,77 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
       ),
       (
         "provider_provenance_scheduler_search_moderation_catalog_governance_policies",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policies_status",
+        "status",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policies",
         "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policies_action_scope",
         "action_scope",
       ),
       (
         "provider_provenance_scheduler_search_moderation_catalog_governance_policies",
         "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policies_name",
+        "name",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions_governance_policy_id",
+        "governance_policy_id",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions_scheduler_key",
+        "scheduler_key",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions_recorded_at",
+        "recorded_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions_action",
+        "action",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions_status",
+        "status",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_governance_policy_id",
+        "governance_policy_id",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_scheduler_key",
+        "scheduler_key",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_recorded_at",
+        "recorded_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_action",
+        "action",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_status",
+        "status",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_actor_tab_id",
+        "actor_tab_id",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits",
+        "ix_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_name",
         "name",
       ),
       (
@@ -1380,6 +1659,32 @@ class ProviderProvenanceSchedulerSearchService:
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord, ...]:
     return self._store.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records()
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
+    return self._store.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+      record
+    )
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord, ...]:
+    return self._store.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records()
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord:
+    return self._store.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+      record
+    )
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord, ...]:
+    return self._store.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records()
 
   def save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
     self,
@@ -1596,6 +1901,48 @@ def create_provider_provenance_scheduler_search_service_app(
       )
     )
 
+  @app.post("/provider-provenance-scheduler-search/moderation-catalog-governance-policy-revisions")
+  def save_moderation_catalog_governance_policy_revision(
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
+    authorization: str | None = Header(default=None),
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
+    _require_authorization(authorization)
+    return service.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+      record
+    )
+
+  @app.get("/provider-provenance-scheduler-search/moderation-catalog-governance-policy-revisions")
+  def list_moderation_catalog_governance_policy_revisions(
+    authorization: str | None = Header(default=None),
+  ) -> _SchedulerSearchModerationCatalogGovernancePolicyRevisionListResponse:
+    _require_authorization(authorization)
+    return _SchedulerSearchModerationCatalogGovernancePolicyRevisionListResponse(
+      items=list(
+        service.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records()
+      )
+    )
+
+  @app.post("/provider-provenance-scheduler-search/moderation-catalog-governance-policy-audits")
+  def save_moderation_catalog_governance_policy_audit(
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
+    authorization: str | None = Header(default=None),
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord:
+    _require_authorization(authorization)
+    return service.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+      record
+    )
+
+  @app.get("/provider-provenance-scheduler-search/moderation-catalog-governance-policy-audits")
+  def list_moderation_catalog_governance_policy_audits(
+    authorization: str | None = Header(default=None),
+  ) -> _SchedulerSearchModerationCatalogGovernancePolicyAuditListResponse:
+    _require_authorization(authorization)
+    return _SchedulerSearchModerationCatalogGovernancePolicyAuditListResponse(
+      items=list(
+        service.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records()
+      )
+    )
+
   @app.post("/provider-provenance-scheduler-search/moderation-catalog-governance-plans")
   def save_moderation_catalog_governance_plan(
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord,
@@ -1746,6 +2093,32 @@ class EmbeddedProviderProvenanceSchedulerSearchServiceClient(
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord, ...]:
     return self._service.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records()
 
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
+    return self._service.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+      record
+    )
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord, ...]:
+    return self._service.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records()
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord:
+    return self._service.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+      record
+    )
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord, ...]:
+    return self._service.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records()
+
   def save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
     self,
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord,
@@ -1782,6 +2155,12 @@ class HttpProviderProvenanceSchedulerSearchServiceClient(
   _moderation_catalog_governance_policy_record_adapter = TypeAdapter(
     ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
   )
+  _moderation_catalog_governance_policy_revision_record_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord
+  )
+  _moderation_catalog_governance_policy_audit_record_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord
+  )
   _moderation_catalog_governance_plan_record_adapter = TypeAdapter(
     ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
   )
@@ -1805,6 +2184,12 @@ class HttpProviderProvenanceSchedulerSearchServiceClient(
   )
   _moderation_catalog_governance_policy_list_response_adapter = TypeAdapter(
     _SchedulerSearchModerationCatalogGovernancePolicyListResponse
+  )
+  _moderation_catalog_governance_policy_revision_list_response_adapter = TypeAdapter(
+    _SchedulerSearchModerationCatalogGovernancePolicyRevisionListResponse
+  )
+  _moderation_catalog_governance_policy_audit_list_response_adapter = TypeAdapter(
+    _SchedulerSearchModerationCatalogGovernancePolicyAuditListResponse
   )
   _moderation_catalog_governance_plan_list_response_adapter = TypeAdapter(
     _SchedulerSearchModerationCatalogGovernancePlanListResponse
@@ -2039,6 +2424,64 @@ class HttpProviderProvenanceSchedulerSearchServiceClient(
       path="/provider-provenance-scheduler-search/moderation-catalog-governance-policies",
     )
     parsed = self._moderation_catalog_governance_policy_list_response_adapter.validate_python(
+      response
+    )
+    return tuple(parsed.items)
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
+    payload = self._moderation_catalog_governance_policy_revision_record_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    response = self._request(
+      method="POST",
+      path="/provider-provenance-scheduler-search/moderation-catalog-governance-policy-revisions",
+      payload=payload,
+    )
+    return self._moderation_catalog_governance_policy_revision_record_adapter.validate_python(
+      response
+    )
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord, ...]:
+    response = self._request(
+      method="GET",
+      path="/provider-provenance-scheduler-search/moderation-catalog-governance-policy-revisions",
+    )
+    parsed = self._moderation_catalog_governance_policy_revision_list_response_adapter.validate_python(
+      response
+    )
+    return tuple(parsed.items)
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord:
+    payload = self._moderation_catalog_governance_policy_audit_record_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    response = self._request(
+      method="POST",
+      path="/provider-provenance-scheduler-search/moderation-catalog-governance-policy-audits",
+      payload=payload,
+    )
+    return self._moderation_catalog_governance_policy_audit_record_adapter.validate_python(
+      response
+    )
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord, ...]:
+    response = self._request(
+      method="GET",
+      path="/provider-provenance-scheduler-search/moderation-catalog-governance-policy-audits",
+    )
+    parsed = self._moderation_catalog_governance_policy_audit_list_response_adapter.validate_python(
       response
     )
     return tuple(parsed.items)
