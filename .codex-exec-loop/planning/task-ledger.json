@@ -1424,18 +1424,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add moderation policy catalog and staged approval queue for scheduler governance",
       "description": "Extend the shipped long-horizon scheduler quality dashboard and batch moderation layer with reusable moderation policy catalog records plus a staged approval queue so operators can govern feedback actions under durable review rules instead of only direct queue mutations.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 73,
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T17:20:00+09:00",
+      "updated_at": "2026-04-22T20:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-quality-governance-dashboard"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says moderation governance still lacks a separate policy catalog and staged approval queue after bf5e7c7 shipped the long-horizon dashboard and batch moderation actions, making this the clearest immediately executable follow-up.",
-      "priority_reason": "Promoted to ready because builtin next-task should continue with the explicit moderation-governance gap named in the latest main-session reply before shifting to heavier retrieval-quality infrastructure."
+      "direction_relation_note": "Completed on main in commit aa59f0d with moderation policy catalog records and staged approval queue support wired through scheduler governance backend surfaces, external search persistence, control-room moderation workflows, and matching docs updates.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web typecheck or build, commit, and push all landed; the latest main-session reply now leaves moderation-catalog lifecycle or audit or bulk-governance depth plus heavier offline reranker infrastructure as the remaining direct follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-moderation-policy-catalog-management",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add lifecycle, audit, and bulk governance workflows for moderation policy catalogs",
+      "description": "Deepen the newly shipped scheduler moderation policy catalog layer by adding catalog edit or delete or versioning flows, team audit visibility, and bulk governance actions so reusable moderation rules can be maintained safely after create, stage, approve, and apply are already in place.",
+      "status": "ready",
+      "base_priority": 74,
+      "dynamic_priority_delta": 25,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T20:05:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-moderation-policy-catalog-queue"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says moderation governance now has policy catalogs and a staged approval queue, but catalog lifecycle, audit, and bulk-governance management are still missing, making this the clearest directly executable continuation.",
+      "priority_reason": "Promoted to ready because builtin next-task should continue with the operator-visible moderation-governance hardening named in the latest main-session reply before shifting to heavier retrieval-quality infrastructure."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-offline-reranker-infrastructure",
@@ -1447,13 +1465,13 @@
       "dynamic_priority_delta": 21,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T17:20:00+09:00",
+      "updated_at": "2026-04-22T20:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-scheduler-quality-governance-dashboard"
+        "task-b1-provider-market-context-scheduler-moderation-policy-catalog-management"
       ],
-      "direction_relation_note": "The latest main-session reply keeps offline reranker or learned-model infrastructure as a heavier follow-up even after bf5e7c7 shipped the long-horizon quality dashboard, so it should now build on the expanded approved-feedback and governance baseline rather than bypass the remaining moderation policy layer.",
-      "priority_reason": "This remains a valid next-stage retrieval-quality investment, but it stays proposed behind the newly explicit moderation policy catalog and staged approval queue continuation so builtin next-task advances through the direct operator-governance gap first."
+      "direction_relation_note": "The latest main-session reply still calls out offline reranker, learned model training, and heavier relevance infrastructure as missing after aa59f0d shipped moderation policy catalogs and staged approval queues, so this should build on the now-governed feedback baseline rather than bypass the remaining moderation-catalog management gap.",
+      "priority_reason": "This remains the next retrieval-quality investment, but it stays proposed behind the newly explicit moderation catalog lifecycle or audit or bulk-governance continuation so builtin next-task advances through one direct operator-governance hardening step first."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
