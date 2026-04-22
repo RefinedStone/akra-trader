@@ -1406,18 +1406,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add long-horizon scheduler search quality dashboard and moderation governance layer",
       "description": "Extend the new query analytics dashboard and moderation queue into a longer-horizon quality operations surface with trend views, governance states, and policy-oriented moderation workflows so scheduler search quality can be reviewed and governed over time instead of only through immediate query rollups.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 74,
       "dynamic_priority_delta": 36,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T17:02:13+09:00",
+      "updated_at": "2026-04-22T17:20:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-analytics-dashboard-feedback-moderation"
       ],
-      "direction_relation_note": "The latest main-session reply says the shipped moderation-gated analytics layer still lacks a separate long-horizon quality dashboard or moderation governance layer, making this the clearest immediately executable operator-facing continuation.",
-      "priority_reason": "Promoted to ready because builtin next-task should continue with the remaining operator-visible quality and governance gap before shifting into heavier offline reranker infrastructure."
+      "direction_relation_note": "Completed on main in commit bf5e7c7 with long-horizon scheduler search quality dashboard filters, governance view selectors, daily trend and actor or moderator rollups, stale or high-score backlog views, and batch moderation actions wired across backend, API, control-room, tests, and docs.",
+      "priority_reason": "Closed after targeted scheduler provenance pytest coverage, compileall verification, web typecheck and build, docs updates, commit, and push all landed; the latest main-session reply now leaves a dedicated moderation policy catalog or staged approval queue as the immediate governance continuation ahead of heavier offline reranker infrastructure."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-moderation-policy-catalog-queue",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add moderation policy catalog and staged approval queue for scheduler governance",
+      "description": "Extend the shipped long-horizon scheduler quality dashboard and batch moderation layer with reusable moderation policy catalog records plus a staged approval queue so operators can govern feedback actions under durable review rules instead of only direct queue mutations.",
+      "status": "ready",
+      "base_priority": 73,
+      "dynamic_priority_delta": 24,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T17:20:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-quality-governance-dashboard"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says moderation governance still lacks a separate policy catalog and staged approval queue after bf5e7c7 shipped the long-horizon dashboard and batch moderation actions, making this the clearest immediately executable follow-up.",
+      "priority_reason": "Promoted to ready because builtin next-task should continue with the explicit moderation-governance gap named in the latest main-session reply before shifting to heavier retrieval-quality infrastructure."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-offline-reranker-infrastructure",
@@ -1429,13 +1447,13 @@
       "dynamic_priority_delta": 21,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T17:02:13+09:00",
+      "updated_at": "2026-04-22T17:20:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-scheduler-analytics-dashboard-feedback-moderation"
+        "task-b1-provider-market-context-scheduler-quality-governance-dashboard"
       ],
-      "direction_relation_note": "The latest main-session reply keeps offline or learned reranker infrastructure as a heavier follow-up after moderation-gated feedback, analytics dashboarding, and operator review flows shipped, so it should build on the approved-feedback baseline rather than the earlier raw feedback loop.",
-      "priority_reason": "This remains a valid next-stage retrieval-quality investment, but it stays proposed behind the more immediate long-horizon quality dashboard and moderation governance continuation so builtin next-task advances through the lighter operator-facing gap first."
+      "direction_relation_note": "The latest main-session reply keeps offline reranker or learned-model infrastructure as a heavier follow-up even after bf5e7c7 shipped the long-horizon quality dashboard, so it should now build on the expanded approved-feedback and governance baseline rather than bypass the remaining moderation policy layer.",
+      "priority_reason": "This remains a valid next-stage retrieval-quality investment, but it stays proposed behind the newly explicit moderation policy catalog and staged approval queue continuation so builtin next-task advances through the direct operator-governance gap first."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
