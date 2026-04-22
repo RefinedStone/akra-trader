@@ -10,18 +10,14 @@ live path is treated as operationally ready.
 
 ## Current status on April 22, 2026
 
-- kill switch, reconciliation, recovery, incidents, delivery history, and venue-backed launch gates
-  already exist
-- reconciliation and kill-switch drill baselines are now documented under `docs/operations/*`
-- the remaining work is completeness of venue lifecycle, candidacy rules, drills, and deployment
-  discipline
+- focused on venue lifecycle completeness, candidacy rules, drills, and deployment discipline
 
 ## Immediate gaps
 
 - broader venue-native lifecycle recovery
 - clearer guarded-live drill and candidacy rules
 - deployment and credential discipline
-- fuller order-management posture beyond the current baseline
+- fuller order-management posture
 - close remaining audit and operator-event gaps across live-affecting actions
 
 ## Linked docs

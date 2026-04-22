@@ -10,11 +10,8 @@ inspection.
 
 ## Current status on April 22, 2026
 
-- presets, preset lifecycle, revisions, comparison, rerun boundaries, and richer query/filter
-  contracts already exist
-- strategy metadata and lifecycle hints already flow through the query/filter surfaces, but custom
-  registration is still not durable
-- this direction is now the main remaining blocker inside `Batch 1`
+- main remaining blocker inside `Batch 1`
+- focused on durable strategy registration, lifecycle durability, and normalized experiment storage
 
 ## Immediate gaps
 

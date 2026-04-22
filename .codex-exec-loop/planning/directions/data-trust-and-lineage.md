@@ -9,12 +9,8 @@ failures are operator-visible, and crypto-first ingestion can expand without wea
 
 ## Current status on April 22, 2026
 
-- deterministic dataset-boundary contracts, claim-aware rerun validation categories, lineage
-  mismatch taxonomy, and operator-visible summaries are already implemented
-- ingestion-job history plus normalized lineage query surfaces already exist for operator review
-- market-data status already exposes freshness, gaps, backfill, lag, and failure history
-- the remaining work is operator guidance, retention, escalation, and drill discipline on top of
-  that baseline rather than first-time implementation
+- narrowed to operator guidance, retention, escalation, and drill discipline on top of the
+  implemented data-trust baseline
 
 ## Immediate gaps
 

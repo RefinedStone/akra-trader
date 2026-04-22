@@ -39,9 +39,6 @@ Status:
 - `Now`
 - overall state: `Partial`
 - directions: `data-trust-and-lineage`, `experiment-os`
-- note: deterministic dataset-boundary contracts, rerun validation categories, lineage mismatch
-  taxonomy, and ingestion-history query surfaces are now in place; the remaining gate is operator
-  guidance plus Experiment OS durability
 
 Why first:
 
@@ -78,8 +75,6 @@ Status:
 - overall state: `Partial`
 - directions: `runtime-ops`, `operator-trust-and-discipline`
 - depends on: `Batch 1`
-- note: the runbook baseline exists now; the remaining gap is productizing those workflows into the
-  control room
 
 Why second:
 

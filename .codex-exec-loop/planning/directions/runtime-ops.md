@@ -9,11 +9,7 @@ control room that reflects real active execution rather than only previews and h
 
 ## Current status on April 22, 2026
 
-- sandbox workers, heartbeat, restart recovery, stale-runtime visibility, and separate paper-mode
-  history already exist
-- the control room now has route-aware shell boundaries and focused lineage/ingestion triage during
-  runtime incidents
-- the remaining work is productization of active-session workflows, not first-time worker creation
+- focused on productizing active-session workflows rather than first-time worker creation
 
 ## Immediate gaps
 

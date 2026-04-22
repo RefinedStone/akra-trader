@@ -10,19 +10,14 @@ knowledge or drifting docs.
 
 ## Current status on April 22, 2026
 
-- the product already exposes meaningful alerts, incidents, reconciliation, audit-oriented control
-  surfaces, and a baseline runbook package
-- release-time documentation checklist and directions execution board now exist to keep status and
-  roadmap docs aligned
-- the remaining gap is active-session clarity, runbook-linked actionability, and operational
-  discipline rather than absence of any operator substrate
+- focused on active-session clarity, runbook-linked actionability, and operational discipline
 
 ## Immediate gaps
 
 - active-session-first control-room clarity
 - runbook-linked action guidance in product surfaces
 - deployment, backup, and credential runbooks
-- keep completed work compacted across status, roadmap, and directions docs
+- keep completed work out of `directions` and compacted in status/roadmap docs
 
 ## Linked docs
 
