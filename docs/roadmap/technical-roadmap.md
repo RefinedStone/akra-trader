@@ -126,8 +126,8 @@ creation.
   reports, so repeated lag/failure windows can be reviewed and shared as one export artifact
   instead of forcing per-row reconstruction only
 - stitched scheduler reports now also live behind a dedicated saved-view surface, so named
-  occurrence slices can be persisted with their export limits and replayed directly into copy,
-  download, or shared-report workflows
+  occurrence slices can be persisted with their export limits and later edited, deleted,
+  revision-restored, or replayed directly into copy, download, or shared-report workflows
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand

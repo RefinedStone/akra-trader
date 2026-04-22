@@ -272,6 +272,30 @@ class OperatorProviderProvenanceSchedulerStitchedReportViewCreateRequest(BaseMod
   created_by_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerStitchedReportViewUpdateRequest(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  query: dict[str, Any] | None = None
+  occurrence_limit: int | None = None
+  history_limit: int | None = None
+  drilldown_history_limit: int | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_stitched_report_view_updated"
+
+
+class OperatorProviderProvenanceSchedulerStitchedReportViewDeleteRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_stitched_report_view_deleted"
+
+
+class OperatorProviderProvenanceSchedulerStitchedReportViewRevisionRestoreRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_stitched_report_view_revision_restored"
+
+
 class OperatorProviderProvenanceSchedulerNarrativeTemplateCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -700,6 +724,18 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "operator_provider_provenance_dashboard_view_create": (OperatorProviderProvenanceDashboardViewCreateRequest, {}),
   "operator_provider_provenance_scheduler_stitched_report_view_create": (
     OperatorProviderProvenanceSchedulerStitchedReportViewCreateRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_stitched_report_view_update": (
+    OperatorProviderProvenanceSchedulerStitchedReportViewUpdateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_stitched_report_view_delete": (
+    OperatorProviderProvenanceSchedulerStitchedReportViewDeleteRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_stitched_report_view_revision_restore": (
+    OperatorProviderProvenanceSchedulerStitchedReportViewRevisionRestoreRequest,
     {},
   ),
   "operator_provider_provenance_scheduler_narrative_template_create": (

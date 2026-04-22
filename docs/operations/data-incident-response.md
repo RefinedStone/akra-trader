@@ -76,8 +76,9 @@ unclear dataset lineage.
   report and share that artifact into the scheduler export registry, so repeated lag/failure
   windows can be handed off as one reviewed report instead of separate row reconstructions
 - stitched scheduler reports now also have a dedicated saved-view surface, so an operator can
-  save the current scheduler occurrence slice as a named report lens and later re-apply, copy,
-  download, or share that same stitched artifact shape during a later handoff
+  save the current scheduler occurrence slice as a named report lens and later re-apply, edit,
+  delete, inspect immutable revisions, restore prior snapshots, copy, download, or share that
+  same stitched artifact shape during a later handoff
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

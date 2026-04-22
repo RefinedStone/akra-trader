@@ -15236,6 +15236,10 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_dashboard_view_list",
     "operator_provider_provenance_scheduler_stitched_report_view_create",
     "operator_provider_provenance_scheduler_stitched_report_view_list",
+    "operator_provider_provenance_scheduler_stitched_report_view_update",
+    "operator_provider_provenance_scheduler_stitched_report_view_delete",
+    "operator_provider_provenance_scheduler_stitched_report_view_revision_list",
+    "operator_provider_provenance_scheduler_stitched_report_view_revision_restore",
     "operator_provider_provenance_scheduler_narrative_template_create",
     "operator_provider_provenance_scheduler_narrative_template_list",
     "operator_provider_provenance_scheduler_narrative_template_update",
@@ -15424,6 +15428,19 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert (
     bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_list"].filter_param_specs[2].key
     == "narrative_facet"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_update"].methods == (
+    "PATCH",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_delete"].path_param_keys == (
+    "view_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_revision_list"].route_path.endswith(
+    "/scheduler-stitched-report-views/{view_id}/revisions"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_revision_restore"].path_param_keys == (
+    "view_id",
+    "revision_id",
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"].methods == ("POST",)
   assert (
@@ -16643,6 +16660,8 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert stitched_report_view_payload["occurrence_limit"] == 6
   assert stitched_report_view_payload["history_limit"] == 16
   assert stitched_report_view_payload["drilldown_history_limit"] == 18
+  assert stitched_report_view_payload["revision_count"] == 1
+  assert stitched_report_view_payload["status"] == "active"
 
   stitched_report_view_list_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_list"],
@@ -16655,6 +16674,75 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert stitched_report_view_list_payload["total"] == 1
   assert stitched_report_view_list_payload["items"][0]["view_id"] == stitched_report_view_payload["view_id"]
+
+  updated_stitched_report_view_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_update"],
+    app=app,
+    path_params={"view_id": stitched_report_view_payload["view_id"]},
+    request_payload={
+      "name": "Lag recovery stitched report v2",
+      "description": "Saved stitched report slice for recurring lag recovery.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "recurring_occurrences",
+        "window_days": 21,
+        "result_limit": 10,
+      },
+      "occurrence_limit": 7,
+      "history_limit": 18,
+      "drilldown_history_limit": 20,
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_stitched_report_view_manual_edit",
+    },
+  )
+  assert updated_stitched_report_view_payload["name"] == "Lag recovery stitched report v2"
+  assert updated_stitched_report_view_payload["query"]["scheduler_alert_narrative_facet"] == "recurring_occurrences"
+  assert updated_stitched_report_view_payload["revision_count"] == 2
+
+  stitched_report_view_revision_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_revision_list"],
+    app=app,
+    path_params={"view_id": stitched_report_view_payload["view_id"]},
+  )
+  assert stitched_report_view_revision_payload["view"]["view_id"] == stitched_report_view_payload["view_id"]
+  assert [item["action"] for item in stitched_report_view_revision_payload["history"][:2]] == [
+    "updated",
+    "created",
+  ]
+  created_stitched_report_view_revision_id = stitched_report_view_revision_payload["history"][-1]["revision_id"]
+
+  deleted_stitched_report_view_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_delete"],
+    app=app,
+    path_params={"view_id": stitched_report_view_payload["view_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_stitched_report_view_deleted_from_control_room",
+    },
+  )
+  assert deleted_stitched_report_view_payload["status"] == "deleted"
+  assert deleted_stitched_report_view_payload["revision_count"] == 3
+
+  restored_stitched_report_view_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_revision_restore"],
+    app=app,
+    path_params={
+      "view_id": stitched_report_view_payload["view_id"],
+      "revision_id": created_stitched_report_view_revision_id,
+    },
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_stitched_report_view_revision_restore_from_control_room",
+    },
+  )
+  assert restored_stitched_report_view_payload["status"] == "active"
+  assert restored_stitched_report_view_payload["name"] == "Lag recovery stitched report"
+  assert restored_stitched_report_view_payload["revision_count"] == 4
 
   template_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"],

@@ -19,6 +19,7 @@ import type {
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerStitchedReportViewEntry,
   ProviderProvenanceSchedulerStitchedReportViewListPayload,
+  ProviderProvenanceSchedulerStitchedReportViewRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
@@ -715,6 +716,90 @@ export async function listProviderProvenanceSchedulerStitchedReportViews(params:
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceSchedulerStitchedReportViewListPayload>(
     `/operator/provider-provenance-analytics/scheduler-stitched-report-views${suffix}`,
+  );
+}
+
+export async function updateProviderProvenanceSchedulerStitchedReportView(params: {
+  viewId: string;
+  name?: string;
+  description?: string;
+  query?: Record<string, unknown>;
+  occurrenceLimit?: number;
+  historyLimit?: number;
+  drilldownHistoryLimit?: number;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerStitchedReportViewEntry>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-views/${encodeURIComponent(params.viewId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(typeof params.name === "string" ? { name: params.name } : {}),
+        ...(typeof params.description === "string" ? { description: params.description } : {}),
+        ...(params.query ? { query: params.query } : {}),
+        ...(typeof params.occurrenceLimit === "number" && Number.isFinite(params.occurrenceLimit)
+          ? { occurrence_limit: Math.max(1, Math.min(Math.round(params.occurrenceLimit), 50)) }
+          : {}),
+        ...(typeof params.historyLimit === "number" && Number.isFinite(params.historyLimit)
+          ? { history_limit: Math.max(1, Math.min(Math.round(params.historyLimit), 200)) }
+          : {}),
+        ...(typeof params.drilldownHistoryLimit === "number" && Number.isFinite(params.drilldownHistoryLimit)
+          ? { drilldown_history_limit: Math.max(1, Math.min(Math.round(params.drilldownHistoryLimit), 100)) }
+          : {}),
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function deleteProviderProvenanceSchedulerStitchedReportView(params: {
+  viewId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerStitchedReportViewEntry>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-views/${encodeURIComponent(params.viewId)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerStitchedReportViewRevisions(
+  viewId: string,
+) {
+  return fetchJson<ProviderProvenanceSchedulerStitchedReportViewRevisionListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-views/${encodeURIComponent(viewId)}/revisions`,
+  );
+}
+
+export async function restoreProviderProvenanceSchedulerStitchedReportViewRevision(params: {
+  viewId: string;
+  revisionId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerStitchedReportViewEntry>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-views/${encodeURIComponent(params.viewId)}/revisions/${encodeURIComponent(params.revisionId)}/restore`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
   );
 }
 

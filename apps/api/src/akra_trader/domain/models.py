@@ -921,10 +921,35 @@ class ProviderProvenanceSchedulerStitchedReportViewRecord:
   occurrence_limit: int = 8
   history_limit: int = 12
   drilldown_history_limit: int = 12
+  status: str = "active"
   created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  current_revision_id: str | None = None
+  revision_count: int = 0
   created_by_tab_id: str | None = None
   created_by_tab_label: str | None = None
+  deleted_at: datetime | None = None
+  deleted_by_tab_id: str | None = None
+  deleted_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerStitchedReportViewRevisionRecord:
+  revision_id: str
+  view_id: str
+  action: str
+  reason: str
+  name: str
+  description: str = ""
+  query: dict[str, Any] = field(default_factory=dict)
+  occurrence_limit: int = 8
+  history_limit: int = 12
+  drilldown_history_limit: int = 12
+  status: str = "active"
+  recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  source_revision_id: str | None = None
+  recorded_by_tab_id: str | None = None
+  recorded_by_tab_label: str | None = None
 
 
 @dataclass(frozen=True)

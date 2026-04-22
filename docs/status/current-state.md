@@ -179,8 +179,9 @@ It is not yet a finished live trading product:
   multi-occurrence narrative reports, so repeated lag/failure windows can move into one handoff
   artifact instead of forcing row-by-row reconstruction
 - stitched scheduler reports now also have a dedicated saved-view surface, so operators can
-  persist a named occurrence slice with export limits and later re-apply, copy, download, or
-  share that exact stitched-report lens without rebuilding it from the timeline toolbar
+  persist a named occurrence slice with export limits and later re-apply, edit, delete, inspect
+  immutable revisions, restore old snapshots, copy, download, or share that exact stitched-report
+  lens without rebuilding it from the timeline toolbar
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

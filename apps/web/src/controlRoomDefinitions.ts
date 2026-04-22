@@ -1586,6 +1586,7 @@ export type ProviderProvenanceSchedulerStitchedReportViewEntry = {
   view_id: string;
   name: string;
   description: string;
+  status: "active" | "deleted" | string;
   query: ProviderProvenanceAnalyticsWorkspaceQuery;
   focus: ProviderProvenanceWorkspaceFocus;
   filter_summary: string;
@@ -1594,13 +1595,43 @@ export type ProviderProvenanceSchedulerStitchedReportViewEntry = {
   drilldown_history_limit: number;
   created_at: string;
   updated_at: string;
+  current_revision_id?: string | null;
+  revision_count: number;
   created_by_tab_id?: string | null;
   created_by_tab_label?: string | null;
+  deleted_at?: string | null;
+  deleted_by_tab_id?: string | null;
+  deleted_by_tab_label?: string | null;
 };
 
 export type ProviderProvenanceSchedulerStitchedReportViewListPayload = {
   items: ProviderProvenanceSchedulerStitchedReportViewEntry[];
   total: number;
+};
+
+export type ProviderProvenanceSchedulerStitchedReportViewRevisionEntry = {
+  revision_id: string;
+  view_id: string;
+  action: string;
+  reason: string;
+  source_revision_id?: string | null;
+  name: string;
+  description: string;
+  status: "active" | "deleted" | string;
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  occurrence_limit: number;
+  history_limit: number;
+  drilldown_history_limit: number;
+  recorded_at: string;
+  recorded_by_tab_id?: string | null;
+  recorded_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerStitchedReportViewRevisionListPayload = {
+  view: ProviderProvenanceSchedulerStitchedReportViewEntry;
+  history: ProviderProvenanceSchedulerStitchedReportViewRevisionEntry[];
 };
 
 export type ProviderProvenanceSchedulerNarrativeTemplateEntry = {

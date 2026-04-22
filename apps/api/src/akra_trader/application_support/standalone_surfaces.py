@@ -125,6 +125,10 @@ def serialize_provider_provenance_scheduler_stitched_report_view_list(*args, **k
   return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_view_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_stitched_report_view_revision_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_view_revision_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduler_narrative_template_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_record')(*args, **kwargs)
 
@@ -718,6 +722,50 @@ def execute_standalone_surface_binding(
         narrative_facet=resolved_filters.get("narrative_facet"),
         search=resolved_filters.get("search"),
         limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_update":
+    return serialize_provider_provenance_scheduler_stitched_report_view_record(
+      app.update_provider_provenance_scheduler_stitched_report_view(
+        resolved_path_params["view_id"],
+        name=resolved_payload.get("name"),
+        description=resolved_payload.get("description"),
+        query=resolved_payload.get("query"),
+        occurrence_limit=resolved_payload.get("occurrence_limit"),
+        history_limit=resolved_payload.get("history_limit"),
+        drilldown_history_limit=resolved_payload.get("drilldown_history_limit"),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_stitched_report_view_updated"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_delete":
+    return serialize_provider_provenance_scheduler_stitched_report_view_record(
+      app.delete_provider_provenance_scheduler_stitched_report_view(
+        resolved_path_params["view_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_stitched_report_view_deleted"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_revision_list":
+    view = app.get_provider_provenance_scheduler_stitched_report_view(
+      resolved_path_params["view_id"]
+    )
+    return serialize_provider_provenance_scheduler_stitched_report_view_revision_list(
+      view,
+      app.list_provider_provenance_scheduler_stitched_report_view_revisions(
+        resolved_path_params["view_id"]
+      ),
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_revision_restore":
+    return serialize_provider_provenance_scheduler_stitched_report_view_record(
+      app.restore_provider_provenance_scheduler_stitched_report_view_revision(
+        resolved_path_params["view_id"],
+        resolved_path_params["revision_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_stitched_report_view_revision_restored"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_create":

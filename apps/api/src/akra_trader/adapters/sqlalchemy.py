@@ -34,6 +34,7 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord
@@ -202,6 +203,15 @@ provider_provenance_scheduler_stitched_report_views = Table(
   Column("name", String, nullable=False, index=True),
   Column("updated_at", String, nullable=False, index=True),
   Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_stitched_report_view_revisions = Table(
+  "provider_provenance_scheduler_stitched_report_view_revisions",
+  metadata,
+  Column("revision_id", String, primary_key=True),
+  Column("view_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduled_reports = Table(
@@ -419,6 +429,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   _provider_provenance_dashboard_view_adapter = TypeAdapter(ProviderProvenanceDashboardViewRecord)
   _provider_provenance_scheduler_stitched_report_view_adapter = TypeAdapter(
     ProviderProvenanceSchedulerStitchedReportViewRecord
+  )
+  _provider_provenance_scheduler_stitched_report_view_revision_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerStitchedReportViewRevisionRecord
   )
   _provider_provenance_scheduled_report_adapter = TypeAdapter(ProviderProvenanceScheduledReportRecord)
   _provider_provenance_scheduler_narrative_template_adapter = TypeAdapter(
@@ -1274,6 +1287,69 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
     if row is None:
       return None
     return self._provider_provenance_scheduler_stitched_report_view_adapter.validate_python(
+      row["payload"]
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_view_revision(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportViewRevisionRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportViewRevisionRecord:
+    payload = self._provider_provenance_scheduler_stitched_report_view_revision_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "revision_id": record.revision_id,
+      "view_id": record.view_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_view_revisions.c.revision_id).where(
+          provider_provenance_scheduler_stitched_report_view_revisions.c.revision_id == record.revision_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_stitched_report_view_revisions).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_stitched_report_view_revisions)
+          .where(provider_provenance_scheduler_stitched_report_view_revisions.c.revision_id == record.revision_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_view_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportViewRevisionRecord, ...]:
+    statement = select(provider_provenance_scheduler_stitched_report_view_revisions.c.payload).order_by(
+      provider_provenance_scheduler_stitched_report_view_revisions.c.recorded_at.desc(),
+      provider_provenance_scheduler_stitched_report_view_revisions.c.revision_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_stitched_report_view_revision_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_view_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportViewRevisionRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_view_revisions.c.payload).where(
+          provider_provenance_scheduler_stitched_report_view_revisions.c.revision_id == revision_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_stitched_report_view_revision_adapter.validate_python(
       row["payload"]
     )
 
@@ -2499,6 +2575,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_provider_provenance_scheduler_stitched_report_views_name", "name"),
         ("ix_provider_provenance_scheduler_stitched_report_views_updated_at", "updated_at"),
         ("ix_provider_provenance_scheduler_stitched_report_views_created_by_tab_id", "created_by_tab_id"),
+        ("ix_provider_provenance_scheduler_stitched_report_view_revisions_view_id", "view_id"),
+        ("ix_provider_provenance_scheduler_stitched_report_view_revisions_action", "action"),
+        ("ix_provider_provenance_scheduler_stitched_report_view_revisions_recorded_at", "recorded_at"),
         ("ix_provider_provenance_scheduled_reports_name", "name"),
         ("ix_provider_provenance_scheduled_reports_status", "status"),
         ("ix_provider_provenance_scheduled_reports_cadence", "cadence"),
@@ -2540,6 +2619,8 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
           if index_name.startswith("ix_provider_provenance_dashboard_views_")
           else "provider_provenance_scheduler_stitched_report_views"
           if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_views_")
+          else "provider_provenance_scheduler_stitched_report_view_revisions"
+          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_view_revisions_")
           else "provider_provenance_analytics_presets"
           if index_name.startswith("ix_provider_provenance_analytics_presets_")
           else
