@@ -1319,30 +1319,3 @@ class ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord
   applied_result: dict[str, Any] | None = None
 
 
-RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
-RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
-  "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "
-  "provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
-)
-RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v14"
-RUN_SURFACE_CAPABILITY_GROUP_ORDER = (
-  "eligible_metrics",
-  "supporting_identity",
-  "operational_workflow",
-  "operational_order_actions",
-)
-RUN_SURFACE_CAPABILITY_FAMILY_ORDER = (
-  "comparison_eligibility",
-  "strategy_schema",
-  "collection_query",
-  "provenance_semantics",
-  "execution_controls",
-)
-RUN_SURFACE_SUBRESOURCE_CONTRACT_KEYS = (
-  "subresource:orders",
-  "subresource:positions",
-  "subresource:metrics",
-)
-RUN_SURFACE_COLLECTION_QUERY_CONTRACT_KEYS = (
-  "query_collection:run_list",
-)

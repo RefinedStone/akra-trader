@@ -1,4 +1,5 @@
 from akra_trader.domain.model_types.provider_provenance import *
+from akra_trader.domain.model_types.run_surface_contracts import *
 from akra_trader.domain.model_types.market_data_status import *
 from akra_trader.domain.model_types.sync_lineage import *
 from akra_trader.domain.model_types.operator_runtime import *
