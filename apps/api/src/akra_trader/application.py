@@ -282,6 +282,7 @@ from akra_trader.ports import GuardedLiveStatePort
 from akra_trader.ports import ExperimentPresetCatalogPort
 from akra_trader.ports import MarketDataPort
 from akra_trader.ports import OperatorAlertDeliveryPort
+from akra_trader.ports import ProviderProvenanceSchedulerSearchBackendPort
 from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
@@ -322,6 +323,7 @@ class TradingApplication:
     references: ReferenceCatalogPort,
     runs: RunRepositoryPort,
     presets: ExperimentPresetCatalogPort | None = None,
+    provider_provenance_scheduler_search_backend: ProviderProvenanceSchedulerSearchBackendPort | None = None,
     guarded_live_state: GuardedLiveStatePort | None = None,
     venue_state: VenueStatePort | None = None,
     venue_execution: VenueExecutionPort | None = None,
@@ -365,6 +367,9 @@ class TradingApplication:
     self._references = references
     self._presets = presets or _EphemeralExperimentPresetCatalog()
     self._runs = runs
+    self._provider_provenance_scheduler_search_backend = (
+      provider_provenance_scheduler_search_backend
+    )
     self._guarded_live_state = guarded_live_state or _EphemeralGuardedLiveStateStore()
     self._venue_state = venue_state or UnavailableVenueStateAdapter(self._clock)
     self._venue_execution = venue_execution or UnavailableVenueExecutionAdapter()
@@ -2925,26 +2930,20 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerSearchDocumentRecord,
   ) -> ProviderProvenanceSchedulerSearchDocumentRecord:
-    save_record = getattr(
-      self._runs,
-      "save_provider_provenance_scheduler_search_document_record",
-      None,
-    )
-    if callable(save_record):
-      return save_record(record)
+    if self._provider_provenance_scheduler_search_backend is not None:
+      return self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_document_record(
+        record
+      )
     self._provider_provenance_scheduler_search_documents[record.record_id] = record
     return record
 
   def _list_provider_provenance_scheduler_search_document_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchDocumentRecord, ...]:
-    list_records = getattr(
-      self._runs,
-      "list_provider_provenance_scheduler_search_document_records",
-      None,
-    )
-    if callable(list_records):
-      return tuple(list_records())
+    if self._provider_provenance_scheduler_search_backend is not None:
+      return tuple(
+        self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_document_records()
+      )
     return tuple(
       sorted(
         self._provider_provenance_scheduler_search_documents.values(),
@@ -2955,13 +2954,12 @@ class TradingApplication:
 
   def _prune_provider_provenance_scheduler_search_document_records(self) -> int:
     current_time = self._clock()
-    prune_records = getattr(
-      self._runs,
-      "prune_provider_provenance_scheduler_search_document_records",
-      None,
-    )
-    if callable(prune_records):
-      return int(prune_records(current_time))
+    if self._provider_provenance_scheduler_search_backend is not None:
+      return int(
+        self._provider_provenance_scheduler_search_backend.prune_provider_provenance_scheduler_search_document_records(
+          current_time
+        )
+      )
     original_count = len(self._provider_provenance_scheduler_search_documents)
     self._provider_provenance_scheduler_search_documents = {
       record_id: record
@@ -2969,6 +2967,18 @@ class TradingApplication:
       if record.expires_at is None or record.expires_at > current_time
     }
     return original_count - len(self._provider_provenance_scheduler_search_documents)
+
+  def _provider_provenance_scheduler_search_persistence_mode(self) -> str:
+    if self._provider_provenance_scheduler_search_backend is not None:
+      persistence_mode = getattr(
+        self._provider_provenance_scheduler_search_backend,
+        "persistence_mode",
+        None,
+      )
+      if isinstance(persistence_mode, str) and persistence_mode.strip():
+        return persistence_mode.strip()
+      return "external_scheduler_search_backend"
+    return "embedded_scheduler_search_backend"
 
   @staticmethod
   def _build_provider_provenance_scheduler_search_document_record(
@@ -36822,6 +36832,7 @@ class TradingApplication:
     if not normalized_record_ids:
       return {}
     self._prune_provider_provenance_scheduler_search_document_records()
+    projection_source = self._provider_provenance_scheduler_search_persistence_mode()
     lookup: dict[str, dict[str, Any]] = {}
     for record in self._list_provider_provenance_scheduler_search_document_records():
       if record.record_id not in normalized_record_ids:
@@ -36834,7 +36845,7 @@ class TradingApplication:
           key: tuple(values)
           for key, values in record.fields.items()
         },
-        "projection_source": "standalone_persistent_scheduler_search_store",
+        "projection_source": projection_source,
       }
     return lookup
 

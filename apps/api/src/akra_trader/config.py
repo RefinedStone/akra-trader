@@ -22,6 +22,7 @@ class Settings:
   default_quote_currency: str = "USDT"
   runs_database_url: str | None = None
   market_data_database_url: str | None = None
+  provider_provenance_scheduler_search_database_url: str | None = None
   market_data_symbols: tuple[str, ...] = ("BTC/USDT", "ETH/USDT", "SOL/USDT")
   market_data_sync_timeframes: tuple[str, ...] = ("5m",)
   market_data_sync_interval_seconds: int = 60
@@ -266,6 +267,9 @@ def load_settings() -> Settings:
     default_quote_currency=os.getenv("AKRA_TRADER_DEFAULT_QUOTE", "USDT"),
     runs_database_url=os.getenv("AKRA_TRADER_RUNS_DATABASE_URL") or None,
     market_data_database_url=os.getenv("AKRA_TRADER_MARKET_DATA_DATABASE_URL") or None,
+    provider_provenance_scheduler_search_database_url=(
+      os.getenv("AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_DATABASE_URL") or None
+    ),
     market_data_symbols=_parse_csv_env(
       os.getenv("AKRA_TRADER_MARKET_DATA_SYMBOLS", "BTC/USDT,ETH/USDT,SOL/USDT")
     ),

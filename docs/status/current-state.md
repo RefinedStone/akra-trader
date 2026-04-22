@@ -230,9 +230,9 @@ It is not yet a finished live trading product:
   semantic/vector retrieval groups, so operators can review stitched recovery or failure
   narratives as ranked clusters instead of scanning one occurrence row at a time
 - that same scheduler search layer now also writes those lexical/semantic projections into a
-  standalone persistent search store and uses tuned ranked relevance, so the boolean/full-text
-  path can reuse dedicated scheduler index material instead of reading search payloads back out of
-  health records
+  dedicated external scheduler search backend and uses tuned ranked relevance, so the
+  boolean/full-text path can reuse dedicated scheduler index material instead of reading search
+  payloads back out of health records or the run repository
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

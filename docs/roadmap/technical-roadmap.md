@@ -174,8 +174,9 @@ creation.
   instead of only paginated occurrence rows
   retrieval instead of re-implementing linear scan matching in each workflow
 - that same scheduler search layer now also persists those lexical/semantic projections in a
-  standalone search store with tuned relevance weighting, so future narrative retrieval can build
-  on dedicated durable index documents instead of recomputing every token stream on demand
+  dedicated external scheduler search backend with tuned relevance weighting, so future narrative
+  retrieval can build on dedicated durable index documents instead of recomputing every token
+  stream on demand or coupling the index to the run repository
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

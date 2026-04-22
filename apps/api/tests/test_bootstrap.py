@@ -5,6 +5,7 @@ from pathlib import Path
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.bootstrap import build_container
 from akra_trader.bootstrap import build_default_market_data_database_url
+from akra_trader.bootstrap import build_default_provider_provenance_scheduler_search_database_url
 from akra_trader.bootstrap import build_default_runs_database_url
 from akra_trader.config import Settings
 
@@ -59,6 +60,26 @@ def test_build_default_market_data_database_url_points_to_local_sqlite() -> None
 
   assert database_url.startswith("sqlite:///")
   assert database_url.endswith("/.local/state/market-data.sqlite3")
+
+
+def test_build_default_provider_provenance_scheduler_search_database_url_points_to_local_sqlite() -> None:
+  repo_root = Path(__file__).resolve().parents[2]
+
+  database_url = build_default_provider_provenance_scheduler_search_database_url(repo_root)
+
+  assert database_url.startswith("sqlite:///")
+  assert database_url.endswith("/.local/state/provider-provenance-scheduler-search.sqlite3")
+
+
+def test_build_default_provider_provenance_scheduler_search_database_url_can_follow_runs_sqlite() -> None:
+  repo_root = Path(__file__).resolve().parents[2]
+
+  database_url = build_default_provider_provenance_scheduler_search_database_url(
+    repo_root,
+    runs_database_url="sqlite:////tmp/akra/runs.sqlite3",
+  )
+
+  assert database_url == "sqlite:////tmp/akra/provider-provenance-scheduler-search.sqlite3"
 
 
 def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> None:

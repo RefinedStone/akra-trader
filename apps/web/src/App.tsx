@@ -18947,11 +18947,15 @@ export default function App() {
                                     ) : null}
                                     {providerProvenanceSchedulerAlertHistory?.search_summary?.relevance_model ? (
                                       <span className="run-filter-summary-chip">
-                                        {providerProvenanceSchedulerAlertHistory.search_summary.persistence_mode === "standalone_persistent_scheduler_search_store"
-                                          ? "Standalone persistent index"
-                                          : providerProvenanceSchedulerAlertHistory.search_summary.persistence_mode === "record_backed_scheduler_search_projection"
-                                            ? "Persistent index"
-                                            : "Ephemeral index"} · {providerProvenanceSchedulerAlertHistory.search_summary.relevance_model}
+                                        {providerProvenanceSchedulerAlertHistory.search_summary.persistence_mode === "external_scheduler_search_backend"
+                                          ? "External search backend"
+                                          : providerProvenanceSchedulerAlertHistory.search_summary.persistence_mode === "standalone_persistent_scheduler_search_store"
+                                            ? "Standalone persistent index"
+                                            : providerProvenanceSchedulerAlertHistory.search_summary.persistence_mode === "embedded_scheduler_search_backend"
+                                              ? "Embedded in-memory index"
+                                              : providerProvenanceSchedulerAlertHistory.search_summary.persistence_mode === "record_backed_scheduler_search_projection"
+                                                ? "Persistent index"
+                                                : "Ephemeral index"} · {providerProvenanceSchedulerAlertHistory.search_summary.relevance_model}
                                       </span>
                                     ) : null}
                                     {providerProvenanceSchedulerAlertHistory?.search_summary?.retrieval_cluster_count ? (
