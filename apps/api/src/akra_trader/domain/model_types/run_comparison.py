@@ -4,23 +4,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from akra_trader.domain.model_types.strategy_catalog import RunExperimentMetadata
+from akra_trader.domain.model_types.strategy_catalog import StrategyCatalogSemantics
+
 if TYPE_CHECKING:
   from akra_trader.domain.models import BenchmarkArtifact
   from akra_trader.domain.models import ReferenceSource
-  from akra_trader.domain.models import RunExperimentMetadata
-  from akra_trader.domain.models import StrategyCatalogSemantics
-
-
-def _default_strategy_catalog_semantics() -> StrategyCatalogSemantics:
-  from akra_trader.domain.models import StrategyCatalogSemantics
-
-  return StrategyCatalogSemantics()
-
-
-def _default_run_experiment_metadata() -> RunExperimentMetadata:
-  from akra_trader.domain.models import RunExperimentMetadata
-
-  return RunExperimentMetadata()
 
 
 @dataclass(frozen=True)
@@ -35,9 +24,7 @@ class RunComparisonRun:
   symbols: tuple[str, ...]
   timeframe: str
   started_at: datetime
-  catalog_semantics: StrategyCatalogSemantics = field(
-    default_factory=_default_strategy_catalog_semantics
-  )
+  catalog_semantics: StrategyCatalogSemantics = field(default_factory=StrategyCatalogSemantics)
   ended_at: datetime | None = None
   reference_id: str | None = None
   reference_version: str | None = None
@@ -47,7 +34,7 @@ class RunComparisonRun:
   rerun_boundary_id: str | None = None
   rerun_boundary_state: str = "range_only"
   dataset_identity: str | None = None
-  experiment: RunExperimentMetadata = field(default_factory=_default_run_experiment_metadata)
+  experiment: RunExperimentMetadata = field(default_factory=RunExperimentMetadata)
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
   benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()
