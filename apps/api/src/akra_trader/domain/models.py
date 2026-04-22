@@ -1659,6 +1659,12 @@ class ProviderProvenanceSchedulerSearchFeedbackRecord:
   ranking_reason: str | None = None
   source_tab_id: str | None = None
   source_tab_label: str | None = None
+  moderation_status: str = "pending"
+  moderation_note: str | None = None
+  moderated_at: datetime | None = None
+  moderated_by: str | None = None
+  moderated_by_tab_id: str | None = None
+  moderated_by_tab_label: str | None = None
 
 
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"

@@ -180,6 +180,9 @@ creation.
 - that same retrieval layer now also persists query analytics plus operator relevance feedback and
   applies learned relevance tuning to later scheduler searches, so future narrative tooling can
   improve ranking from observed operator behavior rather than only static weighting heuristics
+- that same retrieval layer now also exposes a scheduler query analytics dashboard and feedback
+  moderation workflow, so learned relevance tuning can stay operator-reviewed instead of
+  promoting every captured signal directly into ranking
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

@@ -263,6 +263,14 @@ class OperatorProviderProvenanceSchedulerSearchFeedbackRequest(BaseModel):
   source_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerSearchFeedbackModerationRequest(BaseModel):
+  moderation_status: str
+  actor: str = "operator"
+  note: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -2129,6 +2137,60 @@ def create_router(container: Container) -> APIRouter:
     methods=["POST"],
     name="record_operator_provider_provenance_scheduler_search_feedback",
     summary="Record operator feedback for scheduler search ranking",
+  )
+
+  def get_operator_provider_provenance_scheduler_search_dashboard(
+    search: str | None = None,
+    moderation_status: str | None = None,
+    signal: str | None = None,
+    query_limit: int = 12,
+    feedback_limit: int = 20,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.get_provider_provenance_scheduler_search_dashboard(
+        search=search,
+        moderation_status=moderation_status,
+        signal=signal,
+        query_limit=query_limit,
+        feedback_limit=feedback_limit,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/dashboard",
+    get_operator_provider_provenance_scheduler_search_dashboard,
+    methods=["GET"],
+    name="get_operator_provider_provenance_scheduler_search_dashboard",
+    summary="List scheduler query analytics and feedback moderation data",
+  )
+
+  def moderate_operator_provider_provenance_scheduler_search_feedback(
+    feedback_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchFeedbackModerationRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.moderate_provider_provenance_scheduler_search_feedback(
+        feedback_id=feedback_id,
+        moderation_status=request.moderation_status,
+        actor=request.actor,
+        note=request.note,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/feedback/{feedback_id}/moderate",
+    moderate_operator_provider_provenance_scheduler_search_feedback,
+    methods=["POST"],
+    name="moderate_operator_provider_provenance_scheduler_search_feedback",
+    summary="Moderate scheduler search feedback before it influences ranking",
   )
 
   return router

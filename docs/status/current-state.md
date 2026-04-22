@@ -237,6 +237,9 @@ It is not yet a finished live trading product:
   feedback, and applies learned relevance tuning back into later searches, so ranked occurrence
   review can adapt to what operators actually marked as useful instead of staying on static
   field weights alone
+- that same scheduler retrieval now also exposes a query analytics dashboard and feedback
+  moderation queue, so teams can review search usage and only approved relevance signals feed the
+  learned ranking path
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

@@ -124,9 +124,11 @@ import {
   listProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisions,
   listProviderProvenanceSchedulerStitchedReportViewAudits,
   listProviderProvenanceSchedulerStitchedReportViewRevisions,
+  getProviderProvenanceSchedulerSearchDashboard,
   listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
+  moderateProviderProvenanceSchedulerSearchFeedback,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   recordProviderProvenanceSchedulerSearchFeedback,
@@ -360,6 +362,7 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerSearchDashboardPayload,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionEntry,
@@ -492,6 +495,12 @@ type ProviderProvenanceAnalyticsQueryState = {
   window_days: number;
 };
 
+type ProviderProvenanceSchedulerSearchDashboardFilterState = {
+  search: string;
+  moderation_status: string;
+  signal: string;
+};
+
 type ProviderProvenanceSchedulerExportPolicyDraft = {
   job_id: string | null;
   routing_policy_id: string;
@@ -515,6 +524,12 @@ const defaultProviderProvenanceAnalyticsQueryState: ProviderProvenanceAnalyticsQ
   scheduler_alert_narrative_facet: "all_occurrences",
   search_query: "",
   window_days: 14,
+};
+
+const defaultProviderProvenanceSchedulerSearchDashboardFilterState: ProviderProvenanceSchedulerSearchDashboardFilterState = {
+  search: "",
+  moderation_status: ALL_FILTER_VALUE,
+  signal: ALL_FILTER_VALUE,
 };
 
 function normalizeProviderProvenanceSchedulerRoutingPolicyDraftValue(policyId?: string | null) {
@@ -4297,7 +4312,19 @@ export default function App() {
     useState<string | null>(null);
   const [providerProvenanceSchedulerAlertHistoryOffset, setProviderProvenanceSchedulerAlertHistoryOffset] =
     useState(0);
+  const [providerProvenanceSchedulerSearchDashboard, setProviderProvenanceSchedulerSearchDashboard] =
+    useState<ProviderProvenanceSchedulerSearchDashboardPayload | null>(null);
+  const [providerProvenanceSchedulerSearchDashboardLoading, setProviderProvenanceSchedulerSearchDashboardLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerSearchDashboardError, setProviderProvenanceSchedulerSearchDashboardError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchDashboardFilter, setProviderProvenanceSchedulerSearchDashboardFilter] =
+    useState<ProviderProvenanceSchedulerSearchDashboardFilterState>(
+      defaultProviderProvenanceSchedulerSearchDashboardFilterState,
+    );
   const [providerProvenanceSchedulerSearchFeedbackPendingOccurrenceKey, setProviderProvenanceSchedulerSearchFeedbackPendingOccurrenceKey] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchFeedbackModerationPendingId, setProviderProvenanceSchedulerSearchFeedbackModerationPendingId] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerDrilldownBucketKey, setProviderProvenanceSchedulerDrilldownBucketKey] =
     useState<string | null>(null);
@@ -4475,6 +4502,7 @@ export default function App() {
   const providerProvenanceSchedulerAnalyticsRequestIdRef = useRef(0);
   const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerSearchDashboardRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
   const providerProvenanceSchedulerStitchedReportViewRequestIdRef = useRef(0);
   const providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef = useRef(0);
@@ -6104,11 +6132,15 @@ export default function App() {
   }, [
     providerProvenanceAnalyticsQuery.window_days,
     providerProvenanceSchedulerAlertHistoryOffset,
+    providerProvenanceAnalyticsQuery.search_query,
     providerProvenanceAnalyticsQuery.scheduler_alert_category,
     providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet,
     providerProvenanceAnalyticsQuery.scheduler_alert_status,
     providerProvenanceSchedulerHistoryOffset,
     providerProvenanceSchedulerDrilldownBucketKey,
+    providerProvenanceSchedulerSearchDashboardFilter.search,
+    providerProvenanceSchedulerSearchDashboardFilter.moderation_status,
+    providerProvenanceSchedulerSearchDashboardFilter.signal,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.view_id,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.action,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.actor_tab_id,
@@ -6862,6 +6894,8 @@ export default function App() {
     providerProvenanceSchedulerHistoryRequestIdRef.current = historyRequestId;
     const alertHistoryRequestId = providerProvenanceSchedulerAlertHistoryRequestIdRef.current + 1;
     providerProvenanceSchedulerAlertHistoryRequestIdRef.current = alertHistoryRequestId;
+    const searchDashboardRequestId = providerProvenanceSchedulerSearchDashboardRequestIdRef.current + 1;
+    providerProvenanceSchedulerSearchDashboardRequestIdRef.current = searchDashboardRequestId;
     const exportRequestId = providerProvenanceSchedulerExportRequestIdRef.current + 1;
     providerProvenanceSchedulerExportRequestIdRef.current = exportRequestId;
     const stitchedViewRequestId = providerProvenanceSchedulerStitchedReportViewRequestIdRef.current + 1;
@@ -6871,12 +6905,14 @@ export default function App() {
     setProviderProvenanceSchedulerAnalyticsLoading(true);
     setProviderProvenanceSchedulerHistoryLoading(true);
     setProviderProvenanceSchedulerAlertHistoryLoading(true);
+    setProviderProvenanceSchedulerSearchDashboardLoading(true);
     setProviderProvenanceSchedulerExportsLoading(true);
     setProviderProvenanceSchedulerStitchedReportViewsLoading(true);
     setProviderProvenanceSchedulerStitchedReportViewAuditsLoading(true);
     setProviderProvenanceSchedulerAnalyticsError(null);
     setProviderProvenanceSchedulerHistoryError(null);
     setProviderProvenanceSchedulerAlertHistoryError(null);
+    setProviderProvenanceSchedulerSearchDashboardError(null);
     setProviderProvenanceSchedulerExportsError(null);
     setProviderProvenanceSchedulerStitchedReportViewsError(null);
     setProviderProvenanceSchedulerStitchedReportViewAuditsError(null);
@@ -6885,6 +6921,7 @@ export default function App() {
         analyticsPayload,
         historyPayload,
         alertHistoryPayload,
+        searchDashboardPayload,
         exportListPayload,
         stitchedViewPayload,
         stitchedViewAuditPayload,
@@ -6918,6 +6955,21 @@ export default function App() {
               : undefined,
           limit: schedulerHistoryLimit,
           offset: providerProvenanceSchedulerAlertHistoryOffset,
+        }),
+        getProviderProvenanceSchedulerSearchDashboard({
+          search: providerProvenanceSchedulerSearchDashboardFilter.search.trim() || undefined,
+          moderationStatus:
+            providerProvenanceSchedulerSearchDashboardFilter.moderation_status !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerSearchDashboardFilter.moderation_status
+              : undefined,
+          signal:
+            providerProvenanceSchedulerSearchDashboardFilter.signal !== ALL_FILTER_VALUE
+              ? (
+                  providerProvenanceSchedulerSearchDashboardFilter.signal as "relevant" | "not_relevant"
+                )
+              : undefined,
+          queryLimit: 8,
+          feedbackLimit: 12,
         }),
         listProviderProvenanceExportJobs({
           exportScope: "provider_provenance_scheduler_health",
@@ -6954,6 +7006,9 @@ export default function App() {
       if (providerProvenanceSchedulerAlertHistoryRequestIdRef.current === alertHistoryRequestId) {
         setProviderProvenanceSchedulerAlertHistory(alertHistoryPayload);
       }
+      if (providerProvenanceSchedulerSearchDashboardRequestIdRef.current === searchDashboardRequestId) {
+        setProviderProvenanceSchedulerSearchDashboard(searchDashboardPayload);
+      }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExports(exportListPayload.items);
       }
@@ -6985,6 +7040,10 @@ export default function App() {
         setProviderProvenanceSchedulerAlertHistory(null);
         setProviderProvenanceSchedulerAlertHistoryError(message);
       }
+      if (providerProvenanceSchedulerSearchDashboardRequestIdRef.current === searchDashboardRequestId) {
+        setProviderProvenanceSchedulerSearchDashboard(null);
+        setProviderProvenanceSchedulerSearchDashboardError(message);
+      }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExports([]);
         setProviderProvenanceSchedulerExportsError(message);
@@ -7006,6 +7065,9 @@ export default function App() {
       }
       if (providerProvenanceSchedulerAlertHistoryRequestIdRef.current === alertHistoryRequestId) {
         setProviderProvenanceSchedulerAlertHistoryLoading(false);
+      }
+      if (providerProvenanceSchedulerSearchDashboardRequestIdRef.current === searchDashboardRequestId) {
+        setProviderProvenanceSchedulerSearchDashboardLoading(false);
       }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExportsLoading(false);
@@ -7061,6 +7123,37 @@ export default function App() {
       );
     } finally {
       setProviderProvenanceSchedulerSearchFeedbackPendingOccurrenceKey(null);
+    }
+  }
+
+  async function moderateProviderProvenanceSchedulerSearchFeedbackEntry(
+    feedbackId: string,
+    moderationStatus: "pending" | "approved" | "rejected",
+  ) {
+    const normalizedFeedbackId = feedbackId.trim();
+    if (!normalizedFeedbackId) {
+      setProviderProvenanceWorkspaceFeedback("Scheduler feedback moderation requires a feedback id.");
+      return;
+    }
+    setProviderProvenanceSchedulerSearchFeedbackModerationPendingId(normalizedFeedbackId);
+    try {
+      const result = await moderateProviderProvenanceSchedulerSearchFeedback({
+        feedbackId: normalizedFeedbackId,
+        moderationStatus,
+        actor: "operator",
+        sourceTabId: activeWorkspace,
+        sourceTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `${formatWorkflowToken(result.moderation_status)} feedback ${normalizedFeedbackId}. ${result.learned_relevance_hint ?? ""}`.trim(),
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler feedback moderation failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchFeedbackModerationPendingId(null);
     }
   }
 
@@ -19016,7 +19109,7 @@ export default function App() {
                                     ) : null}
                                     {providerProvenanceSchedulerAlertHistory?.search_analytics ? (
                                       <span className="run-filter-summary-chip">
-                                        Feedback {providerProvenanceSchedulerAlertHistory.search_analytics.feedback_count} · helpful {providerProvenanceSchedulerAlertHistory.search_analytics.helpful_feedback_ratio_pct}% · tuned {providerProvenanceSchedulerAlertHistory.search_analytics.tuned_feature_count}
+                                        Feedback {providerProvenanceSchedulerAlertHistory.search_analytics.feedback_count} · pending {providerProvenanceSchedulerAlertHistory.search_analytics.pending_feedback_count} · approved {providerProvenanceSchedulerAlertHistory.search_analytics.approved_feedback_count} · tuned {providerProvenanceSchedulerAlertHistory.search_analytics.tuned_feature_count}
                                       </span>
                                     ) : null}
                                   </div>
@@ -19198,6 +19291,9 @@ export default function App() {
                                           Feedback {providerProvenanceSchedulerAlertHistory.search_analytics.relevant_feedback_count} relevant · {providerProvenanceSchedulerAlertHistory.search_analytics.not_relevant_feedback_count} not relevant
                                         </span>
                                         <span className="run-filter-summary-chip">
+                                          Moderation pending {providerProvenanceSchedulerAlertHistory.search_analytics.pending_feedback_count} · approved {providerProvenanceSchedulerAlertHistory.search_analytics.approved_feedback_count} · rejected {providerProvenanceSchedulerAlertHistory.search_analytics.rejected_feedback_count}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
                                           Learned {providerProvenanceSchedulerAlertHistory.search_analytics.learned_relevance_active ? "active" : "cold"} · {providerProvenanceSchedulerAlertHistory.search_analytics.tuning_profile_version ?? "n/a"}
                                         </span>
                                         <span className="run-filter-summary-chip">
@@ -19255,7 +19351,7 @@ export default function App() {
                                               {providerProvenanceSchedulerAlertHistory.search_analytics.recent_feedback.length ? (
                                                 providerProvenanceSchedulerAlertHistory.search_analytics.recent_feedback.map((entry) => (
                                                   <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-feedback-${entry.feedback_id}`}>
-                                                    {entry.occurrence_id} · {formatWorkflowToken(entry.signal)} · {entry.matched_fields.join(", ") || "ranked fields"}
+                                                    {entry.occurrence_id} · {formatWorkflowToken(entry.signal)} · {formatWorkflowToken(entry.moderation_status)} · {entry.matched_fields.join(", ") || "ranked fields"}
                                                   </p>
                                                 ))
                                               ) : (
@@ -19266,6 +19362,242 @@ export default function App() {
                                         </tbody>
                                       </table>
                                     </>
+                                  ) : null}
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Scheduler query analytics dashboard</strong>
+                                    <p>
+                                      Moderate feedback before it influences learned ranking and inspect which
+                                      scheduler search slices operators are using most often.
+                                    </p>
+                                  </div>
+                                  <div className="market-data-provenance-history-actions">
+                                    <label className="run-form-field">
+                                      <span>Dashboard search</span>
+                                      <input
+                                        onChange={(event) => {
+                                          setProviderProvenanceSchedulerSearchDashboardFilter((current) => ({
+                                            ...current,
+                                            search: event.target.value,
+                                          }));
+                                        }}
+                                        placeholder="query, occurrence id, actor, moderated by"
+                                        type="search"
+                                        value={providerProvenanceSchedulerSearchDashboardFilter.search}
+                                      />
+                                    </label>
+                                    <label className="run-form-field">
+                                      <span>Moderation</span>
+                                      <select
+                                        value={providerProvenanceSchedulerSearchDashboardFilter.moderation_status}
+                                        onChange={(event) => {
+                                          setProviderProvenanceSchedulerSearchDashboardFilter((current) => ({
+                                            ...current,
+                                            moderation_status: event.target.value,
+                                          }));
+                                        }}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All states</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="approved">Approved</option>
+                                        <option value="rejected">Rejected</option>
+                                      </select>
+                                    </label>
+                                    <label className="run-form-field">
+                                      <span>Signal</span>
+                                      <select
+                                        value={providerProvenanceSchedulerSearchDashboardFilter.signal}
+                                        onChange={(event) => {
+                                          setProviderProvenanceSchedulerSearchDashboardFilter((current) => ({
+                                            ...current,
+                                            signal: event.target.value,
+                                          }));
+                                        }}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All signals</option>
+                                        <option value="relevant">Relevant</option>
+                                        <option value="not_relevant">Not relevant</option>
+                                      </select>
+                                    </label>
+                                    {providerProvenanceSchedulerSearchDashboard?.query.search ? (
+                                      <span className="run-lineage-symbol-copy">
+                                        Dashboard search {providerProvenanceSchedulerSearchDashboard.query.search}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {providerProvenanceSchedulerSearchDashboard ? (
+                                    <>
+                                      <div className="run-filter-summary-chip-row">
+                                        <span className="run-filter-summary-chip">
+                                          Queries {providerProvenanceSchedulerSearchDashboard.summary.query_count} · distinct {providerProvenanceSchedulerSearchDashboard.summary.distinct_query_count}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Feedback {providerProvenanceSchedulerSearchDashboard.summary.feedback_count} · pending {providerProvenanceSchedulerSearchDashboard.summary.pending_feedback_count}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Approved {providerProvenanceSchedulerSearchDashboard.summary.approved_feedback_count} · rejected {providerProvenanceSchedulerSearchDashboard.summary.rejected_feedback_count}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Signals {providerProvenanceSchedulerSearchDashboard.summary.relevant_feedback_count} relevant · {providerProvenanceSchedulerSearchDashboard.summary.not_relevant_feedback_count} not relevant
+                                        </span>
+                                      </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Top queries</th>
+                                            <th>Coverage</th>
+                                            <th>Moderation</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          <tr>
+                                            <td>
+                                              <strong>Frequent searches</strong>
+                                              {providerProvenanceSchedulerSearchDashboard.top_queries.length ? (
+                                                providerProvenanceSchedulerSearchDashboard.top_queries.map((entry) => (
+                                                  <div key={`provider-scheduler-search-dashboard-query-${entry.query_ids.join("-")}`}>
+                                                    <p className="run-lineage-symbol-copy">
+                                                      {entry.query} · {entry.search_count} run(s) · top {entry.top_score}
+                                                    </p>
+                                                    <div className="market-data-provenance-history-actions">
+                                                      <button
+                                                        className="ghost-button"
+                                                        onClick={() => {
+                                                          setProviderProvenanceAnalyticsQuery((current) => ({
+                                                            ...current,
+                                                            search_query: entry.query,
+                                                          }));
+                                                          setProviderProvenanceSchedulerAlertHistoryOffset(0);
+                                                        }}
+                                                        type="button"
+                                                      >
+                                                        Use query
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                ))
+                                              ) : (
+                                                <p className="run-lineage-symbol-copy">No persisted scheduler search queries match the current dashboard filter.</p>
+                                              )}
+                                            </td>
+                                            <td>
+                                              <strong>Search footprint</strong>
+                                              {providerProvenanceSchedulerSearchDashboard.top_queries.length ? (
+                                                providerProvenanceSchedulerSearchDashboard.top_queries.map((entry) => (
+                                                  <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-dashboard-coverage-${entry.query_ids.join("-")}`}>
+                                                    {entry.matched_occurrences_total} occurrence hit(s) · {entry.semantic_concepts.join(" · ") || "no semantic concepts"} · {entry.parsed_operators.join(" · ") || "no operators"}
+                                                  </p>
+                                                ))
+                                              ) : (
+                                                <p className="run-lineage-symbol-copy">Coverage rolls up here once operators run scheduler searches.</p>
+                                              )}
+                                            </td>
+                                            <td>
+                                              <strong>Feedback counts</strong>
+                                              {providerProvenanceSchedulerSearchDashboard.top_queries.length ? (
+                                                providerProvenanceSchedulerSearchDashboard.top_queries.map((entry) => (
+                                                  <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-dashboard-feedback-${entry.query_ids.join("-")}`}>
+                                                    pending {entry.pending_feedback_count} · approved {entry.approved_feedback_count} · rejected {entry.rejected_feedback_count}
+                                                  </p>
+                                                ))
+                                              ) : (
+                                                <p className="run-lineage-symbol-copy">No moderation queue activity for the current filter yet.</p>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Feedback item</th>
+                                            <th>Signals</th>
+                                            <th>Moderation</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerSearchDashboard.feedback_items.length ? (
+                                            providerProvenanceSchedulerSearchDashboard.feedback_items.map((entry) => (
+                                              <tr key={`provider-scheduler-search-dashboard-feedback-item-${entry.feedback_id}`}>
+                                                <td>
+                                                  <strong>{entry.query}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.occurrence_id} · {formatWorkflowToken(entry.signal)} · score {entry.score}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.matched_fields.join(" · ") || "ranked fields"} · {entry.semantic_concepts.join(" · ") || "no semantic concepts"}
+                                                  </p>
+                                                  {entry.note ? (
+                                                    <p className="run-lineage-symbol-copy">{entry.note}</p>
+                                                  ) : null}
+                                                </td>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(entry.moderation_status)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Recorded {formatTimestamp(entry.recorded_at)} · actor {entry.actor ?? "operator"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Moderated {formatTimestamp(entry.moderated_at ?? null)} · by {entry.moderated_by ?? "n/a"}
+                                                  </p>
+                                                  {entry.moderation_note ? (
+                                                    <p className="run-lineage-symbol-copy">{entry.moderation_note}</p>
+                                                  ) : null}
+                                                </td>
+                                                <td>
+                                                  <div className="market-data-provenance-history-actions">
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={providerProvenanceSchedulerSearchFeedbackModerationPendingId === entry.feedback_id}
+                                                      onClick={() => {
+                                                        void moderateProviderProvenanceSchedulerSearchFeedbackEntry(entry.feedback_id, "approved");
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Approve
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={providerProvenanceSchedulerSearchFeedbackModerationPendingId === entry.feedback_id}
+                                                      onClick={() => {
+                                                        void moderateProviderProvenanceSchedulerSearchFeedbackEntry(entry.feedback_id, "rejected");
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Reject
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={providerProvenanceSchedulerSearchFeedbackModerationPendingId === entry.feedback_id}
+                                                      onClick={() => {
+                                                        void moderateProviderProvenanceSchedulerSearchFeedbackEntry(entry.feedback_id, "pending");
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Queue
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            ))
+                                          ) : (
+                                            <tr>
+                                              <td colSpan={3}>
+                                                <p className="empty-state">
+                                                  No scheduler search feedback matches the current moderation filter.
+                                                </p>
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    </>
+                                  ) : null}
+                                  {providerProvenanceSchedulerSearchDashboardLoading ? (
+                                    <p className="empty-state">Loading scheduler search dashboard…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerSearchDashboardError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduler search dashboard failed: {providerProvenanceSchedulerSearchDashboardError}
+                                    </p>
                                   ) : null}
                                   {providerProvenanceSchedulerAlertRetrievalClusters.length ? (
                                     <>

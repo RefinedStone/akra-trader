@@ -15,7 +15,9 @@ import type {
   ProviderProvenanceExportJobPolicyResult,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerAlertHistoryPayload,
+  ProviderProvenanceSchedulerSearchDashboardPayload,
   ProviderProvenanceSchedulerSearchFeedbackResult,
+  ProviderProvenanceSchedulerSearchFeedbackModerationResult,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
@@ -587,6 +589,58 @@ export async function recordProviderProvenanceSchedulerSearchFeedback(params: {
         ranking_reason: params.rankingReason ?? null,
         note: params.note ?? null,
         actor: params.actor?.trim() || "operator",
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function getProviderProvenanceSchedulerSearchDashboard(params: {
+  search?: string;
+  moderationStatus?: string;
+  signal?: "relevant" | "not_relevant";
+  queryLimit?: number;
+  feedbackLimit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (params.moderationStatus?.trim()) {
+    searchParams.set("moderation_status", params.moderationStatus.trim());
+  }
+  if (params.signal?.trim()) {
+    searchParams.set("signal", params.signal.trim());
+  }
+  if (typeof params.queryLimit === "number" && Number.isFinite(params.queryLimit)) {
+    searchParams.set("query_limit", String(Math.max(1, Math.min(Math.round(params.queryLimit), 50))));
+  }
+  if (typeof params.feedbackLimit === "number" && Number.isFinite(params.feedbackLimit)) {
+    searchParams.set("feedback_limit", String(Math.max(1, Math.min(Math.round(params.feedbackLimit), 100))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerSearchDashboardPayload>(
+    `/operator/provider-provenance-analytics/scheduler-search/dashboard${suffix}`,
+  );
+}
+
+export async function moderateProviderProvenanceSchedulerSearchFeedback(params: {
+  feedbackId: string;
+  moderationStatus: "pending" | "approved" | "rejected";
+  actor?: string;
+  note?: string | null;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchFeedbackModerationResult>(
+    `/operator/provider-provenance-analytics/scheduler-search/feedback/${encodeURIComponent(params.feedbackId)}/moderate`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        moderation_status: params.moderationStatus,
+        actor: params.actor?.trim() || "operator",
+        note: params.note ?? null,
         source_tab_id: params.sourceTabId?.trim() || null,
         source_tab_label: params.sourceTabLabel?.trim() || null,
       }),

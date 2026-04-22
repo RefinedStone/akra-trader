@@ -5071,6 +5071,45 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert feedback_response.status_code == 200
   feedback_payload = feedback_response.json()
   assert feedback_payload["feedback_count"] == 1
+  assert feedback_payload["moderation_status"] == "pending"
+  assert feedback_payload["pending_feedback_count"] == 1
+
+  pending_search_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-alerts",
+    params={
+      "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
+      "limit": 10,
+      "offset": 0,
+    },
+  )
+  assert pending_search_response.status_code == 200
+  pending_search_payload = pending_search_response.json()
+  assert pending_search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_v1"
+  assert pending_search_payload["search_analytics"]["feedback_count"] == 1
+  assert pending_search_payload["search_analytics"]["pending_feedback_count"] == 1
+  assert pending_search_payload["search_analytics"]["learned_relevance_active"] is False
+
+  dashboard_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-search/dashboard",
+    params={"moderation_status": "pending", "feedback_limit": 10},
+  )
+  assert dashboard_response.status_code == 200
+  dashboard_payload = dashboard_response.json()
+  assert dashboard_payload["summary"]["feedback_count"] >= 1
+  assert dashboard_payload["summary"]["pending_feedback_count"] >= 1
+  assert dashboard_payload["feedback_items"][0]["feedback_id"] == feedback_payload["feedback_id"]
+
+  moderation_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-search/feedback/{feedback_payload['feedback_id']}/moderate",
+    json={
+      "moderation_status": "approved",
+      "actor": "operator",
+    },
+  )
+  assert moderation_response.status_code == 200
+  moderation_payload = moderation_response.json()
+  assert moderation_payload["moderation_status"] == "approved"
+  assert moderation_payload["approved_feedback_count"] == 1
 
   tuned_search_response = client.get(
     "/api/operator/provider-provenance-analytics/scheduler-alerts",
@@ -5084,6 +5123,7 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   tuned_search_payload = tuned_search_response.json()
   assert tuned_search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
   assert tuned_search_payload["search_analytics"]["feedback_count"] == 1
+  assert tuned_search_payload["search_analytics"]["approved_feedback_count"] == 1
   assert tuned_search_payload["search_analytics"]["learned_relevance_active"] is True
   assert tuned_search_payload["items"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
   assert tuned_search_payload["items"][0]["search_match"]["feedback_signal_count"] >= 1

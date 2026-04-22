@@ -1987,6 +1987,41 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
     ranking_reason=search_payload["items"][0]["search_match"]["ranking_reason"],
   )
   assert feedback_result["feedback_count"] == 1
+  assert feedback_result["moderation_status"] == "pending"
+  assert feedback_result["pending_feedback_count"] == 1
+
+  pending_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
+    app=app,
+    filters={
+      "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
+      "limit": 10,
+      "offset": 0,
+    },
+  )
+  assert pending_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_v1"
+  assert pending_payload["search_analytics"]["feedback_count"] == 1
+  assert pending_payload["search_analytics"]["pending_feedback_count"] == 1
+  assert pending_payload["search_analytics"]["approved_feedback_count"] == 0
+  assert pending_payload["search_analytics"]["learned_relevance_active"] is False
+  assert pending_payload["items"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_v1"
+
+  dashboard_payload = app.get_provider_provenance_scheduler_search_dashboard(
+    moderation_status="pending",
+    feedback_limit=10,
+  )
+  assert dashboard_payload["summary"]["feedback_count"] >= 1
+  assert dashboard_payload["summary"]["pending_feedback_count"] >= 1
+  assert dashboard_payload["feedback_items"][0]["feedback_id"] == feedback_result["feedback_id"]
+
+  moderation_result = app.moderate_provider_provenance_scheduler_search_feedback(
+    feedback_id=feedback_result["feedback_id"],
+    moderation_status="approved",
+    actor="operator",
+  )
+  assert moderation_result["moderation_status"] == "approved"
+  assert moderation_result["approved_feedback_count"] == 1
+
   tuned_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
     app=app,
@@ -1998,6 +2033,7 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   )
   assert tuned_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
   assert tuned_payload["search_analytics"]["feedback_count"] == 1
+  assert tuned_payload["search_analytics"]["approved_feedback_count"] == 1
   assert tuned_payload["search_analytics"]["learned_relevance_active"] is True
   assert tuned_payload["items"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
   assert tuned_payload["items"][0]["search_match"]["feedback_signal_count"] >= 1

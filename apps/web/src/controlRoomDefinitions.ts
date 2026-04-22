@@ -1356,6 +1356,9 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     recorded_at: string;
     recent_query_count: number;
     feedback_count: number;
+    pending_feedback_count: number;
+    approved_feedback_count: number;
+    rejected_feedback_count: number;
     relevant_feedback_count: number;
     not_relevant_feedback_count: number;
     helpful_feedback_ratio_pct: number;
@@ -1392,10 +1395,12 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
       recorded_at: string;
       occurrence_id: string;
       signal: string;
+      moderation_status: string;
       matched_fields: string[];
       semantic_concepts: string[];
       operator_hits: string[];
       note?: string | null;
+      moderation_note?: string | null;
     }[];
   } | null;
   items: (OperatorAlertEntry & {
@@ -1454,11 +1459,87 @@ export type ProviderProvenanceSchedulerSearchFeedbackResult = {
   query: string;
   occurrence_id: string;
   signal: string;
+  moderation_status: string;
   feedback_count: number;
+  pending_feedback_count: number;
+  approved_feedback_count: number;
+  rejected_feedback_count: number;
   relevant_feedback_count: number;
   not_relevant_feedback_count: number;
   helpful_feedback_ratio_pct: number;
   learned_relevance_hint?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchFeedbackModerationResult = {
+  feedback_id: string;
+  query_id: string;
+  occurrence_id: string;
+  moderation_status: string;
+  moderated_at?: string | null;
+  moderated_by?: string | null;
+  moderation_note?: string | null;
+  pending_feedback_count: number;
+  approved_feedback_count: number;
+  rejected_feedback_count: number;
+  learned_relevance_hint?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchDashboardPayload = {
+  generated_at: string;
+  query: {
+    search?: string | null;
+    moderation_status?: string | null;
+    signal?: string | null;
+    query_limit: number;
+    feedback_limit: number;
+  };
+  available_filters: {
+    moderation_statuses: string[];
+    signals: string[];
+  };
+  summary: {
+    query_count: number;
+    distinct_query_count: number;
+    feedback_count: number;
+    pending_feedback_count: number;
+    approved_feedback_count: number;
+    rejected_feedback_count: number;
+    relevant_feedback_count: number;
+    not_relevant_feedback_count: number;
+  };
+  top_queries: {
+    query: string;
+    query_ids: string[];
+    search_count: number;
+    last_recorded_at: string;
+    top_score: number;
+    matched_occurrences_total: number;
+    feedback_count: number;
+    pending_feedback_count: number;
+    approved_feedback_count: number;
+    rejected_feedback_count: number;
+    semantic_concepts: string[];
+    parsed_operators: string[];
+    relevance_models: string[];
+  }[];
+  feedback_items: {
+    feedback_id: string;
+    recorded_at: string;
+    query_id: string;
+    query: string;
+    occurrence_id: string;
+    signal: string;
+    actor?: string | null;
+    note?: string | null;
+    moderation_status: string;
+    moderation_note?: string | null;
+    moderated_at?: string | null;
+    moderated_by?: string | null;
+    matched_fields: string[];
+    semantic_concepts: string[];
+    operator_hits: string[];
+    score: number;
+  }[];
 };
 
 export type ProviderProvenanceSchedulerHealthStatusSeriesEntry = {
