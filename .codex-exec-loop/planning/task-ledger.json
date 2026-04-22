@@ -1370,18 +1370,72 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add query analytics, feedback capture, and learned relevance tuning for scheduler retrieval",
       "description": "Instrument scheduler narrative search with durable query analytics, result or click feedback, and learned relevance-tuning signals so boolean, full-text, and semantic ranking quality can be evaluated and improved from operator behavior instead of only static heuristics.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 74,
       "dynamic_priority_delta": 34,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T20:55:00+09:00",
+      "updated_at": "2026-04-22T21:10:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-external-search-service"
       ],
-      "direction_relation_note": "The latest main-session reply says the external search-service split is now complete, but explicitly calls out missing query analytics, feedback loops, and learned relevance tuning above the existing boolean, full-text, and semantic retrieval stack.",
-      "priority_reason": "Promoted to ready because builtin next-task should continue with the only explicit remaining executable follow-up from the latest main-session reply now that the external search-service infrastructure landed in commit 16d35bc."
+      "direction_relation_note": "Completed on main in commit 335d184 with scheduler query analytics persistence, feedback capture, heuristic learned_score and tuning_signals surfaced through the retrieval payload, and control-room Relevant or Not relevant actions plus analytics panels wired into the scheduler search experience.",
+      "priority_reason": "Closed after targeted API pytest coverage, compileall verification, web typecheck/build, docs status updates, commit, and push all landed; the latest main-session reply now leaves operator-facing analytics dashboard and moderation workflow productization plus heavier offline reranker infrastructure as the follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-analytics-dashboard-feedback-moderation",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add scheduler query analytics dashboard and feedback moderation workflow",
+      "description": "Productize the new scheduler retrieval analytics and feedback loop with a dedicated query analytics dashboard, operator-facing feedback review or moderation flows, and reusable quality views so search quality can be monitored and corrected without inspecting raw per-query payloads.",
+      "status": "done",
+      "base_priority": 75,
+      "dynamic_priority_delta": 35,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T17:02:13+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-query-analytics-feedback-loop"
+      ],
+      "direction_relation_note": "Completed on main in commit 44b5907 with dedicated scheduler query analytics dashboard routes and control-room surfaces, moderation-gated feedback status plus moderator metadata persistence, moderation queue actions, and learned tuning restricted to approved feedback.",
+      "priority_reason": "Closed after backend and control-room workflow wiring, targeted pytest coverage, compileall verification, web typecheck/build, docs alignment, commit, and push all landed; the latest main-session reply now leaves longer-horizon search-quality dashboarding or moderation governance plus heavier offline reranker infrastructure as the explicit follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-quality-governance-dashboard",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add long-horizon scheduler search quality dashboard and moderation governance layer",
+      "description": "Extend the new query analytics dashboard and moderation queue into a longer-horizon quality operations surface with trend views, governance states, and policy-oriented moderation workflows so scheduler search quality can be reviewed and governed over time instead of only through immediate query rollups.",
+      "status": "ready",
+      "base_priority": 74,
+      "dynamic_priority_delta": 36,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T17:02:13+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-analytics-dashboard-feedback-moderation"
+      ],
+      "direction_relation_note": "The latest main-session reply says the shipped moderation-gated analytics layer still lacks a separate long-horizon quality dashboard or moderation governance layer, making this the clearest immediately executable operator-facing continuation.",
+      "priority_reason": "Promoted to ready because builtin next-task should continue with the remaining operator-visible quality and governance gap before shifting into heavier offline reranker infrastructure."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-offline-reranker-infrastructure",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add offline evaluation and learned reranker infrastructure for scheduler retrieval",
+      "description": "Extend the new feedback-driven heuristic tuning into heavier relevance infrastructure by adding offline evaluation datasets, replayable ranking experiments, and a learned reranker path so scheduler search quality can improve beyond online heuristics and manually reviewed feedback loops.",
+      "status": "proposed",
+      "base_priority": 72,
+      "dynamic_priority_delta": 21,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T17:02:13+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-analytics-dashboard-feedback-moderation"
+      ],
+      "direction_relation_note": "The latest main-session reply keeps offline or learned reranker infrastructure as a heavier follow-up after moderation-gated feedback, analytics dashboarding, and operator review flows shipped, so it should build on the approved-feedback baseline rather than the earlier raw feedback loop.",
+      "priority_reason": "This remains a valid next-stage retrieval-quality investment, but it stays proposed behind the more immediate long-horizon quality dashboard and moderation governance continuation so builtin next-task advances through the lighter operator-facing gap first."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
