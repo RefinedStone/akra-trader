@@ -1,6 +1,6 @@
 # Epic Backlog
 
-This backlog starts from the repository state as of April 21, 2026.
+This backlog starts from the repository state as of April 22, 2026.
 
 ## Epic 1: Deterministic Research Hardening
 
@@ -16,12 +16,15 @@ Goal:
 Current baseline:
 
 - dataset fingerprints, sync-checkpoint linkage, and rerun boundaries already exist
+- canonical dataset-boundary contracts, claim-aware rerun validation categories, lineage mismatch
+  taxonomy, and ingestion-job history surfaces are now in place
 
 Acceptance criteria:
 
 - repeated identical inputs can be validated against the same data boundary
 - lineage mismatch reasons are explicit when deterministic claims fail
-- operators can inspect data-boundary health without shell access
+- operators can inspect data-boundary health without shell access and follow explicit escalation
+  guidance
 
 ## Epic 2: Durable Strategy Registry And Promotion Workflow
 
@@ -120,6 +123,7 @@ Current baseline:
 
 - kill switch, reconciliation, recovery, incidents, delivery history, and venue-backed launch gates
   already exist
+- reconciliation and kill-switch drill baselines are now documented
 
 Acceptance criteria:
 
@@ -139,8 +143,8 @@ Goal:
 
 Current baseline:
 
-- the product already exposes many operational surfaces, but deployment/runbook discipline is still
-  light
+- baseline runbooks and release/docs checklist now exist, but deployment, backup, credential, and
+  full UX-validation discipline are still light
 
 Acceptance criteria:
 

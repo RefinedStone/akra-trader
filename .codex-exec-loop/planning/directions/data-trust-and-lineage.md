@@ -7,18 +7,20 @@
 Harden the data plane so every run points to a stable dataset boundary, market-data freshness and
 failures are operator-visible, and crypto-first ingestion can expand without weakening provenance.
 
-## Current status on April 21, 2026
+## Current status on April 22, 2026
 
-- dataset fingerprints, sync-checkpoint linkage, and rerun boundaries already exist
+- deterministic dataset-boundary contracts, claim-aware rerun validation categories, lineage
+  mismatch taxonomy, and operator-visible summaries are already implemented
+- ingestion-job history plus normalized lineage query surfaces already exist for operator review
 - market-data status already exposes freshness, gaps, backfill, lag, and failure history
-- the remaining work is about deterministic claims, mismatch interpretation, and normalized lineage
-  surfaces rather than first-time implementation
+- the remaining work is operator guidance, retention, escalation, and drill discipline on top of
+  that baseline rather than first-time implementation
 
 ## Immediate gaps
 
-- stronger deterministic rerun validation
-- lineage mismatch classification
-- ingestion-job history and normalized lineage queries
+- operator-facing lineage action guidance and escalation rules
+- retention policy for lineage-history and ingestion-job review
+- drill and runbook validation for data-boundary incidents
 
 ## Linked docs
 

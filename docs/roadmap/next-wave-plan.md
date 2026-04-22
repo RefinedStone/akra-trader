@@ -1,6 +1,6 @@
 # Next Wave Plan
 
-Planning horizon: April 21, 2026 through the next 60-90 days.
+Planning horizon: April 22, 2026 through the next 60-90 days.
 
 This plan assumes the documentation reset in `status`, `roadmap`, and `blueprint` is the starting
 point rather than a future task.
@@ -9,8 +9,8 @@ point rather than a future task.
 
 Status:
 
-- materially complete, with architecture reset docs now added for backend, frontend, and staged
-  execution
+- materially complete, with architecture reset docs, runbook baseline, and directions board now in
+  place
 
 Goal:
 
@@ -20,6 +20,7 @@ Exit criteria:
 
 - README, status, roadmap, blueprint, and directions no longer disagree on current progress
 - sandbox, worker, and guarded-live terms are used consistently
+- completed work is compacted instead of accumulating as an unbounded bullet log
 
 Completed baseline now in place:
 
@@ -27,8 +28,15 @@ Completed baseline now in place:
 - ports are split under `port_contracts/*` with compatibility re-exports
 - frontend workspace routing and shell composition moved under `apps/web/src/app/*`
 - incident-delivery dispatch now uses a registry layer instead of only large condition chains
+- baseline runbooks and release-time documentation checklist now exist under `docs/operations/*`
 
-## Wave 1: Deterministic Research Baseline
+## Wave 1: Deterministic Research Closure
+
+Status:
+
+- materially complete
+- remaining work is now operator-facing lineage guidance, retention, and escalation policy on top
+  of the deterministic baseline
 
 Target window:
 
@@ -36,24 +44,35 @@ Target window:
 
 Primary outcomes:
 
-- tighten dataset identity and rerun validation
-- make lineage mismatch posture explicit
-- expose clearer research-grade data-boundary health
+- close the operator workflow gap around already-implemented dataset boundaries
+- make deterministic lineage review an explicit discipline instead of a raw data surface
 
 Detailed work:
 
-- define the canonical dataset-identity contract used in run provenance and rerun checks
-- document and implement lineage mismatch categories
-- add operator-visible lineage mismatch and determinism summaries where current provenance is too raw
-- clarify which rerun paths are exact-match claims versus drift-aware replays
+- bind lineage mismatch interpretation to explicit operator guidance and escalation rules
+- add retention and drill expectations for lineage-history and ingestion-job review
+- tighten product language around exact-match claims versus drift-aware replay paths
 
 Acceptance criteria:
 
 - identical strategy/version/params/data inputs can be validated against one stable boundary
 - mismatches are categorized instead of collapsing into generic drift
-- roadmap and current-state can claim deterministic posture without ambiguity
+- operator-visible lineage review is tied to retention and escalation rules instead of raw tables
+
+Completed baseline now in place:
+
+- canonical dataset-boundary contracts in run provenance
+- claim-aware rerun validation categories for exact-match, checkpoint, window-only, delegated, and
+  mode-translation results
+- lineage mismatch taxonomy and operator-visible summaries
+- ingestion-job history plus normalized lineage query surfaces
+- focused runtime triage against the selected instrument's lineage history
 
 ## Wave 2: Durable Strategy Registry And Experiment OS Completion
+
+Status:
+
+- current primary delivery focus
 
 Target window:
 
@@ -115,20 +134,20 @@ Detailed work:
 
 - define supported venue-lifecycle recovery scope per venue
 - clarify cancel, replace, and future amend/order-management posture
-- document reconciliation drill, kill-switch drill, and live candidacy checklist
+- validate reconciliation and kill-switch drills against product UX and live candidacy gates
 - define deployment and secret-governance expectations for guarded-live operation
 
 Acceptance criteria:
 
 - guarded-live scope is described by explicit readiness rules rather than inferred from code
-- operators have documented drills for reconciliation and emergency stop
+- operators have documented and validated drills for reconciliation and emergency stop
 - remaining live gaps are reduced to clear, bounded items instead of broad ambiguity
 
 ## Parallel Foundation: Runbooks And Operator Discipline
 
 This work runs in parallel with Waves 1-4.
 
-Required outputs:
+Baseline already in place:
 
 - daily operations checklist
 - data incident response checklist
@@ -136,6 +155,12 @@ Required outputs:
 - guarded-live reconciliation drill
 - kill-switch procedure
 - release-time documentation checklist
+
+Remaining outputs:
+
+- deployment and backup runbooks
+- secret rotation and credential-governance procedure
+- evidence that product UX fully covers the documented operator workflows without shell fallback
 
 ## Explicit Non-Goals For This Horizon
 

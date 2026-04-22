@@ -39,6 +39,9 @@ Status:
 - `Now`
 - overall state: `Partial`
 - directions: `data-trust-and-lineage`, `experiment-os`
+- note: deterministic dataset-boundary contracts, rerun validation categories, lineage mismatch
+  taxonomy, and ingestion-history query surfaces are now in place; the remaining gate is operator
+  guidance plus Experiment OS durability
 
 Why first:
 
@@ -47,17 +50,17 @@ Why first:
 
 Unfinished work:
 
-1. define one canonical dataset-boundary contract for rerun validation
-2. classify lineage mismatches instead of collapsing them into generic drift
-3. add ingestion-job history and normalized lineage query surfaces
-4. move custom strategy registration into a durable registry with lifecycle and promotion state
-5. add normalized experiment summary, artifact registry, and export registry paths
-6. make benchmark-pack and promotion-review artifacts first-class instead of loose payloads
+1. deepen operator-facing lineage mismatch guidance plus retention and escalation policy
+2. move custom strategy registration into a durable registry with lifecycle and promotion state
+3. wire durable strategy lifecycle and promotion records into query filters
+4. add normalized experiment summary, artifact registry, and export registry paths
+5. make benchmark-pack and promotion-review artifacts first-class instead of loose payloads
 
 Exit evidence:
 
 - `Gate 1: Research OS Gate` can pass
-- repeated identical runs can defend one stable dataset boundary
+- repeated identical runs can defend one stable dataset boundary and mismatch posture
+- lineage-health review paths have explicit operator guidance plus retention/escalation rules
 - strategy registrations survive restart and remain queryable in control-room filters
 - common experiment queries no longer depend on payload-heavy scans for normal usage
 
@@ -75,6 +78,8 @@ Status:
 - overall state: `Partial`
 - directions: `runtime-ops`, `operator-trust-and-discipline`
 - depends on: `Batch 1`
+- note: the runbook baseline exists now; the remaining gap is productizing those workflows into the
+  control room
 
 Why second:
 
@@ -119,8 +124,9 @@ Unfinished work:
 1. define supported venue lifecycle recovery scope and limits per venue
 2. formalize the live candidacy checklist and blocking rules
 3. broaden order-management posture beyond cancel and replace
-4. package reconciliation drills, kill-switch drills, and deployment or credential discipline
-5. enforce audit and operator-event capture across every live-affecting action
+4. validate reconciliation and kill-switch drills against product UX, then add deployment and
+   credential discipline
+5. close remaining audit and operator-event gaps across every live-affecting action
 
 Exit evidence:
 
@@ -170,19 +176,19 @@ Do not expand here yet:
 
 These are the highest-value slices that can start now without violating the gate order:
 
-1. dataset-boundary contract plus rerun validation categories
-2. lineage mismatch taxonomy plus operator-visible summary surface
-3. durable strategy registry schema and repository contract
-4. strategy lifecycle and promotion records wired into query filters
-5. experiment summary, artifact, and export registry model
+1. durable strategy registry schema and repository contract
+2. strategy lifecycle and promotion records wired into query filters
+3. experiment summary, artifact, and export registry model
+4. benchmark-pack and promotion-review artifact model
+5. lineage-health action guidance with retention and escalation rules
 
 These should follow immediately after the queue above:
 
 1. active-session vocabulary split across API and control-room surfaces
 2. runtime health panels for positions, fills, lag, and recent decisions
 3. runbook-linked action guidance for stop, recover, acknowledge, and escalate flows
-4. live candidacy checklist plus reconciliation and kill-switch drill packaging
-5. deployment and credential governance for guarded-live operation
+4. live candidacy checklist plus drill validation
+5. venue lifecycle recovery scope plus deployment and credential governance
 
 ## Cross-Cutting Discipline
 

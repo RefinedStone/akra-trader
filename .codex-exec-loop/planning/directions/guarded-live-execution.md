@@ -8,11 +8,13 @@ Make live candidacy a gated safety program, not an execution shortcut, by requir
 operator events, risk controls, kill switch behavior, and reconciliation before any venue-backed
 live path is treated as operationally ready.
 
-## Current status on April 21, 2026
+## Current status on April 22, 2026
 
 - kill switch, reconciliation, recovery, incidents, delivery history, and venue-backed launch gates
   already exist
-- the remaining work is completeness of venue lifecycle, drills, and operational discipline
+- reconciliation and kill-switch drill baselines are now documented under `docs/operations/*`
+- the remaining work is completeness of venue lifecycle, candidacy rules, drills, and deployment
+  discipline
 
 ## Immediate gaps
 
@@ -20,6 +22,7 @@ live path is treated as operationally ready.
 - clearer guarded-live drill and candidacy rules
 - deployment and credential discipline
 - fuller order-management posture beyond the current baseline
+- close remaining audit and operator-event gaps across live-affecting actions
 
 ## Linked docs
 

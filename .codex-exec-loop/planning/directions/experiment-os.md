@@ -8,19 +8,21 @@ Turn run history into a durable experiment operating system with strategy lifecy
 benchmark packs, and queryable metadata that support promotion decisions instead of one-off
 inspection.
 
-## Current status on April 21, 2026
+## Current status on April 22, 2026
 
 - presets, preset lifecycle, revisions, comparison, rerun boundaries, and richer query/filter
   contracts already exist
-- the remaining work is centered on durable custom strategy registration, normalized experiment
-  storage, and promotion workflow completion
+- strategy metadata and lifecycle hints already flow through the query/filter surfaces, but custom
+  registration is still not durable
+- this direction is now the main remaining blocker inside `Batch 1`
 
 ## Immediate gaps
 
 - durable custom strategy registry
+- normalized experiment summaries for common query paths
 - promotion/lifecycle workflow durability
 - artifact and export registry
-- normalized experiment summaries for common query paths
+- benchmark-pack and promotion-review model
 
 ## Linked docs
 

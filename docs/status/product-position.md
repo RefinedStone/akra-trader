@@ -1,6 +1,6 @@
 # Product Position
 
-Updated for the repository state as of April 21, 2026.
+Updated for the repository state as of April 22, 2026.
 
 ## What This Product Is
 
@@ -44,8 +44,9 @@ registration, and normalized experiment storage still need completion.
 
 Partial but real.
 
-Sandbox workers, heartbeat, recovery, and operator alerts exist. The remaining work is less about
-whether the runtime exists and more about making daily operation clearer and less fragile.
+Sandbox workers, heartbeat, recovery, operator alerts, and the baseline runbook set exist. The
+remaining work is less about whether the runtime exists and more about making daily operation
+clearer and less fragile.
 
 ### Guarded Live
 
@@ -76,7 +77,8 @@ One operator still cannot safely rely on the product alone for:
 
 - durable custom strategy promotion workflows
 - production-grade live venue lifecycle management
-- fully documented day-2 operations and incident response
+- deployment, backup, and credential governance
+- validated drill coverage across every product workflow
 - LLM-assisted strategy research with replay and fallback guarantees
 
 ## Document Contract

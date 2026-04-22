@@ -1,6 +1,6 @@
 # Roadmap
 
-This folder describes the remaining work after the repository state captured on April 21, 2026.
+This folder describes the remaining work after the repository state captured on April 22, 2026.
 
 Use [Current State](../status/current-state.md) first. The roadmap starts from that baseline and
 describes what still needs to be finished, hardened, or productized.
@@ -10,6 +10,8 @@ describes what still needs to be finished, hardened, or productized.
 What is already materially present:
 
 - durable native research runs with provenance and rerun boundaries
+- canonical dataset-boundary contracts, claim-aware rerun validation, and lineage-history query
+  surfaces
 - experiment presets, query/filter surfaces, and native-vs-reference comparison
 - sandbox worker sessions with heartbeat and restart recovery
 - guarded-live control surfaces with kill switch, reconciliation, recovery, incidents, and venue
@@ -18,7 +20,8 @@ What is already materially present:
 
 What still defines the roadmap:
 
-- deterministic research hardening around dataset identity and rerun claims
+- operator-facing lineage guidance, retention, and escalation on top of the deterministic research
+  baseline
 - durable strategy registry and promotion workflow
 - normalized experiment query, artifact, and export posture
 - control-room productization and operator workflow clarity

@@ -1,6 +1,6 @@
 # Runbooks Overview
 
-Updated for the repository state as of April 21, 2026.
+Updated for the repository state as of April 22, 2026.
 
 This folder is the entry point for day-2 operator discipline. The current repository has many
 runtime and guarded-live features, but its runbook coverage is still incomplete. This document

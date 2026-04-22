@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Rebased to the repository state as of April 21, 2026.
+Rebased to the repository state as of April 22, 2026.
 
 ## Objective
 
@@ -31,13 +31,16 @@ The main product gaps are no longer "does the feature exist" but rather:
 ### Current baseline
 
 - dataset identity, sync-checkpoint linkage, and rerun boundaries already exist
+- deterministic dataset-boundary contracts, claim-aware rerun validation categories, and lineage
+  mismatch taxonomy are already implemented
+- ingestion-job history plus normalized lineage query surfaces are already available to operators
 - native vs reference comparison is already a normal workflow
 - presets, preset lifecycle, revisions, and restore flows already exist
 - run and strategy query/filter surfaces are richer than a simple history list
 
 ### Still missing
 
-- deterministic proof posture for repeated identical inputs
+- operator-facing lineage action guidance, retention, and escalation policy
 - durable custom strategy registration and promotion lifecycle
 - normalized experiment summaries, artifact retrieval, and export posture
 - clearer benchmark-pack and promotion review workflow
@@ -54,6 +57,7 @@ The main product gaps are no longer "does the feature exist" but rather:
   guarded-live panels
 - sandbox workers already have heartbeat and recovery semantics
 - operator visibility already captures worker failures, stale runtime, and guarded-live history
+- route-aware shell boundaries and a baseline runbook set already exist
 
 ### Still missing
 
@@ -75,6 +79,7 @@ to do next without leaving the control room.
   already implemented
 - live order cancel and replace controls already exist
 - partial multi-venue continuation and venue-session handoff baseline already exists
+- reconciliation and kill-switch drill baselines are now documented under `docs/operations/*`
 
 ### Still missing
 
@@ -113,7 +118,7 @@ features.
 
 The next meaningful product checkpoint should satisfy these conditions:
 
-- repeated runs can be defended against a stable data boundary
+- lineage review is defended by explicit operator guidance and retention policy
 - experiment lifecycle is durable enough for promotion decisions
 - active sandbox operation is clearer than replay preview semantics
 - guarded-live readiness is explained by product gates, not hidden implementation detail

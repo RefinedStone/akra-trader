@@ -7,9 +7,12 @@
 Convert the existing sandbox worker substrate into clear continuous runtime operations with one
 control room that reflects real active execution rather than only previews and history.
 
-## Current status on April 21, 2026
+## Current status on April 22, 2026
 
-- sandbox workers, heartbeat, restart recovery, and stale-runtime visibility already exist
+- sandbox workers, heartbeat, restart recovery, stale-runtime visibility, and separate paper-mode
+  history already exist
+- the control room now has route-aware shell boundaries and focused lineage/ingestion triage during
+  runtime incidents
 - the remaining work is productization of active-session workflows, not first-time worker creation
 
 ## Immediate gaps
@@ -17,6 +20,7 @@ control room that reflects real active execution rather than only previews and h
 - active-session-first UX
 - clearer lag, positions, fills, and recent-decision surfaces
 - simpler operator guidance around runtime actions and stop rules
+- further control-room decomposition away from dense feature-local state
 
 ## Linked docs
 

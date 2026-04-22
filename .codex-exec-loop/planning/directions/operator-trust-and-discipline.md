@@ -8,18 +8,21 @@ Make the control room, alerts, operator events, runbooks, and documentation stro
 single-operator daily use, incident response, and promotion decisions without depending on shell
 knowledge or drifting docs.
 
-## Current status on April 21, 2026
+## Current status on April 22, 2026
 
-- the product already exposes meaningful alerts, incidents, reconciliation, and audit-oriented
-  control surfaces
-- the remaining gap is clarity, runbook discipline, and documentation alignment rather than absence
-  of any operator substrate
+- the product already exposes meaningful alerts, incidents, reconciliation, audit-oriented control
+  surfaces, and a baseline runbook package
+- release-time documentation checklist and directions execution board now exist to keep status and
+  roadmap docs aligned
+- the remaining gap is active-session clarity, runbook-linked actionability, and operational
+  discipline rather than absence of any operator substrate
 
 ## Immediate gaps
 
 - active-session-first control-room clarity
-- runbook coverage for daily work and incidents
-- release-time documentation discipline
+- runbook-linked action guidance in product surfaces
+- deployment, backup, and credential runbooks
+- keep completed work compacted across status, roadmap, and directions docs
 
 ## Linked docs
 
