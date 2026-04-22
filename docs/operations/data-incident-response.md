@@ -111,6 +111,9 @@ unclear dataset lineage.
   governance, and shared team audit workflow, so the reusable cross-catalog step library can be
   cleaned up, recovered, and attributed without re-exporting the same hierarchy step from a live
   catalog
+- those same reusable hierarchy-step templates now also store queue policy defaults and can stage
+  approval-queue plans directly, so a reviewed cross-catalog step can reopen with the intended
+  lane, priority, and policy provenance instead of relying on manual queue reconfiguration
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

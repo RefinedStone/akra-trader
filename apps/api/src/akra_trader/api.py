@@ -491,6 +491,10 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplat
   step: OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRequest | None = None
   origin_catalog_id: str | None = None
   origin_step_id: str | None = None
+  governance_policy_template_id: str | None = None
+  governance_policy_catalog_id: str | None = None
+  governance_approval_lane: str | None = None
+  governance_approval_priority: str | None = None
   created_by_tab_id: str | None = None
   created_by_tab_label: str | None = None
 
@@ -502,6 +506,14 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplat
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
   reason: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateStageRequest(
+  BaseModel
+):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_hierarchy_step_template_staged"
 
 
 class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateUpdateRequest(
@@ -517,6 +529,10 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplat
   layout_patch: dict[str, Any] | None = None
   template_id: str | None = None
   clear_template_link: bool | None = None
+  governance_policy_template_id: str | None = None
+  governance_policy_catalog_id: str | None = None
+  governance_approval_lane: str | None = None
+  governance_approval_priority: str | None = None
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
   reason: str = "scheduler_narrative_governance_hierarchy_step_template_updated"
@@ -761,6 +777,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply": (
     OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateApplyRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateStageRequest,
     {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage": (

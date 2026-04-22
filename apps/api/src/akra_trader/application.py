@@ -4690,6 +4690,13 @@ class TradingApplication:
       origin_catalog_id=record.origin_catalog_id,
       origin_catalog_name=record.origin_catalog_name,
       origin_step_id=record.origin_step_id,
+      governance_policy_template_id=record.governance_policy_template_id,
+      governance_policy_template_name=record.governance_policy_template_name,
+      governance_policy_catalog_id=record.governance_policy_catalog_id,
+      governance_policy_catalog_name=record.governance_policy_catalog_name,
+      governance_approval_lane=record.governance_approval_lane,
+      governance_approval_priority=record.governance_approval_priority,
+      governance_policy_guidance=record.governance_policy_guidance,
       status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
       recorded_at=recorded_at,
       source_revision_id=source_revision_id,
@@ -4715,14 +4722,21 @@ class TradingApplication:
       record.step
     )
     origin = record.origin_catalog_name or "ad hoc source"
+    policy = (
+      record.governance_policy_template_name
+      or record.governance_policy_catalog_name
+      or f"{record.governance_approval_lane}/{record.governance_approval_priority}"
+    )
     if action == "created":
-      return f"Created hierarchy step template {record.name} from {origin}. {summary}"
+      return f"Created hierarchy step template {record.name} from {origin} on {policy}. {summary}"
     if action == "updated":
-      return f"Updated hierarchy step template {record.name}. {summary}"
+      return f"Updated hierarchy step template {record.name} on {policy}. {summary}"
     if action == "deleted":
       return f"Deleted hierarchy step template {record.name}."
     if action == "restored":
-      return f"Restored hierarchy step template {record.name}. {summary}"
+      return f"Restored hierarchy step template {record.name} on {policy}. {summary}"
+    if action == "staged":
+      return f"Staged hierarchy step template {record.name} into the approval queue on {policy}. {summary}"
     return f"Recorded hierarchy step template action {action} for {record.name}. {summary}"
 
   def _record_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
@@ -4774,6 +4788,13 @@ class TradingApplication:
         origin_catalog_id=updated.origin_catalog_id,
         origin_catalog_name=updated.origin_catalog_name,
         origin_step_id=updated.origin_step_id,
+        governance_policy_template_id=updated.governance_policy_template_id,
+        governance_policy_template_name=updated.governance_policy_template_name,
+        governance_policy_catalog_id=updated.governance_policy_catalog_id,
+        governance_policy_catalog_name=updated.governance_policy_catalog_name,
+        governance_approval_lane=updated.governance_approval_lane,
+        governance_approval_priority=updated.governance_approval_priority,
+        governance_policy_guidance=updated.governance_policy_guidance,
         status=updated.status,
         actor_tab_id=revision.recorded_by_tab_id,
         actor_tab_label=revision.recorded_by_tab_label,
@@ -8259,6 +8280,10 @@ class TradingApplication:
     step: dict[str, Any] | None = None,
     origin_catalog_id: str | None = None,
     origin_step_id: str | None = None,
+    governance_policy_template_id: str | None = None,
+    governance_policy_catalog_id: str | None = None,
+    governance_approval_lane: str | None = None,
+    governance_approval_priority: str | None = None,
     created_by_tab_id: str | None = None,
     created_by_tab_label: str | None = None,
   ) -> ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord:
@@ -8303,6 +8328,20 @@ class TradingApplication:
     resolved_step = self._normalize_provider_provenance_scheduler_narrative_governance_plan_hierarchy_steps(
       (raw_step_payload,)
     )[0]
+    (
+      resolved_policy_catalog,
+      resolved_policy_template,
+      resolved_approval_lane,
+      resolved_approval_priority,
+      resolved_policy_guidance,
+    ) = self._resolve_provider_provenance_scheduler_narrative_governance_policy_layer(
+      item_type=resolved_step.item_type,
+      action=resolved_step.action,
+      policy_catalog_id=governance_policy_catalog_id,
+      policy_template_id=governance_policy_template_id,
+      approval_lane=governance_approval_lane,
+      approval_priority=governance_approval_priority,
+    )
     now = self._clock()
     return self._record_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
       record=ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord(
@@ -8319,6 +8358,17 @@ class TradingApplication:
         origin_catalog_id=resolved_origin_catalog.catalog_id if resolved_origin_catalog is not None else None,
         origin_catalog_name=resolved_origin_catalog.name if resolved_origin_catalog is not None else None,
         origin_step_id=resolved_source_step.step_id if resolved_source_step is not None else None,
+        governance_policy_template_id=(
+          resolved_policy_template.policy_template_id if resolved_policy_template is not None else None
+        ),
+        governance_policy_template_name=resolved_policy_template.name if resolved_policy_template is not None else None,
+        governance_policy_catalog_id=(
+          resolved_policy_catalog.catalog_id if resolved_policy_catalog is not None else None
+        ),
+        governance_policy_catalog_name=resolved_policy_catalog.name if resolved_policy_catalog is not None else None,
+        governance_approval_lane=resolved_approval_lane,
+        governance_approval_priority=resolved_approval_priority,
+        governance_policy_guidance=resolved_policy_guidance,
         status="active",
         created_at=now,
         updated_at=now,
@@ -8368,6 +8418,13 @@ class TradingApplication:
           record.origin_catalog_id,
           record.origin_catalog_name,
           record.origin_step_id,
+          record.governance_policy_template_id,
+          record.governance_policy_template_name,
+          record.governance_policy_catalog_id,
+          record.governance_policy_catalog_name,
+          record.governance_approval_lane,
+          record.governance_approval_priority,
+          record.governance_policy_guidance,
           record.created_by_tab_id,
           record.created_by_tab_label,
           record.step.source_template_id,
@@ -8417,6 +8474,10 @@ class TradingApplication:
     layout_patch: dict[str, Any] | None = None,
     template_id: str | None = None,
     clear_template_link: bool | None = None,
+    governance_policy_template_id: str | None = None,
+    governance_policy_catalog_id: str | None = None,
+    governance_approval_lane: str | None = None,
+    governance_approval_priority: str | None = None,
     actor_tab_id: str | None = None,
     actor_tab_label: str | None = None,
     reason: str = "scheduler_narrative_governance_hierarchy_step_template_updated",
@@ -8465,10 +8526,49 @@ class TradingApplication:
       source_template_id=None,
       source_template_name=None,
     )
+    (
+      resolved_policy_catalog,
+      resolved_policy_template,
+      resolved_approval_lane,
+      resolved_approval_priority,
+      resolved_policy_guidance,
+    ) = self._resolve_provider_provenance_scheduler_narrative_governance_policy_layer(
+      item_type=updated_step.item_type,
+      action=updated_step.action,
+      policy_catalog_id=(
+        governance_policy_catalog_id
+        if governance_policy_catalog_id is not None
+        else current.governance_policy_catalog_id
+      ),
+      policy_template_id=(
+        governance_policy_template_id
+        if governance_policy_template_id is not None
+        else current.governance_policy_template_id
+      ),
+      approval_lane=(
+        governance_approval_lane
+        if governance_approval_lane is not None
+        else current.governance_approval_lane
+      ),
+      approval_priority=(
+        governance_approval_priority
+        if governance_approval_priority is not None
+        else current.governance_approval_priority
+      ),
+    )
     if (
       updated_name == current.name
       and updated_description == current.description
       and updated_step == current.step
+      and (
+        resolved_policy_template.policy_template_id if resolved_policy_template is not None else None
+      ) == current.governance_policy_template_id
+      and (
+        resolved_policy_catalog.catalog_id if resolved_policy_catalog is not None else None
+      ) == current.governance_policy_catalog_id
+      and resolved_approval_lane == current.governance_approval_lane
+      and resolved_approval_priority == current.governance_approval_priority
+      and resolved_policy_guidance == current.governance_policy_guidance
     ):
       return current
     updated = replace(
@@ -8477,6 +8577,17 @@ class TradingApplication:
       description=updated_description,
       item_type=updated_step.item_type,
       step=updated_step,
+      governance_policy_template_id=(
+        resolved_policy_template.policy_template_id if resolved_policy_template is not None else None
+      ),
+      governance_policy_template_name=resolved_policy_template.name if resolved_policy_template is not None else None,
+      governance_policy_catalog_id=(
+        resolved_policy_catalog.catalog_id if resolved_policy_catalog is not None else None
+      ),
+      governance_policy_catalog_name=resolved_policy_catalog.name if resolved_policy_catalog is not None else None,
+      governance_approval_lane=resolved_approval_lane,
+      governance_approval_priority=resolved_approval_priority,
+      governance_policy_guidance=resolved_policy_guidance,
       updated_at=self._clock(),
     )
     return self._record_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
@@ -8660,6 +8771,87 @@ class TradingApplication:
         )
       )
     return tuple(filtered[:normalized_limit])
+
+  def stage_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+    self,
+    hierarchy_step_template_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_narrative_governance_hierarchy_step_template_staged",
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    current = self.get_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+      hierarchy_step_template_id
+    )
+    if current.status == "deleted":
+      raise RuntimeError(
+        "Restore the hierarchy step template before staging approval queue plans."
+      )
+    resolved_reason = reason.strip() if isinstance(reason, str) and reason.strip() else (
+      "scheduler_narrative_governance_hierarchy_step_template_staged"
+    )
+    plan = self.create_provider_provenance_scheduler_narrative_governance_plan(
+      item_type=current.item_type,
+      item_ids=current.step.item_ids,
+      action=current.step.action,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
+      reason=resolved_reason,
+      name_prefix=current.step.name_prefix,
+      name_suffix=current.step.name_suffix,
+      description_append=current.step.description_append,
+      query_patch=current.step.query_patch,
+      layout_patch=current.step.layout_patch,
+      template_id=current.step.template_id,
+      clear_template_link=current.step.clear_template_link,
+      policy_template_id=current.governance_policy_template_id,
+      policy_catalog_id=current.governance_policy_catalog_id,
+      approval_lane=current.governance_approval_lane,
+      approval_priority=current.governance_approval_priority,
+      source_hierarchy_step_template_id=current.hierarchy_step_template_id,
+      source_hierarchy_step_template_name=current.name,
+    )
+    recorded_at = self._clock()
+    self._save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_record(
+      ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord(
+        audit_id=f"{current.hierarchy_step_template_id}:{plan.plan_id}:staged",
+        hierarchy_step_template_id=current.hierarchy_step_template_id,
+        action="staged",
+        recorded_at=recorded_at,
+        reason=resolved_reason,
+        detail=(
+          f"Staged hierarchy step template {current.name} into the approval queue as plan "
+          f"{plan.plan_id}. "
+          f"{self._build_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_detail(record=current, action='staged')}"
+        ),
+        name=current.name,
+        description=current.description,
+        item_type=current.item_type,
+        step=current.step,
+        origin_catalog_id=current.origin_catalog_id,
+        origin_catalog_name=current.origin_catalog_name,
+        origin_step_id=current.origin_step_id,
+        governance_policy_template_id=current.governance_policy_template_id,
+        governance_policy_template_name=current.governance_policy_template_name,
+        governance_policy_catalog_id=current.governance_policy_catalog_id,
+        governance_policy_catalog_name=current.governance_policy_catalog_name,
+        governance_approval_lane=current.governance_approval_lane,
+        governance_approval_priority=current.governance_approval_priority,
+        governance_policy_guidance=current.governance_policy_guidance,
+        status=current.status,
+        actor_tab_id=(
+          actor_tab_id.strip()
+          if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+          else None
+        ),
+        actor_tab_label=(
+          actor_tab_label.strip()
+          if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+          else None
+        ),
+      )
+    )
+    return plan
 
   def _find_latest_active_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
     self,
@@ -9453,6 +9645,102 @@ class TradingApplication:
         return revision
     return None
 
+  def _resolve_provider_provenance_scheduler_narrative_governance_policy_layer(
+    self,
+    *,
+    item_type: str,
+    action: str,
+    policy_catalog_id: str | None = None,
+    policy_template_id: str | None = None,
+    approval_lane: str | None = None,
+    approval_priority: str | None = None,
+  ) -> tuple[
+    ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord | None,
+    ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord | None,
+    str,
+    str,
+    str | None,
+  ]:
+    resolved_policy_catalog = (
+      self.get_provider_provenance_scheduler_narrative_governance_policy_catalog(policy_catalog_id)
+      if isinstance(policy_catalog_id, str) and policy_catalog_id.strip()
+      else None
+    )
+    if resolved_policy_catalog is not None:
+      if resolved_policy_catalog.status != "active":
+        raise ValueError("Selected scheduler governance policy catalog must be active.")
+      if resolved_policy_catalog.item_type_scope not in {"any", item_type}:
+        raise ValueError("Selected scheduler governance policy catalog does not support this item type.")
+      if resolved_policy_catalog.action_scope not in {"any", action}:
+        raise ValueError("Selected scheduler governance policy catalog does not support this action.")
+    explicit_policy_template_id = (
+      policy_template_id.strip()
+      if isinstance(policy_template_id, str) and policy_template_id.strip()
+      else None
+    )
+    resolved_policy_template = (
+      self.get_provider_provenance_scheduler_narrative_governance_policy_template(
+        explicit_policy_template_id
+        if explicit_policy_template_id is not None
+        else (
+          resolved_policy_catalog.default_policy_template_id
+          if resolved_policy_catalog is not None and resolved_policy_catalog.default_policy_template_id
+          else ""
+        )
+      )
+      if explicit_policy_template_id is not None or (
+        resolved_policy_catalog is not None
+        and resolved_policy_catalog.default_policy_template_id is not None
+      )
+      else None
+    )
+    if resolved_policy_template is not None:
+      if resolved_policy_template.status != "active":
+        raise ValueError("Selected scheduler governance policy template must be active.")
+      if (
+        resolved_policy_catalog is not None
+        and resolved_policy_template.policy_template_id not in resolved_policy_catalog.policy_template_ids
+      ):
+        raise ValueError("Selected scheduler governance policy template is not linked to the chosen policy catalog.")
+      if resolved_policy_template.item_type_scope not in {"any", item_type}:
+        raise ValueError("Selected scheduler governance policy template does not support this item type.")
+      if resolved_policy_template.action_scope not in {"any", action}:
+        raise ValueError("Selected scheduler governance policy template does not support this action.")
+    resolved_approval_lane = self._normalize_provider_provenance_scheduler_narrative_governance_approval_lane(
+      (
+        approval_lane
+        if isinstance(approval_lane, str) and approval_lane.strip()
+        else (
+          resolved_policy_template.approval_lane
+          if resolved_policy_template is not None
+          else resolved_policy_catalog.approval_lane if resolved_policy_catalog is not None else None
+        )
+      )
+    )
+    resolved_approval_priority = self._normalize_provider_provenance_scheduler_narrative_governance_approval_priority(
+      (
+        approval_priority
+        if isinstance(approval_priority, str) and approval_priority.strip()
+        else (
+          resolved_policy_template.approval_priority
+          if resolved_policy_template is not None
+          else resolved_policy_catalog.approval_priority if resolved_policy_catalog is not None else None
+        )
+      )
+    )
+    resolved_policy_guidance = (
+      resolved_policy_template.guidance
+      if resolved_policy_template is not None
+      else resolved_policy_catalog.guidance if resolved_policy_catalog is not None else None
+    )
+    return (
+      resolved_policy_catalog,
+      resolved_policy_template,
+      resolved_approval_lane,
+      resolved_approval_priority,
+      resolved_policy_guidance,
+    )
+
   def create_provider_provenance_scheduler_narrative_governance_plan(
     self,
     *,
@@ -9473,6 +9761,8 @@ class TradingApplication:
     policy_catalog_id: str | None = None,
     approval_lane: str | None = None,
     approval_priority: str | None = None,
+    source_hierarchy_step_template_id: str | None = None,
+    source_hierarchy_step_template_name: str | None = None,
     hierarchy_key: str | None = None,
     hierarchy_name: str | None = None,
     hierarchy_position: int | None = None,
@@ -9595,74 +9885,40 @@ class TradingApplication:
       request_payload["template_id"] = template_id.strip()
     if clear_template_link:
       request_payload["clear_template_link"] = True
-    resolved_policy_catalog = (
-      self.get_provider_provenance_scheduler_narrative_governance_policy_catalog(policy_catalog_id)
-      if isinstance(policy_catalog_id, str) and policy_catalog_id.strip()
-      else None
+    (
+      resolved_policy_catalog,
+      resolved_policy_template,
+      resolved_approval_lane,
+      resolved_approval_priority,
+      resolved_policy_guidance,
+    ) = self._resolve_provider_provenance_scheduler_narrative_governance_policy_layer(
+      item_type=normalized_item_type,
+      action=normalized_action,
+      policy_catalog_id=policy_catalog_id,
+      policy_template_id=policy_template_id,
+      approval_lane=approval_lane,
+      approval_priority=approval_priority,
     )
     if resolved_policy_catalog is not None:
-      if resolved_policy_catalog.status != "active":
-        raise ValueError("Selected scheduler governance policy catalog must be active.")
-      if resolved_policy_catalog.item_type_scope not in {"any", normalized_item_type}:
-        raise ValueError("Selected scheduler governance policy catalog does not support this item type.")
-      if resolved_policy_catalog.action_scope not in {"any", normalized_action}:
-        raise ValueError("Selected scheduler governance policy catalog does not support this action.")
       request_payload["policy_catalog_id"] = resolved_policy_catalog.catalog_id
-    resolved_policy_template = (
-      self.get_provider_provenance_scheduler_narrative_governance_policy_template(
-        policy_template_id
-        if isinstance(policy_template_id, str) and policy_template_id.strip()
-        else (
-          resolved_policy_catalog.default_policy_template_id
-          if resolved_policy_catalog is not None and resolved_policy_catalog.default_policy_template_id
-          else ""
-        )
-      )
-      if (
-        isinstance(policy_template_id, str) and policy_template_id.strip()
-      ) or (
-        resolved_policy_catalog is not None
-        and resolved_policy_catalog.default_policy_template_id is not None
-      )
-      else None
-    )
     if resolved_policy_template is not None:
-      if resolved_policy_template.status != "active":
-        raise ValueError("Selected scheduler governance policy template must be active.")
-      if (
-        resolved_policy_catalog is not None
-        and resolved_policy_template.policy_template_id not in resolved_policy_catalog.policy_template_ids
-      ):
-        raise ValueError("Selected scheduler governance policy template is not linked to the chosen policy catalog.")
-      if resolved_policy_template.item_type_scope not in {"any", normalized_item_type}:
-        raise ValueError("Selected scheduler governance policy template does not support this item type.")
-      if resolved_policy_template.action_scope not in {"any", normalized_action}:
-        raise ValueError("Selected scheduler governance policy template does not support this action.")
       request_payload["policy_template_id"] = resolved_policy_template.policy_template_id
-    resolved_approval_lane = self._normalize_provider_provenance_scheduler_narrative_governance_approval_lane(
-      (
-        approval_lane
-        if approval_lane is not None
-        else (
-          resolved_policy_template.approval_lane
-          if resolved_policy_template is not None
-          else resolved_policy_catalog.approval_lane if resolved_policy_catalog is not None else None
-        )
-      )
-    )
-    resolved_approval_priority = self._normalize_provider_provenance_scheduler_narrative_governance_approval_priority(
-      (
-        approval_priority
-        if approval_priority is not None
-        else (
-          resolved_policy_template.approval_priority
-          if resolved_policy_template is not None
-          else resolved_policy_catalog.approval_priority if resolved_policy_catalog is not None else None
-        )
-      )
-    )
     request_payload["approval_lane"] = resolved_approval_lane
     request_payload["approval_priority"] = resolved_approval_priority
+    normalized_source_hierarchy_step_template_id = (
+      source_hierarchy_step_template_id.strip()
+      if isinstance(source_hierarchy_step_template_id, str) and source_hierarchy_step_template_id.strip()
+      else None
+    )
+    normalized_source_hierarchy_step_template_name = (
+      source_hierarchy_step_template_name.strip()
+      if isinstance(source_hierarchy_step_template_name, str) and source_hierarchy_step_template_name.strip()
+      else None
+    )
+    if normalized_source_hierarchy_step_template_id is not None:
+      request_payload["source_hierarchy_step_template_id"] = normalized_source_hierarchy_step_template_id
+    if normalized_source_hierarchy_step_template_name is not None:
+      request_payload["source_hierarchy_step_template_name"] = normalized_source_hierarchy_step_template_name
     normalized_hierarchy_key = (
       hierarchy_key.strip()
       if isinstance(hierarchy_key, str) and hierarchy_key.strip()
@@ -9699,6 +9955,8 @@ class TradingApplication:
         action=normalized_action,
         reason=resolved_reason,
         status="previewed",
+        source_hierarchy_step_template_id=normalized_source_hierarchy_step_template_id,
+        source_hierarchy_step_template_name=normalized_source_hierarchy_step_template_name,
         policy_template_id=(
           resolved_policy_template.policy_template_id if resolved_policy_template is not None else None
         ),
@@ -9713,11 +9971,7 @@ class TradingApplication:
         ),
         approval_lane=resolved_approval_lane,
         approval_priority=resolved_approval_priority,
-        policy_guidance=(
-          resolved_policy_template.guidance
-          if resolved_policy_template is not None
-          else resolved_policy_catalog.guidance if resolved_policy_catalog is not None else None
-        ),
+        policy_guidance=resolved_policy_guidance,
         hierarchy_key=normalized_hierarchy_key,
         hierarchy_name=normalized_hierarchy_name,
         hierarchy_position=resolved_hierarchy_position,
@@ -36031,6 +36285,13 @@ def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_
     "origin_catalog_id": record.origin_catalog_id,
     "origin_catalog_name": record.origin_catalog_name,
     "origin_step_id": record.origin_step_id,
+    "governance_policy_template_id": record.governance_policy_template_id,
+    "governance_policy_template_name": record.governance_policy_template_name,
+    "governance_policy_catalog_id": record.governance_policy_catalog_id,
+    "governance_policy_catalog_name": record.governance_policy_catalog_name,
+    "governance_approval_lane": record.governance_approval_lane,
+    "governance_approval_priority": record.governance_approval_priority,
+    "governance_policy_guidance": record.governance_policy_guidance,
     "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
       record.status
     ),
@@ -36077,6 +36338,13 @@ def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_
     "origin_catalog_id": revision.origin_catalog_id,
     "origin_catalog_name": revision.origin_catalog_name,
     "origin_step_id": revision.origin_step_id,
+    "governance_policy_template_id": revision.governance_policy_template_id,
+    "governance_policy_template_name": revision.governance_policy_template_name,
+    "governance_policy_catalog_id": revision.governance_policy_catalog_id,
+    "governance_policy_catalog_name": revision.governance_policy_catalog_name,
+    "governance_approval_lane": revision.governance_approval_lane,
+    "governance_approval_priority": revision.governance_approval_priority,
+    "governance_policy_guidance": revision.governance_policy_guidance,
     "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
       revision.status
     ),
@@ -36123,6 +36391,13 @@ def serialize_provider_provenance_scheduler_narrative_governance_hierarchy_step_
     "origin_catalog_id": record.origin_catalog_id,
     "origin_catalog_name": record.origin_catalog_name,
     "origin_step_id": record.origin_step_id,
+    "governance_policy_template_id": record.governance_policy_template_id,
+    "governance_policy_template_name": record.governance_policy_template_name,
+    "governance_policy_catalog_id": record.governance_policy_catalog_id,
+    "governance_policy_catalog_name": record.governance_policy_catalog_name,
+    "governance_approval_lane": record.governance_approval_lane,
+    "governance_approval_priority": record.governance_approval_priority,
+    "governance_policy_guidance": record.governance_policy_guidance,
     "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
       record.status
     ),
@@ -36328,6 +36603,8 @@ def serialize_provider_provenance_scheduler_narrative_governance_plan_record(
     "approval_lane": record.approval_lane,
     "approval_priority": record.approval_priority,
     "policy_guidance": record.policy_guidance,
+    "source_hierarchy_step_template_id": record.source_hierarchy_step_template_id,
+    "source_hierarchy_step_template_name": record.source_hierarchy_step_template_name,
     "hierarchy_key": record.hierarchy_key,
     "hierarchy_name": record.hierarchy_name,
     "hierarchy_position": record.hierarchy_position,

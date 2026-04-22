@@ -2345,6 +2345,17 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("hierarchy_step_template_id",),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
   )
+  operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_id}/stage",
+    route_name="stage_operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template",
+    response_title="Stage provider provenance scheduler narrative governance hierarchy step template",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage",
+    methods=("POST",),
+    path_param_keys=("hierarchy_step_template_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage",
+  )
   operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{catalog_id}/stage",
@@ -4177,6 +4188,7 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_restore_binding,
     operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply_binding,
+    operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_create_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_list_binding,

@@ -15184,6 +15184,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision_restore",
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list",
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
@@ -15430,6 +15431,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   ].filter_param_specs[0].key == "hierarchy_step_template_id"
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply"
+  ].path_param_keys == ("hierarchy_step_template_id",)
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage"
   ].path_param_keys == ("hierarchy_step_template_id",)
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage"
@@ -17434,6 +17438,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
       "description": "Reusable hierarchy step for template governance sync.",
       "origin_catalog_id": governance_policy_catalog_payload["catalog_id"],
       "origin_step_id": template_hierarchy_step_id,
+      "governance_policy_catalog_id": governance_policy_catalog_payload["catalog_id"],
       "created_by_tab_id": "tab_ops",
       "created_by_tab_label": "Ops desk",
     },
@@ -17441,6 +17446,14 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert hierarchy_step_template_payload["origin_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
   assert hierarchy_step_template_payload["origin_step_id"] == template_hierarchy_step_id
   assert hierarchy_step_template_payload["step"]["source_template_id"] is None
+  assert (
+    hierarchy_step_template_payload["governance_policy_catalog_id"]
+    == governance_policy_catalog_payload["catalog_id"]
+  )
+  assert (
+    hierarchy_step_template_payload["governance_policy_template_id"]
+    == governance_policy_template_payload["policy_template_id"]
+  )
 
   hierarchy_step_template_list_payload = execute_standalone_surface_binding(
     binding=bindings_by_key[
@@ -17470,6 +17483,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
       "query_patch": {
         "scheduler_alert_status": "resolved",
       },
+      "governance_approval_priority": "critical",
       "actor_tab_id": "tab_ops",
       "actor_tab_label": "Ops desk",
       "reason": "update_hierarchy_step_template",
@@ -17477,6 +17491,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert updated_hierarchy_step_template_payload["revision_count"] == 2
   assert updated_hierarchy_step_template_payload["step"]["name_suffix"] == " / reviewed"
+  assert updated_hierarchy_step_template_payload["governance_approval_priority"] == "critical"
 
   hierarchy_step_template_revision_payload = execute_standalone_surface_binding(
     binding=bindings_by_key[
@@ -17543,6 +17558,33 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert bulk_governed_hierarchy_step_template_payload["applied_count"] == 1
 
+  staged_hierarchy_step_template_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage"
+    ],
+    app=app,
+    path_params={
+      "hierarchy_step_template_id": hierarchy_step_template_payload["hierarchy_step_template_id"],
+    },
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_hierarchy_step_template",
+    },
+  )
+  assert (
+    staged_hierarchy_step_template_plan_payload["source_hierarchy_step_template_id"]
+    == hierarchy_step_template_payload["hierarchy_step_template_id"]
+  )
+  assert staged_hierarchy_step_template_plan_payload["source_hierarchy_step_template_name"] == (
+    "Cross-catalog template sync / bulk"
+  )
+  assert (
+    staged_hierarchy_step_template_plan_payload["policy_catalog_id"]
+    == governance_policy_catalog_payload["catalog_id"]
+  )
+  assert staged_hierarchy_step_template_plan_payload["approval_priority"] == "critical"
+
   hierarchy_step_template_audit_payload = execute_standalone_surface_binding(
     binding=bindings_by_key[
       "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list"
@@ -17553,13 +17595,14 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
       "limit": 10,
     },
   )
-  assert [item["action"] for item in hierarchy_step_template_audit_payload["items"][:5]] == [
-    "updated",
-    "restored",
-    "deleted",
-    "updated",
-    "created",
+  hierarchy_step_template_audit_actions = [
+    item["action"] for item in hierarchy_step_template_audit_payload["items"][:6]
   ]
+  assert "staged" in hierarchy_step_template_audit_actions
+  assert hierarchy_step_template_audit_actions.count("updated") >= 2
+  assert "restored" in hierarchy_step_template_audit_actions
+  assert "deleted" in hierarchy_step_template_audit_actions
+  assert "created" in hierarchy_step_template_audit_actions
 
   applied_hierarchy_step_template_payload = execute_standalone_surface_binding(
     binding=bindings_by_key[

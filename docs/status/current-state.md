@@ -215,6 +215,9 @@ It is not yet a finished live trading product:
 - those hierarchy-step templates now also support edit/delete/revision restore, bulk governance,
   and a shared team audit surface, so the cross-catalog step library can be corrected, retired,
   reinstated, and traced without recreating each reusable step from an active policy catalog
+- those same hierarchy-step templates now also carry saved governance policy defaults and can stage
+  approval-queue plans directly, so reusable cross-catalog steps preserve their lane/priority
+  policy layer when operators reopen them as queue work
 
 ### Operator discipline baseline
 

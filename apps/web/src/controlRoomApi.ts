@@ -1502,6 +1502,10 @@ export async function createProviderProvenanceSchedulerNarrativeGovernanceHierar
   };
   originCatalogId?: string;
   originStepId?: string;
+  governancePolicyTemplateId?: string;
+  governancePolicyCatalogId?: string;
+  governanceApprovalLane?: string;
+  governanceApprovalPriority?: string;
   createdByTabId?: string;
   createdByTabLabel?: string;
 }) {
@@ -1533,6 +1537,18 @@ export async function createProviderProvenanceSchedulerNarrativeGovernanceHierar
           : {}),
         ...(params.originCatalogId?.trim() ? { origin_catalog_id: params.originCatalogId.trim() } : {}),
         ...(params.originStepId?.trim() ? { origin_step_id: params.originStepId.trim() } : {}),
+        ...(params.governancePolicyTemplateId?.trim()
+          ? { governance_policy_template_id: params.governancePolicyTemplateId.trim() }
+          : {}),
+        ...(params.governancePolicyCatalogId?.trim()
+          ? { governance_policy_catalog_id: params.governancePolicyCatalogId.trim() }
+          : {}),
+        ...(params.governanceApprovalLane?.trim()
+          ? { governance_approval_lane: params.governanceApprovalLane.trim() }
+          : {}),
+        ...(params.governanceApprovalPriority?.trim()
+          ? { governance_approval_priority: params.governanceApprovalPriority.trim() }
+          : {}),
         ...(params.createdByTabId?.trim() ? { created_by_tab_id: params.createdByTabId.trim() } : {}),
         ...(params.createdByTabLabel?.trim()
           ? { created_by_tab_label: params.createdByTabLabel.trim() }
@@ -1575,6 +1591,10 @@ export async function updateProviderProvenanceSchedulerNarrativeGovernanceHierar
   layoutPatch?: Record<string, unknown>;
   templateId?: string;
   clearTemplateLink?: boolean;
+  governancePolicyTemplateId?: string;
+  governancePolicyCatalogId?: string;
+  governanceApprovalLane?: string;
+  governanceApprovalPriority?: string;
   actorTabId?: string;
   actorTabLabel?: string;
   reason?: string;
@@ -1596,6 +1616,18 @@ export async function updateProviderProvenanceSchedulerNarrativeGovernanceHierar
         ...(params.layoutPatch !== undefined ? { layout_patch: params.layoutPatch } : {}),
         ...(params.templateId !== undefined ? { template_id: params.templateId } : {}),
         ...(params.clearTemplateLink !== undefined ? { clear_template_link: params.clearTemplateLink } : {}),
+        ...(params.governancePolicyTemplateId !== undefined
+          ? { governance_policy_template_id: params.governancePolicyTemplateId }
+          : {}),
+        ...(params.governancePolicyCatalogId !== undefined
+          ? { governance_policy_catalog_id: params.governancePolicyCatalogId }
+          : {}),
+        ...(params.governanceApprovalLane !== undefined
+          ? { governance_approval_lane: params.governanceApprovalLane }
+          : {}),
+        ...(params.governanceApprovalPriority !== undefined
+          ? { governance_approval_priority: params.governanceApprovalPriority }
+          : {}),
         ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
         ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
         ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
@@ -1741,6 +1773,25 @@ export async function applyProviderProvenanceSchedulerNarrativeGovernanceHierarc
       method: "POST",
       body: JSON.stringify({
         catalog_ids: params.catalogIds,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(params: {
+  hierarchyStepTemplateId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/${encodeURIComponent(params.hierarchyStepTemplateId)}/stage`,
+    {
+      method: "POST",
+      body: JSON.stringify({
         ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
         ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
         ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),

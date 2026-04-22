@@ -1197,6 +1197,13 @@ class ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord:
   origin_catalog_id: str | None = None
   origin_catalog_name: str | None = None
   origin_step_id: str | None = None
+  governance_policy_template_id: str | None = None
+  governance_policy_template_name: str | None = None
+  governance_policy_catalog_id: str | None = None
+  governance_policy_catalog_name: str | None = None
+  governance_approval_lane: str = "general"
+  governance_approval_priority: str = "normal"
+  governance_policy_guidance: str | None = None
   status: str = "active"
   created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -1226,6 +1233,13 @@ class ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisio
   origin_catalog_id: str | None = None
   origin_catalog_name: str | None = None
   origin_step_id: str | None = None
+  governance_policy_template_id: str | None = None
+  governance_policy_template_name: str | None = None
+  governance_policy_catalog_id: str | None = None
+  governance_policy_catalog_name: str | None = None
+  governance_approval_lane: str = "general"
+  governance_approval_priority: str = "normal"
+  governance_policy_guidance: str | None = None
   status: str = "active"
   recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   source_revision_id: str | None = None
@@ -1254,6 +1268,13 @@ class ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRe
   origin_catalog_id: str | None = None
   origin_catalog_name: str | None = None
   origin_step_id: str | None = None
+  governance_policy_template_id: str | None = None
+  governance_policy_template_name: str | None = None
+  governance_policy_catalog_id: str | None = None
+  governance_policy_catalog_name: str | None = None
+  governance_approval_lane: str = "general"
+  governance_approval_priority: str = "normal"
+  governance_policy_guidance: str | None = None
   status: str = "active"
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
@@ -1284,6 +1305,8 @@ class ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
   action: str
   reason: str
   status: str = "previewed"
+  source_hierarchy_step_template_id: str | None = None
+  source_hierarchy_step_template_name: str | None = None
   policy_template_id: str | None = None
   policy_template_name: str | None = None
   policy_catalog_id: str | None = None

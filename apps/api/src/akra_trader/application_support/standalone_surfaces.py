@@ -1084,6 +1084,10 @@ def execute_standalone_surface_binding(
         step=resolved_payload.get("step"),
         origin_catalog_id=resolved_payload.get("origin_catalog_id"),
         origin_step_id=resolved_payload.get("origin_step_id"),
+        governance_policy_template_id=resolved_payload.get("governance_policy_template_id"),
+        governance_policy_catalog_id=resolved_payload.get("governance_policy_catalog_id"),
+        governance_approval_lane=resolved_payload.get("governance_approval_lane"),
+        governance_approval_priority=resolved_payload.get("governance_approval_priority"),
         created_by_tab_id=resolved_payload.get("created_by_tab_id"),
         created_by_tab_label=resolved_payload.get("created_by_tab_label"),
       )
@@ -1131,6 +1135,10 @@ def execute_standalone_surface_binding(
         layout_patch=resolved_payload.get("layout_patch"),
         template_id=resolved_payload.get("template_id"),
         clear_template_link=resolved_payload.get("clear_template_link"),
+        governance_policy_template_id=resolved_payload.get("governance_policy_template_id"),
+        governance_policy_catalog_id=resolved_payload.get("governance_policy_catalog_id"),
+        governance_approval_lane=resolved_payload.get("governance_approval_lane"),
+        governance_approval_priority=resolved_payload.get("governance_approval_priority"),
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
         reason=resolved_payload.get("reason", "scheduler_narrative_governance_hierarchy_step_template_updated"),
@@ -1182,6 +1190,18 @@ def execute_standalone_surface_binding(
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
         reason=resolved_payload.get("reason"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.stage_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+        resolved_path_params["hierarchy_step_template_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get(
+          "reason",
+          "scheduler_narrative_governance_hierarchy_step_template_staged",
+        ),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage":
