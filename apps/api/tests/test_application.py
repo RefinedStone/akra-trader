@@ -17580,6 +17580,135 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert reverted_registry_list_payload["total"] == 2
 
+  stitched_report_view_governance_policy_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_create"],
+    app=app,
+    request_payload={
+      "name": "Stitched report staged updates",
+      "description": "Reusable staged review lane for saved stitched scheduler reports.",
+      "item_type_scope": "stitched_report_view",
+      "action_scope": "update",
+      "approval_lane": "scheduler_reports",
+      "approval_priority": "high",
+      "guidance": "Review stitched report diffs before cross-shift apply.",
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert stitched_report_view_governance_policy_template_payload["item_type_scope"] == (
+    "stitched_report_view"
+  )
+
+  stitched_report_view_governance_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
+    app=app,
+    request_payload={
+      "item_type": "stitched_report_view",
+      "item_ids": [
+        stitched_report_view_payload["view_id"],
+        secondary_stitched_report_view_payload["view_id"],
+      ],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_stitched_report_view_governance_plan",
+      "name_suffix": " / staged",
+      "query_patch": {
+        "scheduler_alert_status": "resolved",
+      },
+      "occurrence_limit": 11,
+      "history_limit": 21,
+      "drilldown_history_limit": 23,
+      "policy_template_id": stitched_report_view_governance_policy_template_payload["policy_template_id"],
+    },
+  )
+  assert stitched_report_view_governance_plan_payload["status"] == "previewed"
+  assert stitched_report_view_governance_plan_payload["item_type"] == "stitched_report_view"
+  assert stitched_report_view_governance_plan_payload["preview_changed_count"] == 2
+  assert stitched_report_view_governance_plan_payload["policy_template_id"] == (
+    stitched_report_view_governance_policy_template_payload["policy_template_id"]
+  )
+  assert stitched_report_view_governance_plan_payload["approval_lane"] == "scheduler_reports"
+  assert stitched_report_view_governance_plan_payload["approval_priority"] == "high"
+  assert stitched_report_view_governance_plan_payload["request_payload"]["occurrence_limit"] == 11
+  assert stitched_report_view_governance_plan_payload["request_payload"]["history_limit"] == 21
+  assert stitched_report_view_governance_plan_payload["request_payload"]["drilldown_history_limit"] == 23
+  assert any(
+    "occurrence_limit" in item["changed_fields"] or "history_limit" in item["changed_fields"]
+    for item in stitched_report_view_governance_plan_payload["preview_items"]
+  )
+
+  stitched_report_view_governance_plan_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"],
+    app=app,
+    filters={"item_type": "stitched_report_view", "status": "previewed", "limit": 10},
+  )
+  assert stitched_report_view_governance_plan_list_payload["total"] >= 1
+  assert stitched_report_view_governance_plan_payload["plan_id"] in {
+    item["plan_id"] for item in stitched_report_view_governance_plan_list_payload["items"]
+  }
+
+  approved_stitched_report_view_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_approve"],
+    app=app,
+    path_params={"plan_id": stitched_report_view_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "approved stitched view rollout",
+    },
+  )
+  assert approved_stitched_report_view_plan_payload["status"] == "approved"
+
+  applied_stitched_report_view_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_apply"],
+    app=app,
+    path_params={"plan_id": stitched_report_view_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert applied_stitched_report_view_plan_payload["status"] == "applied"
+  assert applied_stitched_report_view_plan_payload["applied_result"]["applied_count"] == 2
+  staged_stitched_report_view_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_list"],
+    app=app,
+    filters={"category": "scheduler_failure", "status": "active", "limit": 10},
+  )
+  assert all(
+    item["name"].endswith(" / staged")
+    and item["occurrence_limit"] == 11
+    and item["history_limit"] == 21
+    and item["drilldown_history_limit"] == 23
+    for item in staged_stitched_report_view_list_payload["items"]
+  )
+
+  rolled_back_stitched_report_view_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_rollback"],
+    app=app,
+    path_params={"plan_id": stitched_report_view_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "rollback stitched view staged rollout",
+    },
+  )
+  assert rolled_back_stitched_report_view_plan_payload["status"] == "rolled_back"
+  assert rolled_back_stitched_report_view_plan_payload["rollback_result"]["applied_count"] == 2
+  reverted_stitched_report_view_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_list"],
+    app=app,
+    filters={"category": "scheduler_failure", "status": "active", "limit": 10},
+  )
+  assert all(
+    not item["name"].endswith(" / staged")
+    and item["occurrence_limit"] == 9
+    and item["history_limit"] == 20
+    and item["drilldown_history_limit"] == 22
+    for item in reverted_stitched_report_view_list_payload["items"]
+  )
+
   batch_template_governance_plan_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
     app=app,

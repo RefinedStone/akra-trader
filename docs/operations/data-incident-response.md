@@ -82,6 +82,9 @@ unclear dataset lineage.
 - those saved stitched report views now also expose bulk governance and a shared team audit
   surface, so repeated scheduler handoff lenses can be reviewed, patched, or retired as shared
   operational assets instead of one-off personal shortcuts
+- those same saved stitched report views now also use staged governance plans with reusable
+  policy templates, so bulk stitched-report edits enter the shared approval queue with previewed
+  diffs and rollback targets before they touch the active handoff lens
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

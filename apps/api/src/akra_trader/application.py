@@ -6608,6 +6608,23 @@ class TradingApplication:
       "layout": deepcopy(normalized_layout),
     }
 
+  def _build_provider_provenance_scheduler_stitched_report_view_snapshot(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportViewRecord,
+  ) -> dict[str, Any]:
+    normalized_query = self._normalize_provider_provenance_analytics_query_payload(record.query)
+    return {
+      "name": record.name,
+      "description": record.description,
+      "status": self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+      "query": deepcopy(normalized_query),
+      "focus": self._build_provider_provenance_workspace_focus_payload(normalized_query),
+      "filter_summary": self._build_provider_provenance_analytics_filter_summary(normalized_query),
+      "occurrence_limit": int(record.occurrence_limit),
+      "history_limit": int(record.history_limit),
+      "drilldown_history_limit": int(record.drilldown_history_limit),
+    }
+
   @staticmethod
   def _build_provider_provenance_scheduler_narrative_field_diffs(
     current_snapshot: dict[str, Any],
@@ -6957,6 +6974,241 @@ class TradingApplication:
       rollback_revision_id=current.current_revision_id,
       outcome="changed",
       message="Registry will be updated with the requested bulk governance patch.",
+      changed_fields=changed_fields,
+      field_diffs=field_diffs,
+      current_snapshot=current_snapshot,
+      proposed_snapshot=proposed_snapshot,
+    )
+
+  def _preview_provider_provenance_scheduler_stitched_report_view_governance_item(
+    self,
+    current: ProviderProvenanceSchedulerStitchedReportViewRecord,
+    *,
+    action: str,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    description_append: str | None = None,
+    query_patch: dict[str, Any] | None = None,
+    occurrence_limit: int | None = None,
+    history_limit: int | None = None,
+    drilldown_history_limit: int | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePreviewItem:
+    current_snapshot = self._build_provider_provenance_scheduler_stitched_report_view_snapshot(current)
+    if action == "delete":
+      if current.status == "deleted":
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.view_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="skipped",
+          message="Stitched report view is already deleted.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      proposed = replace(current, status="deleted")
+      proposed_snapshot = self._build_provider_provenance_scheduler_stitched_report_view_snapshot(proposed)
+      changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+        current_snapshot,
+        proposed_snapshot,
+        ("status",),
+      )
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.view_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="changed",
+        message="Stitched report view will be deleted.",
+        changed_fields=changed_fields,
+        field_diffs=field_diffs,
+        current_snapshot=current_snapshot,
+        proposed_snapshot=proposed_snapshot,
+      )
+    if action == "restore":
+      if current.status != "deleted":
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.view_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="skipped",
+          message="Stitched report view is already active.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      revision = self._find_latest_active_provider_provenance_scheduler_stitched_report_view_revision(
+        current.view_id
+      )
+      if revision is None:
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.view_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="failed",
+          message="No active revision is available for restore.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      proposed = replace(
+        current,
+        name=revision.name,
+        description=revision.description,
+        query=self._normalize_provider_provenance_analytics_query_payload(revision.query),
+        occurrence_limit=self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+          revision.occurrence_limit,
+          default=8,
+          minimum=1,
+          maximum=50,
+          field_name="scheduler stitched report occurrence_limit",
+        ),
+        history_limit=self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+          revision.history_limit,
+          default=12,
+          minimum=1,
+          maximum=200,
+          field_name="scheduler stitched report history_limit",
+        ),
+        drilldown_history_limit=self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+          revision.drilldown_history_limit,
+          default=12,
+          minimum=1,
+          maximum=100,
+          field_name="scheduler stitched report drilldown_history_limit",
+        ),
+        status="active",
+      )
+      proposed_snapshot = self._build_provider_provenance_scheduler_stitched_report_view_snapshot(proposed)
+      changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+        current_snapshot,
+        proposed_snapshot,
+        (
+          "name",
+          "description",
+          "status",
+          "query",
+          "filter_summary",
+          "focus",
+          "occurrence_limit",
+          "history_limit",
+          "drilldown_history_limit",
+        ),
+      )
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.view_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        apply_revision_id=revision.revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="changed",
+        message="Stitched report view will be restored from the latest active revision.",
+        changed_fields=changed_fields,
+        field_diffs=field_diffs,
+        current_snapshot=current_snapshot,
+        proposed_snapshot=proposed_snapshot,
+      )
+    if current.status == "deleted":
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.view_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="skipped",
+        message="Stitched report view is deleted; restore it before applying bulk edits.",
+        current_snapshot=current_snapshot,
+        proposed_snapshot=deepcopy(current_snapshot),
+      )
+    updated_name = f"{name_prefix or ''}{current.name}{name_suffix or ''}"
+    updated_description = (
+      f"{current.description} {description_append}".strip()
+      if description_append is not None
+      else current.description
+    )
+    updated_query = self._build_provider_provenance_scheduler_stitched_report_view_bulk_query(
+      current.query,
+      query_patch,
+    )
+    proposed = replace(
+      current,
+      name=updated_name,
+      description=updated_description,
+      query=updated_query,
+      occurrence_limit=(
+        self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+          occurrence_limit,
+          default=int(current.occurrence_limit),
+          minimum=1,
+          maximum=50,
+          field_name="scheduler stitched report occurrence_limit",
+        )
+        if occurrence_limit is not None
+        else current.occurrence_limit
+      ),
+      history_limit=(
+        self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+          history_limit,
+          default=int(current.history_limit),
+          minimum=1,
+          maximum=200,
+          field_name="scheduler stitched report history_limit",
+        )
+        if history_limit is not None
+        else current.history_limit
+      ),
+      drilldown_history_limit=(
+        self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+          drilldown_history_limit,
+          default=int(current.drilldown_history_limit),
+          minimum=1,
+          maximum=100,
+          field_name="scheduler stitched report drilldown_history_limit",
+        )
+        if drilldown_history_limit is not None
+        else current.drilldown_history_limit
+      ),
+    )
+    proposed_snapshot = self._build_provider_provenance_scheduler_stitched_report_view_snapshot(proposed)
+    changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+      current_snapshot,
+      proposed_snapshot,
+      (
+        "name",
+        "description",
+        "query",
+        "filter_summary",
+        "focus",
+        "occurrence_limit",
+        "history_limit",
+        "drilldown_history_limit",
+      ),
+    )
+    if not changed_fields:
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.view_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="skipped",
+        message="Stitched report view already matches the requested bulk edits.",
+        current_snapshot=current_snapshot,
+        proposed_snapshot=deepcopy(current_snapshot),
+      )
+    return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+      item_id=current.view_id,
+      item_name=current.name,
+      status=current.status,
+      current_revision_id=current.current_revision_id,
+      rollback_revision_id=current.current_revision_id,
+      outcome="changed",
+      message="Stitched report view will be updated with the requested governance patch.",
       changed_fields=changed_fields,
       field_diffs=field_diffs,
       current_snapshot=current_snapshot,
@@ -7765,7 +8017,7 @@ class TradingApplication:
     item_type: str,
   ) -> str:
     normalized = item_type.strip().lower()
-    if normalized not in {"template", "registry"}:
+    if normalized not in {"template", "registry", "stitched_report_view"}:
       raise ValueError("Unsupported scheduler narrative governance item type.")
     return normalized
 
@@ -7778,7 +8030,7 @@ class TradingApplication:
       if isinstance(item_type_scope, str) and item_type_scope.strip()
       else "any"
     )
-    if normalized not in {"any", "template", "registry"}:
+    if normalized not in {"any", "template", "registry", "stitched_report_view"}:
       raise ValueError("Unsupported scheduler narrative governance policy item-type scope.")
     return normalized
 
@@ -10941,6 +11193,9 @@ class TradingApplication:
     description_append: str | None = None,
     query_patch: dict[str, Any] | None = None,
     layout_patch: dict[str, Any] | None = None,
+    occurrence_limit: int | None = None,
+    history_limit: int | None = None,
+    drilldown_history_limit: int | None = None,
     template_id: str | None = None,
     clear_template_link: bool = False,
     policy_template_id: str | None = None,
@@ -10993,6 +11248,18 @@ class TradingApplication:
       and not clear_template_link
     ):
       raise ValueError("No scheduler narrative registry bulk update fields were provided.")
+    if (
+      normalized_action == "update"
+      and normalized_item_type == "stitched_report_view"
+      and normalized_name_prefix is None
+      and normalized_name_suffix is None
+      and normalized_description_append is None
+      and not isinstance(query_patch, dict)
+      and occurrence_limit is None
+      and history_limit is None
+      and drilldown_history_limit is None
+    ):
+      raise ValueError("No scheduler stitched report view governance fields were provided.")
     resolved_reason = (
       reason.strip()
       if isinstance(reason, str) and reason.strip()
@@ -11021,7 +11288,7 @@ class TradingApplication:
               query_patch=query_patch,
             )
           )
-        else:
+        elif normalized_item_type == "registry":
           current_registry = self.get_provider_provenance_scheduler_narrative_registry_entry(item_id)
           preview_items.append(
             self._preview_provider_provenance_scheduler_narrative_registry_governance_item(
@@ -11034,6 +11301,21 @@ class TradingApplication:
               layout_patch=layout_patch,
               template_id=template_id,
               clear_template_link=clear_template_link,
+            )
+          )
+        else:
+          current_view = self.get_provider_provenance_scheduler_stitched_report_view(item_id)
+          preview_items.append(
+            self._preview_provider_provenance_scheduler_stitched_report_view_governance_item(
+              current_view,
+              action=normalized_action,
+              name_prefix=normalized_name_prefix,
+              name_suffix=normalized_name_suffix,
+              description_append=normalized_description_append,
+              query_patch=query_patch,
+              occurrence_limit=occurrence_limit,
+              history_limit=history_limit,
+              drilldown_history_limit=drilldown_history_limit,
             )
           )
       except (LookupError, RuntimeError, ValueError) as exc:
@@ -11067,6 +11349,30 @@ class TradingApplication:
       request_payload["query_patch"] = deepcopy(query_patch)
     if isinstance(layout_patch, dict) and layout_patch:
       request_payload["layout_patch"] = deepcopy(layout_patch)
+    if occurrence_limit is not None:
+      request_payload["occurrence_limit"] = self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+        occurrence_limit,
+        default=8,
+        minimum=1,
+        maximum=50,
+        field_name="scheduler stitched report occurrence_limit",
+      )
+    if history_limit is not None:
+      request_payload["history_limit"] = self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+        history_limit,
+        default=12,
+        minimum=1,
+        maximum=200,
+        field_name="scheduler stitched report history_limit",
+      )
+    if drilldown_history_limit is not None:
+      request_payload["drilldown_history_limit"] = self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+        drilldown_history_limit,
+        default=12,
+        minimum=1,
+        maximum=100,
+        field_name="scheduler stitched report drilldown_history_limit",
+      )
     if isinstance(template_id, str) and template_id.strip():
       request_payload["template_id"] = template_id.strip()
     if clear_template_link:
@@ -11501,7 +11807,7 @@ class TradingApplication:
               message=preview.message,
             )
           )
-        else:
+        elif current.item_type == "registry":
           existing = self.get_provider_provenance_scheduler_narrative_registry_entry(preview.item_id)
           if existing.current_revision_id != preview.current_revision_id:
             raise RuntimeError("Registry drifted since the governance preview was created.")
@@ -11562,6 +11868,74 @@ class TradingApplication:
           results.append(
             ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
               item_id=updated.registry_id,
+              item_name=updated.name,
+              outcome="applied",
+              status=updated.status,
+              current_revision_id=updated.current_revision_id,
+              message=preview.message,
+            )
+          )
+        else:
+          existing = self.get_provider_provenance_scheduler_stitched_report_view(preview.item_id)
+          if existing.current_revision_id != preview.current_revision_id:
+            raise RuntimeError("Stitched report view drifted since the governance preview was created.")
+          if current.action == "delete":
+            updated = self.delete_provider_provenance_scheduler_stitched_report_view(
+              preview.item_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          elif current.action == "restore":
+            if not preview.apply_revision_id:
+              raise RuntimeError("No restore revision was captured in the governance preview.")
+            updated = self.restore_provider_provenance_scheduler_stitched_report_view_revision(
+              preview.item_id,
+              preview.apply_revision_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          else:
+            updated_name = (
+              f"{request_payload.get('name_prefix', '')}{existing.name}{request_payload.get('name_suffix', '')}"
+            )
+            updated_description = (
+              f"{existing.description} {request_payload['description_append']}".strip()
+              if isinstance(request_payload.get("description_append"), str)
+              else existing.description
+            )
+            updated_query = self._build_provider_provenance_scheduler_stitched_report_view_bulk_query(
+              existing.query,
+              request_payload.get("query_patch"),
+            )
+            updated = self.update_provider_provenance_scheduler_stitched_report_view(
+              preview.item_id,
+              name=updated_name,
+              description=updated_description,
+              query=updated_query,
+              occurrence_limit=(
+                request_payload.get("occurrence_limit")
+                if isinstance(request_payload.get("occurrence_limit"), int)
+                else existing.occurrence_limit
+              ),
+              history_limit=(
+                request_payload.get("history_limit")
+                if isinstance(request_payload.get("history_limit"), int)
+                else existing.history_limit
+              ),
+              drilldown_history_limit=(
+                request_payload.get("drilldown_history_limit")
+                if isinstance(request_payload.get("drilldown_history_limit"), int)
+                else existing.drilldown_history_limit
+              ),
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          results.append(
+            ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+              item_id=updated.view_id,
               item_name=updated.name,
               outcome="applied",
               status=updated.status,
@@ -11762,7 +12136,7 @@ class TradingApplication:
               message="Template restored to the pre-apply revision snapshot.",
             )
           )
-        else:
+        elif current.item_type == "registry":
           updated = self.restore_provider_provenance_scheduler_narrative_registry_revision(
             preview.item_id,
             preview.rollback_revision_id,
@@ -11778,6 +12152,24 @@ class TradingApplication:
               status=updated.status,
               current_revision_id=updated.current_revision_id,
               message="Registry restored to the pre-apply revision snapshot.",
+            )
+          )
+        else:
+          updated = self.restore_provider_provenance_scheduler_stitched_report_view_revision(
+            preview.item_id,
+            preview.rollback_revision_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason="scheduler_stitched_report_view_governance_rollback",
+          )
+          results.append(
+            ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+              item_id=updated.view_id,
+              item_name=updated.name,
+              outcome="applied",
+              status=updated.status,
+              current_revision_id=updated.current_revision_id,
+              message="Stitched report view restored to the pre-apply revision snapshot.",
             )
           )
         applied_count += 1

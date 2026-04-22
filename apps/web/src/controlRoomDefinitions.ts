@@ -1714,7 +1714,7 @@ export type ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult = {
 };
 
 export type ProviderProvenanceSchedulerNarrativeBulkGovernanceResult = {
-  item_type: "template" | "registry" | string;
+  item_type: "template" | "registry" | "stitched_report_view" | string;
   action: "delete" | "restore" | string;
   reason: string;
   requested_count: number;
@@ -1743,7 +1743,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate = {
   policy_template_id: string;
   name: string;
   description: string;
-  item_type_scope: "any" | "template" | "registry" | string;
+  item_type_scope: "any" | "template" | "registry" | "stitched_report_view" | string;
   action_scope: "any" | "delete" | "restore" | "update" | string;
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
@@ -1773,7 +1773,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevision
   source_revision_id?: string | null;
   name: string;
   description: string;
-  item_type_scope: "any" | "template" | "registry" | string;
+  item_type_scope: "any" | "template" | "registry" | "stitched_report_view" | string;
   action_scope: "any" | "delete" | "restore" | "update" | string;
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
@@ -1800,7 +1800,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRec
   source_revision_id?: string | null;
   name: string;
   status: "active" | "deleted" | string;
-  item_type_scope: "any" | "template" | "registry" | string;
+  item_type_scope: "any" | "template" | "registry" | "stitched_report_view" | string;
   action_scope: "any" | "delete" | "restore" | "update" | string;
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
@@ -1822,7 +1822,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog = {
   policy_template_names: string[];
   default_policy_template_id?: string | null;
   default_policy_template_name?: string | null;
-  item_type_scope: "any" | "template" | "registry" | string;
+  item_type_scope: "any" | "template" | "registry" | "stitched_report_view" | string;
   action_scope: "any" | "delete" | "restore" | "update" | string;
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
@@ -1857,7 +1857,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionE
   policy_template_names: string[];
   default_policy_template_id?: string | null;
   default_policy_template_name?: string | null;
-  item_type_scope: "any" | "template" | "registry" | string;
+  item_type_scope: "any" | "template" | "registry" | "stitched_report_view" | string;
   action_scope: "any" | "delete" | "restore" | "update" | string;
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
@@ -1889,7 +1889,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditReco
   default_policy_template_name?: string | null;
   policy_template_ids: string[];
   policy_template_names: string[];
-  item_type_scope: "any" | "template" | "registry" | string;
+  item_type_scope: "any" | "template" | "registry" | "stitched_report_view" | string;
   action_scope: "any" | "delete" | "restore" | "update" | string;
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
@@ -2020,7 +2020,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep = {
 
 export type ProviderProvenanceSchedulerNarrativeGovernancePlan = {
   plan_id: string;
-  item_type: "template" | "registry" | string;
+  item_type: "template" | "registry" | "stitched_report_view" | string;
   action: "delete" | "restore" | "update" | "rollback" | string;
   reason: string;
   status: "previewed" | "approved" | "applied" | "rolled_back" | string;

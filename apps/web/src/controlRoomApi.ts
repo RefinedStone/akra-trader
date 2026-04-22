@@ -1204,7 +1204,7 @@ export async function restoreProviderProvenanceSchedulerNarrativeRegistryRevisio
 }
 
 export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(params: {
-  itemType: "template" | "registry";
+  itemType: "template" | "registry" | "stitched_report_view";
   itemIds: string[];
   action: "delete" | "restore" | "update";
   actorTabId?: string;
@@ -1215,6 +1215,9 @@ export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(p
   descriptionAppend?: string;
   queryPatch?: Record<string, unknown>;
   layoutPatch?: Record<string, unknown>;
+  occurrenceLimit?: number;
+  historyLimit?: number;
+  drilldownHistoryLimit?: number;
   templateId?: string;
   clearTemplateLink?: boolean;
   policyTemplateId?: string;
@@ -1242,6 +1245,15 @@ export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(p
         ...(params.descriptionAppend?.trim() ? { description_append: params.descriptionAppend.trim() } : {}),
         ...(params.queryPatch ? { query_patch: params.queryPatch } : {}),
         ...(params.layoutPatch ? { layout_patch: params.layoutPatch } : {}),
+        ...(typeof params.occurrenceLimit === "number"
+          ? { occurrence_limit: Math.max(1, Math.min(Math.round(params.occurrenceLimit), 50)) }
+          : {}),
+        ...(typeof params.historyLimit === "number"
+          ? { history_limit: Math.max(1, Math.min(Math.round(params.historyLimit), 200)) }
+          : {}),
+        ...(typeof params.drilldownHistoryLimit === "number"
+          ? { drilldown_history_limit: Math.max(1, Math.min(Math.round(params.drilldownHistoryLimit), 100)) }
+          : {}),
         ...(params.templateId?.trim() ? { template_id: params.templateId.trim() } : {}),
         ...(params.clearTemplateLink ? { clear_template_link: true } : {}),
         ...(params.policyTemplateId?.trim() ? { policy_template_id: params.policyTemplateId.trim() } : {}),

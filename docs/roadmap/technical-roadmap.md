@@ -131,6 +131,9 @@ creation.
 - those saved stitched report views now also have bulk governance plus a team audit layer, so
   shared scheduler handoff lenses can be batch-patched, retired, restored, and reviewed as team
   assets instead of only per-view lifecycle entries
+- those same saved stitched report views now also run through staged governance plans with
+  reusable policy templates, so saved scheduler report lenses can follow the same queue,
+  approval, and rollback discipline as the rest of the scheduler governance layer
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand
