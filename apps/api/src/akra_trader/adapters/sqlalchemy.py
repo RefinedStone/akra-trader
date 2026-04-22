@@ -33,6 +33,7 @@ from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord
@@ -190,6 +191,15 @@ provider_provenance_dashboard_views = Table(
   Column("view_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
   Column("preset_id", String, nullable=True, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_stitched_report_views = Table(
+  "provider_provenance_scheduler_stitched_report_views",
+  metadata,
+  Column("view_id", String, primary_key=True),
+  Column("name", String, nullable=False, index=True),
   Column("updated_at", String, nullable=False, index=True),
   Column("created_by_tab_id", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
@@ -407,6 +417,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   _provider_provenance_export_job_audit_adapter = TypeAdapter(ProviderProvenanceExportJobAuditRecord)
   _provider_provenance_analytics_preset_adapter = TypeAdapter(ProviderProvenanceAnalyticsPresetRecord)
   _provider_provenance_dashboard_view_adapter = TypeAdapter(ProviderProvenanceDashboardViewRecord)
+  _provider_provenance_scheduler_stitched_report_view_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerStitchedReportViewRecord
+  )
   _provider_provenance_scheduled_report_adapter = TypeAdapter(ProviderProvenanceScheduledReportRecord)
   _provider_provenance_scheduler_narrative_template_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeTemplateRecord
@@ -1202,6 +1215,67 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
     if row is None:
       return None
     return self._provider_provenance_dashboard_view_adapter.validate_python(row["payload"])
+
+  def save_provider_provenance_scheduler_stitched_report_view(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportViewRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportViewRecord:
+    payload = self._provider_provenance_scheduler_stitched_report_view_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "view_id": record.view_id,
+      "name": record.name,
+      "updated_at": record.updated_at.isoformat(),
+      "created_by_tab_id": record.created_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_views.c.view_id).where(
+          provider_provenance_scheduler_stitched_report_views.c.view_id == record.view_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_stitched_report_views).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_stitched_report_views)
+          .where(provider_provenance_scheduler_stitched_report_views.c.view_id == record.view_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_views(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportViewRecord, ...]:
+    statement = select(provider_provenance_scheduler_stitched_report_views.c.payload).order_by(
+      provider_provenance_scheduler_stitched_report_views.c.updated_at.desc(),
+      provider_provenance_scheduler_stitched_report_views.c.view_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_stitched_report_view_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_view(
+    self,
+    view_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportViewRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_views.c.payload).where(
+          provider_provenance_scheduler_stitched_report_views.c.view_id == view_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_stitched_report_view_adapter.validate_python(
+      row["payload"]
+    )
 
   def save_provider_provenance_scheduled_report(
     self,
@@ -2422,6 +2496,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_provider_provenance_dashboard_views_preset_id", "preset_id"),
         ("ix_provider_provenance_dashboard_views_updated_at", "updated_at"),
         ("ix_provider_provenance_dashboard_views_created_by_tab_id", "created_by_tab_id"),
+        ("ix_provider_provenance_scheduler_stitched_report_views_name", "name"),
+        ("ix_provider_provenance_scheduler_stitched_report_views_updated_at", "updated_at"),
+        ("ix_provider_provenance_scheduler_stitched_report_views_created_by_tab_id", "created_by_tab_id"),
         ("ix_provider_provenance_scheduled_reports_name", "name"),
         ("ix_provider_provenance_scheduled_reports_status", "status"),
         ("ix_provider_provenance_scheduled_reports_cadence", "cadence"),
@@ -2461,6 +2538,8 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
           if index_name.startswith("ix_provider_provenance_scheduled_reports_")
           else "provider_provenance_dashboard_views"
           if index_name.startswith("ix_provider_provenance_dashboard_views_")
+          else "provider_provenance_scheduler_stitched_report_views"
+          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_views_")
           else "provider_provenance_analytics_presets"
           if index_name.startswith("ix_provider_provenance_analytics_presets_")
           else

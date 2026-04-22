@@ -913,6 +913,21 @@ class ProviderProvenanceDashboardViewRecord:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerStitchedReportViewRecord:
+  view_id: str
+  name: str
+  description: str = ""
+  query: dict[str, Any] = field(default_factory=dict)
+  occurrence_limit: int = 8
+  history_limit: int = 12
+  drilldown_history_limit: int = 12
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceScheduledReportRecord:
   report_id: str
   name: str

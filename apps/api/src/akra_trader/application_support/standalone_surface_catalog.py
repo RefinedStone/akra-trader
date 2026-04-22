@@ -1473,6 +1473,82 @@ def build_standalone_surface_runtime_bindings(
       ),
     ),
   )
+  operator_provider_provenance_scheduler_stitched_report_view_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_view_create",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-views",
+    route_name="create_operator_provider_provenance_scheduler_stitched_report_view",
+    response_title="Create provider provenance scheduler stitched report view",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_view_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_stitched_report_view_create",
+  )
+  operator_provider_provenance_scheduler_stitched_report_view_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_view_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-views",
+    route_name="list_operator_provider_provenance_scheduler_stitched_report_views",
+    response_title="List provider provenance scheduler stitched report views",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_view_list",
+    filter_keys=("created_by_tab_id", "category", "narrative_facet", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "created_by_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Created by tab ID",
+          description="Filter stitched report views by creating tab identity.",
+          examples=("tab_ops",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "category",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Scheduler alert category",
+          description="Filter stitched report views by scheduler alert category.",
+          examples=("scheduler_lag",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "narrative_facet",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Narrative facet",
+          description="Filter stitched report views by scheduler narrative facet.",
+          examples=("post_resolution_recovery",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search stitched report views by name, description, or scheduler query fields.",
+          examples=("lag recovery",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of stitched report views to return.",
+          examples=(12,),
+        ),
+      ),
+    ),
+  )
   operator_provider_provenance_scheduler_narrative_template_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_template_create",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates",
@@ -4245,6 +4321,8 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_analytics_preset_list_binding,
     operator_provider_provenance_dashboard_view_create_binding,
     operator_provider_provenance_dashboard_view_list_binding,
+    operator_provider_provenance_scheduler_stitched_report_view_create_binding,
+    operator_provider_provenance_scheduler_stitched_report_view_list_binding,
     operator_provider_provenance_scheduler_narrative_template_create_binding,
     operator_provider_provenance_scheduler_narrative_template_list_binding,
     operator_provider_provenance_scheduler_narrative_template_update_binding,

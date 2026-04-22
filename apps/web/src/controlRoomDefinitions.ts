@@ -1582,6 +1582,27 @@ export type ProviderProvenanceDashboardViewListPayload = {
   total: number;
 };
 
+export type ProviderProvenanceSchedulerStitchedReportViewEntry = {
+  view_id: string;
+  name: string;
+  description: string;
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  occurrence_limit: number;
+  history_limit: number;
+  drilldown_history_limit: number;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerStitchedReportViewListPayload = {
+  items: ProviderProvenanceSchedulerStitchedReportViewEntry[];
+  total: number;
+};
+
 export type ProviderProvenanceSchedulerNarrativeTemplateEntry = {
   template_id: string;
   name: string;

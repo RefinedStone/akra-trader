@@ -15234,6 +15234,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_analytics_preset_list",
     "operator_provider_provenance_dashboard_view_create",
     "operator_provider_provenance_dashboard_view_list",
+    "operator_provider_provenance_scheduler_stitched_report_view_create",
+    "operator_provider_provenance_scheduler_stitched_report_view_list",
     "operator_provider_provenance_scheduler_narrative_template_create",
     "operator_provider_provenance_scheduler_narrative_template_list",
     "operator_provider_provenance_scheduler_narrative_template_update",
@@ -15415,6 +15417,13 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_dashboard_view_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_dashboard_view_list"].filter_param_specs[3].key == (
     "highlight_panel"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_create"].methods == (
+    "POST",
+  )
+  assert (
+    bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_list"].filter_param_specs[2].key
+    == "narrative_facet"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"].methods == ("POST",)
   assert (
@@ -16607,6 +16616,45 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert view_list_payload["total"] == 1
   assert view_list_payload["items"][0]["view_id"] == view_payload["view_id"]
+
+  stitched_report_view_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_create"],
+    app=app,
+    request_payload={
+      "name": "Lag recovery stitched report",
+      "description": "Saved stitched report slice for lag recovery.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "post_resolution_recovery",
+        "window_days": 14,
+        "result_limit": 12,
+      },
+      "occurrence_limit": 6,
+      "history_limit": 16,
+      "drilldown_history_limit": 18,
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert stitched_report_view_payload["query"]["scheduler_alert_category"] == "scheduler_lag"
+  assert stitched_report_view_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
+  assert stitched_report_view_payload["occurrence_limit"] == 6
+  assert stitched_report_view_payload["history_limit"] == 16
+  assert stitched_report_view_payload["drilldown_history_limit"] == 18
+
+  stitched_report_view_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_view_list"],
+    app=app,
+    filters={
+      "category": "scheduler_lag",
+      "narrative_facet": "post_resolution_recovery",
+      "limit": 10,
+    },
+  )
+  assert stitched_report_view_list_payload["total"] == 1
+  assert stitched_report_view_list_payload["items"][0]["view_id"] == stitched_report_view_payload["view_id"]
 
   template_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"],

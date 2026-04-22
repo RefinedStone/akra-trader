@@ -117,6 +117,14 @@ def serialize_provider_provenance_dashboard_view_list(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_dashboard_view_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_stitched_report_view_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_view_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_stitched_report_view_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_view_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduler_narrative_template_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_record')(*args, **kwargs)
 
@@ -685,6 +693,29 @@ def execute_standalone_surface_binding(
         created_by_tab_id=resolved_filters.get("created_by_tab_id"),
         focus_scope=resolved_filters.get("focus_scope"),
         highlight_panel=resolved_filters.get("highlight_panel"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_create":
+    return serialize_provider_provenance_scheduler_stitched_report_view_record(
+      app.create_provider_provenance_scheduler_stitched_report_view(
+        name=resolved_payload["name"],
+        description=resolved_payload.get("description") or "",
+        query=resolved_payload.get("query"),
+        occurrence_limit=resolved_payload.get("occurrence_limit", 8),
+        history_limit=resolved_payload.get("history_limit", 12),
+        drilldown_history_limit=resolved_payload.get("drilldown_history_limit", 12),
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_list":
+    return serialize_provider_provenance_scheduler_stitched_report_view_list(
+      app.list_provider_provenance_scheduler_stitched_report_views(
+        created_by_tab_id=resolved_filters.get("created_by_tab_id"),
+        category=resolved_filters.get("category"),
+        narrative_facet=resolved_filters.get("narrative_facet"),
         search=resolved_filters.get("search"),
         limit=resolved_filters.get("limit", 50),
       )

@@ -56,6 +56,7 @@ import {
   createProviderProvenanceAnalyticsPreset,
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
+  createProviderProvenanceSchedulerStitchedReportView,
   createProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy,
   createProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
@@ -88,6 +89,7 @@ import {
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
   listProviderProvenanceAnalyticsPresets,
   listProviderProvenanceDashboardViews,
+  listProviderProvenanceSchedulerStitchedReportViews,
   listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAudits,
   listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates,
   listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisions,
@@ -338,6 +340,7 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerStitchedReportViewEntry,
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
@@ -2956,6 +2959,7 @@ function buildProviderProvenanceAnalyticsWorkspaceQuery(
 function buildProviderProvenanceAnalyticsQueryStateFromWorkspaceQuery(
   query: ProviderProvenanceAnalyticsPresetEntry["query"]
     | ProviderProvenanceDashboardViewEntry["query"]
+    | ProviderProvenanceSchedulerStitchedReportViewEntry["query"]
     | ProviderProvenanceSchedulerNarrativeTemplateEntry["query"]
     | ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry["query"]
     | ProviderProvenanceSchedulerNarrativeRegistryEntry["query"]
@@ -3650,6 +3654,8 @@ export default function App() {
     ...defaultProviderProvenanceWorkspaceDraft,
     preset_id: "",
   }));
+  const [providerProvenanceSchedulerStitchedReportViewDraft, setProviderProvenanceSchedulerStitchedReportViewDraft] =
+    useState(defaultProviderProvenanceWorkspaceDraft);
   const [providerProvenanceReportDraft, setProviderProvenanceReportDraft] =
     useState<ProviderProvenanceReportDraftState>(defaultProviderProvenanceReportDraft);
   const [providerProvenanceAnalyticsPresets, setProviderProvenanceAnalyticsPresets] =
@@ -3663,6 +3669,12 @@ export default function App() {
   const [providerProvenanceDashboardViewsLoading, setProviderProvenanceDashboardViewsLoading] =
     useState(false);
   const [providerProvenanceDashboardViewsError, setProviderProvenanceDashboardViewsError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerStitchedReportViews, setProviderProvenanceSchedulerStitchedReportViews] =
+    useState<ProviderProvenanceSchedulerStitchedReportViewEntry[]>([]);
+  const [providerProvenanceSchedulerStitchedReportViewsLoading, setProviderProvenanceSchedulerStitchedReportViewsLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerStitchedReportViewsError, setProviderProvenanceSchedulerStitchedReportViewsError] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerNarrativeTemplates, setProviderProvenanceSchedulerNarrativeTemplates] =
     useState<ProviderProvenanceSchedulerNarrativeTemplateEntry[]>([]);
@@ -4066,6 +4078,7 @@ export default function App() {
   const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerStitchedReportViewRequestIdRef = useRef(0);
   const providerProvenanceSchedulerNarrativeGovernancePlanRequestIdRef = useRef(0);
   const providerProvenanceWorkspaceRegistryLoadedRef = useRef(false);
   const providerProvenanceSchedulerAutomationRef = useRef<HTMLDivElement | null>(null);
@@ -6311,16 +6324,20 @@ export default function App() {
     providerProvenanceSchedulerAlertHistoryRequestIdRef.current = alertHistoryRequestId;
     const exportRequestId = providerProvenanceSchedulerExportRequestIdRef.current + 1;
     providerProvenanceSchedulerExportRequestIdRef.current = exportRequestId;
+    const stitchedViewRequestId = providerProvenanceSchedulerStitchedReportViewRequestIdRef.current + 1;
+    providerProvenanceSchedulerStitchedReportViewRequestIdRef.current = stitchedViewRequestId;
     setProviderProvenanceSchedulerAnalyticsLoading(true);
     setProviderProvenanceSchedulerHistoryLoading(true);
     setProviderProvenanceSchedulerAlertHistoryLoading(true);
     setProviderProvenanceSchedulerExportsLoading(true);
+    setProviderProvenanceSchedulerStitchedReportViewsLoading(true);
     setProviderProvenanceSchedulerAnalyticsError(null);
     setProviderProvenanceSchedulerHistoryError(null);
     setProviderProvenanceSchedulerAlertHistoryError(null);
     setProviderProvenanceSchedulerExportsError(null);
+    setProviderProvenanceSchedulerStitchedReportViewsError(null);
     try {
-      const [analyticsPayload, historyPayload, alertHistoryPayload, exportListPayload] = await Promise.all([
+      const [analyticsPayload, historyPayload, alertHistoryPayload, exportListPayload, stitchedViewPayload] = await Promise.all([
         getProviderProvenanceSchedulerHealthAnalytics({
           windowDays: providerProvenanceAnalyticsQuery.window_days,
           historyLimit: schedulerHistoryLimit,
@@ -6351,6 +6368,17 @@ export default function App() {
           exportScope: "provider_provenance_scheduler_health",
           limit: schedulerHistoryLimit,
         }),
+        listProviderProvenanceSchedulerStitchedReportViews({
+          category:
+            providerProvenanceAnalyticsQuery.scheduler_alert_category !== ALL_FILTER_VALUE
+              ? providerProvenanceAnalyticsQuery.scheduler_alert_category
+              : undefined,
+          narrativeFacet:
+            providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet !== "all_occurrences"
+              ? providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet
+              : undefined,
+          limit: schedulerHistoryLimit,
+        }),
       ]);
       if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
         setProviderProvenanceSchedulerAnalytics(analyticsPayload);
@@ -6363,6 +6391,9 @@ export default function App() {
       }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExports(exportListPayload.items);
+      }
+      if (providerProvenanceSchedulerStitchedReportViewRequestIdRef.current === stitchedViewRequestId) {
+        setProviderProvenanceSchedulerStitchedReportViews(stitchedViewPayload.items);
       }
     } catch (error) {
       const message = (error as Error).message;
@@ -6382,6 +6413,10 @@ export default function App() {
         setProviderProvenanceSchedulerExports([]);
         setProviderProvenanceSchedulerExportsError(message);
       }
+      if (providerProvenanceSchedulerStitchedReportViewRequestIdRef.current === stitchedViewRequestId) {
+        setProviderProvenanceSchedulerStitchedReportViews([]);
+        setProviderProvenanceSchedulerStitchedReportViewsError(message);
+      }
     } finally {
       if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
         setProviderProvenanceSchedulerAnalyticsLoading(false);
@@ -6394,6 +6429,9 @@ export default function App() {
       }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExportsLoading(false);
+      }
+      if (providerProvenanceSchedulerStitchedReportViewRequestIdRef.current === stitchedViewRequestId) {
+        setProviderProvenanceSchedulerStitchedReportViewsLoading(false);
       }
     }
   }
@@ -6448,25 +6486,42 @@ export default function App() {
 
   async function requestProviderProvenanceSchedulerStitchedNarrativeReport(
     format: "json" | "csv",
+    options?: {
+      query?: ProviderProvenanceSchedulerStitchedReportViewEntry["query"];
+      offset?: number;
+      occurrenceLimit?: number;
+      historyLimit?: number;
+      drilldownHistoryLimit?: number;
+    },
   ) {
-    return exportProviderProvenanceSchedulerStitchedNarrativeReport({
-      alertCategory:
-        providerProvenanceAnalyticsQuery.scheduler_alert_category !== ALL_FILTER_VALUE
+    const query = options?.query;
+    const category =
+      query?.scheduler_alert_category && query.scheduler_alert_category !== ALL_FILTER_VALUE
+        ? query.scheduler_alert_category
+        : providerProvenanceAnalyticsQuery.scheduler_alert_category !== ALL_FILTER_VALUE
           ? providerProvenanceAnalyticsQuery.scheduler_alert_category
-          : undefined,
-      status:
-        providerProvenanceAnalyticsQuery.scheduler_alert_status !== ALL_FILTER_VALUE
+          : undefined;
+    const status =
+      query?.scheduler_alert_status && query.scheduler_alert_status !== ALL_FILTER_VALUE
+        ? query.scheduler_alert_status
+        : providerProvenanceAnalyticsQuery.scheduler_alert_status !== ALL_FILTER_VALUE
           ? providerProvenanceAnalyticsQuery.scheduler_alert_status
-          : undefined,
-      narrativeFacet:
-        providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet !== "all_occurrences"
+          : undefined;
+    const narrativeFacet =
+      query?.scheduler_alert_narrative_facet && query.scheduler_alert_narrative_facet !== "all_occurrences"
+        ? query.scheduler_alert_narrative_facet
+        : providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet !== "all_occurrences"
           ? providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet
-          : undefined,
-      offset: providerProvenanceSchedulerAlertHistoryOffset,
-      occurrenceLimit: providerProvenanceSchedulerAlertHistory?.query.limit ?? 8,
+          : undefined;
+    return exportProviderProvenanceSchedulerStitchedNarrativeReport({
+      alertCategory: category,
+      status,
+      narrativeFacet,
+      offset: options?.offset ?? providerProvenanceSchedulerAlertHistoryOffset,
+      occurrenceLimit: options?.occurrenceLimit ?? providerProvenanceSchedulerAlertHistory?.query.limit ?? 8,
       format,
-      historyLimit: 12,
-      drilldownHistoryLimit: 12,
+      historyLimit: options?.historyLimit ?? 12,
+      drilldownHistoryLimit: options?.drilldownHistoryLimit ?? 12,
     });
   }
 
@@ -6515,6 +6570,122 @@ export default function App() {
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
         `Stitched scheduler narrative share failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function saveCurrentProviderProvenanceSchedulerStitchedReportView() {
+    if (!providerProvenanceSchedulerStitchedReportViewDraft.name.trim()) {
+      setProviderProvenanceWorkspaceFeedback("Enter a stitched report view name before saving the current scheduler slice.");
+      return;
+    }
+    if (providerProvenanceAnalyticsQuery.scope === "current_focus" && !activeMarketInstrument) {
+      setProviderProvenanceWorkspaceFeedback("Select a triage focus before saving a current-focus stitched report view.");
+      return;
+    }
+    try {
+      const createdView = await createProviderProvenanceSchedulerStitchedReportView({
+        name: providerProvenanceSchedulerStitchedReportViewDraft.name.trim(),
+        description: providerProvenanceSchedulerStitchedReportViewDraft.description.trim(),
+        query: buildProviderProvenanceAnalyticsWorkspaceQuery(
+          providerProvenanceAnalyticsQuery,
+          activeMarketInstrument,
+        ),
+        occurrenceLimit: providerProvenanceSchedulerAlertHistory?.query.limit ?? 8,
+        historyLimit: 12,
+        drilldownHistoryLimit: 12,
+        createdByTabId: comparisonHistoryTabIdentity.tabId,
+        createdByTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      setProviderProvenanceSchedulerStitchedReportViewDraft(defaultProviderProvenanceWorkspaceDraft);
+      await loadProviderProvenanceSchedulerSurfaces();
+      setProviderProvenanceWorkspaceFeedback(`Saved stitched scheduler report view ${createdView.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler stitched report view save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function applyProviderProvenanceSchedulerStitchedReportView(
+    entry: ProviderProvenanceSchedulerStitchedReportViewEntry,
+  ) {
+    await applyProviderProvenanceWorkspaceQuery(entry, {
+      includeLayout: false,
+      feedbackLabel: `Stitched report view ${entry.name}`,
+      forceSchedulerHighlight: true,
+    });
+  }
+
+  async function copyProviderProvenanceSchedulerStitchedNarrativeReportView(
+    entry: ProviderProvenanceSchedulerStitchedReportViewEntry,
+  ) {
+    if (!navigator.clipboard?.writeText) {
+      setProviderProvenanceWorkspaceFeedback("Clipboard is unavailable for stitched scheduler narrative reports.");
+      return;
+    }
+    try {
+      const exportPayload = await requestProviderProvenanceSchedulerStitchedNarrativeReport("json", {
+        query: entry.query,
+        offset: 0,
+        occurrenceLimit: entry.occurrence_limit,
+        historyLimit: entry.history_limit,
+        drilldownHistoryLimit: entry.drilldown_history_limit,
+      });
+      await navigator.clipboard.writeText(exportPayload.content);
+      setProviderProvenanceWorkspaceFeedback(
+        `Copied stitched scheduler narrative report ${exportPayload.filename} from saved view ${entry.name}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Saved stitched report copy failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function downloadProviderProvenanceSchedulerStitchedNarrativeCsvView(
+    entry: ProviderProvenanceSchedulerStitchedReportViewEntry,
+  ) {
+    try {
+      const exportPayload = await requestProviderProvenanceSchedulerStitchedNarrativeReport("csv", {
+        query: entry.query,
+        offset: 0,
+        occurrenceLimit: entry.occurrence_limit,
+        historyLimit: entry.history_limit,
+        drilldownHistoryLimit: entry.drilldown_history_limit,
+      });
+      downloadTextExport(exportPayload);
+      setProviderProvenanceWorkspaceFeedback(
+        `Downloaded stitched scheduler narrative report ${exportPayload.filename} from saved view ${entry.name}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Saved stitched report CSV export failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function shareProviderProvenanceSchedulerStitchedNarrativeReportView(
+    entry: ProviderProvenanceSchedulerStitchedReportViewEntry,
+  ) {
+    try {
+      const exportPayload = await requestProviderProvenanceSchedulerStitchedNarrativeReport("json", {
+        query: entry.query,
+        offset: 0,
+        occurrenceLimit: entry.occurrence_limit,
+        historyLimit: entry.history_limit,
+        drilldownHistoryLimit: entry.drilldown_history_limit,
+      });
+      const sharedEntry = await createSharedProviderProvenanceSchedulerExportSnapshot({
+        sourceLabel: `saved stitched report view ${entry.name}`,
+        exportPayload,
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Shared stitched scheduler report ${shortenIdentifier(sharedEntry.job_id, 10)} from saved view ${entry.name}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Saved stitched report share failed: ${(error as Error).message}`,
       );
     }
   }
@@ -7357,6 +7528,7 @@ export default function App() {
     entry:
       | ProviderProvenanceAnalyticsPresetEntry
       | ProviderProvenanceDashboardViewEntry
+      | ProviderProvenanceSchedulerStitchedReportViewEntry
       | ProviderProvenanceSchedulerNarrativeTemplateEntry
       | ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry
       | ProviderProvenanceSchedulerNarrativeRegistryEntry
@@ -7429,6 +7601,14 @@ export default function App() {
         ? current.description
         : `Saved scheduler occurrence view for ${facetLabel}.`,
     }));
+    setProviderProvenanceSchedulerStitchedReportViewDraft((current) => ({
+      ...current,
+      name: current.name.trim() ? current.name : `Scheduler ${facetLabel} stitched report`,
+      description:
+        current.description.trim()
+          ? current.description
+          : `Saved stitched scheduler report slice for ${facetLabel}.`,
+    }));
     setProviderProvenanceSchedulerNarrativeTemplateDraft((current) => ({
       ...current,
       name: current.name.trim() ? current.name : `Scheduler ${facetLabel} template`,
@@ -7446,7 +7626,7 @@ export default function App() {
           : `Shared scheduler narrative review board for ${facetLabel}.`,
     }));
     setProviderProvenanceWorkspaceFeedback(
-      "Scheduler narrative drafts staged. Save a template, narrative registry entry, or shared view to persist the current facet and filters.",
+      "Scheduler narrative drafts staged. Save a stitched report view, template, narrative registry entry, or shared view to persist the current facet and filters.",
     );
   }
 
@@ -17328,6 +17508,140 @@ export default function App() {
                                     </table>
                                   ) : (
                                     <p className="empty-state">No scheduler alert occurrences match the selected filters.</p>
+                                  )}
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Saved stitched report views</strong>
+                                    <p>
+                                      Store stitched multi-occurrence scheduler report slices as reusable saved views,
+                                      then re-apply, copy, download, or share them without rebuilding the filter set by
+                                      hand.
+                                    </p>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Name</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerStitchedReportViewDraft((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Lag recovery stitched report"
+                                        type="text"
+                                        value={providerProvenanceSchedulerStitchedReportViewDraft.name}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Description</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerStitchedReportViewDraft((current) => ({
+                                            ...current,
+                                            description: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="saved stitched occurrence slice"
+                                        type="text"
+                                        value={providerProvenanceSchedulerStitchedReportViewDraft.description}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Action</span>
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          void saveCurrentProviderProvenanceSchedulerStitchedReportView();
+                                        }}
+                                        type="button"
+                                      >
+                                        Save stitched view
+                                      </button>
+                                    </label>
+                                  </div>
+                                  {providerProvenanceSchedulerStitchedReportViewsLoading ? (
+                                    <p className="empty-state">Loading stitched report views…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerStitchedReportViewsError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Stitched report views failed: {providerProvenanceSchedulerStitchedReportViewsError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerStitchedReportViews.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>View</th>
+                                          <th>Slice</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceSchedulerStitchedReportViews.map((entry) => (
+                                          <tr key={`provider-scheduler-stitched-view-${entry.view_id}`}>
+                                            <td>
+                                              <strong>{entry.name}</strong>
+                                              <p className="run-lineage-symbol-copy">{entry.filter_summary}</p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.created_by_tab_label ?? entry.created_by_tab_id ?? "unknown tab"} · updated{" "}
+                                                {formatTimestamp(entry.updated_at)}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{entry.occurrence_limit} occurrence(s)</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                History {entry.history_limit} · drill-down {entry.drilldown_history_limit}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                Focus {entry.query.focus_scope === "current_focus" ? "current focus" : "all focuses"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <div className="market-data-provenance-history-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void applyProviderProvenanceSchedulerStitchedReportView(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Apply
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void copyProviderProvenanceSchedulerStitchedNarrativeReportView(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Copy report
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void downloadProviderProvenanceSchedulerStitchedNarrativeCsvView(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Download CSV
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void shareProviderProvenanceSchedulerStitchedNarrativeReportView(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Share report
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No stitched scheduler report views saved yet.</p>
                                   )}
                                   <div className="market-data-provenance-history-head">
                                     <strong>Shared scheduler exports</strong>

@@ -261,6 +261,17 @@ class OperatorProviderProvenanceDashboardViewCreateRequest(BaseModel):
   created_by_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerStitchedReportViewCreateRequest(BaseModel):
+  name: str
+  description: str = ""
+  query: dict[str, Any] = Field(default_factory=dict)
+  occurrence_limit: int = 8
+  history_limit: int = 12
+  drilldown_history_limit: int = 12
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
 class OperatorProviderProvenanceSchedulerNarrativeTemplateCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -687,6 +698,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "operator_provider_provenance_export_job_escalate": (OperatorProviderProvenanceExportJobEscalateRequest, {}),
   "operator_provider_provenance_analytics_preset_create": (OperatorProviderProvenanceAnalyticsPresetCreateRequest, {}),
   "operator_provider_provenance_dashboard_view_create": (OperatorProviderProvenanceDashboardViewCreateRequest, {}),
+  "operator_provider_provenance_scheduler_stitched_report_view_create": (
+    OperatorProviderProvenanceSchedulerStitchedReportViewCreateRequest,
+    {},
+  ),
   "operator_provider_provenance_scheduler_narrative_template_create": (
     OperatorProviderProvenanceSchedulerNarrativeTemplateCreateRequest,
     {},

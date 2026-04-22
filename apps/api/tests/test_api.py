@@ -598,6 +598,20 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "limit",
     "app",
   )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_stitched_report_view"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_stitched_report_views"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "created_by_tab_id",
+    "category",
+    "narrative_facet",
+    "search",
+    "limit",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_narrative_template"].endpoint).parameters) == (
     "request",
     "app",

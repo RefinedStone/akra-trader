@@ -32,6 +32,7 @@ from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionRecord
@@ -294,6 +295,10 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_export_job_audit_records: OrderedDict[str, ProviderProvenanceExportJobAuditRecord] = OrderedDict()
     self._provider_provenance_analytics_presets: OrderedDict[str, ProviderProvenanceAnalyticsPresetRecord] = OrderedDict()
     self._provider_provenance_dashboard_views: OrderedDict[str, ProviderProvenanceDashboardViewRecord] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_views: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerStitchedReportViewRecord,
+    ] = OrderedDict()
     self._provider_provenance_scheduled_reports: OrderedDict[str, ProviderProvenanceScheduledReportRecord] = OrderedDict()
     self._provider_provenance_scheduler_narrative_templates: OrderedDict[
       str,
@@ -756,6 +761,30 @@ class InMemoryRunRepository(RunRepositoryPort):
     view_id: str,
   ) -> ProviderProvenanceDashboardViewRecord | None:
     return self._provider_provenance_dashboard_views.get(view_id)
+
+  def save_provider_provenance_scheduler_stitched_report_view(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportViewRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportViewRecord:
+    self._provider_provenance_scheduler_stitched_report_views[record.view_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_views(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportViewRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_views.values(),
+        key=lambda record: (record.updated_at, record.view_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_view(
+    self,
+    view_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportViewRecord | None:
+    return self._provider_provenance_scheduler_stitched_report_views.get(view_id)
 
   def save_provider_provenance_scheduled_report(
     self,

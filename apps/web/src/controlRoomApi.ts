@@ -17,6 +17,8 @@ import type {
   ProviderProvenanceSchedulerAlertHistoryPayload,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerStitchedReportViewEntry,
+  ProviderProvenanceSchedulerStitchedReportViewListPayload,
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
@@ -650,6 +652,69 @@ export async function listProviderProvenanceDashboardViews(params: {
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceDashboardViewListPayload>(
     `/operator/provider-provenance-analytics/views${suffix}`,
+  );
+}
+
+export async function createProviderProvenanceSchedulerStitchedReportView(params: {
+  name: string;
+  description?: string;
+  query?: Record<string, unknown>;
+  occurrenceLimit?: number;
+  historyLimit?: number;
+  drilldownHistoryLimit?: number;
+  createdByTabId?: string;
+  createdByTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerStitchedReportViewEntry>(
+    "/operator/provider-provenance-analytics/scheduler-stitched-report-views",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: params.name,
+        description: params.description ?? "",
+        ...(params.query ? { query: params.query } : {}),
+        ...(typeof params.occurrenceLimit === "number" && Number.isFinite(params.occurrenceLimit)
+          ? { occurrence_limit: Math.max(1, Math.min(Math.round(params.occurrenceLimit), 50)) }
+          : {}),
+        ...(typeof params.historyLimit === "number" && Number.isFinite(params.historyLimit)
+          ? { history_limit: Math.max(1, Math.min(Math.round(params.historyLimit), 200)) }
+          : {}),
+        ...(typeof params.drilldownHistoryLimit === "number" && Number.isFinite(params.drilldownHistoryLimit)
+          ? { drilldown_history_limit: Math.max(1, Math.min(Math.round(params.drilldownHistoryLimit), 100)) }
+          : {}),
+        ...(params.createdByTabId?.trim() ? { created_by_tab_id: params.createdByTabId.trim() } : {}),
+        ...(params.createdByTabLabel?.trim() ? { created_by_tab_label: params.createdByTabLabel.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerStitchedReportViews(params: {
+  createdByTabId?: string;
+  category?: string;
+  narrativeFacet?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.createdByTabId?.trim()) {
+    searchParams.set("created_by_tab_id", params.createdByTabId.trim());
+  }
+  if (params.category?.trim()) {
+    searchParams.set("category", params.category.trim());
+  }
+  if (params.narrativeFacet?.trim()) {
+    searchParams.set("narrative_facet", params.narrativeFacet.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerStitchedReportViewListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-views${suffix}`,
   );
 }
 
