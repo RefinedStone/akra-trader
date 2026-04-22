@@ -1256,8 +1256,14 @@ def execute_standalone_surface_binding(
       app.list_provider_provenance_scheduler_narrative_governance_plans(
         item_type=resolved_filters.get("item_type"),
         status=resolved_filters.get("status"),
+        queue_state=resolved_filters.get("queue_state"),
+        approval_lane=resolved_filters.get("approval_lane"),
+        approval_priority=resolved_filters.get("approval_priority"),
+        policy_template_id=resolved_filters.get("policy_template_id"),
         policy_catalog_id=resolved_filters.get("policy_catalog_id"),
         source_hierarchy_step_template_id=resolved_filters.get("source_hierarchy_step_template_id"),
+        search=resolved_filters.get("search"),
+        sort=resolved_filters.get("sort"),
         limit=resolved_filters.get("limit", 20),
       )
     )

@@ -1368,6 +1368,15 @@ class ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePlanListResult:
+  items: tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...] = ()
+  total: int = 0
+  pending_approval_count: int = 0
+  ready_to_apply_count: int = 0
+  completed_count: int = 0
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogStageResult:
   catalog_id: str
   catalog_name: str

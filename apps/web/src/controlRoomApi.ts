@@ -1842,8 +1842,14 @@ export async function stageProviderProvenanceSchedulerNarrativeGovernancePolicyC
 export async function listProviderProvenanceSchedulerNarrativeGovernancePlans(params: {
   itemType?: string;
   status?: string;
+  queueState?: string;
+  approvalLane?: string;
+  approvalPriority?: string;
+  policyTemplateId?: string;
   policyCatalogId?: string;
   sourceHierarchyStepTemplateId?: string;
+  search?: string;
+  sort?: string;
   limit?: number;
 } = {}) {
   const searchParams = new URLSearchParams();
@@ -1853,11 +1859,40 @@ export async function listProviderProvenanceSchedulerNarrativeGovernancePlans(pa
   if (params.status?.trim()) {
     searchParams.set("status", params.status.trim());
   }
-  if (params.policyCatalogId?.trim()) {
-    searchParams.set("policy_catalog_id", params.policyCatalogId.trim());
+  if (params.queueState?.trim()) {
+    searchParams.set("queue_state", params.queueState.trim());
   }
-  if (params.sourceHierarchyStepTemplateId?.trim()) {
-    searchParams.set("source_hierarchy_step_template_id", params.sourceHierarchyStepTemplateId.trim());
+  if (params.approvalLane?.trim()) {
+    searchParams.set("approval_lane", params.approvalLane.trim());
+  }
+  if (params.approvalPriority?.trim()) {
+    searchParams.set("approval_priority", params.approvalPriority.trim());
+  }
+  if (typeof params.policyTemplateId === "string") {
+    searchParams.set(
+      "policy_template_id",
+      params.policyTemplateId === "" ? "__none__" : params.policyTemplateId.trim(),
+    );
+  }
+  if (typeof params.policyCatalogId === "string") {
+    searchParams.set(
+      "policy_catalog_id",
+      params.policyCatalogId === "" ? "__none__" : params.policyCatalogId.trim(),
+    );
+  }
+  if (typeof params.sourceHierarchyStepTemplateId === "string") {
+    searchParams.set(
+      "source_hierarchy_step_template_id",
+      params.sourceHierarchyStepTemplateId === ""
+        ? "__none__"
+        : params.sourceHierarchyStepTemplateId.trim(),
+    );
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (params.sort?.trim()) {
+    searchParams.set("sort", params.sort.trim());
   }
   if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
     searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 100))));

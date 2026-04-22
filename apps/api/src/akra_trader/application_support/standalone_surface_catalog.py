@@ -2394,7 +2394,19 @@ def build_standalone_surface_runtime_bindings(
     response_title="List provider provenance scheduler narrative governance plans",
     scope="app",
     binding_kind="operator_provider_provenance_scheduler_narrative_governance_plan_list",
-    filter_keys=("item_type", "status", "policy_catalog_id", "source_hierarchy_step_template_id", "limit"),
+    filter_keys=(
+      "item_type",
+      "status",
+      "queue_state",
+      "approval_lane",
+      "approval_priority",
+      "policy_template_id",
+      "policy_catalog_id",
+      "source_hierarchy_step_template_id",
+      "search",
+      "sort",
+      "limit",
+    ),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
         "item_type",
@@ -2419,6 +2431,50 @@ def build_standalone_surface_runtime_bindings(
         ),
       ),
       StandaloneSurfaceFilterParamSpec(
+        "queue_state",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Queue state",
+          description="Filter scheduler narrative governance plans by pending approval, ready to apply, or completed queue state.",
+          examples=("pending_approval",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "approval_lane",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Approval lane",
+          description="Filter scheduler narrative governance plans by approval lane.",
+          examples=("shift_lead",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "approval_priority",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Approval priority",
+          description="Filter scheduler narrative governance plans by approval priority.",
+          examples=("critical",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "policy_template_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Policy template ID",
+          description="Filter scheduler narrative governance plans by linked policy template.",
+          examples=("pt_123",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
         "policy_catalog_id",
         str | None,
         default=None,
@@ -2438,6 +2494,28 @@ def build_standalone_surface_runtime_bindings(
           title="Source hierarchy-step template ID",
           description="Filter scheduler narrative governance plans by source hierarchy-step template provenance.",
           examples=("hst_123",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search scheduler narrative governance plans by source template, policy, hierarchy, reason, or creator fields.",
+          examples=("lag recovery",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "sort",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Sort",
+          description="Sort scheduler narrative governance plans by queue priority, recency, or source template name.",
+          examples=("source_template_asc",),
         ),
       ),
       StandaloneSurfaceFilterParamSpec(

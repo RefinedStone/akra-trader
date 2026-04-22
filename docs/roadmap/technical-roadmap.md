@@ -151,8 +151,10 @@ creation.
   step bulk-governance workflow; hierarchy steps can now also be promoted into named templates and
   synced across multiple policy catalogs, and those reusable hierarchy-step templates now also
   support edit/delete/revision-restore, bulk governance, shared team audit, saved policy defaults,
-  direct approval-queue staging, source-template queue filtering, and batch queue staging; stitched
-  multi-occurrence narrative artifacts and deeper server-side narrative search are still not built
+  direct approval-queue staging, source-template queue filtering, batch queue staging, plus
+  server-side queue search/sort and saved dashboard views for hierarchy-step approval review;
+  stitched multi-occurrence narrative artifacts and deeper server-side narrative search are still
+  not built
 
 ### Remaining work
 

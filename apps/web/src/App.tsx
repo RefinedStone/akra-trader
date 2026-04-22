@@ -341,6 +341,7 @@ import type {
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep,
+  ProviderProvenanceSchedulerNarrativeGovernanceQueueView,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionEntry,
@@ -640,6 +641,8 @@ const defaultProviderProvenanceDashboardLayout: ProviderProvenanceDashboardLayou
   show_recent_exports: true,
 };
 
+const DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT = "queue_priority";
+
 const defaultProviderProvenanceWorkspaceDraft = {
   name: "",
   description: "",
@@ -893,6 +896,8 @@ type ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
   policy_template_id: string;
   policy_catalog_id: string;
   source_hierarchy_step_template_id: string;
+  search: string;
+  sort: string;
 };
 
 const defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter:
@@ -904,6 +909,8 @@ const defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter:
   policy_template_id: ALL_FILTER_VALUE,
   policy_catalog_id: ALL_FILTER_VALUE,
   source_hierarchy_step_template_id: ALL_FILTER_VALUE,
+  search: "",
+  sort: DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
 };
 
 type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState = {
@@ -2702,6 +2709,9 @@ function formatProviderProvenanceAnalyticsQuerySummary(
 function normalizeProviderProvenanceDashboardLayoutState(
   layout: Partial<ProviderProvenanceDashboardLayout> | null | undefined,
 ): ProviderProvenanceDashboardLayout {
+  const normalizedGovernanceQueueView = normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueView(
+    layout?.governance_queue_view,
+  );
   return {
     highlight_panel:
       layout?.highlight_panel === "drift"
@@ -2714,7 +2724,200 @@ function normalizeProviderProvenanceDashboardLayoutState(
     show_rollups: layout?.show_rollups !== false,
     show_time_series: layout?.show_time_series !== false,
     show_recent_exports: layout?.show_recent_exports !== false,
+    ...(normalizedGovernanceQueueView
+      ? {
+          governance_queue_view: normalizedGovernanceQueueView,
+        }
+      : {}),
   };
+}
+
+function normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueSort(
+  value: string | null | undefined,
+) {
+  return value === "updated_desc"
+    || value === "updated_asc"
+    || value === "created_desc"
+    || value === "created_asc"
+    || value === "source_template_asc"
+    || value === "source_template_desc"
+    || value === DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT
+    ? value
+    : DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT;
+}
+
+function normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueView(
+  queueView: Partial<ProviderProvenanceSchedulerNarrativeGovernanceQueueView> | null | undefined,
+): ProviderProvenanceSchedulerNarrativeGovernanceQueueView | null {
+  const normalized: ProviderProvenanceSchedulerNarrativeGovernanceQueueView = {};
+  if (
+    queueView?.queue_state === "pending_approval"
+    || queueView?.queue_state === "ready_to_apply"
+    || queueView?.queue_state === "completed"
+  ) {
+    normalized.queue_state = queueView.queue_state;
+  }
+  if (queueView?.item_type === "template" || queueView?.item_type === "registry") {
+    normalized.item_type = queueView.item_type;
+  }
+  if (typeof queueView?.approval_lane === "string" && queueView.approval_lane.trim()) {
+    normalized.approval_lane = queueView.approval_lane.trim();
+  }
+  if (typeof queueView?.approval_priority === "string" && queueView.approval_priority.trim()) {
+    normalized.approval_priority = queueView.approval_priority.trim();
+  }
+  if (typeof queueView?.policy_template_id === "string") {
+    normalized.policy_template_id = queueView.policy_template_id.trim();
+  }
+  if (typeof queueView?.policy_catalog_id === "string") {
+    normalized.policy_catalog_id = queueView.policy_catalog_id.trim();
+  }
+  if (typeof queueView?.source_hierarchy_step_template_id === "string") {
+    normalized.source_hierarchy_step_template_id = queueView.source_hierarchy_step_template_id.trim();
+  }
+  if (
+    typeof queueView?.source_hierarchy_step_template_name === "string"
+    && queueView.source_hierarchy_step_template_name.trim()
+  ) {
+    normalized.source_hierarchy_step_template_name = queueView.source_hierarchy_step_template_name.trim();
+  }
+  if (typeof queueView?.search === "string" && queueView.search.trim()) {
+    normalized.search = queueView.search.trim();
+  }
+  const normalizedSort = normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueSort(
+    queueView?.sort,
+  );
+  if (Object.keys(normalized).length || normalizedSort !== DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT) {
+    normalized.sort = normalizedSort;
+  }
+  return Object.keys(normalized).length ? normalized : null;
+}
+
+function buildProviderProvenanceSchedulerNarrativeGovernanceQueueFilterStateFromView(
+  queueView: Partial<ProviderProvenanceSchedulerNarrativeGovernanceQueueView> | null | undefined,
+): ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState {
+  const normalized = normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueView(queueView);
+  return {
+    queue_state:
+      normalized?.queue_state === "pending_approval"
+      || normalized?.queue_state === "ready_to_apply"
+      || normalized?.queue_state === "completed"
+        ? normalized.queue_state
+        : ALL_FILTER_VALUE,
+    item_type:
+      normalized?.item_type === "template" || normalized?.item_type === "registry"
+        ? normalized.item_type
+        : ALL_FILTER_VALUE,
+    approval_lane: normalized?.approval_lane ?? ALL_FILTER_VALUE,
+    approval_priority: normalized?.approval_priority ?? ALL_FILTER_VALUE,
+    policy_template_id:
+      typeof normalized?.policy_template_id === "string"
+        ? normalized.policy_template_id
+        : ALL_FILTER_VALUE,
+    policy_catalog_id:
+      typeof normalized?.policy_catalog_id === "string"
+        ? normalized.policy_catalog_id
+        : ALL_FILTER_VALUE,
+    source_hierarchy_step_template_id:
+      typeof normalized?.source_hierarchy_step_template_id === "string"
+        ? normalized.source_hierarchy_step_template_id
+        : ALL_FILTER_VALUE,
+    search: normalized?.search ?? "",
+    sort:
+      normalized?.sort ?? DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
+  };
+}
+
+function buildProviderProvenanceSchedulerNarrativeGovernanceQueueViewPayload(
+  filter: ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState,
+  sourceTemplateNameMap: Map<string, string>,
+): ProviderProvenanceSchedulerNarrativeGovernanceQueueView | null {
+  const normalized: ProviderProvenanceSchedulerNarrativeGovernanceQueueView = {};
+  if (filter.queue_state !== ALL_FILTER_VALUE) {
+    normalized.queue_state = filter.queue_state;
+  }
+  if (filter.item_type !== ALL_FILTER_VALUE) {
+    normalized.item_type = filter.item_type;
+  }
+  if (filter.approval_lane !== ALL_FILTER_VALUE) {
+    normalized.approval_lane = filter.approval_lane;
+  }
+  if (filter.approval_priority !== ALL_FILTER_VALUE) {
+    normalized.approval_priority = filter.approval_priority;
+  }
+  if (filter.policy_template_id !== ALL_FILTER_VALUE) {
+    normalized.policy_template_id = filter.policy_template_id;
+  }
+  if (filter.policy_catalog_id !== ALL_FILTER_VALUE) {
+    normalized.policy_catalog_id = filter.policy_catalog_id;
+  }
+  if (filter.source_hierarchy_step_template_id !== ALL_FILTER_VALUE) {
+    normalized.source_hierarchy_step_template_id = filter.source_hierarchy_step_template_id;
+    if (filter.source_hierarchy_step_template_id) {
+      normalized.source_hierarchy_step_template_name =
+        sourceTemplateNameMap.get(filter.source_hierarchy_step_template_id)
+        ?? filter.source_hierarchy_step_template_id;
+    }
+  }
+  if (filter.search.trim()) {
+    normalized.search = filter.search.trim();
+  }
+  const normalizedSort = normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueSort(
+    filter.sort,
+  );
+  if (Object.keys(normalized).length || normalizedSort !== DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT) {
+    normalized.sort = normalizedSort;
+  }
+  return normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueView(normalized);
+}
+
+function formatProviderProvenanceSchedulerNarrativeGovernanceQueueSortLabel(sort: string) {
+  if (sort === "updated_desc") {
+    return "updated ↓";
+  }
+  if (sort === "updated_asc") {
+    return "updated ↑";
+  }
+  if (sort === "created_desc") {
+    return "created ↓";
+  }
+  if (sort === "created_asc") {
+    return "created ↑";
+  }
+  if (sort === "source_template_asc") {
+    return "source template A-Z";
+  }
+  if (sort === "source_template_desc") {
+    return "source template Z-A";
+  }
+  return "queue priority";
+}
+
+function formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary(
+  queueView: Partial<ProviderProvenanceSchedulerNarrativeGovernanceQueueView> | null | undefined,
+) {
+  const normalized = normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueView(queueView);
+  if (!normalized) {
+    return null;
+  }
+  const tokens: string[] = [];
+  if (normalized.queue_state) {
+    tokens.push(`queue ${formatWorkflowToken(normalized.queue_state)}`);
+  }
+  if (normalized.item_type) {
+    tokens.push(formatWorkflowToken(normalized.item_type));
+  }
+  if (normalized.source_hierarchy_step_template_name || normalized.source_hierarchy_step_template_id !== undefined) {
+    tokens.push(
+      normalized.source_hierarchy_step_template_name
+      ?? (normalized.source_hierarchy_step_template_id === "" ? "no source template" : normalized.source_hierarchy_step_template_id ?? "all source templates"),
+    );
+  }
+  if (normalized.search) {
+    tokens.push(`search "${normalized.search}"`);
+  }
+  tokens.push(`sort ${formatProviderProvenanceSchedulerNarrativeGovernanceQueueSortLabel(normalized.sort ?? DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT)}`);
+  return tokens.join(" · ");
 }
 
 function buildProviderProvenanceAnalyticsWorkspaceQuery(
@@ -3630,6 +3833,13 @@ export default function App() {
     );
   const [providerProvenanceSchedulerNarrativeGovernancePlans, setProviderProvenanceSchedulerNarrativeGovernancePlans] =
     useState<ProviderProvenanceSchedulerNarrativeGovernancePlan[]>([]);
+  const [providerProvenanceSchedulerNarrativeGovernancePlanListSummary, setProviderProvenanceSchedulerNarrativeGovernancePlanListSummary] =
+    useState({
+      total: 0,
+      pending_approval_count: 0,
+      ready_to_apply_count: 0,
+      completed_count: 0,
+    });
   const [providerProvenanceSchedulerNarrativeGovernancePlansLoading, setProviderProvenanceSchedulerNarrativeGovernancePlansLoading] =
     useState(false);
   const [providerProvenanceSchedulerNarrativeGovernancePlansError, setProviderProvenanceSchedulerNarrativeGovernancePlansError] =
@@ -3855,6 +4065,8 @@ export default function App() {
   const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerNarrativeGovernancePlanRequestIdRef = useRef(0);
+  const providerProvenanceWorkspaceRegistryLoadedRef = useRef(false);
   const providerProvenanceSchedulerAutomationRef = useRef<HTMLDivElement | null>(null);
   const providerProvenanceSchedulerNarrativeTemplateNameMap = useMemo(
     () =>
@@ -3862,6 +4074,16 @@ export default function App() {
         providerProvenanceSchedulerNarrativeTemplates.map((entry) => [entry.template_id, entry.name]),
       ),
     [providerProvenanceSchedulerNarrativeTemplates],
+  );
+  const providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateNameMap = useMemo(
+    () =>
+      new Map(
+        providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.map((entry) => [
+          entry.hierarchy_step_template_id,
+          entry.name,
+        ]),
+      ),
+    [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates],
   );
   const selectedProviderProvenanceSchedulerNarrativeTemplateIdSet = useMemo(
     () => new Set(selectedProviderProvenanceSchedulerNarrativeTemplateIds),
@@ -4022,97 +4244,12 @@ export default function App() {
     ],
   );
   const providerProvenanceSchedulerNarrativeGovernanceQueueSummary = useMemo(
-    () => ({
-      pending_approval_count: providerProvenanceSchedulerNarrativeGovernancePlans.filter(
-        (entry) => getProviderProvenanceSchedulerNarrativeGovernanceQueueState(entry) === "pending_approval",
-      ).length,
-      ready_to_apply_count: providerProvenanceSchedulerNarrativeGovernancePlans.filter(
-        (entry) => getProviderProvenanceSchedulerNarrativeGovernanceQueueState(entry) === "ready_to_apply",
-      ).length,
-      completed_count: providerProvenanceSchedulerNarrativeGovernancePlans.filter(
-        (entry) => getProviderProvenanceSchedulerNarrativeGovernanceQueueState(entry) === "completed",
-      ).length,
-    }),
-    [providerProvenanceSchedulerNarrativeGovernancePlans],
+    () => providerProvenanceSchedulerNarrativeGovernancePlanListSummary,
+    [providerProvenanceSchedulerNarrativeGovernancePlanListSummary],
   );
   const filteredProviderProvenanceSchedulerNarrativeGovernancePlans = useMemo(
-    () =>
-      [...providerProvenanceSchedulerNarrativeGovernancePlans]
-        .filter((entry) => {
-          const queueState = getProviderProvenanceSchedulerNarrativeGovernanceQueueState(entry);
-          if (
-            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.queue_state !== ALL_FILTER_VALUE
-            && queueState !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.queue_state
-          ) {
-            return false;
-          }
-          if (
-            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.item_type !== ALL_FILTER_VALUE
-            && entry.item_type !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.item_type
-          ) {
-            return false;
-          }
-          if (
-            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_lane !== ALL_FILTER_VALUE
-            && entry.approval_lane !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_lane
-          ) {
-            return false;
-          }
-          if (
-            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_priority !== ALL_FILTER_VALUE
-            && entry.approval_priority !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_priority
-          ) {
-            return false;
-          }
-          if (
-            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id !== ALL_FILTER_VALUE
-            && (entry.policy_template_id ?? "") !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id
-          ) {
-            return false;
-          }
-          if (
-            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id !== ALL_FILTER_VALUE
-            && (entry.policy_catalog_id ?? "") !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id
-          ) {
-            return false;
-          }
-          if (
-            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.source_hierarchy_step_template_id !== ALL_FILTER_VALUE
-            && (entry.source_hierarchy_step_template_id ?? "")
-              !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.source_hierarchy_step_template_id
-          ) {
-            return false;
-          }
-          return true;
-        })
-        .sort((left, right) => {
-          const leftQueueState = getProviderProvenanceSchedulerNarrativeGovernanceQueueState(left);
-          const rightQueueState = getProviderProvenanceSchedulerNarrativeGovernanceQueueState(right);
-          const queueOrder = (queueState: string) => {
-            if (queueState === "pending_approval") {
-              return 0;
-            }
-            if (queueState === "ready_to_apply") {
-              return 1;
-            }
-            return 2;
-          };
-          const queueDelta = queueOrder(leftQueueState) - queueOrder(rightQueueState);
-          if (queueDelta !== 0) {
-            return queueDelta;
-          }
-          const priorityDelta =
-            getProviderProvenanceSchedulerNarrativeGovernanceQueuePriorityRank(right.approval_priority)
-            - getProviderProvenanceSchedulerNarrativeGovernanceQueuePriorityRank(left.approval_priority);
-          if (priorityDelta !== 0) {
-            return priorityDelta;
-          }
-          return right.updated_at.localeCompare(left.updated_at);
-        }),
-    [
-      providerProvenanceSchedulerNarrativeGovernancePlans,
-      providerProvenanceSchedulerNarrativeGovernanceQueueFilter,
-    ],
+    () => providerProvenanceSchedulerNarrativeGovernancePlans,
+    [providerProvenanceSchedulerNarrativeGovernancePlans],
   );
   const selectedFilteredProviderProvenanceSchedulerNarrativeGovernancePlans = useMemo(
     () =>
@@ -6577,6 +6714,88 @@ export default function App() {
     }
   }
 
+  const loadProviderProvenanceSchedulerNarrativeGovernancePlans = useCallback(async () => {
+    const requestId = ++providerProvenanceSchedulerNarrativeGovernancePlanRequestIdRef.current;
+    setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(true);
+    setProviderProvenanceSchedulerNarrativeGovernancePlansError(null);
+    try {
+      const payload = await listProviderProvenanceSchedulerNarrativeGovernancePlans({
+        itemType:
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.item_type !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerNarrativeGovernanceQueueFilter.item_type
+            : undefined,
+        queueState:
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.queue_state !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerNarrativeGovernanceQueueFilter.queue_state
+            : undefined,
+        approvalLane:
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_lane !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_lane
+            : undefined,
+        approvalPriority:
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_priority !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_priority
+            : undefined,
+        policyTemplateId:
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id
+            : undefined,
+        policyCatalogId:
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id
+            : undefined,
+        sourceHierarchyStepTemplateId:
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.source_hierarchy_step_template_id !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerNarrativeGovernanceQueueFilter.source_hierarchy_step_template_id
+            : undefined,
+        search:
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.search.trim() || undefined,
+        sort: normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueSort(
+          providerProvenanceSchedulerNarrativeGovernanceQueueFilter.sort,
+        ),
+        limit: 24,
+      });
+      if (requestId !== providerProvenanceSchedulerNarrativeGovernancePlanRequestIdRef.current) {
+        return;
+      }
+      setProviderProvenanceSchedulerNarrativeGovernancePlans(payload.items);
+      setProviderProvenanceSchedulerNarrativeGovernancePlanListSummary({
+        total: payload.total,
+        pending_approval_count: payload.pending_approval_count,
+        ready_to_apply_count: payload.ready_to_apply_count,
+        completed_count: payload.completed_count,
+      });
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanIds((current) =>
+        current.filter((planId) => payload.items.some((entry) => entry.plan_id === planId)),
+      );
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId((current) =>
+        current && payload.items.some((entry) => entry.plan_id === current)
+          ? current
+          : payload.items[0]?.plan_id ?? null,
+      );
+    } catch (error) {
+      if (requestId !== providerProvenanceSchedulerNarrativeGovernancePlanRequestIdRef.current) {
+        return;
+      }
+      setProviderProvenanceSchedulerNarrativeGovernancePlans([]);
+      setProviderProvenanceSchedulerNarrativeGovernancePlanListSummary({
+        total: 0,
+        pending_approval_count: 0,
+        ready_to_apply_count: 0,
+        completed_count: 0,
+      });
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanIds([]);
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(null);
+      setProviderProvenanceSchedulerNarrativeGovernancePlansError((error as Error).message);
+    } finally {
+      if (requestId === providerProvenanceSchedulerNarrativeGovernancePlanRequestIdRef.current) {
+        setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(false);
+      }
+    }
+  }, [
+    providerProvenanceSchedulerNarrativeGovernanceQueueFilter,
+  ]);
+
   async function loadProviderProvenanceWorkspaceRegistry() {
     setProviderProvenanceAnalyticsPresetsLoading(true);
     setProviderProvenanceDashboardViewsLoading(true);
@@ -6614,7 +6833,6 @@ export default function App() {
         governanceHierarchyStepTemplateAuditPayload,
         governancePolicyTemplateAuditPayload,
         governancePolicyCatalogAuditPayload,
-        governancePlanPayload,
         reportPayload,
       ] = await Promise.all([
         listProviderProvenanceAnalyticsPresets({ limit: 24 }),
@@ -6673,7 +6891,6 @@ export default function App() {
               || undefined,
           limit: 24,
         }),
-        listProviderProvenanceSchedulerNarrativeGovernancePlans({ limit: 24 }),
         listProviderProvenanceScheduledReports({ limit: 24 }),
       ]);
       setProviderProvenanceAnalyticsPresets(presetPayload.items);
@@ -6694,16 +6911,10 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits(
         governancePolicyCatalogAuditPayload.items,
       );
-      setProviderProvenanceSchedulerNarrativeGovernancePlans(governancePlanPayload.items);
       setProviderProvenanceScheduledReports(reportPayload.items);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateIds((current) =>
         current.filter((policyTemplateId) =>
           governancePolicyTemplatePayload.items.some((entry) => entry.policy_template_id === policyTemplateId),
-        ),
-      );
-      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanIds((current) =>
-        current.filter((planId) =>
-          governancePlanPayload.items.some((entry) => entry.plan_id === planId),
         ),
       );
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds((current) =>
@@ -6809,9 +7020,6 @@ export default function App() {
           resetProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft();
         }
       }
-      if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlanId && governancePlanPayload.items.length) {
-        setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(governancePlanPayload.items[0].plan_id);
-      }
       setSelectedProviderProvenanceSchedulerNarrativeTemplateIds((current) =>
         current.filter((templateId) =>
           templatePayload.items.some((entry) => entry.template_id === templateId),
@@ -6848,14 +7056,6 @@ export default function App() {
           : current
       ));
       if (
-        selectedProviderProvenanceSchedulerNarrativeGovernancePlanId
-        && !governancePlanPayload.items.some((entry) => entry.plan_id === selectedProviderProvenanceSchedulerNarrativeGovernancePlanId)
-      ) {
-        setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(
-          governancePlanPayload.items[0]?.plan_id ?? null,
-        );
-      }
-      if (
         selectedProviderProvenanceScheduledReportId
         && !reportPayload.items.some((entry) => entry.report_id === selectedProviderProvenanceScheduledReportId)
       ) {
@@ -6863,8 +7063,11 @@ export default function App() {
         setSelectedProviderProvenanceScheduledReportHistory(null);
         setProviderProvenanceScheduledReportHistoryError(null);
       }
+      providerProvenanceWorkspaceRegistryLoadedRef.current = true;
+      await loadProviderProvenanceSchedulerNarrativeGovernancePlans();
     } catch (error) {
       const message = (error as Error).message;
+      providerProvenanceWorkspaceRegistryLoadedRef.current = false;
       setProviderProvenanceAnalyticsPresets([]);
       setProviderProvenanceDashboardViews([]);
       setProviderProvenanceSchedulerNarrativeTemplates([]);
@@ -6883,6 +7086,12 @@ export default function App() {
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(null);
+      setProviderProvenanceSchedulerNarrativeGovernancePlanListSummary({
+        total: 0,
+        pending_approval_count: 0,
+        ready_to_apply_count: 0,
+        completed_count: 0,
+      });
       setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory(null);
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateId(null);
@@ -6906,6 +7115,7 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePlansError(message);
+      setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(false);
       setProviderProvenanceScheduledReportsError(message);
     } finally {
       setProviderProvenanceAnalyticsPresetsLoading(false);
@@ -6918,10 +7128,16 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditsLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading(false);
-      setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(false);
       setProviderProvenanceScheduledReportsLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!providerProvenanceWorkspaceRegistryLoadedRef.current) {
+      return;
+    }
+    void loadProviderProvenanceSchedulerNarrativeGovernancePlans();
+  }, [loadProviderProvenanceSchedulerNarrativeGovernancePlans]);
 
   async function loadMarketDataWorkflow(
     instrument: MarketDataStatus["instruments"][number] | null,
@@ -7084,9 +7300,15 @@ export default function App() {
     );
     setProviderProvenanceSchedulerAlertHistoryOffset(0);
     if (includeLayout && "layout" in entry) {
-      setProviderProvenanceDashboardLayout(
-        normalizeProviderProvenanceDashboardLayoutState(entry.layout),
-      );
+      const normalizedLayout = normalizeProviderProvenanceDashboardLayoutState(entry.layout);
+      setProviderProvenanceDashboardLayout(normalizedLayout);
+      if (normalizedLayout.governance_queue_view) {
+        setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter(
+          buildProviderProvenanceSchedulerNarrativeGovernanceQueueFilterStateFromView(
+            normalizedLayout.governance_queue_view,
+          ),
+        );
+      }
     } else if (forceSchedulerHighlight) {
       setProviderProvenanceDashboardLayout((current) => ({
         ...current,
@@ -7904,6 +8126,8 @@ export default function App() {
       policy_template_id: catalog.default_policy_template_id ?? ALL_FILTER_VALUE,
       policy_catalog_id: catalog.catalog_id,
       source_hierarchy_step_template_id: ALL_FILTER_VALUE,
+      search: "",
+      sort: DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
     });
     if (catalog.item_type_scope !== "registry" && catalog.default_policy_template_id) {
       setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId(
@@ -9466,6 +9690,17 @@ export default function App() {
       return;
     }
     try {
+      const governanceQueueView = buildProviderProvenanceSchedulerNarrativeGovernanceQueueViewPayload(
+        providerProvenanceSchedulerNarrativeGovernanceQueueFilter,
+        providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateNameMap,
+      );
+      const layoutPayload = {
+        highlight_panel: providerProvenanceDashboardLayout.highlight_panel,
+        show_rollups: providerProvenanceDashboardLayout.show_rollups,
+        show_time_series: providerProvenanceDashboardLayout.show_time_series,
+        show_recent_exports: providerProvenanceDashboardLayout.show_recent_exports,
+        ...(governanceQueueView ? { governance_queue_view: governanceQueueView } : {}),
+      };
       const createdView = await createProviderProvenanceDashboardView({
         name: providerProvenanceViewDraft.name.trim(),
         description: providerProvenanceViewDraft.description.trim(),
@@ -9473,7 +9708,7 @@ export default function App() {
           providerProvenanceAnalyticsQuery,
           activeMarketInstrument,
         ),
-        layout: providerProvenanceDashboardLayout,
+        layout: layoutPayload,
         presetId: providerProvenanceViewDraft.preset_id.trim() || undefined,
         createdByTabId: comparisonHistoryTabIdentity.tabId,
         createdByTabLabel: comparisonHistoryTabIdentity.label,
@@ -9506,6 +9741,17 @@ export default function App() {
       return;
     }
     try {
+      const governanceQueueView = buildProviderProvenanceSchedulerNarrativeGovernanceQueueViewPayload(
+        providerProvenanceSchedulerNarrativeGovernanceQueueFilter,
+        providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateNameMap,
+      );
+      const layoutPayload = {
+        highlight_panel: providerProvenanceDashboardLayout.highlight_panel,
+        show_rollups: providerProvenanceDashboardLayout.show_rollups,
+        show_time_series: providerProvenanceDashboardLayout.show_time_series,
+        show_recent_exports: providerProvenanceDashboardLayout.show_recent_exports,
+        ...(governanceQueueView ? { governance_queue_view: governanceQueueView } : {}),
+      };
       const createdReport = await createProviderProvenanceScheduledReport({
         name: providerProvenanceReportDraft.name.trim(),
         description: providerProvenanceReportDraft.description.trim(),
@@ -9513,7 +9759,7 @@ export default function App() {
           providerProvenanceAnalyticsQuery,
           activeMarketInstrument,
         ),
-        layout: providerProvenanceDashboardLayout,
+        layout: layoutPayload,
         presetId: providerProvenanceReportDraft.preset_id.trim() || undefined,
         viewId: providerProvenanceReportDraft.view_id.trim() || undefined,
         cadence: providerProvenanceReportDraft.cadence,
@@ -14282,7 +14528,7 @@ export default function App() {
                                 <div className="provider-provenance-workspace-card">
                                   <div className="market-data-provenance-history-head">
                                     <strong>Shared dashboard views</strong>
-                                    <p>Store the current analytics query together with the chosen layout emphasis.</p>
+                                    <p>Store the current analytics query together with the chosen layout emphasis and any scheduler approval queue slice.</p>
                                   </div>
                                   <div className="filter-bar">
                                     <label>
@@ -14381,6 +14627,15 @@ export default function App() {
                                                 {entry.layout.show_rollups ? "rollups" : "no rollups"} · {" "}
                                                 {entry.layout.show_recent_exports ? "recent exports" : "no recent exports"}
                                               </p>
+                                              {formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary(
+                                                entry.layout.governance_queue_view,
+                                              ) ? (
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary(
+                                                    entry.layout.governance_queue_view,
+                                                  )}
+                                                </p>
+                                              ) : null}
                                             </td>
                                             <td>
                                               <button
@@ -15463,7 +15718,7 @@ export default function App() {
                                       Pending {providerProvenanceSchedulerNarrativeGovernanceQueueSummary.pending_approval_count} · Ready {providerProvenanceSchedulerNarrativeGovernanceQueueSummary.ready_to_apply_count} · Completed {providerProvenanceSchedulerNarrativeGovernanceQueueSummary.completed_count}
                                     </strong>
                                     <span>
-                                      Filtered queue rows: {filteredProviderProvenanceSchedulerNarrativeGovernancePlans.length}
+                                      Filtered queue rows: {filteredProviderProvenanceSchedulerNarrativeGovernancePlans.length} of {providerProvenanceSchedulerNarrativeGovernanceQueueSummary.total}
                                     </span>
                                   </div>
                                   <div className="provider-provenance-governance-editor">
@@ -15662,6 +15917,44 @@ export default function App() {
                                             {entry.name}
                                           </option>
                                         ))}
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Search</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            search: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="plan, template, hierarchy"
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.search}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Sort</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            sort: normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueSort(
+                                              event.target.value,
+                                            ),
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.sort}
+                                      >
+                                        <option value={DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT}>
+                                          Queue priority
+                                        </option>
+                                        <option value="updated_desc">Updated newest</option>
+                                        <option value="updated_asc">Updated oldest</option>
+                                        <option value="created_desc">Created newest</option>
+                                        <option value="created_asc">Created oldest</option>
+                                        <option value="source_template_asc">Source template A-Z</option>
+                                        <option value="source_template_desc">Source template Z-A</option>
                                       </select>
                                     </label>
                                   </div>

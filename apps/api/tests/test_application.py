@@ -15446,8 +15446,11 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[0].key == (
     "item_type"
   )
-  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[3].key == (
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[7].key == (
     "source_hierarchy_step_template_id"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[9].key == (
+    "sort"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_approve"].path_param_keys == (
     "plan_id",
@@ -16488,6 +16491,13 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
         "show_rollups": True,
         "show_time_series": True,
         "show_recent_exports": False,
+        "governance_queue_view": {
+          "queue_state": "pending_approval",
+          "source_hierarchy_step_template_id": "hst_demo",
+          "source_hierarchy_step_template_name": "Lag triage step",
+          "search": "lag recovery",
+          "sort": "source_template_asc",
+        },
       },
       "created_by_tab_id": "tab_ops",
       "created_by_tab_label": "Ops desk",
@@ -16495,6 +16505,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert view_payload["preset_id"] == preset_payload["preset_id"]
   assert view_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+  assert view_payload["layout"]["governance_queue_view"]["source_hierarchy_step_template_id"] == "hst_demo"
   assert view_payload["query"]["scheduler_alert_status"] == "resolved"
 
   view_list_payload = execute_standalone_surface_binding(
@@ -17741,6 +17752,8 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     app=app,
     filters={
       "source_hierarchy_step_template_id": hierarchy_step_template_payload["hierarchy_step_template_id"],
+      "search": hierarchy_step_template_payload["name"],
+      "sort": "source_template_desc",
       "limit": 10,
     },
   )

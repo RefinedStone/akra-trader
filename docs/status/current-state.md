@@ -221,6 +221,9 @@ It is not yet a finished live trading product:
 - that approval queue now also filters by source hierarchy-step template and reusable step library
   selections can be batch-staged into queue plans, so operators can reopen one reviewed source or a
   whole selected handoff set without staging each template row one at a time
+- the same approval queue now also runs its source-template slice as a server-side query with
+  search, sort, and shared dashboard-view persistence, so hierarchy-step approval review can be
+  reopened as a named queue workspace instead of a one-off local table filter
 
 ### Operator discipline baseline
 

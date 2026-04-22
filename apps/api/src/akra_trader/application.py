@@ -42,6 +42,7 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGo
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanListResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord
@@ -4231,12 +4232,20 @@ class TradingApplication:
       }
       else "overview"
     )
-    return {
+    normalized_layout = {
       "highlight_panel": normalized_highlight_panel,
       "show_rollups": bool(layout.get("show_rollups", True)),
       "show_time_series": bool(layout.get("show_time_series", True)),
       "show_recent_exports": bool(layout.get("show_recent_exports", True)),
     }
+    normalized_governance_queue_view = (
+      TradingApplication._normalize_provider_provenance_scheduler_narrative_governance_queue_view_payload(
+        layout.get("governance_queue_view")
+      )
+    )
+    if normalized_governance_queue_view is not None:
+      normalized_layout["governance_queue_view"] = normalized_governance_queue_view
+    return normalized_layout
 
   @classmethod
   def _normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
@@ -5173,6 +5182,51 @@ class TradingApplication:
           normalized_query.get("scheduler_alert_narrative_facet"),
           normalized_query.get("search"),
           normalized_layout.get("highlight_panel"),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("queue_state")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("approval_lane")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("approval_priority")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("policy_template_id")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("policy_catalog_id")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("source_hierarchy_step_template_id")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("source_hierarchy_step_template_name")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("search")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
+          (
+            normalized_layout.get("governance_queue_view", {}).get("sort")
+            if isinstance(normalized_layout.get("governance_queue_view"), dict)
+            else None
+          ),
         ),
         search=search,
       ):
@@ -6800,6 +6854,104 @@ class TradingApplication:
     if normalized == "approved":
       return "ready_to_apply"
     return "completed"
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_governance_queue_state_filter(
+    queue_state: str | None,
+  ) -> str:
+    normalized = (
+      queue_state.strip().lower()
+      if isinstance(queue_state, str) and queue_state.strip()
+      else ""
+    )
+    if normalized not in {"pending_approval", "ready_to_apply", "completed"}:
+      raise ValueError("Unsupported scheduler narrative governance queue state.")
+    return normalized
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_governance_plan_sort(
+    sort: str | None,
+  ) -> str:
+    normalized = (
+      sort.strip().lower()
+      if isinstance(sort, str) and sort.strip()
+      else "queue_priority"
+    )
+    if normalized not in {
+      "queue_priority",
+      "updated_desc",
+      "updated_asc",
+      "created_desc",
+      "created_asc",
+      "source_template_asc",
+      "source_template_desc",
+    }:
+      raise ValueError("Unsupported scheduler narrative governance plan sort.")
+    return normalized
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_narrative_governance_priority_rank(
+    approval_priority: str,
+  ) -> int:
+    normalized = approval_priority.strip().lower()
+    if normalized == "critical":
+      return 3
+    if normalized == "high":
+      return 2
+    if normalized == "normal":
+      return 1
+    return 0
+
+  @classmethod
+  def _normalize_provider_provenance_scheduler_narrative_governance_queue_view_payload(
+    cls,
+    payload: dict[str, Any] | None,
+  ) -> dict[str, Any] | None:
+    queue_view = deepcopy(payload) if isinstance(payload, dict) else {}
+    if not queue_view:
+      return None
+    normalized: dict[str, Any] = {}
+    queue_state = queue_view.get("queue_state")
+    if isinstance(queue_state, str) and queue_state.strip():
+      normalized["queue_state"] = cls._normalize_provider_provenance_scheduler_narrative_governance_queue_state_filter(
+        queue_state
+      )
+    item_type = queue_view.get("item_type")
+    if isinstance(item_type, str) and item_type.strip():
+      normalized["item_type"] = cls._normalize_provider_provenance_scheduler_narrative_governance_item_type(
+        item_type
+      )
+    approval_lane = queue_view.get("approval_lane")
+    if isinstance(approval_lane, str) and approval_lane.strip():
+      normalized["approval_lane"] = cls._normalize_provider_provenance_scheduler_narrative_governance_approval_lane(
+        approval_lane
+      )
+    approval_priority = queue_view.get("approval_priority")
+    if isinstance(approval_priority, str) and approval_priority.strip():
+      normalized["approval_priority"] = cls._normalize_provider_provenance_scheduler_narrative_governance_approval_priority(
+        approval_priority
+      )
+    for key in ("policy_template_id", "policy_catalog_id", "source_hierarchy_step_template_id"):
+      value = queue_view.get(key)
+      if isinstance(value, str):
+        normalized[key] = value.strip() if value.strip() else ""
+    source_hierarchy_step_template_name = queue_view.get("source_hierarchy_step_template_name")
+    if (
+      isinstance(source_hierarchy_step_template_name, str)
+      and source_hierarchy_step_template_name.strip()
+    ):
+      normalized["source_hierarchy_step_template_name"] = (
+        source_hierarchy_step_template_name.strip()
+      )
+    search = queue_view.get("search")
+    if isinstance(search, str) and search.strip():
+      normalized["search"] = search.strip()
+    normalized_sort = cls._normalize_provider_provenance_scheduler_narrative_governance_plan_sort(
+      queue_view.get("sort") if isinstance(queue_view.get("sort"), str) else None
+    )
+    if normalized or normalized_sort != "queue_priority":
+      normalized["sort"] = normalized_sort
+    return normalized or None
 
   def _normalize_provider_provenance_scheduler_narrative_governance_plan_hierarchy_steps(
     self,
@@ -10067,10 +10219,16 @@ class TradingApplication:
     *,
     item_type: str | None = None,
     status: str | None = None,
+    queue_state: str | None = None,
+    approval_lane: str | None = None,
+    approval_priority: str | None = None,
+    policy_template_id: str | None = None,
     policy_catalog_id: str | None = None,
     source_hierarchy_step_template_id: str | None = None,
+    search: str | None = None,
+    sort: str | None = None,
     limit: int = 20,
-  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...]:
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanListResult:
     normalized_item_type = (
       self._normalize_provider_provenance_scheduler_narrative_governance_item_type(item_type)
       if isinstance(item_type, str) and item_type.strip()
@@ -10081,17 +10239,43 @@ class TradingApplication:
       if isinstance(status, str) and status.strip()
       else None
     )
-    normalized_policy_catalog_id = (
-      policy_catalog_id.strip()
-      if isinstance(policy_catalog_id, str) and policy_catalog_id.strip()
+    normalized_queue_state = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_queue_state_filter(queue_state)
+      if isinstance(queue_state, str) and queue_state.strip()
       else None
+    )
+    normalized_approval_lane = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_approval_lane(approval_lane)
+      if isinstance(approval_lane, str) and approval_lane.strip()
+      else None
+    )
+    normalized_approval_priority = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_approval_priority(approval_priority)
+      if isinstance(approval_priority, str) and approval_priority.strip()
+      else None
+    )
+    normalized_policy_template_id = (
+      None
+      if not isinstance(policy_template_id, str)
+      else ""
+      if policy_template_id == "__none__"
+      else policy_template_id.strip() or None
+    )
+    normalized_policy_catalog_id = (
+      None
+      if not isinstance(policy_catalog_id, str)
+      else ""
+      if policy_catalog_id == "__none__"
+      else policy_catalog_id.strip() or None
     )
     normalized_source_hierarchy_step_template_id = (
-      source_hierarchy_step_template_id.strip()
-      if isinstance(source_hierarchy_step_template_id, str)
-      and source_hierarchy_step_template_id.strip()
-      else None
+      None
+      if not isinstance(source_hierarchy_step_template_id, str)
+      else ""
+      if source_hierarchy_step_template_id == "__none__"
+      else source_hierarchy_step_template_id.strip() or None
     )
+    normalized_sort = self._normalize_provider_provenance_scheduler_narrative_governance_plan_sort(sort)
     normalized_limit = max(1, min(limit, 100))
     filtered: list[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord] = []
     for record in self._list_provider_provenance_scheduler_narrative_governance_plan_records():
@@ -10099,17 +10283,105 @@ class TradingApplication:
         continue
       if normalized_status is not None and record.status != normalized_status:
         continue
-      if normalized_policy_catalog_id is not None and record.policy_catalog_id != normalized_policy_catalog_id:
+      if (
+        normalized_queue_state is not None
+        and self._build_provider_provenance_scheduler_narrative_governance_queue_state(record.status)
+        != normalized_queue_state
+      ):
+        continue
+      if normalized_approval_lane is not None and record.approval_lane != normalized_approval_lane:
+        continue
+      if normalized_approval_priority is not None and record.approval_priority != normalized_approval_priority:
+        continue
+      if normalized_policy_template_id is not None and (record.policy_template_id or "") != normalized_policy_template_id:
+        continue
+      if normalized_policy_catalog_id is not None and (record.policy_catalog_id or "") != normalized_policy_catalog_id:
         continue
       if (
         normalized_source_hierarchy_step_template_id is not None
-        and record.source_hierarchy_step_template_id != normalized_source_hierarchy_step_template_id
+        and (record.source_hierarchy_step_template_id or "") != normalized_source_hierarchy_step_template_id
+      ):
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.plan_id,
+          record.item_type,
+          record.action,
+          record.reason,
+          record.status,
+          self._build_provider_provenance_scheduler_narrative_governance_queue_state(record.status),
+          record.policy_template_id,
+          record.policy_template_name,
+          record.policy_catalog_id,
+          record.policy_catalog_name,
+          record.source_hierarchy_step_template_id,
+          record.source_hierarchy_step_template_name,
+          record.approval_lane,
+          record.approval_priority,
+          record.policy_guidance,
+          record.hierarchy_key,
+          record.hierarchy_name,
+          record.created_by_tab_id,
+          record.created_by_tab_label,
+          *(
+            item.item_name
+            for item in record.preview_items
+            if isinstance(item.item_name, str) and item.item_name.strip()
+          ),
+        ),
+        search=search,
       ):
         continue
       filtered.append(record)
-      if len(filtered) >= normalized_limit:
-        break
-    return tuple(filtered)
+    pending_approval_count = sum(1 for record in filtered if record.status == "previewed")
+    ready_to_apply_count = sum(1 for record in filtered if record.status == "approved")
+    completed_count = sum(1 for record in filtered if record.status in {"applied", "rolled_back"})
+
+    def _sort_source_template_value(
+      record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
+    ) -> str:
+      return (
+        record.source_hierarchy_step_template_name
+        or record.source_hierarchy_step_template_id
+        or ""
+      ).lower()
+
+    filtered.sort(key=lambda record: record.plan_id)
+    filtered.sort(key=lambda record: record.updated_at, reverse=True)
+    if normalized_sort == "queue_priority":
+      filtered.sort(
+        key=lambda record: self._build_provider_provenance_scheduler_narrative_governance_priority_rank(
+          record.approval_priority
+        ),
+        reverse=True,
+      )
+      filtered.sort(
+        key=lambda record: {
+          "pending_approval": 0,
+          "ready_to_apply": 1,
+          "completed": 2,
+        }[
+          self._build_provider_provenance_scheduler_narrative_governance_queue_state(record.status)
+        ]
+      )
+    elif normalized_sort == "updated_asc":
+      filtered.sort(key=lambda record: record.updated_at)
+    elif normalized_sort == "created_desc":
+      filtered.sort(key=lambda record: record.created_at, reverse=True)
+    elif normalized_sort == "created_asc":
+      filtered.sort(key=lambda record: record.created_at)
+    elif normalized_sort == "source_template_asc":
+      filtered.sort(key=_sort_source_template_value)
+    elif normalized_sort == "source_template_desc":
+      filtered.sort(key=_sort_source_template_value, reverse=True)
+
+    return ProviderProvenanceSchedulerNarrativeGovernancePlanListResult(
+      items=tuple(filtered[:normalized_limit]),
+      total=len(filtered),
+      pending_approval_count=pending_approval_count,
+      ready_to_apply_count=ready_to_apply_count,
+      completed_count=completed_count,
+    )
 
   def get_provider_provenance_scheduler_narrative_governance_plan(
     self,
@@ -36737,20 +37009,17 @@ def serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_
 
 
 def serialize_provider_provenance_scheduler_narrative_governance_plan_list(
-  records: tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...],
+  result: ProviderProvenanceSchedulerNarrativeGovernancePlanListResult,
 ) -> dict[str, Any]:
-  pending_approval_count = sum(1 for record in records if record.status == "previewed")
-  ready_to_apply_count = sum(1 for record in records if record.status == "approved")
-  completed_count = sum(1 for record in records if record.status in {"applied", "rolled_back"})
   return {
     "items": [
       serialize_provider_provenance_scheduler_narrative_governance_plan_record(record)
-      for record in records
+      for record in result.items
     ],
-    "total": len(records),
-    "pending_approval_count": pending_approval_count,
-    "ready_to_apply_count": ready_to_apply_count,
-    "completed_count": completed_count,
+    "total": result.total,
+    "pending_approval_count": result.pending_approval_count,
+    "ready_to_apply_count": result.ready_to_apply_count,
+    "completed_count": result.completed_count,
   }
 
 

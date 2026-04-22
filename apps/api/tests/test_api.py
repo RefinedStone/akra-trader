@@ -1345,6 +1345,13 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
         "show_rollups": True,
         "show_time_series": True,
         "show_recent_exports": False,
+        "governance_queue_view": {
+          "queue_state": "pending_approval",
+          "source_hierarchy_step_template_id": "hst_demo",
+          "source_hierarchy_step_template_name": "Lag triage step",
+          "search": "lag recovery",
+          "sort": "source_template_asc",
+        },
       },
       "created_by_tab_id": "tab_ops",
       "created_by_tab_label": "Ops desk",
@@ -1353,6 +1360,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert view_response.status_code == 200
   view_payload = view_response.json()
   assert view_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+  assert view_payload["layout"]["governance_queue_view"]["source_hierarchy_step_template_id"] == "hst_demo"
   assert view_payload["query"]["scheduler_alert_status"] == "resolved"
 
   list_views_response = client.get(
@@ -2551,6 +2559,8 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
     "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
     params={
       "source_hierarchy_step_template_id": hierarchy_step_template_payload["hierarchy_step_template_id"],
+      "search": hierarchy_step_template_payload["name"],
+      "sort": "source_template_desc",
       "limit": 10,
     },
   )

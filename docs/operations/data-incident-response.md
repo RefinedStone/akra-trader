@@ -117,6 +117,9 @@ unclear dataset lineage.
 - the same queue now also filters by source hierarchy-step template and supports batch staging from
   selected reusable step templates, so shift operators can reopen one source lineage or a reviewed
   bundle of reusable steps as approval work in a single action
+- that same source-template approval queue now also supports server-side search, sort, and saved
+  dashboard views, so operators can reopen the exact hierarchy-step approval slice and ordering
+  they used during a previous shift review
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

@@ -1519,6 +1519,20 @@ export type ProviderProvenanceDashboardLayout = {
   show_rollups: boolean;
   show_time_series: boolean;
   show_recent_exports: boolean;
+  governance_queue_view?: ProviderProvenanceSchedulerNarrativeGovernanceQueueView | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceQueueView = {
+  queue_state?: "pending_approval" | "ready_to_apply" | "completed" | string | null;
+  item_type?: "template" | "registry" | string | null;
+  approval_lane?: string | null;
+  approval_priority?: string | null;
+  policy_template_id?: string | null;
+  policy_catalog_id?: string | null;
+  source_hierarchy_step_template_id?: string | null;
+  source_hierarchy_step_template_name?: string | null;
+  search?: string | null;
+  sort?: string | null;
 };
 
 export type ProviderProvenanceWorkspaceFocus = {
