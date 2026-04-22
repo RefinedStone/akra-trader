@@ -65,16 +65,31 @@
       "id": "task-llm-sensitivity-application-guarded-live-provider-governance-support-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Move guarded-live and provider-governance orchestration out of application.py",
-      "description": "Keep `application.py` import-compatible but peel guarded-live and provider-governance orchestration into bounded `application_support/*` or nearby use-case modules so the compatibility facade stops accumulating policy and serializer logic outside the already-split comparison path.",
-      "status": "ready",
+      "description": "Completed the orchestration extraction by moving guarded-live worker session maintenance and provider-governance search-moderation catalog flows out of `application.py` into bounded `application_support` orchestration modules while keeping `TradingApplication` as a delegation facade.",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 17,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T21:21:56+09:00",
+      "updated_at": "2026-04-22T21:30:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "With the App.tsx and tooltip-helper decomposition stages now complete, the next still-open compatibility-facade target in this direction is the guarded-live and provider-governance orchestration that remains in `application.py`.",
-      "priority_reason": "Promoted to the sole ready queue head because the operator asked to continue with one queued task, the previous frontend consolidation head is now done, and this is the clearest executable follow-up in the same decomposition lane."
+      "direction_relation_note": "The latest main-session reply confirms guarded-live orchestration now lives in `guarded_live_orchestration.py` and provider-governance orchestration now lives in `provider_governance_orchestration.py`, satisfying this compatibility-facade extraction milestone.",
+      "priority_reason": "Marked done because the main session completed the orchestration move, validated it with `py_compile` plus focused pytest coverage, and pushed commit `0542476` to `origin/main`."
+    },
+    {
+      "id": "task-llm-sensitivity-application-remaining-governance-guarded-live-helper-support-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Extract remaining governance serializers and guarded-live helpers out of application.py",
+      "description": "Continue the `application.py` compatibility-facade shrink by moving the remaining governance serializer/save/load/private helper paths and guarded-live primitive helpers into bounded `application_support` or service modules that the new orchestration layer can call directly.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 19,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T21:30:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly says orchestration extraction is finished and names the next decomposition target as the governance serializer/save/load/private helpers plus guarded-live primitives still living in `application.py` around the new support-layer entrypoints.",
+      "priority_reason": "Promoted to the sole ready queue head because the operator asked to continue with one queued task, the prior ready task is now complete, and this is the most direct executable continuation called out by the latest main-session `Remaining` section."
     },
     {
       "id": "task-llm-sensitivity-domain-models-operator-guarded-live-family-split",
@@ -86,10 +101,10 @@
       "dynamic_priority_delta": 10,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:10:00+09:00",
+      "updated_at": "2026-04-22T21:30:00+09:00",
       "source_turn_id": null,
       "direction_relation_note": "The direction detail and current-state docs explicitly note that provider-provenance records already moved behind domain/models.py compatibility imports, while the remaining operator and guarded-live families still need the same bounded-family treatment.",
-      "priority_reason": "This is still clearly executable work, but it stays proposed because the immediate next continuation from the latest reply is to identify and execute the highest-pressure hexagonal split candidate first rather than starting multiple large decomposition fronts at once."
+      "priority_reason": "This remains executable but stays proposed because the latest main-session reply points to finishing the remaining `application.py` support/helper decomposition first, so opening a second backend compatibility split now would dilute the immediate continuation."
     }
   ]
 }
