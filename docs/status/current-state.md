@@ -175,6 +175,9 @@ It is not yet a finished live trading product:
 - resolved scheduler occurrences can now export mixed-status post-resolution narratives, so the
   shared scheduler artifact can capture recovery, healthy stabilization, and other intervening
   statuses instead of only the original lag/failure rows
+- the same scheduler occurrence slice can now also export, copy, download, and share stitched
+  multi-occurrence narrative reports, so repeated lag/failure windows can move into one handoff
+  artifact instead of forcing row-by-row reconstruction
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

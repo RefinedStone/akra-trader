@@ -77,6 +77,7 @@ import {
   downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   escalateProviderProvenanceExportJob,
   exportProviderProvenanceSchedulerHealth,
+  exportProviderProvenanceSchedulerStitchedNarrativeReport,
   reconstructProviderProvenanceSchedulerHealthExport,
   exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   fetchJson,
@@ -6441,6 +6442,79 @@ export default function App() {
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
         `Scheduler health CSV export failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function requestProviderProvenanceSchedulerStitchedNarrativeReport(
+    format: "json" | "csv",
+  ) {
+    return exportProviderProvenanceSchedulerStitchedNarrativeReport({
+      alertCategory:
+        providerProvenanceAnalyticsQuery.scheduler_alert_category !== ALL_FILTER_VALUE
+          ? providerProvenanceAnalyticsQuery.scheduler_alert_category
+          : undefined,
+      status:
+        providerProvenanceAnalyticsQuery.scheduler_alert_status !== ALL_FILTER_VALUE
+          ? providerProvenanceAnalyticsQuery.scheduler_alert_status
+          : undefined,
+      narrativeFacet:
+        providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet !== "all_occurrences"
+          ? providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet
+          : undefined,
+      offset: providerProvenanceSchedulerAlertHistoryOffset,
+      occurrenceLimit: providerProvenanceSchedulerAlertHistory?.query.limit ?? 8,
+      format,
+      historyLimit: 12,
+      drilldownHistoryLimit: 12,
+    });
+  }
+
+  async function copyProviderProvenanceSchedulerStitchedNarrativeReport() {
+    if (!navigator.clipboard?.writeText) {
+      setProviderProvenanceWorkspaceFeedback("Clipboard is unavailable for stitched scheduler narrative reports.");
+      return;
+    }
+    try {
+      const exportPayload = await requestProviderProvenanceSchedulerStitchedNarrativeReport("json");
+      await navigator.clipboard.writeText(exportPayload.content);
+      setProviderProvenanceWorkspaceFeedback(
+        `Copied stitched scheduler narrative report ${exportPayload.filename} for the current occurrence slice.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Stitched scheduler narrative copy failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function downloadProviderProvenanceSchedulerStitchedNarrativeCsv() {
+    try {
+      const exportPayload = await requestProviderProvenanceSchedulerStitchedNarrativeReport("csv");
+      downloadTextExport(exportPayload);
+      setProviderProvenanceWorkspaceFeedback(
+        `Downloaded stitched scheduler narrative report ${exportPayload.filename}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Stitched scheduler narrative CSV export failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function shareProviderProvenanceSchedulerStitchedNarrativeReport() {
+    try {
+      const exportPayload = await requestProviderProvenanceSchedulerStitchedNarrativeReport("json");
+      const sharedEntry = await createSharedProviderProvenanceSchedulerExportSnapshot({
+        sourceLabel: "scheduler occurrence narrative report",
+        exportPayload,
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Shared stitched scheduler narrative report ${shortenIdentifier(sharedEntry.job_id, 10)} from the current occurrence slice.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Stitched scheduler narrative share failed: ${(error as Error).message}`,
       );
     }
   }
@@ -17076,6 +17150,36 @@ export default function App() {
                                         ))}
                                       </select>
                                     </label>
+                                    <button
+                                      className="ghost-button"
+                                      disabled={!providerProvenanceSchedulerAlertTimelineItems.length}
+                                      onClick={() => {
+                                        void copyProviderProvenanceSchedulerStitchedNarrativeReport();
+                                      }}
+                                      type="button"
+                                    >
+                                      Copy stitched report
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      disabled={!providerProvenanceSchedulerAlertTimelineItems.length}
+                                      onClick={() => {
+                                        void downloadProviderProvenanceSchedulerStitchedNarrativeCsv();
+                                      }}
+                                      type="button"
+                                    >
+                                      Download stitched CSV
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      disabled={!providerProvenanceSchedulerAlertTimelineItems.length}
+                                      onClick={() => {
+                                        void shareProviderProvenanceSchedulerStitchedNarrativeReport();
+                                      }}
+                                      type="button"
+                                    >
+                                      Share stitched report
+                                    </button>
                                     <button
                                       className="ghost-button"
                                       onClick={() => {

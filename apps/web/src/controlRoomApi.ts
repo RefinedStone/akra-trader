@@ -483,6 +483,46 @@ export async function reconstructProviderProvenanceSchedulerHealthExport(params:
   );
 }
 
+export async function exportProviderProvenanceSchedulerStitchedNarrativeReport(params: {
+  alertCategory?: string;
+  status?: string;
+  narrativeFacet?: string;
+  offset?: number;
+  occurrenceLimit?: number;
+  format?: "json" | "csv";
+  historyLimit?: number;
+  drilldownHistoryLimit?: number;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerHealthExportPayload>(
+    "/operator/provider-provenance-analytics/scheduler-alerts/report-export",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        alert_category: params.alertCategory?.trim() || null,
+        status: params.status?.trim() || null,
+        narrative_facet: params.narrativeFacet?.trim() || null,
+        offset:
+          typeof params.offset === "number" && Number.isFinite(params.offset)
+            ? Math.max(0, Math.min(Math.round(params.offset), 10000))
+            : 0,
+        occurrence_limit:
+          typeof params.occurrenceLimit === "number" && Number.isFinite(params.occurrenceLimit)
+            ? Math.max(1, Math.min(Math.round(params.occurrenceLimit), 50))
+            : 8,
+        format: params.format ?? "json",
+        history_limit:
+          typeof params.historyLimit === "number" && Number.isFinite(params.historyLimit)
+            ? Math.max(1, Math.min(Math.round(params.historyLimit), 200))
+            : 25,
+        drilldown_history_limit:
+          typeof params.drilldownHistoryLimit === "number" && Number.isFinite(params.drilldownHistoryLimit)
+            ? Math.max(1, Math.min(Math.round(params.drilldownHistoryLimit), 100))
+            : 24,
+      }),
+    },
+  );
+}
+
 export async function downloadProviderProvenanceExportJob(params: {
   jobId: string;
   sourceTabId?: string;

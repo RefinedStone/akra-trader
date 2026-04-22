@@ -4960,6 +4960,94 @@ def test_operator_visibility_endpoint_can_reconstruct_mixed_status_scheduler_nar
   assert reconstructed["analytics"]["query"]["narrative_mode"] == "mixed_status_post_resolution"
 
 
+def test_operator_visibility_endpoint_can_export_stitched_scheduler_narrative_report(
+  tmp_path: Path,
+) -> None:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    provider_provenance_report_scheduler_enabled=False,
+  ) as client:
+    app = client.app.state.container.app
+    fixed_time = datetime(2026, 4, 22, 12, 0, tzinfo=UTC)
+    app._clock = lambda: fixed_time
+    app._provider_provenance_report_scheduler_interval_seconds = 60
+    app._provider_provenance_report_scheduler_batch_limit = 1
+    app._provider_provenance_scheduler_health_records = {}
+    app._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
+      generated_at=fixed_time,
+      enabled=True,
+      status="starting",
+      summary="Background scheduler has not completed a provider provenance automation cycle yet.",
+      interval_seconds=60,
+      batch_limit=1,
+    )
+
+    report_a = app.create_provider_provenance_scheduled_report(name="Narrative report A")
+    report_b = app.create_provider_provenance_scheduled_report(name="Narrative report B")
+    overdue_at = fixed_time - timedelta(minutes=10)
+    app._save_provider_provenance_scheduled_report_record(replace(report_a, next_run_at=overdue_at))
+    app._save_provider_provenance_scheduled_report_record(replace(report_b, next_run_at=overdue_at))
+
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time + timedelta(days=7))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time - timedelta(minutes=10))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time + timedelta(days=7))
+      )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+
+    export_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-alerts/report-export",
+      json={
+        "alert_category": "scheduler_lag",
+        "status": "resolved",
+        "narrative_facet": "resolved_narratives",
+        "offset": 0,
+        "occurrence_limit": 4,
+        "format": "json",
+        "history_limit": 8,
+        "drilldown_history_limit": 12,
+      },
+    )
+
+  assert export_response.status_code == 200
+  payload = export_response.json()
+  stitched_report = json.loads(payload["content"])
+  assert stitched_report["query"]["reconstruction_mode"] == "stitched_occurrence_report"
+  assert stitched_report["query"]["narrative_mode"] == "stitched_multi_occurrence"
+  assert stitched_report["query"]["narrative_facet"] == "resolved_narratives"
+  assert stitched_report["stitched_occurrence_report"]["summary"]["occurrence_count"] == 2
+  assert len(stitched_report["stitched_occurrence_report"]["occurrences"]) == 2
+  assert stitched_report["stitched_occurrence_report"]["stitched_status_sequence"]
+
+
 def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trends(
   monkeypatch,
   tmp_path: Path,

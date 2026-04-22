@@ -232,6 +232,17 @@ class OperatorProviderProvenanceSchedulerHistoricalExportRequest(BaseModel):
   drilldown_history_limit: int = 24
 
 
+class OperatorProviderProvenanceSchedulerNarrativeReportRequest(BaseModel):
+  alert_category: str | None = None
+  status: str | None = None
+  narrative_facet: str | None = None
+  offset: int = 0
+  occurrence_limit: int = 8
+  format: str = "json"
+  history_limit: int = 25
+  drilldown_history_limit: int = 24
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -1890,6 +1901,34 @@ def create_router(container: Container) -> APIRouter:
     methods=["POST"],
     name="reconstruct_operator_provider_provenance_scheduler_health_export",
     summary="Reconstruct provider provenance scheduler health export for a historical alert row",
+  )
+
+  def export_operator_provider_provenance_scheduler_stitched_narrative_report(
+    request: OperatorProviderProvenanceSchedulerNarrativeReportRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.export_provider_provenance_scheduler_stitched_narrative_report(
+        category=request.alert_category,
+        status=request.status,
+        narrative_facet=request.narrative_facet,
+        offset=request.offset,
+        occurrence_limit=request.occurrence_limit,
+        export_format=request.format,
+        history_limit=request.history_limit,
+        drilldown_history_limit=request.drilldown_history_limit,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (ValueError, RuntimeError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-alerts/report-export",
+    export_operator_provider_provenance_scheduler_stitched_narrative_report,
+    methods=["POST"],
+    name="export_operator_provider_provenance_scheduler_stitched_narrative_report",
+    summary="Export a stitched multi-occurrence scheduler narrative report",
   )
 
   return router

@@ -72,6 +72,9 @@ unclear dataset lineage.
   through unrelated operator alerts
 - resolved scheduler exports now also support a mixed-status post-resolution narrative mode, so
   operator handoff can include the recovery path and stabilization history after the alert closed
+- the same scheduler occurrence slice can now also export a stitched multi-occurrence narrative
+  report and share that artifact into the scheduler export registry, so repeated lag/failure
+  windows can be handed off as one reviewed report instead of separate row reconstructions
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

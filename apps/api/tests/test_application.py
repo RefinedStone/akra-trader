@@ -1092,6 +1092,7 @@ def test_operator_visibility_surfaces_provider_provenance_scheduler_lag(tmp_path
     runs=runs,
     presets=presets,
     clock=clock,
+    operator_alert_delivery=FakeOperatorAlertDeliveryAdapter(),
     provider_provenance_report_scheduler_interval_seconds=60,
     provider_provenance_report_scheduler_batch_limit=1,
   )
@@ -1450,6 +1451,7 @@ def test_resolved_scheduler_alert_row_reconstructs_historical_export(
     runs=runs,
     presets=presets,
     clock=clock,
+    operator_alert_delivery=FakeOperatorAlertDeliveryAdapter(),
     provider_provenance_report_scheduler_interval_seconds=60,
     provider_provenance_report_scheduler_batch_limit=1,
   )
@@ -1554,6 +1556,7 @@ def test_resolved_scheduler_alert_row_can_export_mixed_status_post_resolution_na
     runs=runs,
     presets=presets,
     clock=clock,
+    operator_alert_delivery=FakeOperatorAlertDeliveryAdapter(),
     provider_provenance_report_scheduler_interval_seconds=60,
     provider_provenance_report_scheduler_batch_limit=1,
   )
@@ -1632,6 +1635,95 @@ def test_resolved_scheduler_alert_row_can_export_mixed_status_post_resolution_na
   assert reconstructed["mixed_status_narrative"]["post_resolution_history"]["items"][0]["status"] == "healthy"
   assert reconstructed["analytics"]["query"]["narrative_mode"] == "mixed_status_post_resolution"
   assert "mixed-status narrative" in (shared_export.filter_summary or "")
+
+
+def test_scheduler_alert_history_can_export_stitched_multi_occurrence_report(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 12, 45, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+
+  overdue_at = clock.current - timedelta(minutes=10)
+  for name in ("Report watch A", "Report watch B"):
+    report = app.create_provider_provenance_scheduled_report(name=name)
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report, next_run_at=overdue_at)
+    )
+
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  clock.advance(timedelta(minutes=1))
+  for record in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(record, next_run_at=clock.current + timedelta(days=7))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  clock.advance(timedelta(minutes=1))
+  for record in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(record, next_run_at=clock.current - timedelta(minutes=10))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  clock.advance(timedelta(minutes=1))
+  for record in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(record, next_run_at=clock.current + timedelta(days=7))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+
+  export_payload = app.export_provider_provenance_scheduler_stitched_narrative_report(
+    category="scheduler_lag",
+    status="resolved",
+    narrative_facet="resolved_narratives",
+    occurrence_limit=4,
+    export_format="json",
+    history_limit=8,
+    drilldown_history_limit=12,
+  )
+  stitched_report = json.loads(export_payload["content"])
+  shared_export = app.create_provider_provenance_export_job(
+    content=export_payload["content"],
+    requested_by_tab_id="tab_scheduler_stitched",
+    requested_by_tab_label="Scheduler stitched report",
+  )
+
+  assert stitched_report["query"]["reconstruction_mode"] == "stitched_occurrence_report"
+  assert stitched_report["query"]["narrative_mode"] == "stitched_multi_occurrence"
+  assert stitched_report["query"]["narrative_facet"] == "resolved_narratives"
+  assert stitched_report["stitched_occurrence_report"]["mode"] == "stitched_multi_occurrence"
+  assert stitched_report["stitched_occurrence_report"]["summary"]["occurrence_count"] == 2
+  assert len(stitched_report["stitched_occurrence_report"]["occurrences"]) == 2
+  assert stitched_report["stitched_occurrence_report"]["stitched_status_sequence"]
+  assert all(
+    segment["occurrence_id"]
+    for segment in stitched_report["stitched_occurrence_report"]["stitched_status_sequence"]
+  )
+  assert stitched_report["history_page"]["total"] >= 2
+  assert shared_export.export_scope == "provider_provenance_scheduler_health"
+  assert "stitched occurrence report" in (shared_export.filter_summary or "")
+  assert "stitched multi-occurrence narrative" in (shared_export.filter_summary or "")
 
 
 def test_scheduler_alert_history_tracks_multiple_resolved_occurrences_per_category(

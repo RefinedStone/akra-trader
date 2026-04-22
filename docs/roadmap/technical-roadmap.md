@@ -122,6 +122,9 @@ creation.
 - resolved scheduler exports can now switch into a mixed-status post-resolution narrative, so the
   exported artifact can carry recovery and stabilization context instead of only the original
   alert-status slice
+- the same scheduler occurrence slice can now also emit stitched multi-occurrence narrative
+  reports, so repeated lag/failure windows can be reviewed and shared as one export artifact
+  instead of forcing per-row reconstruction only
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand
@@ -153,8 +156,7 @@ creation.
   support edit/delete/revision-restore, bulk governance, shared team audit, saved policy defaults,
   direct approval-queue staging, source-template queue filtering, batch queue staging, plus
   server-side queue search/sort and saved dashboard views for hierarchy-step approval review;
-  stitched multi-occurrence narrative artifacts and deeper server-side narrative search are still
-  not built
+  deeper server-side scheduler narrative search is still not built
 
 ### Remaining work
 
