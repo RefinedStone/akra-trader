@@ -35,6 +35,7 @@ from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
@@ -457,6 +458,10 @@ class TradingApplication:
     self._provider_provenance_scheduler_stitched_report_view_revisions: dict[
       str,
       ProviderProvenanceSchedulerStitchedReportViewRevisionRecord,
+    ] = {}
+    self._provider_provenance_scheduler_stitched_report_view_audit_records: dict[
+      str,
+      ProviderProvenanceSchedulerStitchedReportViewAuditRecord,
     ] = {}
     self._provider_provenance_scheduled_reports: dict[str, ProviderProvenanceScheduledReportRecord] = {}
     self._provider_provenance_scheduler_narrative_templates: dict[
@@ -1783,6 +1788,30 @@ class TradingApplication:
       sorted(
         self._provider_provenance_scheduler_stitched_report_view_revisions.values(),
         key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_stitched_report_view_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportViewAuditRecord,
+  ) -> ProviderProvenanceSchedulerStitchedReportViewAuditRecord:
+    save_audit = getattr(self._runs, "save_provider_provenance_scheduler_stitched_report_view_audit_record", None)
+    if callable(save_audit):
+      return save_audit(record)
+    self._provider_provenance_scheduler_stitched_report_view_audit_records[record.audit_id] = record
+    return record
+
+  def _list_provider_provenance_scheduler_stitched_report_view_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportViewAuditRecord, ...]:
+    list_audits = getattr(self._runs, "list_provider_provenance_scheduler_stitched_report_view_audit_records", None)
+    if callable(list_audits):
+      return tuple(list_audits())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_view_audit_records.values(),
+        key=lambda record: (record.recorded_at, record.audit_id),
         reverse=True,
       )
     )
@@ -4400,6 +4429,46 @@ class TradingApplication:
       ),
     )
 
+  def _find_latest_active_provider_provenance_scheduler_stitched_report_view_revision(
+    self,
+    view_id: str,
+  ) -> ProviderProvenanceSchedulerStitchedReportViewRevisionRecord | None:
+    for revision in self._list_provider_provenance_scheduler_stitched_report_view_revision_records():
+      if revision.view_id != view_id:
+        continue
+      if self._normalize_provider_provenance_scheduler_narrative_record_status(revision.status) != "active":
+        continue
+      return revision
+    return None
+
+  def _build_provider_provenance_scheduler_stitched_report_view_bulk_query(
+    self,
+    current_query: dict[str, Any],
+    query_patch: dict[str, Any] | None,
+  ) -> dict[str, Any]:
+    candidate = deepcopy(current_query)
+    if isinstance(query_patch, dict):
+      for key, value in query_patch.items():
+        candidate[key] = deepcopy(value)
+    return self._normalize_provider_provenance_analytics_query_payload(candidate)
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_stitched_report_view_audit_detail(
+    *,
+    record: ProviderProvenanceSchedulerStitchedReportViewRecord,
+    action: str,
+  ) -> str:
+    lens = f"{record.occurrence_limit} occurrences / {record.history_limit} history / {record.drilldown_history_limit} drill-down"
+    if action == "created":
+      return f"Created stitched report view {record.name} with {lens}."
+    if action == "updated":
+      return f"Updated stitched report view {record.name} with {lens}."
+    if action == "deleted":
+      return f"Deleted stitched report view {record.name}."
+    if action == "restored":
+      return f"Restored stitched report view {record.name}."
+    return f"Recorded stitched report view action {action} for {record.name}."
+
   def _record_provider_provenance_scheduler_stitched_report_view_revision(
     self,
     *,
@@ -4422,13 +4491,38 @@ class TradingApplication:
         actor_tab_label=actor_tab_label,
       )
     )
-    return self._save_provider_provenance_scheduler_stitched_report_view_record(
+    updated = self._save_provider_provenance_scheduler_stitched_report_view_record(
       replace(
         record,
         current_revision_id=revision.revision_id,
         revision_count=int(record.revision_count or 0) + 1,
       )
     )
+    normalized_query = self._normalize_provider_provenance_analytics_query_payload(updated.query)
+    self._save_provider_provenance_scheduler_stitched_report_view_audit_record(
+      ProviderProvenanceSchedulerStitchedReportViewAuditRecord(
+        audit_id=f"{updated.view_id}:{revision.revision_id}:{action}",
+        view_id=updated.view_id,
+        action=action,
+        recorded_at=recorded_at,
+        reason=reason.strip() if isinstance(reason, str) and reason.strip() else action,
+        detail=self._build_provider_provenance_scheduler_stitched_report_view_audit_detail(
+          record=updated,
+          action=action,
+        ),
+        revision_id=revision.revision_id,
+        source_revision_id=source_revision_id,
+        name=updated.name,
+        status=updated.status,
+        occurrence_limit=int(updated.occurrence_limit),
+        history_limit=int(updated.history_limit),
+        drilldown_history_limit=int(updated.drilldown_history_limit),
+        filter_summary=self._build_provider_provenance_analytics_filter_summary(normalized_query),
+        actor_tab_id=revision.recorded_by_tab_id,
+        actor_tab_label=revision.recorded_by_tab_label,
+      )
+    )
+    return updated
 
   def _build_provider_provenance_scheduler_narrative_template_revision(
     self,
@@ -5822,6 +5916,317 @@ class TradingApplication:
       actor_tab_id=actor_tab_id,
       actor_tab_label=actor_tab_label,
     )
+
+  def bulk_govern_provider_provenance_scheduler_stitched_report_views(
+    self,
+    view_ids: Iterable[str],
+    *,
+    action: str,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str | None = None,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    description_append: str | None = None,
+    query_patch: dict[str, Any] | None = None,
+    occurrence_limit: int | None = None,
+    history_limit: int | None = None,
+    drilldown_history_limit: int | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeBulkGovernanceResult:
+    normalized_action = action.strip().lower() if isinstance(action, str) else ""
+    if normalized_action not in {"delete", "restore", "update"}:
+      raise ValueError("Bulk governance action must be delete, restore, or update.")
+    normalized_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(view_ids)
+    normalized_reason = (
+      reason.strip()
+      if isinstance(reason, str) and reason.strip()
+      else f"scheduler_stitched_report_view_bulk_{normalized_action}"
+    )
+    normalized_name_prefix = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      name_prefix,
+      preserve_outer_spacing=True,
+    )
+    normalized_name_suffix = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      name_suffix,
+      preserve_outer_spacing=True,
+    )
+    normalized_description_append = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      description_append
+    )
+    normalized_occurrence_limit = (
+      self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+        occurrence_limit,
+        default=8,
+        minimum=1,
+        maximum=50,
+        field_name="scheduler stitched report occurrence_limit",
+      )
+      if isinstance(occurrence_limit, int)
+      else None
+    )
+    normalized_history_limit = (
+      self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+        history_limit,
+        default=12,
+        minimum=1,
+        maximum=200,
+        field_name="scheduler stitched report history_limit",
+      )
+      if isinstance(history_limit, int)
+      else None
+    )
+    normalized_drilldown_history_limit = (
+      self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
+        drilldown_history_limit,
+        default=12,
+        minimum=1,
+        maximum=100,
+        field_name="scheduler stitched report drilldown_history_limit",
+      )
+      if isinstance(drilldown_history_limit, int)
+      else None
+    )
+    results: list[ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult] = []
+    applied_count = 0
+    skipped_count = 0
+    failed_count = 0
+    for view_id in normalized_ids:
+      current = self._load_provider_provenance_scheduler_stitched_report_view_record(view_id)
+      if current is None:
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=view_id,
+            outcome="failed",
+            message="Stitched report view not found.",
+          )
+        )
+        continue
+      try:
+        if normalized_action == "delete":
+          if current.status == "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.view_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Stitched report view is already deleted.",
+              )
+            )
+            continue
+          updated = self.delete_provider_provenance_scheduler_stitched_report_view(
+            current.view_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=normalized_reason,
+          )
+        elif normalized_action == "restore":
+          if current.status != "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.view_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Stitched report view is already active.",
+              )
+            )
+            continue
+          revision = self._find_latest_active_provider_provenance_scheduler_stitched_report_view_revision(
+            current.view_id
+          )
+          if revision is None:
+            failed_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.view_id,
+                item_name=current.name,
+                outcome="failed",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="No active revision is available for restore.",
+              )
+            )
+            continue
+          updated = self.restore_provider_provenance_scheduler_stitched_report_view_revision(
+            current.view_id,
+            revision.revision_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=normalized_reason,
+          )
+        else:
+          if current.status == "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.view_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Stitched report view is deleted; restore it before bulk editing.",
+              )
+            )
+            continue
+          updated_name = (
+            f"{normalized_name_prefix or ''}{current.name}{normalized_name_suffix or ''}"
+          )
+          updated_description = (
+            f"{current.description} {normalized_description_append}".strip()
+            if normalized_description_append is not None
+            else current.description
+          )
+          updated_query = self._build_provider_provenance_scheduler_stitched_report_view_bulk_query(
+            current.query,
+            query_patch,
+          )
+          updated_occurrence_limit = (
+            normalized_occurrence_limit
+            if normalized_occurrence_limit is not None
+            else current.occurrence_limit
+          )
+          updated_history_limit = (
+            normalized_history_limit
+            if normalized_history_limit is not None
+            else current.history_limit
+          )
+          updated_drilldown_history_limit = (
+            normalized_drilldown_history_limit
+            if normalized_drilldown_history_limit is not None
+            else current.drilldown_history_limit
+          )
+          if (
+            updated_name == current.name
+            and updated_description == current.description
+            and updated_query == current.query
+            and updated_occurrence_limit == current.occurrence_limit
+            and updated_history_limit == current.history_limit
+            and updated_drilldown_history_limit == current.drilldown_history_limit
+          ):
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.view_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Stitched report view already matches the requested bulk edits.",
+              )
+            )
+            continue
+          updated = self.update_provider_provenance_scheduler_stitched_report_view(
+            current.view_id,
+            name=updated_name,
+            description=updated_description,
+            query=updated_query,
+            occurrence_limit=updated_occurrence_limit,
+            history_limit=updated_history_limit,
+            drilldown_history_limit=updated_drilldown_history_limit,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=normalized_reason,
+          )
+        applied_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=updated.view_id,
+            item_name=updated.name,
+            outcome="applied",
+            status=updated.status,
+            current_revision_id=updated.current_revision_id,
+            message=(
+              "Stitched report view updated."
+              if normalized_action == "update"
+              else "Stitched report view restored."
+              if normalized_action == "restore"
+              else "Stitched report view deleted."
+            ),
+          )
+        )
+      except Exception as error:
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+            item_id=current.view_id,
+            item_name=current.name,
+            outcome="failed",
+            status=current.status,
+            current_revision_id=current.current_revision_id,
+            message=str(error),
+          )
+        )
+    return ProviderProvenanceSchedulerNarrativeBulkGovernanceResult(
+      item_type="stitched_report_view",
+      action=normalized_action,
+      reason=normalized_reason,
+      requested_count=len(normalized_ids),
+      applied_count=applied_count,
+      skipped_count=skipped_count,
+      failed_count=failed_count,
+      results=tuple(results),
+    )
+
+  def list_provider_provenance_scheduler_stitched_report_view_audits(
+    self,
+    *,
+    view_id: str | None = None,
+    action: str | None = None,
+    actor_tab_id: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceSchedulerStitchedReportViewAuditRecord, ...]:
+    normalized_view_id = (
+      view_id.strip()
+      if isinstance(view_id, str) and view_id.strip()
+      else None
+    )
+    normalized_action = action.strip().lower() if isinstance(action, str) and action.strip() else None
+    normalized_actor_tab_id = (
+      actor_tab_id.strip()
+      if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+      else None
+    )
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceSchedulerStitchedReportViewAuditRecord] = []
+    for record in self._list_provider_provenance_scheduler_stitched_report_view_audit_records():
+      if normalized_view_id is not None and record.view_id != normalized_view_id:
+        continue
+      if normalized_action is not None and record.action != normalized_action:
+        continue
+      if normalized_actor_tab_id is not None and record.actor_tab_id != normalized_actor_tab_id:
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.audit_id,
+          record.view_id,
+          record.action,
+          record.reason,
+          record.detail,
+          record.revision_id,
+          record.source_revision_id,
+          record.name,
+          record.status,
+          record.filter_summary,
+          record.actor_tab_id,
+          record.actor_tab_label,
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(
+        replace(
+          record,
+          status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+        )
+      )
+    return tuple(filtered[:normalized_limit])
 
   def create_provider_provenance_scheduler_narrative_template(
     self,
@@ -37470,6 +37875,43 @@ def serialize_provider_provenance_scheduler_stitched_report_view_revision_list(
       serialize_provider_provenance_scheduler_stitched_report_view_revision_record(revision)
       for revision in revisions
     ],
+  }
+
+
+def serialize_provider_provenance_scheduler_stitched_report_view_audit_record(
+  record: ProviderProvenanceSchedulerStitchedReportViewAuditRecord,
+) -> dict[str, Any]:
+  return {
+    "audit_id": record.audit_id,
+    "view_id": record.view_id,
+    "action": record.action,
+    "recorded_at": record.recorded_at.isoformat(),
+    "reason": record.reason,
+    "detail": record.detail,
+    "revision_id": record.revision_id,
+    "source_revision_id": record.source_revision_id,
+    "name": record.name,
+    "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+      record.status
+    ),
+    "occurrence_limit": int(record.occurrence_limit),
+    "history_limit": int(record.history_limit),
+    "drilldown_history_limit": int(record.drilldown_history_limit),
+    "filter_summary": record.filter_summary,
+    "actor_tab_id": record.actor_tab_id,
+    "actor_tab_label": record.actor_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_stitched_report_view_audit_list(
+  records: tuple[ProviderProvenanceSchedulerStitchedReportViewAuditRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduler_stitched_report_view_audit_record(record)
+      for record in records
+    ],
+    "total": len(records),
   }
 
 

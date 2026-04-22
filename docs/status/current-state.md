@@ -182,6 +182,9 @@ It is not yet a finished live trading product:
   persist a named occurrence slice with export limits and later re-apply, edit, delete, inspect
   immutable revisions, restore old snapshots, copy, download, or share that exact stitched-report
   lens without rebuilding it from the timeline toolbar
+- those saved stitched report views now also support bulk governance and a shared team audit
+  trail, so multiple saved scheduler handoff lenses can be patched, retired, restored, and
+  reviewed across shifts without treating them as browser-local personal state
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

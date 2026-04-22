@@ -128,6 +128,9 @@ creation.
 - stitched scheduler reports now also live behind a dedicated saved-view surface, so named
   occurrence slices can be persisted with their export limits and later edited, deleted,
   revision-restored, or replayed directly into copy, download, or shared-report workflows
+- those saved stitched report views now also have bulk governance plus a team audit layer, so
+  shared scheduler handoff lenses can be batch-patched, retired, restored, and reviewed as team
+  assets instead of only per-view lifecycle entries
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand

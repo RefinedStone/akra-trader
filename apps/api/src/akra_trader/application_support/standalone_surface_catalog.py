@@ -1571,6 +1571,16 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("view_id",),
     request_payload_kind="operator_provider_provenance_scheduler_stitched_report_view_delete",
   )
+  operator_provider_provenance_scheduler_stitched_report_view_bulk_governance_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_view_bulk_governance",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-views/bulk-governance",
+    route_name="bulk_govern_operator_provider_provenance_scheduler_stitched_report_views",
+    response_title="Bulk govern provider provenance scheduler stitched report views",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_view_bulk_governance",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_stitched_report_view_bulk_governance",
+  )
   operator_provider_provenance_scheduler_stitched_report_view_revision_list_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_stitched_report_view_revision_list",
     route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-views/{view_id}/revisions",
@@ -1590,6 +1600,72 @@ def build_standalone_surface_runtime_bindings(
     methods=("POST",),
     path_param_keys=("view_id", "revision_id"),
     request_payload_kind="operator_provider_provenance_scheduler_stitched_report_view_revision_restore",
+  )
+  operator_provider_provenance_scheduler_stitched_report_view_audit_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_view_audit_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-views/audits",
+    route_name="list_operator_provider_provenance_scheduler_stitched_report_view_audits",
+    response_title="List provider provenance scheduler stitched report view audits",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_view_audit_list",
+    filter_keys=("view_id", "action", "actor_tab_id", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "view_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="View ID",
+          description="Filter stitched report view audit rows by saved view.",
+          examples=("view_demo",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "action",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Action",
+          description="Filter stitched report view audit rows by lifecycle action.",
+          examples=("updated",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "actor_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Actor tab ID",
+          description="Filter stitched report view audit rows by actor tab identity.",
+          examples=("tab_ops",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search stitched report view audits by name, reason, detail, actor, or filter summary.",
+          examples=("lag recovery",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of stitched report view audit rows to return.",
+          examples=(20,),
+        ),
+      ),
+    ),
   )
   operator_provider_provenance_scheduler_narrative_template_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_template_create",
@@ -4367,8 +4443,10 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_stitched_report_view_list_binding,
     operator_provider_provenance_scheduler_stitched_report_view_update_binding,
     operator_provider_provenance_scheduler_stitched_report_view_delete_binding,
+    operator_provider_provenance_scheduler_stitched_report_view_bulk_governance_binding,
     operator_provider_provenance_scheduler_stitched_report_view_revision_list_binding,
     operator_provider_provenance_scheduler_stitched_report_view_revision_restore_binding,
+    operator_provider_provenance_scheduler_stitched_report_view_audit_list_binding,
     operator_provider_provenance_scheduler_narrative_template_create_binding,
     operator_provider_provenance_scheduler_narrative_template_list_binding,
     operator_provider_provenance_scheduler_narrative_template_update_binding,

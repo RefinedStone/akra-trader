@@ -1634,6 +1634,30 @@ export type ProviderProvenanceSchedulerStitchedReportViewRevisionListPayload = {
   history: ProviderProvenanceSchedulerStitchedReportViewRevisionEntry[];
 };
 
+export type ProviderProvenanceSchedulerStitchedReportViewAuditRecord = {
+  audit_id: string;
+  view_id: string;
+  action: string;
+  recorded_at: string;
+  reason: string;
+  detail: string;
+  revision_id?: string | null;
+  source_revision_id?: string | null;
+  name: string;
+  status: "active" | "deleted" | string;
+  occurrence_limit: number;
+  history_limit: number;
+  drilldown_history_limit: number;
+  filter_summary: string;
+  actor_tab_id?: string | null;
+  actor_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerStitchedReportViewAuditListPayload = {
+  items: ProviderProvenanceSchedulerStitchedReportViewAuditRecord[];
+  total: number;
+};
+
 export type ProviderProvenanceSchedulerNarrativeTemplateEntry = {
   template_id: string;
   name: string;

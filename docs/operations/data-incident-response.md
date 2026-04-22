@@ -79,6 +79,9 @@ unclear dataset lineage.
   save the current scheduler occurrence slice as a named report lens and later re-apply, edit,
   delete, inspect immutable revisions, restore prior snapshots, copy, download, or share that
   same stitched artifact shape during a later handoff
+- those saved stitched report views now also expose bulk governance and a shared team audit
+  surface, so repeated scheduler handoff lenses can be reviewed, patched, or retired as shared
+  operational assets instead of one-off personal shortcuts
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

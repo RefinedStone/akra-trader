@@ -53,6 +53,7 @@ import type {
 import {
   applyProviderProvenanceSchedulerNarrativeGovernancePlan,
   approveProviderProvenanceSchedulerNarrativeGovernancePlan,
+  bulkGovernProviderProvenanceSchedulerStitchedReportViews,
   createProviderProvenanceAnalyticsPreset,
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
@@ -111,6 +112,7 @@ import {
   listProviderProvenanceExportJobs,
   listProviderProvenanceSchedulerAlertHistory,
   listProviderProvenanceSchedulerHealthHistory,
+  listProviderProvenanceSchedulerStitchedReportViewAudits,
   listProviderProvenanceSchedulerStitchedReportViewRevisions,
   listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
@@ -344,6 +346,7 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerStitchedReportViewAuditRecord,
   ProviderProvenanceSchedulerStitchedReportViewEntry,
   ProviderProvenanceSchedulerStitchedReportViewRevisionEntry,
   ProviderProvenanceSchedulerStitchedReportViewRevisionListPayload,
@@ -690,6 +693,37 @@ const defaultProviderProvenanceSchedulerNarrativeTemplateBulkDraft: ProviderProv
   result_limit: "",
 };
 
+type ProviderProvenanceSchedulerStitchedReportViewBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  scheduler_alert_category: string;
+  scheduler_alert_status: string;
+  scheduler_alert_narrative_facet:
+    | typeof KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    | ProviderProvenanceSchedulerOccurrenceNarrativeFacet;
+  window_days: string;
+  result_limit: string;
+  occurrence_limit: string;
+  history_limit: string;
+  drilldown_history_limit: string;
+};
+
+const defaultProviderProvenanceSchedulerStitchedReportViewBulkDraft:
+  ProviderProvenanceSchedulerStitchedReportViewBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    scheduler_alert_category: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+    scheduler_alert_status: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+    scheduler_alert_narrative_facet: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+    window_days: "",
+    result_limit: "",
+    occurrence_limit: "",
+    history_limit: "",
+    drilldown_history_limit: "",
+  };
+
 type ProviderProvenanceSchedulerNarrativeRegistryDraftState = {
   name: string;
   description: string;
@@ -963,6 +997,21 @@ type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditFil
 const defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditFilter:
   ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditFilterState = {
     hierarchy_step_template_id: "",
+    action: ALL_FILTER_VALUE,
+    actor_tab_id: "",
+    search: "",
+  };
+
+type ProviderProvenanceSchedulerStitchedReportViewAuditFilterState = {
+  view_id: string;
+  action: string;
+  actor_tab_id: string;
+  search: string;
+};
+
+const defaultProviderProvenanceSchedulerStitchedReportViewAuditFilter:
+  ProviderProvenanceSchedulerStitchedReportViewAuditFilterState = {
+    view_id: "",
     action: ALL_FILTER_VALUE,
     actor_tab_id: "",
     search: "",
@@ -3664,6 +3713,10 @@ export default function App() {
     useState(defaultProviderProvenanceWorkspaceDraft);
   const [editingProviderProvenanceSchedulerStitchedReportViewId, setEditingProviderProvenanceSchedulerStitchedReportViewId] =
     useState<string | null>(null);
+  const [providerProvenanceSchedulerStitchedReportViewBulkDraft, setProviderProvenanceSchedulerStitchedReportViewBulkDraft] =
+    useState<ProviderProvenanceSchedulerStitchedReportViewBulkDraftState>(
+      defaultProviderProvenanceSchedulerStitchedReportViewBulkDraft,
+    );
   const [providerProvenanceReportDraft, setProviderProvenanceReportDraft] =
     useState<ProviderProvenanceReportDraftState>(defaultProviderProvenanceReportDraft);
   const [providerProvenanceAnalyticsPresets, setProviderProvenanceAnalyticsPresets] =
@@ -3684,6 +3737,10 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerStitchedReportViewsError, setProviderProvenanceSchedulerStitchedReportViewsError] =
     useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerStitchedReportViewIds, setSelectedProviderProvenanceSchedulerStitchedReportViewIds] =
+    useState<string[]>([]);
+  const [providerProvenanceSchedulerStitchedReportViewBulkAction, setProviderProvenanceSchedulerStitchedReportViewBulkAction] =
+    useState<"delete" | "restore" | "update" | null>(null);
   const [selectedProviderProvenanceSchedulerStitchedReportViewId, setSelectedProviderProvenanceSchedulerStitchedReportViewId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerStitchedReportViewHistory, setSelectedProviderProvenanceSchedulerStitchedReportViewHistory] =
@@ -3691,6 +3748,16 @@ export default function App() {
   const [providerProvenanceSchedulerStitchedReportViewHistoryLoading, setProviderProvenanceSchedulerStitchedReportViewHistoryLoading] =
     useState(false);
   const [providerProvenanceSchedulerStitchedReportViewHistoryError, setProviderProvenanceSchedulerStitchedReportViewHistoryError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerStitchedReportViewAuditFilter, setProviderProvenanceSchedulerStitchedReportViewAuditFilter] =
+    useState<ProviderProvenanceSchedulerStitchedReportViewAuditFilterState>(
+      defaultProviderProvenanceSchedulerStitchedReportViewAuditFilter,
+    );
+  const [providerProvenanceSchedulerStitchedReportViewAudits, setProviderProvenanceSchedulerStitchedReportViewAudits] =
+    useState<ProviderProvenanceSchedulerStitchedReportViewAuditRecord[]>([]);
+  const [providerProvenanceSchedulerStitchedReportViewAuditsLoading, setProviderProvenanceSchedulerStitchedReportViewAuditsLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerStitchedReportViewAuditsError, setProviderProvenanceSchedulerStitchedReportViewAuditsError] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerNarrativeTemplates, setProviderProvenanceSchedulerNarrativeTemplates] =
     useState<ProviderProvenanceSchedulerNarrativeTemplateEntry[]>([]);
@@ -4095,6 +4162,7 @@ export default function App() {
   const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
   const providerProvenanceSchedulerStitchedReportViewRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef = useRef(0);
   const providerProvenanceSchedulerNarrativeGovernancePlanRequestIdRef = useRef(0);
   const providerProvenanceWorkspaceRegistryLoadedRef = useRef(false);
   const providerProvenanceSchedulerAutomationRef = useRef<HTMLDivElement | null>(null);
@@ -4115,6 +4183,10 @@ export default function App() {
       ),
     [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates],
   );
+  const selectedProviderProvenanceSchedulerStitchedReportViewIdSet = useMemo(
+    () => new Set(selectedProviderProvenanceSchedulerStitchedReportViewIds),
+    [selectedProviderProvenanceSchedulerStitchedReportViewIds],
+  );
   const selectedProviderProvenanceSchedulerNarrativeTemplateIdSet = useMemo(
     () => new Set(selectedProviderProvenanceSchedulerNarrativeTemplateIds),
     [selectedProviderProvenanceSchedulerNarrativeTemplateIds],
@@ -4134,6 +4206,16 @@ export default function App() {
   const selectedProviderProvenanceSchedulerNarrativeGovernancePlanIdSet = useMemo(
     () => new Set(selectedProviderProvenanceSchedulerNarrativeGovernancePlanIds),
     [selectedProviderProvenanceSchedulerNarrativeGovernancePlanIds],
+  );
+  const selectedProviderProvenanceSchedulerStitchedReportViewEntries = useMemo(
+    () =>
+      providerProvenanceSchedulerStitchedReportViews.filter((entry) =>
+        selectedProviderProvenanceSchedulerStitchedReportViewIdSet.has(entry.view_id),
+      ),
+    [
+      selectedProviderProvenanceSchedulerStitchedReportViewIdSet,
+      providerProvenanceSchedulerStitchedReportViews,
+    ],
   );
   const selectedProviderProvenanceSchedulerNarrativeTemplateEntries = useMemo(
     () =>
@@ -5594,6 +5676,10 @@ export default function App() {
     providerProvenanceAnalyticsQuery.scheduler_alert_status,
     providerProvenanceSchedulerHistoryOffset,
     providerProvenanceSchedulerDrilldownBucketKey,
+    providerProvenanceSchedulerStitchedReportViewAuditFilter.view_id,
+    providerProvenanceSchedulerStitchedReportViewAuditFilter.action,
+    providerProvenanceSchedulerStitchedReportViewAuditFilter.actor_tab_id,
+    providerProvenanceSchedulerStitchedReportViewAuditFilter.search,
   ]);
 
   useEffect(() => {
@@ -6342,18 +6428,29 @@ export default function App() {
     providerProvenanceSchedulerExportRequestIdRef.current = exportRequestId;
     const stitchedViewRequestId = providerProvenanceSchedulerStitchedReportViewRequestIdRef.current + 1;
     providerProvenanceSchedulerStitchedReportViewRequestIdRef.current = stitchedViewRequestId;
+    const stitchedViewAuditRequestId = providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef.current + 1;
+    providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef.current = stitchedViewAuditRequestId;
     setProviderProvenanceSchedulerAnalyticsLoading(true);
     setProviderProvenanceSchedulerHistoryLoading(true);
     setProviderProvenanceSchedulerAlertHistoryLoading(true);
     setProviderProvenanceSchedulerExportsLoading(true);
     setProviderProvenanceSchedulerStitchedReportViewsLoading(true);
+    setProviderProvenanceSchedulerStitchedReportViewAuditsLoading(true);
     setProviderProvenanceSchedulerAnalyticsError(null);
     setProviderProvenanceSchedulerHistoryError(null);
     setProviderProvenanceSchedulerAlertHistoryError(null);
     setProviderProvenanceSchedulerExportsError(null);
     setProviderProvenanceSchedulerStitchedReportViewsError(null);
+    setProviderProvenanceSchedulerStitchedReportViewAuditsError(null);
     try {
-      const [analyticsPayload, historyPayload, alertHistoryPayload, exportListPayload, stitchedViewPayload] = await Promise.all([
+      const [
+        analyticsPayload,
+        historyPayload,
+        alertHistoryPayload,
+        exportListPayload,
+        stitchedViewPayload,
+        stitchedViewAuditPayload,
+      ] = await Promise.all([
         getProviderProvenanceSchedulerHealthAnalytics({
           windowDays: providerProvenanceAnalyticsQuery.window_days,
           historyLimit: schedulerHistoryLimit,
@@ -6395,6 +6492,16 @@ export default function App() {
               : undefined,
           limit: schedulerHistoryLimit,
         }),
+        listProviderProvenanceSchedulerStitchedReportViewAudits({
+          viewId: providerProvenanceSchedulerStitchedReportViewAuditFilter.view_id.trim() || undefined,
+          action:
+            providerProvenanceSchedulerStitchedReportViewAuditFilter.action !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerStitchedReportViewAuditFilter.action
+              : undefined,
+          actorTabId: providerProvenanceSchedulerStitchedReportViewAuditFilter.actor_tab_id.trim() || undefined,
+          search: providerProvenanceSchedulerStitchedReportViewAuditFilter.search.trim() || undefined,
+          limit: 12,
+        }),
       ]);
       if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
         setProviderProvenanceSchedulerAnalytics(analyticsPayload);
@@ -6419,6 +6526,9 @@ export default function App() {
           setProviderProvenanceSchedulerStitchedReportViewHistoryError(null);
         }
       }
+      if (providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef.current === stitchedViewAuditRequestId) {
+        setProviderProvenanceSchedulerStitchedReportViewAudits(stitchedViewAuditPayload.items);
+      }
     } catch (error) {
       const message = (error as Error).message;
       if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
@@ -6441,6 +6551,10 @@ export default function App() {
         setProviderProvenanceSchedulerStitchedReportViews([]);
         setProviderProvenanceSchedulerStitchedReportViewsError(message);
       }
+      if (providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef.current === stitchedViewAuditRequestId) {
+        setProviderProvenanceSchedulerStitchedReportViewAudits([]);
+        setProviderProvenanceSchedulerStitchedReportViewAuditsError(message);
+      }
     } finally {
       if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
         setProviderProvenanceSchedulerAnalyticsLoading(false);
@@ -6456,6 +6570,9 @@ export default function App() {
       }
       if (providerProvenanceSchedulerStitchedReportViewRequestIdRef.current === stitchedViewRequestId) {
         setProviderProvenanceSchedulerStitchedReportViewsLoading(false);
+      }
+      if (providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef.current === stitchedViewAuditRequestId) {
+        setProviderProvenanceSchedulerStitchedReportViewAuditsLoading(false);
       }
     }
   }
@@ -6651,6 +6768,113 @@ export default function App() {
       setProviderProvenanceWorkspaceFeedback(
         `Scheduler stitched report view save failed: ${(error as Error).message}`,
       );
+    }
+  }
+
+  function buildProviderProvenanceSchedulerStitchedReportViewBulkQueryPatch() {
+    const queryPatch: Record<string, unknown> = {};
+    if (
+      providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_category
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      queryPatch.scheduler_alert_category =
+        providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_category;
+    }
+    if (
+      providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_status
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      queryPatch.scheduler_alert_status =
+        providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_status;
+    }
+    if (
+      providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_narrative_facet
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      queryPatch.scheduler_alert_narrative_facet =
+        providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_narrative_facet;
+    }
+    if (providerProvenanceSchedulerStitchedReportViewBulkDraft.window_days.trim()) {
+      const parsed = Number.parseInt(providerProvenanceSchedulerStitchedReportViewBulkDraft.window_days, 10);
+      if (Number.isFinite(parsed)) {
+        queryPatch.window_days = parsed;
+      }
+    }
+    if (providerProvenanceSchedulerStitchedReportViewBulkDraft.result_limit.trim()) {
+      const parsed = Number.parseInt(providerProvenanceSchedulerStitchedReportViewBulkDraft.result_limit, 10);
+      if (Number.isFinite(parsed)) {
+        queryPatch.result_limit = parsed;
+      }
+    }
+    return Object.keys(queryPatch).length ? queryPatch : undefined;
+  }
+
+  async function runProviderProvenanceSchedulerStitchedReportViewBulkGovernance(
+    action: "delete" | "restore" | "update",
+  ) {
+    if (!selectedProviderProvenanceSchedulerStitchedReportViewIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more stitched report views first.");
+      return;
+    }
+    setProviderProvenanceSchedulerStitchedReportViewBulkAction(action);
+    try {
+      const parseOptionalLimit = (value: string) => {
+        if (!value.trim()) {
+          return undefined;
+        }
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      };
+      const result = await bulkGovernProviderProvenanceSchedulerStitchedReportViews({
+        action,
+        viewIds: selectedProviderProvenanceSchedulerStitchedReportViewIds,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: `scheduler_stitched_report_view_bulk_${action}_from_control_room`,
+        namePrefix:
+          action === "update"
+            ? providerProvenanceSchedulerStitchedReportViewBulkDraft.name_prefix
+            : undefined,
+        nameSuffix:
+          action === "update"
+            ? providerProvenanceSchedulerStitchedReportViewBulkDraft.name_suffix
+            : undefined,
+        descriptionAppend:
+          action === "update"
+            ? providerProvenanceSchedulerStitchedReportViewBulkDraft.description_append
+            : undefined,
+        queryPatch:
+          action === "update"
+            ? buildProviderProvenanceSchedulerStitchedReportViewBulkQueryPatch()
+            : undefined,
+        occurrenceLimit:
+          action === "update"
+            ? parseOptionalLimit(providerProvenanceSchedulerStitchedReportViewBulkDraft.occurrence_limit)
+            : undefined,
+        historyLimit:
+          action === "update"
+            ? parseOptionalLimit(providerProvenanceSchedulerStitchedReportViewBulkDraft.history_limit)
+            : undefined,
+        drilldownHistoryLimit:
+          action === "update"
+            ? parseOptionalLimit(providerProvenanceSchedulerStitchedReportViewBulkDraft.drilldown_history_limit)
+            : undefined,
+      });
+      await loadProviderProvenanceSchedulerSurfaces();
+      if (action === "update") {
+        setProviderProvenanceSchedulerStitchedReportViewBulkDraft(
+          defaultProviderProvenanceSchedulerStitchedReportViewBulkDraft,
+        );
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Stitched report view bulk ${action} failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerStitchedReportViewBulkAction(null);
     }
   }
 
@@ -7795,6 +8019,22 @@ export default function App() {
     setProviderProvenanceSchedulerStitchedReportViewDraft(defaultProviderProvenanceWorkspaceDraft);
   }
 
+  function toggleProviderProvenanceSchedulerStitchedReportViewSelection(viewId: string) {
+    setSelectedProviderProvenanceSchedulerStitchedReportViewIds((current) =>
+      current.includes(viewId)
+        ? current.filter((candidate) => candidate !== viewId)
+        : [...current, viewId],
+    );
+  }
+
+  function toggleAllProviderProvenanceSchedulerStitchedReportViewSelections() {
+    setSelectedProviderProvenanceSchedulerStitchedReportViewIds((current) =>
+      current.length === providerProvenanceSchedulerStitchedReportViews.length
+        ? []
+        : providerProvenanceSchedulerStitchedReportViews.map((entry) => entry.view_id),
+    );
+  }
+
   function resetProviderProvenanceSchedulerNarrativeRegistryDraft() {
     setEditingProviderProvenanceSchedulerNarrativeRegistryId(null);
     setProviderProvenanceSchedulerNarrativeRegistryDraft(
@@ -7961,6 +8201,8 @@ export default function App() {
     const label =
       result.item_type === "registry"
         ? "registry entries"
+        : result.item_type === "stitched_report_view"
+          ? "stitched report views"
         : result.item_type === "policy_catalog"
           ? "policy catalogs"
           : "templates";
@@ -17734,6 +17976,256 @@ export default function App() {
                                       </div>
                                     </label>
                                   </div>
+                                  {providerProvenanceSchedulerStitchedReportViews.length ? (
+                                    <div className="provider-provenance-governance-bar">
+                                      <div className="provider-provenance-governance-summary">
+                                        <strong>
+                                          {selectedProviderProvenanceSchedulerStitchedReportViewIds.length} selected
+                                        </strong>
+                                        <span>
+                                          {selectedProviderProvenanceSchedulerStitchedReportViewEntries.filter((entry) => entry.status === "active").length} active · {" "}
+                                          {selectedProviderProvenanceSchedulerStitchedReportViewEntries.filter((entry) => entry.status === "deleted").length} deleted
+                                        </span>
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <button
+                                          className="ghost-button"
+                                          onClick={toggleAllProviderProvenanceSchedulerStitchedReportViewSelections}
+                                          type="button"
+                                        >
+                                          {selectedProviderProvenanceSchedulerStitchedReportViewIds.length === providerProvenanceSchedulerStitchedReportViews.length
+                                            ? "Clear all"
+                                            : "Select all"}
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={!selectedProviderProvenanceSchedulerStitchedReportViewIds.length || providerProvenanceSchedulerStitchedReportViewBulkAction !== null}
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerStitchedReportViewBulkGovernance("delete");
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerStitchedReportViewBulkAction === "delete"
+                                            ? "Applying…"
+                                            : "Delete selected"}
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={!selectedProviderProvenanceSchedulerStitchedReportViewIds.length || providerProvenanceSchedulerStitchedReportViewBulkAction !== null}
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerStitchedReportViewBulkGovernance("restore");
+                                          }}
+                                          type="button"
+                                        >
+                                          {providerProvenanceSchedulerStitchedReportViewBulkAction === "restore"
+                                            ? "Applying…"
+                                            : "Restore selected"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                  {providerProvenanceSchedulerStitchedReportViews.length ? (
+                                    <div className="provider-provenance-governance-editor">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Bulk stitched view edits</strong>
+                                        <p>Patch metadata, scheduler slice filters, and export limits across multiple saved stitched report views at once.</p>
+                                      </div>
+                                      <div className="filter-bar">
+                                        <label>
+                                          <span>Name prefix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                name_prefix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="Ops / "
+                                            type="text"
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.name_prefix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Name suffix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                name_suffix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder=" / v2"
+                                            type="text"
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.name_suffix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Description append</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                description_append: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="reviewed in shift handoff"
+                                            type="text"
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.description_append}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Category</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_category: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_category}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value={ALL_FILTER_VALUE}>All categories</option>
+                                            <option value="scheduler_lag">scheduler lag</option>
+                                            <option value="scheduler_failure">scheduler failure</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Status</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_status: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_status}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value={ALL_FILTER_VALUE}>All statuses</option>
+                                            <option value="active">active</option>
+                                            <option value="resolved">resolved</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Facet</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_narrative_facet:
+                                                  event.target.value === "resolved_narratives"
+                                                  || event.target.value === "post_resolution_recovery"
+                                                  || event.target.value === "recurring_occurrences"
+                                                  || event.target.value === "all_occurrences"
+                                                    ? event.target.value
+                                                    : KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.scheduler_alert_narrative_facet}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value="all_occurrences">all occurrences</option>
+                                            <option value="resolved_narratives">resolved narratives</option>
+                                            <option value="post_resolution_recovery">post-resolution recovery</option>
+                                            <option value="recurring_occurrences">recurring occurrences</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Window days</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                window_days: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.window_days}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Result limit</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                result_limit: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.result_limit}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Occurrence limit</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                occurrence_limit: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.occurrence_limit}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>History limit</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                history_limit: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.history_limit}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Drill-down limit</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerStitchedReportViewBulkDraft((current) => ({
+                                                ...current,
+                                                drilldown_history_limit: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerStitchedReportViewBulkDraft.drilldown_history_limit}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <div className="market-data-provenance-history-actions">
+                                            <button
+                                              className="ghost-button"
+                                              disabled={!selectedProviderProvenanceSchedulerStitchedReportViewIds.length || providerProvenanceSchedulerStitchedReportViewBulkAction !== null}
+                                              onClick={() => {
+                                                void runProviderProvenanceSchedulerStitchedReportViewBulkGovernance("update");
+                                              }}
+                                              type="button"
+                                            >
+                                              {providerProvenanceSchedulerStitchedReportViewBulkAction === "update"
+                                                ? "Applying…"
+                                                : "Apply bulk edit"}
+                                            </button>
+                                          </div>
+                                        </label>
+                                      </div>
+                                    </div>
+                                  ) : null}
                                   {providerProvenanceSchedulerStitchedReportViewsLoading ? (
                                     <p className="empty-state">Loading stitched report views…</p>
                                   ) : null}
@@ -17746,6 +18238,17 @@ export default function App() {
                                     <table className="data-table">
                                       <thead>
                                         <tr>
+                                          <th>
+                                            <input
+                                              aria-label="Select all stitched report views"
+                                              checked={
+                                                providerProvenanceSchedulerStitchedReportViews.length > 0
+                                                && selectedProviderProvenanceSchedulerStitchedReportViewIds.length === providerProvenanceSchedulerStitchedReportViews.length
+                                              }
+                                              onChange={toggleAllProviderProvenanceSchedulerStitchedReportViewSelections}
+                                              type="checkbox"
+                                            />
+                                          </th>
                                           <th>View</th>
                                           <th>Slice</th>
                                           <th>Action</th>
@@ -17754,6 +18257,16 @@ export default function App() {
                                       <tbody>
                                         {providerProvenanceSchedulerStitchedReportViews.map((entry) => (
                                           <tr key={`provider-scheduler-stitched-view-${entry.view_id}`}>
+                                            <td className="provider-provenance-selection-cell">
+                                              <input
+                                                aria-label={`Select stitched report view ${entry.name}`}
+                                                checked={selectedProviderProvenanceSchedulerStitchedReportViewIdSet.has(entry.view_id)}
+                                                onChange={() => {
+                                                  toggleProviderProvenanceSchedulerStitchedReportViewSelection(entry.view_id);
+                                                }}
+                                                type="checkbox"
+                                              />
+                                            </td>
                                             <td>
                                               <strong>{entry.name}</strong>
                                               <p className="run-lineage-symbol-copy">{entry.filter_summary}</p>
@@ -17928,6 +18441,132 @@ export default function App() {
                                       ) : null}
                                     </div>
                                   ) : null}
+                                  <div className="market-data-provenance-shared-history">
+                                    <div className="market-data-provenance-history-head">
+                                      <strong>Stitched report view team audit</strong>
+                                      <p>Filter shared audit rows by saved view, action, or actor to review bulk governance and lifecycle changes.</p>
+                                    </div>
+                                    <div className="filter-bar">
+                                      <label>
+                                        <span>View</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportViewAuditFilter((current) => ({
+                                              ...current,
+                                              view_id: event.target.value,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportViewAuditFilter.view_id}
+                                        >
+                                          <option value="">All views</option>
+                                          {providerProvenanceSchedulerStitchedReportViews.map((entry) => (
+                                            <option key={entry.view_id} value={entry.view_id}>
+                                              {entry.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Action</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportViewAuditFilter((current) => ({
+                                              ...current,
+                                              action: event.target.value,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportViewAuditFilter.action}
+                                        >
+                                          <option value={ALL_FILTER_VALUE}>All actions</option>
+                                          <option value="created">Created</option>
+                                          <option value="updated">Updated</option>
+                                          <option value="deleted">Deleted</option>
+                                          <option value="restored">Restored</option>
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Actor tab</span>
+                                        <input
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportViewAuditFilter((current) => ({
+                                              ...current,
+                                              actor_tab_id: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="tab_ops"
+                                          type="text"
+                                          value={providerProvenanceSchedulerStitchedReportViewAuditFilter.actor_tab_id}
+                                        />
+                                      </label>
+                                      <label>
+                                        <span>Search</span>
+                                        <input
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportViewAuditFilter((current) => ({
+                                              ...current,
+                                              search: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="lag recovery"
+                                          type="text"
+                                          value={providerProvenanceSchedulerStitchedReportViewAuditFilter.search}
+                                        />
+                                      </label>
+                                    </div>
+                                    {providerProvenanceSchedulerStitchedReportViewAuditsLoading ? (
+                                      <p className="empty-state">Loading stitched report view audit…</p>
+                                    ) : null}
+                                    {providerProvenanceSchedulerStitchedReportViewAuditsError ? (
+                                      <p className="market-data-workflow-feedback">
+                                        Stitched report view audit failed: {providerProvenanceSchedulerStitchedReportViewAuditsError}
+                                      </p>
+                                    ) : null}
+                                    {providerProvenanceSchedulerStitchedReportViewAudits.length ? (
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>When</th>
+                                            <th>Action</th>
+                                            <th>Actor</th>
+                                            <th>Detail</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerStitchedReportViewAudits.map((entry) => (
+                                            <tr key={`provider-scheduler-stitched-view-audit-${entry.audit_id}`}>
+                                              <td>
+                                                <strong>{formatTimestamp(entry.recorded_at)}</strong>
+                                                <p className="run-lineage-symbol-copy">{entry.name}</p>
+                                              </td>
+                                              <td>
+                                                <strong>{formatWorkflowToken(entry.action)}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(entry.status)} · {entry.filter_summary}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <strong>{entry.actor_tab_label ?? entry.actor_tab_id ?? "unknown tab"}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.actor_tab_id ?? "No tab id recorded."}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <strong>{entry.detail}</strong>
+                                                <p className="run-lineage-symbol-copy">{entry.reason}</p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {entry.occurrence_limit} occurrence(s) · history {entry.history_limit} · drill-down {entry.drilldown_history_limit}
+                                                </p>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : (
+                                      !providerProvenanceSchedulerStitchedReportViewAuditsLoading
+                                        ? <p className="empty-state">No stitched report view audit events match the selected filters.</p>
+                                        : null
+                                    )}
+                                  </div>
                                   <div className="market-data-provenance-history-head">
                                     <strong>Shared scheduler exports</strong>
                                     <p>

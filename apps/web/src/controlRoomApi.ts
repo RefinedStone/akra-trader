@@ -18,6 +18,7 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerStitchedReportViewEntry,
+  ProviderProvenanceSchedulerStitchedReportViewAuditListPayload,
   ProviderProvenanceSchedulerStitchedReportViewListPayload,
   ProviderProvenanceSchedulerStitchedReportViewRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
@@ -775,6 +776,48 @@ export async function deleteProviderProvenanceSchedulerStitchedReportView(params
   );
 }
 
+export async function bulkGovernProviderProvenanceSchedulerStitchedReportViews(params: {
+  action: "delete" | "restore" | "update";
+  viewIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  queryPatch?: Record<string, unknown>;
+  occurrenceLimit?: number;
+  historyLimit?: number;
+  drilldownHistoryLimit?: number;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
+    "/operator/provider-provenance-analytics/scheduler-stitched-report-views/bulk-governance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: params.action,
+        view_ids: params.viewIds,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.namePrefix ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend?.trim() ? { description_append: params.descriptionAppend.trim() } : {}),
+        ...(params.queryPatch ? { query_patch: params.queryPatch } : {}),
+        ...(typeof params.occurrenceLimit === "number" && Number.isFinite(params.occurrenceLimit)
+          ? { occurrence_limit: Math.max(1, Math.min(Math.round(params.occurrenceLimit), 50)) }
+          : {}),
+        ...(typeof params.historyLimit === "number" && Number.isFinite(params.historyLimit)
+          ? { history_limit: Math.max(1, Math.min(Math.round(params.historyLimit), 200)) }
+          : {}),
+        ...(typeof params.drilldownHistoryLimit === "number" && Number.isFinite(params.drilldownHistoryLimit)
+          ? { drilldown_history_limit: Math.max(1, Math.min(Math.round(params.drilldownHistoryLimit), 100)) }
+          : {}),
+      }),
+    },
+  );
+}
+
 export async function listProviderProvenanceSchedulerStitchedReportViewRevisions(
   viewId: string,
 ) {
@@ -800,6 +843,35 @@ export async function restoreProviderProvenanceSchedulerStitchedReportViewRevisi
         ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
       }),
     },
+  );
+}
+
+export async function listProviderProvenanceSchedulerStitchedReportViewAudits(params: {
+  viewId?: string;
+  action?: string;
+  actorTabId?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.viewId?.trim()) {
+    searchParams.set("view_id", params.viewId.trim());
+  }
+  if (params.action?.trim()) {
+    searchParams.set("action", params.action.trim());
+  }
+  if (params.actorTabId?.trim()) {
+    searchParams.set("actor_tab_id", params.actorTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 200))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerStitchedReportViewAuditListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-views/audits${suffix}`,
   );
 }
 

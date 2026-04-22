@@ -953,6 +953,26 @@ class ProviderProvenanceSchedulerStitchedReportViewRevisionRecord:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerStitchedReportViewAuditRecord:
+  audit_id: str
+  view_id: str
+  action: str
+  recorded_at: datetime
+  reason: str
+  detail: str = ""
+  revision_id: str | None = None
+  source_revision_id: str | None = None
+  name: str = ""
+  status: str = "active"
+  occurrence_limit: int = 8
+  history_limit: int = 12
+  drilldown_history_limit: int = 12
+  filter_summary: str = ""
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceScheduledReportRecord:
   report_id: str
   name: str

@@ -129,6 +129,10 @@ def serialize_provider_provenance_scheduler_stitched_report_view_revision_list(*
   return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_view_revision_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_stitched_report_view_audit_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_stitched_report_view_audit_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduler_narrative_template_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_record')(*args, **kwargs)
 
@@ -748,6 +752,23 @@ def execute_standalone_surface_binding(
         reason=resolved_payload.get("reason", "scheduler_stitched_report_view_deleted"),
       )
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_bulk_governance":
+    return serialize_provider_provenance_scheduler_narrative_bulk_governance_result(
+      app.bulk_govern_provider_provenance_scheduler_stitched_report_views(
+        resolved_payload.get("view_ids", ()),
+        action=resolved_payload.get("action", ""),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        query_patch=resolved_payload.get("query_patch"),
+        occurrence_limit=resolved_payload.get("occurrence_limit"),
+        history_limit=resolved_payload.get("history_limit"),
+        drilldown_history_limit=resolved_payload.get("drilldown_history_limit"),
+      )
+    )
   if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_revision_list":
     view = app.get_provider_provenance_scheduler_stitched_report_view(
       resolved_path_params["view_id"]
@@ -766,6 +787,16 @@ def execute_standalone_surface_binding(
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
         reason=resolved_payload.get("reason", "scheduler_stitched_report_view_revision_restored"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_view_audit_list":
+    return serialize_provider_provenance_scheduler_stitched_report_view_audit_list(
+      app.list_provider_provenance_scheduler_stitched_report_view_audits(
+        view_id=resolved_filters.get("view_id"),
+        action=resolved_filters.get("action"),
+        actor_tab_id=resolved_filters.get("actor_tab_id"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_create":
