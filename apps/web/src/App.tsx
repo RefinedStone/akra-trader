@@ -124,6 +124,7 @@ import {
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernance,
+  stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates,
   stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   runDueProviderProvenanceScheduledReports,
@@ -891,6 +892,7 @@ type ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
   approval_priority: string;
   policy_template_id: string;
   policy_catalog_id: string;
+  source_hierarchy_step_template_id: string;
 };
 
 const defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter:
@@ -901,6 +903,7 @@ const defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter:
   approval_priority: ALL_FILTER_VALUE,
   policy_template_id: ALL_FILTER_VALUE,
   policy_catalog_id: ALL_FILTER_VALUE,
+  source_hierarchy_step_template_id: ALL_FILTER_VALUE,
 };
 
 type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState = {
@@ -3528,7 +3531,7 @@ export default function App() {
   const [selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds, setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds] =
     useState<string[]>([]);
   const [providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction, setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction] =
-    useState<"delete" | "restore" | "update" | null>(null);
+    useState<"delete" | "restore" | "stage" | "update" | null>(null);
   const [editingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId, setEditingProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory, setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateHistory] =
@@ -4070,6 +4073,13 @@ export default function App() {
           if (
             providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id !== ALL_FILTER_VALUE
             && (entry.policy_catalog_id ?? "") !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id
+          ) {
+            return false;
+          }
+          if (
+            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.source_hierarchy_step_template_id !== ALL_FILTER_VALUE
+            && (entry.source_hierarchy_step_template_id ?? "")
+              !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.source_hierarchy_step_template_id
           ) {
             return false;
           }
@@ -7893,6 +7903,7 @@ export default function App() {
       approval_priority: catalog.approval_priority || ALL_FILTER_VALUE,
       policy_template_id: catalog.default_policy_template_id ?? ALL_FILTER_VALUE,
       policy_catalog_id: catalog.catalog_id,
+      source_hierarchy_step_template_id: ALL_FILTER_VALUE,
     });
     if (catalog.item_type_scope !== "registry" && catalog.default_policy_template_id) {
       setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId(
@@ -8708,6 +8719,7 @@ export default function App() {
         approval_priority: plan.approval_priority || current.approval_priority,
         policy_template_id: plan.policy_template_id ?? current.policy_template_id,
         policy_catalog_id: plan.policy_catalog_id ?? current.policy_catalog_id,
+        source_hierarchy_step_template_id: template.hierarchy_step_template_id,
       }));
       setProviderProvenanceWorkspaceFeedback(
         `Staged hierarchy step template ${template.name} into the approval queue as ${shortenIdentifier(plan.plan_id, 10)}.`,
@@ -8716,6 +8728,52 @@ export default function App() {
       setProviderProvenanceWorkspaceFeedback(
         `Hierarchy step template stage failed: ${(error as Error).message}`,
       );
+    }
+  }
+
+  async function stageSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates() {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more hierarchy step templates first.");
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction("stage");
+    try {
+      const result = await stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates({
+        hierarchyStepTemplateIds: selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_hierarchy_step_templates_stage_batch_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const stagedPlans = result.results
+        .map((entry) => entry.plan)
+        .filter((entry): entry is ProviderProvenanceSchedulerNarrativeGovernancePlan => entry !== null);
+      if (stagedPlans.length) {
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(stagedPlans[0].plan_id);
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanIds(
+          stagedPlans.map((entry) => entry.plan_id),
+        );
+        setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+          ...current,
+          item_type: stagedPlans.length === 1
+            && (stagedPlans[0].item_type === "registry" || stagedPlans[0].item_type === "template")
+            ? stagedPlans[0].item_type
+            : current.item_type,
+          source_hierarchy_step_template_id:
+            selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length === 1
+              ? selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds[0]
+              : ALL_FILTER_VALUE,
+        }));
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        `Staged ${result.succeeded_count} hierarchy step template queue plan(s); ${result.failed_count} failed.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Hierarchy step template batch stage failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction(null);
     }
   }
 
@@ -13414,6 +13472,21 @@ export default function App() {
                                             className="ghost-button"
                                             disabled={!selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length}
                                             onClick={() => {
+                                              void stageSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates();
+                                            }}
+                                            type="button"
+                                          >
+                                            {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction === "stage"
+                                              ? "Staging…"
+                                              : "Stage selected"}
+                                          </button>
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <button
+                                            className="ghost-button"
+                                            disabled={!selectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds.length}
+                                            onClick={() => {
                                               void runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkAction("update");
                                             }}
                                             type="button"
@@ -15563,6 +15636,29 @@ export default function App() {
                                         <option value="">No policy catalog</option>
                                         {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.map((entry) => (
                                           <option key={entry.catalog_id} value={entry.catalog_id}>
+                                            {entry.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Source template</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            source_hierarchy_step_template_id:
+                                              event.target.value === ""
+                                                ? ""
+                                                : event.target.value || ALL_FILTER_VALUE,
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.source_hierarchy_step_template_id}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All source templates</option>
+                                        <option value="">No source template</option>
+                                        {providerProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates.map((entry) => (
+                                          <option key={entry.hierarchy_step_template_id} value={entry.hierarchy_step_template_id}>
                                             {entry.name}
                                           </option>
                                         ))}

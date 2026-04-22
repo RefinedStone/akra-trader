@@ -8853,6 +8853,64 @@ class TradingApplication:
     )
     return plan
 
+  def stage_provider_provenance_scheduler_narrative_governance_hierarchy_step_templates(
+    self,
+    hierarchy_step_template_ids: Iterable[str],
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_narrative_governance_hierarchy_step_templates_staged",
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult:
+    normalized_template_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(
+      hierarchy_step_template_ids
+    )
+    if not normalized_template_ids:
+      raise ValueError("Select at least one hierarchy step template to stage.")
+    results: list[ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult] = []
+    succeeded_count = 0
+    skipped_count = 0
+    failed_count = 0
+    for hierarchy_step_template_id in normalized_template_ids:
+      try:
+        plan = self.stage_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+          hierarchy_step_template_id,
+          actor_tab_id=actor_tab_id,
+          actor_tab_label=actor_tab_label,
+          reason=reason,
+        )
+        succeeded_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult(
+            plan_id=plan.plan_id,
+            action="stage",
+            outcome="succeeded",
+            status=plan.status,
+            queue_state=self._build_provider_provenance_scheduler_narrative_governance_queue_state(
+              plan.status
+            ),
+            message="Hierarchy step template staged into the approval queue.",
+            plan=plan,
+          )
+        )
+      except (LookupError, RuntimeError, ValueError) as exc:
+        failed_count += 1
+        results.append(
+          ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult(
+            plan_id=hierarchy_step_template_id,
+            action="stage",
+            outcome="failed",
+            message=str(exc),
+          )
+        )
+    return ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult(
+      action="stage",
+      requested_count=len(normalized_template_ids),
+      succeeded_count=succeeded_count,
+      skipped_count=skipped_count,
+      failed_count=failed_count,
+      results=tuple(results),
+    )
+
   def _find_latest_active_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revision(
     self,
     hierarchy_step_template_id: str,
@@ -10010,6 +10068,7 @@ class TradingApplication:
     item_type: str | None = None,
     status: str | None = None,
     policy_catalog_id: str | None = None,
+    source_hierarchy_step_template_id: str | None = None,
     limit: int = 20,
   ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...]:
     normalized_item_type = (
@@ -10027,6 +10086,12 @@ class TradingApplication:
       if isinstance(policy_catalog_id, str) and policy_catalog_id.strip()
       else None
     )
+    normalized_source_hierarchy_step_template_id = (
+      source_hierarchy_step_template_id.strip()
+      if isinstance(source_hierarchy_step_template_id, str)
+      and source_hierarchy_step_template_id.strip()
+      else None
+    )
     normalized_limit = max(1, min(limit, 100))
     filtered: list[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord] = []
     for record in self._list_provider_provenance_scheduler_narrative_governance_plan_records():
@@ -10035,6 +10100,11 @@ class TradingApplication:
       if normalized_status is not None and record.status != normalized_status:
         continue
       if normalized_policy_catalog_id is not None and record.policy_catalog_id != normalized_policy_catalog_id:
+        continue
+      if (
+        normalized_source_hierarchy_step_template_id is not None
+        and record.source_hierarchy_step_template_id != normalized_source_hierarchy_step_template_id
+      ):
         continue
       filtered.append(record)
       if len(filtered) >= normalized_limit:

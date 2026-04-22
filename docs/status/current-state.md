@@ -218,6 +218,9 @@ It is not yet a finished live trading product:
 - those same hierarchy-step templates now also carry saved governance policy defaults and can stage
   approval-queue plans directly, so reusable cross-catalog steps preserve their lane/priority
   policy layer when operators reopen them as queue work
+- that approval queue now also filters by source hierarchy-step template and reusable step library
+  selections can be batch-staged into queue plans, so operators can reopen one reviewed source or a
+  whole selected handoff set without staging each template row one at a time
 
 ### Operator discipline baseline
 

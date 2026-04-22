@@ -2319,6 +2319,25 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   )
   assert hierarchy_step_template_list_payload["items"][0]["revision_count"] == 1
 
+  secondary_hierarchy_step_template_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates",
+    json={
+      "name": "Registry rollout sync",
+      "description": "Reusable hierarchy step for registry governance sync.",
+      "origin_catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "origin_step_id": registry_hierarchy_step_id,
+      "governance_policy_catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert secondary_hierarchy_step_template_response.status_code == 200
+  secondary_hierarchy_step_template_payload = secondary_hierarchy_step_template_response.json()
+  assert (
+    secondary_hierarchy_step_template_payload["governance_policy_template_id"]
+    == governance_policy_template_payload["policy_template_id"]
+  )
+
   updated_hierarchy_step_template_response = client.patch(
     f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_payload['hierarchy_step_template_id']}",
     json={
@@ -2413,6 +2432,32 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   )
   assert staged_hierarchy_step_template_plan_payload["approval_priority"] == "critical"
 
+  batch_staged_hierarchy_step_template_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/stage-batch",
+    json={
+      "hierarchy_step_template_ids": [
+        hierarchy_step_template_payload["hierarchy_step_template_id"],
+        secondary_hierarchy_step_template_payload["hierarchy_step_template_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_hierarchy_step_templates_batch",
+    },
+  )
+  assert batch_staged_hierarchy_step_template_response.status_code == 200
+  batch_staged_hierarchy_step_template_payload = batch_staged_hierarchy_step_template_response.json()
+  assert batch_staged_hierarchy_step_template_payload["action"] == "stage"
+  assert batch_staged_hierarchy_step_template_payload["requested_count"] == 2
+  assert batch_staged_hierarchy_step_template_payload["succeeded_count"] == 2
+  assert {
+    item["plan"]["source_hierarchy_step_template_id"]
+    for item in batch_staged_hierarchy_step_template_payload["results"]
+    if item["plan"] is not None
+  } == {
+    hierarchy_step_template_payload["hierarchy_step_template_id"],
+    secondary_hierarchy_step_template_payload["hierarchy_step_template_id"],
+  }
+
   hierarchy_step_template_audit_response = client.get(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/audits",
     params={
@@ -2423,7 +2468,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert hierarchy_step_template_audit_response.status_code == 200
   hierarchy_step_template_audit_payload = hierarchy_step_template_audit_response.json()
   hierarchy_step_template_audit_actions = [
-    item["action"] for item in hierarchy_step_template_audit_payload["items"][:6]
+    item["action"] for item in hierarchy_step_template_audit_payload["items"]
   ]
   assert "staged" in hierarchy_step_template_audit_actions
   assert hierarchy_step_template_audit_actions.count("updated") >= 2
@@ -2500,6 +2545,21 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert all(
     item["policy_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
     for item in governance_plan_catalog_slice_payload["items"][:2]
+  )
+
+  governance_plan_source_template_slice_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    params={
+      "source_hierarchy_step_template_id": hierarchy_step_template_payload["hierarchy_step_template_id"],
+      "limit": 10,
+    },
+  )
+  assert governance_plan_source_template_slice_response.status_code == 200
+  governance_plan_source_template_slice_payload = governance_plan_source_template_slice_response.json()
+  assert governance_plan_source_template_slice_payload["total"] >= 2
+  assert all(
+    item["source_hierarchy_step_template_id"] == hierarchy_step_template_payload["hierarchy_step_template_id"]
+    for item in governance_plan_source_template_slice_payload["items"]
   )
 
   report_response = client.post(

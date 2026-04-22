@@ -114,6 +114,9 @@ unclear dataset lineage.
 - those same reusable hierarchy-step templates now also store queue policy defaults and can stage
   approval-queue plans directly, so a reviewed cross-catalog step can reopen with the intended
   lane, priority, and policy provenance instead of relying on manual queue reconfiguration
+- the same queue now also filters by source hierarchy-step template and supports batch staging from
+  selected reusable step templates, so shift operators can reopen one source lineage or a reviewed
+  bundle of reusable steps as approval work in a single action
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

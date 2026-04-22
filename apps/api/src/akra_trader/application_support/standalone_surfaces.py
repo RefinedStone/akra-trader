@@ -1204,6 +1204,18 @@ def execute_standalone_surface_binding(
         ),
       )
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_batch_stage":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_batch_result(
+      app.stage_provider_provenance_scheduler_narrative_governance_hierarchy_step_templates(
+        resolved_payload.get("hierarchy_step_template_ids", ()),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get(
+          "reason",
+          "scheduler_narrative_governance_hierarchy_step_templates_staged",
+        ),
+      )
+    )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage":
     return serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_result(
       app.stage_provider_provenance_scheduler_narrative_governance_policy_catalog(
@@ -1245,6 +1257,7 @@ def execute_standalone_surface_binding(
         item_type=resolved_filters.get("item_type"),
         status=resolved_filters.get("status"),
         policy_catalog_id=resolved_filters.get("policy_catalog_id"),
+        source_hierarchy_step_template_id=resolved_filters.get("source_hierarchy_step_template_id"),
         limit=resolved_filters.get("limit", 20),
       )
     )

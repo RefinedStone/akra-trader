@@ -15185,6 +15185,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list",
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage",
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_batch_stage",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
@@ -15436,11 +15437,17 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage"
   ].path_param_keys == ("hierarchy_step_template_id",)
   assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_batch_stage"
+  ].methods == ("POST",)
+  assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage"
   ].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[0].key == (
     "item_type"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[3].key == (
+    "source_hierarchy_step_template_id"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_approve"].path_param_keys == (
     "plan_id",
@@ -17469,6 +17476,26 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert hierarchy_step_template_list_payload["items"][0]["revision_count"] == 1
 
+  secondary_hierarchy_step_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create"
+    ],
+    app=app,
+    request_payload={
+      "name": "Registry rollout sync",
+      "description": "Reusable hierarchy step for registry governance sync.",
+      "origin_catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "origin_step_id": registry_hierarchy_step_id,
+      "governance_policy_catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert (
+    secondary_hierarchy_step_template_payload["governance_policy_template_id"]
+    == governance_policy_template_payload["policy_template_id"]
+  )
+
   updated_hierarchy_step_template_payload = execute_standalone_surface_binding(
     binding=bindings_by_key[
       "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_update"
@@ -17585,6 +17612,33 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert staged_hierarchy_step_template_plan_payload["approval_priority"] == "critical"
 
+  batch_staged_hierarchy_step_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_batch_stage"
+    ],
+    app=app,
+    request_payload={
+      "hierarchy_step_template_ids": [
+        hierarchy_step_template_payload["hierarchy_step_template_id"],
+        secondary_hierarchy_step_template_payload["hierarchy_step_template_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_hierarchy_step_templates_batch",
+    },
+  )
+  assert batch_staged_hierarchy_step_template_payload["action"] == "stage"
+  assert batch_staged_hierarchy_step_template_payload["requested_count"] == 2
+  assert batch_staged_hierarchy_step_template_payload["succeeded_count"] == 2
+  assert {
+    item["plan"]["source_hierarchy_step_template_id"]
+    for item in batch_staged_hierarchy_step_template_payload["results"]
+    if item["plan"] is not None
+  } == {
+    hierarchy_step_template_payload["hierarchy_step_template_id"],
+    secondary_hierarchy_step_template_payload["hierarchy_step_template_id"],
+  }
+
   hierarchy_step_template_audit_payload = execute_standalone_surface_binding(
     binding=bindings_by_key[
       "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_list"
@@ -17596,7 +17650,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     },
   )
   hierarchy_step_template_audit_actions = [
-    item["action"] for item in hierarchy_step_template_audit_payload["items"][:6]
+    item["action"] for item in hierarchy_step_template_audit_payload["items"]
   ]
   assert "staged" in hierarchy_step_template_audit_actions
   assert hierarchy_step_template_audit_actions.count("updated") >= 2
@@ -17680,6 +17734,20 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert all(
     item["policy_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
     for item in governance_plan_catalog_slice_payload["items"][:2]
+  )
+
+  governance_plan_source_template_slice_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"],
+    app=app,
+    filters={
+      "source_hierarchy_step_template_id": hierarchy_step_template_payload["hierarchy_step_template_id"],
+      "limit": 10,
+    },
+  )
+  assert governance_plan_source_template_slice_payload["total"] >= 2
+  assert all(
+    item["source_hierarchy_step_template_id"] == hierarchy_step_template_payload["hierarchy_step_template_id"]
+    for item in governance_plan_source_template_slice_payload["items"]
   )
 
   report_payload = execute_standalone_surface_binding(

@@ -516,6 +516,15 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplat
   reason: str = "scheduler_narrative_governance_hierarchy_step_template_staged"
 
 
+class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBatchStageRequest(
+  BaseModel
+):
+  hierarchy_step_template_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_hierarchy_step_templates_staged"
+
+
 class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateUpdateRequest(
   BaseModel
 ):
@@ -781,6 +790,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_stage": (
     OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateStageRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_batch_stage": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBatchStageRequest,
     {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage": (

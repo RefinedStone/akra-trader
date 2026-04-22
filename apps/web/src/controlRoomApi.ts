@@ -1800,6 +1800,26 @@ export async function stageProviderProvenanceSchedulerNarrativeGovernanceHierarc
   );
 }
 
+export async function stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates(params: {
+  hierarchyStepTemplateIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/stage-batch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        hierarchy_step_template_ids: params.hierarchyStepTemplateIds,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
 export async function stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog(params: {
   catalogId: string;
   actorTabId?: string;
@@ -1823,6 +1843,7 @@ export async function listProviderProvenanceSchedulerNarrativeGovernancePlans(pa
   itemType?: string;
   status?: string;
   policyCatalogId?: string;
+  sourceHierarchyStepTemplateId?: string;
   limit?: number;
 } = {}) {
   const searchParams = new URLSearchParams();
@@ -1834,6 +1855,9 @@ export async function listProviderProvenanceSchedulerNarrativeGovernancePlans(pa
   }
   if (params.policyCatalogId?.trim()) {
     searchParams.set("policy_catalog_id", params.policyCatalogId.trim());
+  }
+  if (params.sourceHierarchyStepTemplateId?.trim()) {
+    searchParams.set("source_hierarchy_step_template_id", params.sourceHierarchyStepTemplateId.trim());
   }
   if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
     searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 100))));
