@@ -350,31 +350,31 @@
       "id": "task-llm-sensitivity-guarded-live-alert-workflows-compatibility-import-surface-cleanup-decision",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Decide and trim the guarded_live_alert_workflows.py compatibility import surface",
-      "description": "Audit the remaining compatibility imports in `application_support/guarded_live_alert_workflows.py` and either remove the shim if no callers depend on it or narrow the surface further so ownership stays with the bounded guarded-live support modules.",
-      "status": "ready",
+      "description": "Completed the guarded-live compatibility import cleanup by updating `application.py` to call the bounded guarded-live support modules directly for alert-state refresh, incident event construction, delivery/remediation, external sync, pull-sync, incident workflow orchestration, and run alert building, leaving `application_support/guarded_live_alert_workflows.py` owning only the remaining `recover/acknowledge/remediate/escalate` workflows.",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 42,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T23:40:00+09:00",
+      "updated_at": "2026-04-22T23:58:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says the just-finished builder split has no remaining work and names the remaining compatibility import surface in `guarded_live_alert_workflows.py` as the next candidate if the same area continues to be decomposed.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task, the previous ready queue head just finished, and the latest main-session reply directly identifies the compatibility import surface cleanup as the next executable guarded-live follow-up."
+      "direction_relation_note": "The latest main-session reply confirms the compatibility import surface was trimmed in commit `f54142b`, with `guarded_live_alert_workflows.py` no longer acting as a broad re-export layer and retaining only the four workflows it still owns.",
+      "priority_reason": "Marked done because the main session completed the cleanup, validated it with `python -m py_compile` plus guarded-live regression pytest coverage (`apps/api/tests/test_application.py` 10 cases and `apps/api/tests/test_api.py` 3 cases), and pushed commit `f54142b` to `origin/main`."
     },
     {
       "id": "task-llm-sensitivity-domain-models-operator-guarded-live-family-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split operator and guarded-live model families out of domain/models.py",
       "description": "Continue the `domain/models.py` compatibility re-export pattern by extracting the remaining operator and guarded-live model families into `domain/model_types/*` modules so new backend feature work no longer defaults to the broad shared model file.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 82,
-      "dynamic_priority_delta": 10,
+      "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T23:31:00+09:00",
+      "updated_at": "2026-04-22T23:58:00+09:00",
       "source_turn_id": null,
       "direction_relation_note": "The direction detail and current-state docs explicitly note that provider-provenance records already moved behind domain/models.py compatibility imports, while the remaining operator and guarded-live families still need the same bounded-family treatment.",
-      "priority_reason": "This remains executable but stays proposed because the latest main-session reply gives a narrower immediate-next-task signal for the remaining `guarded_live_alert_workflows.py` live operator alert builder block, so switching to `domain/models.py` now would interrupt the active guarded-live decomposition chain."
+      "priority_reason": "Promoted to ready because the previous guarded-live queue head is now complete with no follow-up left in that file, and this is the highest-priority remaining executable decomposition task for continuing the `llm-sensitivity-decomposition` lane."
     }
   ]
 }
