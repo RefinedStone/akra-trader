@@ -344,6 +344,20 @@ class OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisio
   reason: str = "scheduler_stitched_report_governance_registry_revision_restored"
 
 
+class OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkGovernanceRequest(BaseModel):
+  action: str
+  registry_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  queue_view_patch: dict[str, Any] | None = None
+  default_policy_template_id: str | None = None
+  default_policy_catalog_id: str | None = None
+
+
 class OperatorProviderProvenanceSchedulerNarrativeTemplateCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -808,6 +822,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore": (
     OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRestoreRequest,
     {},
+  ),
+  "operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance": (
+    OperatorProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkGovernanceRequest,
+    {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_template_create": (
     OperatorProviderProvenanceSchedulerNarrativeTemplateCreateRequest,

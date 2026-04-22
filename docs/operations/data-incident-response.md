@@ -93,6 +93,9 @@ unclear dataset lineage.
   lifecycle layer, so shift leads can persist a stitched-only queue slice plus default policy
   bundle and later re-apply or restore it during handoff without reopening the generic shared
   catalog workflow first
+- those stitched-report governance registries now also have bulk governance controls and a
+  dedicated team audit trail, so shift leads can patch or retire multiple queue/default bundles
+  together and still review who changed which stitched handoff lane later
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

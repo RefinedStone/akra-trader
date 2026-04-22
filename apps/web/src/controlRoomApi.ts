@@ -18,6 +18,7 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
+  ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditListPayload,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryListPayload,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionListPayload,
   ProviderProvenanceSchedulerStitchedReportViewEntry,
@@ -1002,6 +1003,73 @@ export async function restoreProviderProvenanceSchedulerStitchedReportGovernance
         ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
       }),
     },
+  );
+}
+
+export async function bulkGovernProviderProvenanceSchedulerStitchedReportGovernanceRegistries(params: {
+  action: "delete" | "restore" | "update";
+  registryIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  queueViewPatch?: Record<string, unknown>;
+  defaultPolicyTemplateId?: string;
+  defaultPolicyCatalogId?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
+    "/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries/bulk-governance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: params.action,
+        registry_ids: params.registryIds,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend !== undefined ? { description_append: params.descriptionAppend } : {}),
+        ...(params.queueViewPatch ? { queue_view_patch: params.queueViewPatch } : {}),
+        ...(params.defaultPolicyTemplateId !== undefined
+          ? { default_policy_template_id: params.defaultPolicyTemplateId }
+          : {}),
+        ...(params.defaultPolicyCatalogId !== undefined
+          ? { default_policy_catalog_id: params.defaultPolicyCatalogId }
+          : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerStitchedReportGovernanceRegistryAudits(params: {
+  registryId?: string;
+  action?: string;
+  actorTabId?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.registryId?.trim()) {
+    searchParams.set("registry_id", params.registryId.trim());
+  }
+  if (params.action?.trim()) {
+    searchParams.set("action", params.action.trim());
+  }
+  if (params.actorTabId?.trim()) {
+    searchParams.set("actor_tab_id", params.actorTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 200))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries/audits${suffix}`,
   );
 }
 

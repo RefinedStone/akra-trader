@@ -1015,6 +1015,28 @@ class ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord:
+  audit_id: str
+  registry_id: str
+  action: str
+  recorded_at: datetime
+  reason: str
+  detail: str = ""
+  revision_id: str | None = None
+  source_revision_id: str | None = None
+  name: str = ""
+  description: str = ""
+  queue_view: dict[str, Any] = field(default_factory=dict)
+  default_policy_template_id: str | None = None
+  default_policy_template_name: str | None = None
+  default_policy_catalog_id: str | None = None
+  default_policy_catalog_name: str | None = None
+  status: str = "active"
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceScheduledReportRecord:
   report_id: str
   name: str

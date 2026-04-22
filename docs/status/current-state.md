@@ -195,6 +195,9 @@ It is not yet a finished live trading product:
   revision lifecycle layer, so teams can save, re-apply, delete, and restore dedicated queue
   slices plus default policy bundles without treating stitched-report governance as a filtered
   view of the shared policy catalog alone
+- those stitched-report governance registries now also support bulk lifecycle edits and a shared
+  team audit surface, so queue-slice bundles can be patched, retired, restored, and reviewed
+  across shifts without dropping back to one-registry-at-a-time maintenance
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

@@ -1752,6 +1752,82 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("registry_id", "revision_id"),
     request_payload_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore",
   )
+  operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries/bulk-governance",
+    route_name="bulk_govern_operator_provider_provenance_scheduler_stitched_report_governance_registries",
+    response_title="Bulk govern provider provenance stitched report governance registries",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance",
+  )
+  operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-stitched-report-governance-registries/audits",
+    route_name="list_operator_provider_provenance_scheduler_stitched_report_governance_registry_audits",
+    response_title="List provider provenance stitched report governance registry audits",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list",
+    filter_keys=("registry_id", "action", "actor_tab_id", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "registry_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Registry ID",
+          description="Filter stitched governance registry audits by registry.",
+          examples=("reg_demo",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "action",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Action",
+          description="Filter stitched governance registry audits by lifecycle action.",
+          examples=("updated",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "actor_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Actor tab ID",
+          description="Filter stitched governance registry audits by actor tab identity.",
+          examples=("tab_ops",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search stitched governance registry audits by name, reason, detail, actor, queue slice, or default policy.",
+          examples=("lag recovery",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of stitched governance registry audit rows to return.",
+          examples=(20,),
+        ),
+      ),
+    ),
+  )
   operator_provider_provenance_scheduler_narrative_template_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_template_create",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates",
@@ -4538,6 +4614,8 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_stitched_report_governance_registry_delete_binding,
     operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list_binding,
     operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore_binding,
+    operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance_binding,
+    operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list_binding,
     operator_provider_provenance_scheduler_narrative_template_create_binding,
     operator_provider_provenance_scheduler_narrative_template_list_binding,
     operator_provider_provenance_scheduler_narrative_template_update_binding,

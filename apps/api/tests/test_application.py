@@ -15248,6 +15248,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_stitched_report_governance_registry_delete",
     "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_list",
     "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore",
+    "operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance",
+    "operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list",
     "operator_provider_provenance_scheduler_narrative_template_create",
     "operator_provider_provenance_scheduler_narrative_template_list",
     "operator_provider_provenance_scheduler_narrative_template_update",
@@ -15474,6 +15476,12 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore"].path_param_keys == (
     "registry_id",
     "revision_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance"].methods == (
+    "POST",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list"].route_path.endswith(
+    "/scheduler-stitched-report-governance-registries/audits"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"].methods == ("POST",)
   assert (
@@ -16953,6 +16961,90 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert restored_stitched_governance_registry_payload["status"] == "active"
   assert restored_stitched_governance_registry_payload["name"] == "Lag stitched governance bundle"
   assert restored_stitched_governance_registry_payload["revision_count"] == 4
+
+  secondary_stitched_governance_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_create"],
+    app=app,
+    request_payload={
+      "name": "Failure stitched governance bundle",
+      "description": "Dedicated failure stitched-report queue slice and defaults.",
+      "queue_view": {
+        "queue_state": "pending_approval",
+        "item_type": "stitched_report_view",
+        "approval_lane": "chatops",
+        "approval_priority": "normal",
+        "search": "failure recovery",
+        "sort": "queue_priority",
+      },
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+
+  bulk_governed_stitched_governance_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance"],
+    app=app,
+    request_payload={
+      "action": "update",
+      "registry_ids": [
+        stitched_governance_registry_payload["registry_id"],
+        secondary_stitched_governance_registry_payload["registry_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_govern_stitched_governance_registries",
+      "name_prefix": "Shift / ",
+      "description_append": "bulk-reviewed",
+      "queue_view_patch": {
+        "item_type": "stitched_report_view",
+        "queue_state": "ready_to_apply",
+        "approval_priority": "critical",
+        "search": "reviewed handoff",
+        "sort": "updated_desc",
+      },
+    },
+  )
+  assert bulk_governed_stitched_governance_registry_payload["action"] == "update"
+  assert bulk_governed_stitched_governance_registry_payload["item_type"] == "stitched_report_governance_registry"
+  assert bulk_governed_stitched_governance_registry_payload["applied_count"] == 2
+
+  bulk_updated_stitched_governance_registry_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_list"],
+    app=app,
+    filters={"search": "Shift /", "limit": 10},
+  )
+  assert bulk_updated_stitched_governance_registry_list_payload["total"] == 2
+  assert all(
+    item["name"].startswith("Shift / ")
+    for item in bulk_updated_stitched_governance_registry_list_payload["items"]
+  )
+  assert all(
+    item["description"].endswith("bulk-reviewed")
+    for item in bulk_updated_stitched_governance_registry_list_payload["items"]
+  )
+  assert all(
+    item["queue_view"]["queue_state"] == "ready_to_apply"
+    for item in bulk_updated_stitched_governance_registry_list_payload["items"]
+  )
+
+  stitched_governance_registry_audit_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list"],
+    app=app,
+    filters={
+      "registry_id": stitched_governance_registry_payload["registry_id"],
+      "action": "updated",
+      "actor_tab_id": "tab_ops",
+      "search": "Shift /",
+      "limit": 10,
+    },
+  )
+  assert stitched_governance_registry_audit_payload["total"] >= 1
+  assert stitched_governance_registry_audit_payload["items"][0]["registry_id"] == (
+    stitched_governance_registry_payload["registry_id"]
+  )
+  assert stitched_governance_registry_audit_payload["items"][0]["action"] == "updated"
+  assert stitched_governance_registry_audit_payload["items"][0]["actor_tab_id"] == "tab_ops"
+  assert "Shift /" in stitched_governance_registry_audit_payload["items"][0]["detail"]
 
   template_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"],

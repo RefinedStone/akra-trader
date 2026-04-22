@@ -1708,6 +1708,32 @@ export type ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionL
   history: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionEntry[];
 };
 
+export type ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord = {
+  audit_id: string;
+  registry_id: string;
+  action: string;
+  recorded_at: string;
+  reason: string;
+  detail: string;
+  revision_id?: string | null;
+  source_revision_id?: string | null;
+  name: string;
+  description: string;
+  queue_view: ProviderProvenanceSchedulerNarrativeGovernanceQueueView;
+  default_policy_template_id?: string | null;
+  default_policy_template_name?: string | null;
+  default_policy_catalog_id?: string | null;
+  default_policy_catalog_name?: string | null;
+  status: "active" | "deleted" | string;
+  actor_tab_id?: string | null;
+  actor_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditListPayload = {
+  items: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord[];
+  total: number;
+};
+
 export type ProviderProvenanceSchedulerNarrativeTemplateEntry = {
   template_id: string;
   name: string;

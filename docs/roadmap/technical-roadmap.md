@@ -141,6 +141,9 @@ creation.
   lifecycle surface, so stitched queue slices plus default policy bundles can be saved,
   reapplied, deleted, and revision-restored as dedicated stitched governance objects instead of
   only as filters over the shared scheduler governance catalog
+- those stitched-report governance registries now also have bulk-governance and shared audit
+  surfaces, so the saved stitched-only queue/default bundles can be batch-patched and reviewed as
+  team-owned lifecycle objects instead of one-off manual edits
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand
