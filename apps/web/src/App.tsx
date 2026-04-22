@@ -54,8 +54,8 @@ import { RunSurfaceCollectionQueryBuilder } from "./features/query-builder";
 import {
   formatComparisonTooltipConflictSessionRelativeTime,
   formatComparisonTooltipTuningValue,
-  RunSection,
-} from "./features/run-history/RunSection";
+} from "./features/comparisonTooltipFormatters";
+import { RunSection } from "./features/run-history/RunSection";
 import type {
   RunSurfaceCollectionQueryBuilderApplyPayload,
   RunSurfaceCollectionQueryRuntimeCandidateContextSelection,
