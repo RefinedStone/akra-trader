@@ -4,17 +4,32 @@
     {
       "id": "task-llm-sensitivity-app-route-owned-comparison-history-split",
       "direction_id": "llm-sensitivity-decomposition",
-      "title": "Extract comparison and history workspace ownership out of App.tsx",
-      "description": "Move the remaining comparison/history and run-panel state or rendering bodies behind route-owned workspace modules so `App.tsx` keeps shell composition only while existing route semantics, barrels, and smoke-test coverage stay intact.",
-      "status": "ready",
+      "title": "Extract comparison/history workspace panel ownership out of App.tsx",
+      "description": "Completed the first App.tsx decomposition stage by moving comparison/history workspace panel ownership into `runHistoryWorkspacePanels.tsx`, keeping `App.tsx` focused on route composition and handler wiring while adding targeted workspace-panel tests.",
+      "status": "done",
       "base_priority": 95,
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:10:00+09:00",
+      "updated_at": "2026-04-22T20:50:56+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the next hexagonal split should keep the import surface stable while moving ownership into feature-owned modules, and the frontend target/current-state docs call out comparison/history and run-panel rendering as the next waves still concentrated in App.tsx.",
-      "priority_reason": "This is the clearest immediate continuation because App.tsx remains the largest active pressure point, route smoke tests already exist as the floor for this extraction, and the direction explicitly prioritizes route-owned workspace ownership ahead of adding more logic to the giant entrypoint."
+      "direction_relation_note": "The latest main-session reply confirms this stage landed in commit `756a6b9` with `runHistoryWorkspacePanels.tsx` and matching tests, satisfying the workspace-level ownership extraction that was previously at the queue head.",
+      "priority_reason": "Marked done because the main session completed, validated, committed, and pushed the workspace-panel ownership split; the remaining App.tsx pressure moved to `RunSection` and comparison/history browser internals."
+    },
+    {
+      "id": "task-llm-sensitivity-app-runsection-comparison-history-browser-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Extract RunSection and comparison/history browser implementation out of App.tsx",
+      "description": "Use the new shared panel contract as the seam to move `RunSection` and its comparison/history browser rendering or state out of `App.tsx`, preserving route behavior and coverage while finishing the next App-owned decomposition layer the latest main-session reply called out explicitly.",
+      "status": "ready",
+      "base_priority": 96,
+      "dynamic_priority_delta": 20,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T20:50:56+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply states that workspace-level ownership is now extracted, but `RunSection` itself and the comparison/history browser implementation still live in `App.tsx`, making this the direct next decomposition step.",
+      "priority_reason": "This is the clearest executable continuation because the operator asked to proceed with the next queued task, the prior head is complete, and the reply names this remaining App.tsx ownership split as the immediate follow-up."
     },
     {
       "id": "task-llm-sensitivity-application-guarded-live-provider-governance-support-split",
