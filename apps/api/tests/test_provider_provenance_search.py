@@ -24,7 +24,9 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentR
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanPreviewItem
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchQueryAnalyticsRecord
 
 
@@ -192,10 +194,11 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalogs_an
     service=service,
     auth_token="search-token",
   )
+  now = datetime(2026, 4, 22, 13, 0, tzinfo=UTC)
   catalog_record = ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord(
     catalog_id="catalog-1",
-    created_at=datetime(2026, 4, 22, 13, 0, tzinfo=UTC),
-    updated_at=datetime(2026, 4, 22, 13, 0, tzinfo=UTC),
+    created_at=now,
+    updated_at=now,
     name="Pending scheduler approvals",
     description="Moderate high-signal scheduler feedback before ranking learns from it.",
     default_moderation_status="approved",
@@ -207,8 +210,8 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalogs_an
   )
   plan_record = ProviderProvenanceSchedulerSearchModerationPlanRecord(
     plan_id="plan-1",
-    created_at=datetime(2026, 4, 22, 13, 5, tzinfo=UTC),
-    updated_at=datetime(2026, 4, 22, 13, 5, tzinfo=UTC),
+    created_at=now + timedelta(minutes=5),
+    updated_at=now + timedelta(minutes=5),
     policy_catalog_id="catalog-1",
     policy_catalog_name="Pending scheduler approvals",
     proposed_moderation_status="approved",
@@ -234,6 +237,43 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalogs_an
         query_run_count=3,
       ),
     ),
+  )
+  revision_record = ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionRecord(
+    revision_id="catalog-1:r0001",
+    catalog_id="catalog-1",
+    action="created",
+    reason="scheduler_search_moderation_policy_catalog_created",
+    name="Scheduler moderation queue",
+    description="High-signal approvals with notes.",
+    status="active",
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=30,
+    stale_pending_hours=24,
+    minimum_score=250,
+    require_note=True,
+    recorded_at=now,
+    recorded_by_tab_id="control-room",
+    recorded_by_tab_label="Control room",
+  )
+  audit_record = ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord(
+    audit_id="audit-1",
+    catalog_id="catalog-1",
+    action="created",
+    recorded_at=now,
+    reason="scheduler_search_moderation_policy_catalog_created",
+    detail="Created moderation policy catalog Scheduler moderation queue with approved @ 250+.",
+    revision_id="catalog-1:r0001",
+    name="Scheduler moderation queue",
+    status="active",
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=30,
+    stale_pending_hours=24,
+    minimum_score=250,
+    require_note=True,
+    actor_tab_id="control-room",
+    actor_tab_label="Control room",
   )
 
   with TestClient(service_app) as service_client:
@@ -264,15 +304,29 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalogs_an
     saved_catalog = backend.save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
       catalog_record
     )
+    saved_revision = backend.save_provider_provenance_scheduler_search_moderation_policy_catalog_revision_record(
+      revision_record
+    )
+    saved_audit = backend.save_provider_provenance_scheduler_search_moderation_policy_catalog_audit_record(
+      audit_record
+    )
     saved_plan = backend.save_provider_provenance_scheduler_search_moderation_plan_record(
       plan_record
     )
     listed_catalogs = backend.list_provider_provenance_scheduler_search_moderation_policy_catalog_records()
+    listed_revisions = backend.list_provider_provenance_scheduler_search_moderation_policy_catalog_revision_records()
+    listed_audits = backend.list_provider_provenance_scheduler_search_moderation_policy_catalog_audit_records()
     listed_plans = backend.list_provider_provenance_scheduler_search_moderation_plan_records()
 
   assert saved_catalog.catalog_id == "catalog-1"
+  assert saved_revision.revision_id == "catalog-1:r0001"
+  assert saved_audit.audit_id == "audit-1"
   assert saved_plan.plan_id == "plan-1"
   assert len(listed_catalogs) == 1
   assert listed_catalogs[0].require_note is True
+  assert len(listed_revisions) == 1
+  assert listed_revisions[0].action == "created"
+  assert len(listed_audits) == 1
+  assert listed_audits[0].actor_tab_id == "control-room"
   assert len(listed_plans) == 1
   assert listed_plans[0].preview_items[0].feedback_id == "feedback-1"

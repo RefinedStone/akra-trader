@@ -5234,7 +5234,53 @@ def test_scheduler_search_moderation_policy_catalog_and_plan_routes(
       "/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
     )
     assert list_catalogs_response.status_code == 200
-    assert list_catalogs_response.json()["total"] == 1
+    list_catalogs_payload = list_catalogs_response.json()
+    assert list_catalogs_payload["total"] == 1
+    assert list_catalogs_payload["items"][0]["revision_count"] == 1
+
+    update_catalog_response = client.patch(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/{catalog_payload['catalog_id']}",
+      json={
+        "description": "Approve only high-signal scheduler matches with a reviewed note.",
+        "governance_view": "pending_queue",
+        "stale_pending_hours": 48,
+        "actor_tab_id": "control-room",
+        "actor_tab_label": "Control room",
+      },
+    )
+    assert update_catalog_response.status_code == 200
+    updated_catalog_payload = update_catalog_response.json()
+    assert updated_catalog_payload["governance_view"] == "pending_queue"
+    assert updated_catalog_payload["revision_count"] == 2
+
+    revision_response = client.get(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/{catalog_payload['catalog_id']}/revisions",
+    )
+    assert revision_response.status_code == 200
+    revision_payload = revision_response.json()
+    assert revision_payload["history"][0]["action"] == "updated"
+
+    audit_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/audits",
+      params={"catalog_id": catalog_payload["catalog_id"]},
+    )
+    assert audit_response.status_code == 200
+    assert audit_response.json()["total"] >= 2
+
+    bulk_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/bulk-governance",
+      json={
+        "action": "update",
+        "catalog_ids": [catalog_payload["catalog_id"]],
+        "name_prefix": "[Ops] ",
+        "minimum_score": 175,
+        "actor_tab_id": "control-room",
+        "actor_tab_label": "Control room",
+      },
+    )
+    assert bulk_response.status_code == 200
+    bulk_payload = bulk_response.json()
+    assert bulk_payload["applied_count"] == 1
 
     stage_response = client.post(
       "/api/operator/provider-provenance-analytics/scheduler-search/moderation-plans",

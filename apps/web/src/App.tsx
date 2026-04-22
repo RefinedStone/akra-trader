@@ -125,7 +125,10 @@ import {
   listProviderProvenanceSchedulerStitchedReportViewAudits,
   listProviderProvenanceSchedulerStitchedReportViewRevisions,
   getProviderProvenanceSchedulerSearchDashboard,
+  bulkGovernProviderProvenanceSchedulerSearchModerationPolicyCatalogs,
   listProviderProvenanceSchedulerSearchModerationPolicyCatalogs,
+  listProviderProvenanceSchedulerSearchModerationPolicyCatalogAudits,
+  listProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisions,
   listProviderProvenanceSchedulerSearchModerationPlans,
   listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
@@ -133,6 +136,7 @@ import {
   approveProviderProvenanceSchedulerSearchModerationPlan,
   applyProviderProvenanceSchedulerSearchModerationPlan,
   createProviderProvenanceSchedulerSearchModerationPolicyCatalog,
+  deleteProviderProvenanceSchedulerSearchModerationPolicyCatalog,
   moderateProviderProvenanceSchedulerSearchFeedbackBatch,
   moderateProviderProvenanceSchedulerSearchFeedback,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
@@ -142,6 +146,7 @@ import {
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevision,
+  restoreProviderProvenanceSchedulerSearchModerationPolicyCatalogRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevision,
   restoreProviderProvenanceSchedulerNarrativeRegistryRevision,
   restoreProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevision,
@@ -153,6 +158,7 @@ import {
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernance,
   stageProviderProvenanceSchedulerSearchModerationPlan,
+  updateProviderProvenanceSchedulerSearchModerationPolicyCatalog,
   stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates,
   stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
@@ -369,7 +375,9 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord,
   ProviderProvenanceSchedulerSearchModerationPlanListPayload,
+  ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionListPayload,
   ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload,
   ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult,
   ProviderProvenanceSchedulerSearchDashboardPayload,
@@ -525,6 +533,25 @@ type ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft = {
   require_note: boolean;
 };
 
+type ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilterState = {
+  catalog_id: string;
+  action: string;
+  actor_tab_id: string;
+  search: string;
+};
+
+type ProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+};
+
 type ProviderProvenanceSchedulerSearchModerationQueueFilterState = {
   queue_state: string;
   policy_catalog_id: string;
@@ -573,6 +600,25 @@ const defaultProviderProvenanceSchedulerSearchDashboardFilterState: ProviderProv
 const defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft: ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft = {
   name: "",
   description: "",
+  default_moderation_status: "approved",
+  governance_view: "pending_queue",
+  window_days: 30,
+  stale_pending_hours: 24,
+  minimum_score: 0,
+  require_note: false,
+};
+
+const defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter: ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilterState = {
+  catalog_id: "",
+  action: ALL_FILTER_VALUE,
+  actor_tab_id: "",
+  search: "",
+};
+
+const defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft: ProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft = {
+  name_prefix: "",
+  name_suffix: "",
+  description_append: "",
   default_moderation_status: "approved",
   governance_view: "pending_queue",
   window_days: 30,
@@ -4388,6 +4434,34 @@ export default function App() {
     useState<ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft>(
       defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft,
     );
+  const [editingProviderProvenanceSchedulerSearchModerationPolicyCatalogId, setEditingProviderProvenanceSchedulerSearchModerationPolicyCatalogId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds, setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds] =
+    useState<string[]>([]);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogBulkAction, setProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkAction] =
+    useState<"delete" | "restore" | "update" | null>(null);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft, setProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft] =
+    useState<ProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft>(
+      defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft,
+    );
+  const [selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId, setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory, setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory] =
+    useState<ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionListPayload | null>(null);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryLoading, setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryError, setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter, setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter] =
+    useState<ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilterState>(
+      defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter,
+    );
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogAudits, setProviderProvenanceSchedulerSearchModerationPolicyCatalogAudits] =
+    useState<ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord[]>([]);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogAuditsLoading, setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogAuditsError, setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsError] =
+    useState<string | null>(null);
   const [providerProvenanceSchedulerSearchModerationPlans, setProviderProvenanceSchedulerSearchModerationPlans] =
     useState<ProviderProvenanceSchedulerSearchModerationPlanListPayload | null>(null);
   const [providerProvenanceSchedulerSearchModerationPlansLoading, setProviderProvenanceSchedulerSearchModerationPlansLoading] =
@@ -4592,6 +4666,8 @@ export default function App() {
   const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerSearchDashboardRequestIdRef = useRef(0);
   const providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef = useRef(0);
   const providerProvenanceSchedulerSearchModerationPlanRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
   const providerProvenanceSchedulerStitchedReportViewRequestIdRef = useRef(0);
@@ -6234,6 +6310,10 @@ export default function App() {
     providerProvenanceSchedulerSearchDashboardFilter.governance_view,
     providerProvenanceSchedulerSearchDashboardFilter.window_days,
     providerProvenanceSchedulerSearchDashboardFilter.stale_pending_hours,
+    providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.catalog_id,
+    providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.action,
+    providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.actor_tab_id,
+    providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.search,
     providerProvenanceSchedulerSearchModerationQueueFilter.queue_state,
     providerProvenanceSchedulerSearchModerationQueueFilter.policy_catalog_id,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.view_id,
@@ -6995,6 +7075,10 @@ export default function App() {
       providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef.current + 1;
     providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef.current =
       searchModerationPolicyCatalogRequestId;
+    const searchModerationPolicyCatalogAuditRequestId =
+      providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef.current + 1;
+    providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef.current =
+      searchModerationPolicyCatalogAuditRequestId;
     const searchModerationPlanRequestId =
       providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current + 1;
     providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current =
@@ -7010,6 +7094,7 @@ export default function App() {
     setProviderProvenanceSchedulerAlertHistoryLoading(true);
     setProviderProvenanceSchedulerSearchDashboardLoading(true);
     setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(true);
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsLoading(true);
     setProviderProvenanceSchedulerSearchModerationPlansLoading(true);
     setProviderProvenanceSchedulerExportsLoading(true);
     setProviderProvenanceSchedulerStitchedReportViewsLoading(true);
@@ -7019,6 +7104,7 @@ export default function App() {
     setProviderProvenanceSchedulerAlertHistoryError(null);
     setProviderProvenanceSchedulerSearchDashboardError(null);
     setProviderProvenanceSchedulerSearchModerationPolicyCatalogsError(null);
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsError(null);
     setProviderProvenanceSchedulerSearchModerationPlansError(null);
     setProviderProvenanceSchedulerExportsError(null);
     setProviderProvenanceSchedulerStitchedReportViewsError(null);
@@ -7030,6 +7116,7 @@ export default function App() {
         alertHistoryPayload,
         searchDashboardPayload,
         searchModerationPolicyCatalogPayload,
+        searchModerationPolicyCatalogAuditPayload,
         searchModerationPlanPayload,
         exportListPayload,
         stitchedViewPayload,
@@ -7084,6 +7171,19 @@ export default function App() {
           feedbackLimit: 12,
         }),
         listProviderProvenanceSchedulerSearchModerationPolicyCatalogs(),
+        listProviderProvenanceSchedulerSearchModerationPolicyCatalogAudits({
+          catalogId:
+            providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.catalog_id.trim() || undefined,
+          action:
+            providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.action !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.action
+              : undefined,
+          actorTabId:
+            providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.actor_tab_id.trim() || undefined,
+          search:
+            providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.search.trim() || undefined,
+          limit: 12,
+        }),
         listProviderProvenanceSchedulerSearchModerationPlans({
           queueState:
             providerProvenanceSchedulerSearchModerationQueueFilter.queue_state !== ALL_FILTER_VALUE
@@ -7144,6 +7244,29 @@ export default function App() {
         setProviderProvenanceSchedulerSearchModerationPolicyCatalogs(
           searchModerationPolicyCatalogPayload,
         );
+        setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds((current) =>
+          current.filter((catalogId) =>
+            searchModerationPolicyCatalogPayload.items.some((entry) => entry.catalog_id === catalogId),
+          ),
+        );
+        if (
+          selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId
+          && !searchModerationPolicyCatalogPayload.items.some(
+            (entry) => entry.catalog_id === selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId,
+          )
+        ) {
+          setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId(null);
+          setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(null);
+          setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryError(null);
+        }
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef.current
+        === searchModerationPolicyCatalogAuditRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogAudits(
+          searchModerationPolicyCatalogAuditPayload.items,
+        );
       }
       if (
         providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
@@ -7194,6 +7317,13 @@ export default function App() {
         setProviderProvenanceSchedulerSearchModerationPolicyCatalogsError(message);
       }
       if (
+        providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef.current
+        === searchModerationPolicyCatalogAuditRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogAudits([]);
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsError(message);
+      }
+      if (
         providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
         === searchModerationPlanRequestId
       ) {
@@ -7230,6 +7360,12 @@ export default function App() {
         === searchModerationPolicyCatalogRequestId
       ) {
         setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(false);
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef.current
+        === searchModerationPolicyCatalogAuditRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsLoading(false);
       }
       if (
         providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
@@ -7357,6 +7493,43 @@ export default function App() {
     }
   }
 
+  function buildProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft(
+    entry: ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload["items"][number],
+  ): ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft {
+    return {
+      name: entry.name,
+      description: entry.description,
+      default_moderation_status: entry.default_moderation_status,
+      governance_view: entry.governance_view,
+      window_days: entry.window_days,
+      stale_pending_hours: entry.stale_pending_hours,
+      minimum_score: entry.minimum_score,
+      require_note: entry.require_note,
+    };
+  }
+
+  function resetProviderProvenanceSchedulerSearchModerationPolicyCatalogEditor() {
+    setEditingProviderProvenanceSchedulerSearchModerationPolicyCatalogId(null);
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft(
+      defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft,
+    );
+  }
+
+  function toggleProviderProvenanceSchedulerSearchModerationPolicyCatalogSelection(catalogId: string) {
+    setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds((current) =>
+      current.includes(catalogId)
+        ? current.filter((entry) => entry !== catalogId)
+        : [...current, catalogId],
+    );
+  }
+
+  function toggleAllProviderProvenanceSchedulerSearchModerationPolicyCatalogSelections() {
+    const catalogIds = providerProvenanceSchedulerSearchModerationPolicyCatalogs?.items.map((entry) => entry.catalog_id) ?? [];
+    setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds((current) =>
+      current.length === catalogIds.length ? [] : catalogIds,
+    );
+  }
+
   async function createProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry() {
     const normalizedName = providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.name.trim();
     if (!normalizedName) {
@@ -7365,7 +7538,7 @@ export default function App() {
     }
     setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(true);
     try {
-      const result = await createProviderProvenanceSchedulerSearchModerationPolicyCatalog({
+      const policyDraft = {
         name: normalizedName,
         description: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.description,
         defaultModerationStatus:
@@ -7374,22 +7547,30 @@ export default function App() {
             || providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.default_moderation_status
               === "rejected"
             ? providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.default_moderation_status
-            : "approved",
+            : "approved" as "pending" | "approved" | "rejected",
         governanceView: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.governance_view,
         windowDays: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.window_days,
         stalePendingHours:
           providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.stale_pending_hours,
         minimumScore: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.minimum_score,
         requireNote: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.require_note,
-        createdByTabId: activeWorkspace,
-        createdByTabLabel: "control-room",
-      });
+      };
+      const result = editingProviderProvenanceSchedulerSearchModerationPolicyCatalogId
+        ? await updateProviderProvenanceSchedulerSearchModerationPolicyCatalog({
+            catalogId: editingProviderProvenanceSchedulerSearchModerationPolicyCatalogId,
+            ...policyDraft,
+            actorTabId: activeWorkspace,
+            actorTabLabel: "control-room",
+          })
+        : await createProviderProvenanceSchedulerSearchModerationPolicyCatalog({
+            ...policyDraft,
+            createdByTabId: activeWorkspace,
+            createdByTabLabel: "control-room",
+          });
       setProviderProvenanceWorkspaceFeedback(
-        `Saved moderation policy catalog ${result.name} with ${formatWorkflowToken(result.default_moderation_status)} defaults.`,
+        `${editingProviderProvenanceSchedulerSearchModerationPolicyCatalogId ? "Updated" : "Saved"} moderation policy catalog ${result.name} with ${formatWorkflowToken(result.default_moderation_status)} defaults.`,
       );
-      setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft(
-        defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft,
-      );
+      resetProviderProvenanceSchedulerSearchModerationPolicyCatalogEditor();
       await loadProviderProvenanceSchedulerSurfaces();
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
@@ -7397,6 +7578,169 @@ export default function App() {
       );
     } finally {
       setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(false);
+    }
+  }
+
+  async function editProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry(
+    entry: ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload["items"][number],
+  ) {
+    if (entry.status === "deleted") {
+      setProviderProvenanceWorkspaceFeedback(
+        "Restore the moderation policy catalog from revision history before editing it.",
+      );
+      return;
+    }
+    setEditingProviderProvenanceSchedulerSearchModerationPolicyCatalogId(entry.catalog_id);
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft(
+      buildProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft(entry),
+    );
+    setProviderProvenanceWorkspaceFeedback(`Editing moderation policy catalog ${entry.name}.`);
+  }
+
+  async function loadProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(catalogId: string) {
+    const requestId = providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryRequestIdRef.current + 1;
+    providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryRequestIdRef.current = requestId;
+    setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId(catalogId);
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryLoading(true);
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryError(null);
+    try {
+      const payload = await listProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisions(catalogId);
+      if (providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryRequestIdRef.current !== requestId) {
+        return;
+      }
+      setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(payload);
+    } catch (error) {
+      if (providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryRequestIdRef.current !== requestId) {
+        return;
+      }
+      setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(null);
+      setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryError((error as Error).message);
+    } finally {
+      if (providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryRequestIdRef.current === requestId) {
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryLoading(false);
+      }
+    }
+  }
+
+  async function restoreProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryRevision(
+    revisionId: string,
+  ) {
+    const catalogId = selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId;
+    if (!catalogId) {
+      setProviderProvenanceWorkspaceFeedback("Select a moderation policy catalog row and open Versions first.");
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryLoading(true);
+    try {
+      const restored = await restoreProviderProvenanceSchedulerSearchModerationPolicyCatalogRevision({
+        catalogId,
+        revisionId,
+        actorTabId: activeWorkspace,
+        actorTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Restored moderation policy catalog ${restored.name} from revision ${revisionId}.`,
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+      await loadProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(catalogId);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Moderation policy catalog restore failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryLoading(false);
+    }
+  }
+
+  async function deleteProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry(
+    entry: ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload["items"][number],
+  ) {
+    if (entry.status === "deleted") {
+      setProviderProvenanceWorkspaceFeedback(`Moderation policy catalog ${entry.name} is already deleted.`);
+      return;
+    }
+    if (typeof window !== "undefined" && !window.confirm(`Delete moderation policy catalog ${entry.name}?`)) {
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(true);
+    try {
+      await deleteProviderProvenanceSchedulerSearchModerationPolicyCatalog({
+        catalogId: entry.catalog_id,
+        actorTabId: activeWorkspace,
+        actorTabLabel: "control-room",
+      });
+      if (editingProviderProvenanceSchedulerSearchModerationPolicyCatalogId === entry.catalog_id) {
+        resetProviderProvenanceSchedulerSearchModerationPolicyCatalogEditor();
+      }
+      setProviderProvenanceWorkspaceFeedback(`Deleted moderation policy catalog ${entry.name}.`);
+      await loadProviderProvenanceSchedulerSurfaces();
+      if (selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId === entry.catalog_id) {
+        await loadProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(entry.catalog_id);
+      }
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Moderation policy catalog delete failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(false);
+    }
+  }
+
+  async function runProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkGovernance(
+    action: "delete" | "restore" | "update",
+  ) {
+    if (!selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more moderation policy catalogs first.");
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkAction(action);
+    try {
+      const result = await bulkGovernProviderProvenanceSchedulerSearchModerationPolicyCatalogs({
+        action,
+        catalogIds: selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds,
+        actorTabId: activeWorkspace,
+        actorTabLabel: "control-room",
+        ...(action === "update"
+          ? {
+              namePrefix: providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.name_prefix,
+              nameSuffix: providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.name_suffix,
+              descriptionAppend:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.description_append,
+              defaultModerationStatus:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.default_moderation_status
+                  === "pending"
+                || providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.default_moderation_status
+                    === "rejected"
+                  ? providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.default_moderation_status
+                  : "approved",
+              governanceView:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.governance_view,
+              windowDays: providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.window_days,
+              stalePendingHours:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.stale_pending_hours,
+              minimumScore:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.minimum_score,
+              requireNote:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.require_note,
+            }
+          : {}),
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `${formatWorkflowToken(action)} applied ${result.applied_count}, skipped ${result.skipped_count}, failed ${result.failed_count}.`,
+      );
+      setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds([]);
+      await loadProviderProvenanceSchedulerSurfaces();
+      if (selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId) {
+        await loadProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(
+          selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId,
+        );
+      }
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler moderation policy catalog bulk ${action} failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkAction(null);
     }
   }
 
@@ -20267,21 +20611,142 @@ export default function App() {
                                           }}
                                           type="button"
                                         >
-                                          Save policy catalog
+                                          {editingProviderProvenanceSchedulerSearchModerationPolicyCatalogId ? "Update policy catalog" : "Save policy catalog"}
                                         </button>
+                                        {editingProviderProvenanceSchedulerSearchModerationPolicyCatalogId ? (
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => {
+                                              resetProviderProvenanceSchedulerSearchModerationPolicyCatalogEditor();
+                                              setProviderProvenanceWorkspaceFeedback("Moderation policy catalog editor reset.");
+                                            }}
+                                            type="button"
+                                          >
+                                            Cancel edit
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <span className="run-lineage-symbol-copy">
+                                          {selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.length} selected
+                                        </span>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            !selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.length
+                                            || providerProvenanceSchedulerSearchModerationPolicyCatalogBulkAction !== null
+                                          }
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkGovernance("delete");
+                                          }}
+                                          type="button"
+                                        >
+                                          Delete selected
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            !selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.length
+                                            || providerProvenanceSchedulerSearchModerationPolicyCatalogBulkAction !== null
+                                          }
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkGovernance("restore");
+                                          }}
+                                          type="button"
+                                        >
+                                          Restore selected
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            !selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.length
+                                            || providerProvenanceSchedulerSearchModerationPolicyCatalogBulkAction !== null
+                                          }
+                                          onClick={() => {
+                                            void runProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkGovernance("update");
+                                          }}
+                                          type="button"
+                                        >
+                                          Bulk edit
+                                        </button>
+                                        <label className="run-form-field">
+                                          <span>Name prefix</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft((current) => ({
+                                                ...current,
+                                                name_prefix: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="[Ops] "
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.name_prefix}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Name suffix</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft((current) => ({
+                                                ...current,
+                                                name_suffix: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder=" / reviewed"
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.name_suffix}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Description append</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft((current) => ({
+                                                ...current,
+                                                description_append: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="Bulk-governed in control room"
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.description_append}
+                                          />
+                                        </label>
                                       </div>
                                       <table className="data-table">
                                         <thead>
                                           <tr>
+                                            <th>
+                                              <input
+                                                aria-label="Select all moderation policy catalogs"
+                                                checked={
+                                                  (providerProvenanceSchedulerSearchModerationPolicyCatalogs?.items.length ?? 0) > 0
+                                                  && selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.length
+                                                    === (providerProvenanceSchedulerSearchModerationPolicyCatalogs?.items.length ?? 0)
+                                                }
+                                                onChange={toggleAllProviderProvenanceSchedulerSearchModerationPolicyCatalogSelections}
+                                                type="checkbox"
+                                              />
+                                            </th>
                                             <th>Catalog</th>
                                             <th>Defaults</th>
                                             <th>Governance</th>
+                                            <th>Action</th>
                                           </tr>
                                         </thead>
                                         <tbody>
                                           {providerProvenanceSchedulerSearchModerationPolicyCatalogs?.items.length ? (
                                             providerProvenanceSchedulerSearchModerationPolicyCatalogs.items.map((entry) => (
                                               <tr key={`provider-scheduler-search-policy-catalog-${entry.catalog_id}`}>
+                                                <td className="provider-provenance-selection-cell">
+                                                  <input
+                                                    aria-label={`Select moderation policy catalog ${entry.name}`}
+                                                    checked={selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.includes(entry.catalog_id)}
+                                                    onChange={() => {
+                                                      toggleProviderProvenanceSchedulerSearchModerationPolicyCatalogSelection(entry.catalog_id);
+                                                    }}
+                                                    type="checkbox"
+                                                  />
+                                                </td>
                                                 <td>
                                                   <strong>{entry.name}</strong>
                                                   <p className="run-lineage-symbol-copy">
@@ -20289,6 +20754,10 @@ export default function App() {
                                                   </p>
                                                   <p className="run-lineage-symbol-copy">
                                                     {shortenIdentifier(entry.catalog_id, 10)} · created {formatTimestamp(entry.created_at)}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatWorkflowToken(entry.status)} · {entry.revision_count} revision(s)
+                                                    {entry.deleted_at ? ` · deleted ${formatTimestamp(entry.deleted_at)}` : ""}
                                                   </p>
                                                 </td>
                                                 <td>
@@ -20307,11 +20776,56 @@ export default function App() {
                                                     Window {entry.window_days}d · stale {entry.stale_pending_hours}h
                                                   </p>
                                                 </td>
+                                                <td>
+                                                  <div className="market-data-provenance-history-actions">
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={entry.status !== "active"}
+                                                      onClick={() => {
+                                                        void editProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry(entry);
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Edit
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={entry.status !== "active"}
+                                                      onClick={() => {
+                                                        void deleteProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry(entry);
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Delete
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() => {
+                                                        if (
+                                                          selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId === entry.catalog_id
+                                                          && selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory
+                                                        ) {
+                                                          setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId(null);
+                                                          setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(null);
+                                                          setProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryError(null);
+                                                        } else {
+                                                          void loadProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory(entry.catalog_id);
+                                                        }
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      {selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId === entry.catalog_id
+                                                        && selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory
+                                                        ? "Hide versions"
+                                                        : "Versions"}
+                                                    </button>
+                                                  </div>
+                                                </td>
                                               </tr>
                                             ))
                                           ) : (
                                             <tr>
-                                              <td colSpan={3}>
+                                              <td colSpan={5}>
                                                 <p className="empty-state">
                                                   No scheduler moderation policy catalogs saved yet.
                                                 </p>
@@ -20320,6 +20834,191 @@ export default function App() {
                                           )}
                                         </tbody>
                                       </table>
+                                      {selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogId ? (
+                                        <div className="market-data-provenance-shared-history">
+                                          <div className="market-data-provenance-history-head">
+                                            <strong>Scheduler moderation policy catalog revisions</strong>
+                                            <p>Inspect immutable catalog snapshots and restore a previous moderation governance revision.</p>
+                                          </div>
+                                          {providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryLoading ? (
+                                            <p className="empty-state">Loading moderation policy catalog revisions…</p>
+                                          ) : null}
+                                          {providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryError ? (
+                                            <p className="market-data-workflow-feedback">
+                                              Moderation policy catalog revisions failed: {providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryError}
+                                            </p>
+                                          ) : null}
+                                          {selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory ? (
+                                            <table className="data-table">
+                                              <thead>
+                                                <tr>
+                                                  <th>When</th>
+                                                  <th>Snapshot</th>
+                                                  <th>Action</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogHistory.history.map((entry) => (
+                                                  <tr key={entry.revision_id}>
+                                                    <td>
+                                                      <strong>{formatTimestamp(entry.recorded_at)}</strong>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        {entry.recorded_by_tab_label ?? entry.recorded_by_tab_id ?? "unknown tab"}
+                                                      </p>
+                                                    </td>
+                                                    <td>
+                                                      <strong>{formatWorkflowToken(entry.action)} · {formatWorkflowToken(entry.status)}</strong>
+                                                      <p className="run-lineage-symbol-copy">{entry.name}</p>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        Outcome {formatWorkflowToken(entry.default_moderation_status)} · view {formatWorkflowToken(entry.governance_view)}
+                                                      </p>
+                                                      <p className="run-lineage-symbol-copy">
+                                                        Window {entry.window_days}d · stale {entry.stale_pending_hours}h · minimum {entry.minimum_score}
+                                                      </p>
+                                                      <p className="run-lineage-symbol-copy">{entry.reason}</p>
+                                                    </td>
+                                                    <td>
+                                                      <button
+                                                        className="ghost-button"
+                                                        onClick={() => {
+                                                          void restoreProviderProvenanceSchedulerSearchModerationPolicyCatalogHistoryRevision(entry.revision_id);
+                                                        }}
+                                                        type="button"
+                                                      >
+                                                        Restore revision
+                                                      </button>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          ) : null}
+                                        </div>
+                                      ) : null}
+                                      <div className="market-data-provenance-shared-history">
+                                        <div className="market-data-provenance-history-head">
+                                          <strong>Scheduler moderation policy catalog team audit</strong>
+                                          <p>Filter lifecycle and bulk-governance events by catalog, action, actor, or search text.</p>
+                                        </div>
+                                        <div className="filter-bar">
+                                          <label>
+                                            <span>Catalog</span>
+                                            <select
+                                              onChange={(event) =>
+                                                setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter((current) => ({
+                                                  ...current,
+                                                  catalog_id: event.target.value,
+                                                }))
+                                              }
+                                              value={providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.catalog_id}
+                                            >
+                                              <option value="">All catalogs</option>
+                                              {(providerProvenanceSchedulerSearchModerationPolicyCatalogs?.items ?? []).map((entry) => (
+                                                <option key={entry.catalog_id} value={entry.catalog_id}>
+                                                  {entry.name}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          </label>
+                                          <label>
+                                            <span>Action</span>
+                                            <select
+                                              onChange={(event) =>
+                                                setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter((current) => ({
+                                                  ...current,
+                                                  action: event.target.value,
+                                                }))
+                                              }
+                                              value={providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.action}
+                                            >
+                                              <option value={ALL_FILTER_VALUE}>All actions</option>
+                                              <option value="created">Created</option>
+                                              <option value="updated">Updated</option>
+                                              <option value="deleted">Deleted</option>
+                                              <option value="restored">Restored</option>
+                                              <option value="bulk_updated">Bulk updated</option>
+                                              <option value="bulk_deleted">Bulk deleted</option>
+                                              <option value="bulk_restored">Bulk restored</option>
+                                            </select>
+                                          </label>
+                                          <label>
+                                            <span>Actor tab</span>
+                                            <input
+                                              onChange={(event) =>
+                                                setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter((current) => ({
+                                                  ...current,
+                                                  actor_tab_id: event.target.value,
+                                                }))
+                                              }
+                                              placeholder="control-room"
+                                              type="text"
+                                              value={providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.actor_tab_id}
+                                            />
+                                          </label>
+                                          <label>
+                                            <span>Search</span>
+                                            <input
+                                              onChange={(event) =>
+                                                setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter((current) => ({
+                                                  ...current,
+                                                  search: event.target.value,
+                                                }))
+                                              }
+                                              placeholder="high-score pending"
+                                              type="text"
+                                              value={providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.search}
+                                            />
+                                          </label>
+                                        </div>
+                                        {providerProvenanceSchedulerSearchModerationPolicyCatalogAuditsLoading ? (
+                                          <p className="empty-state">Loading scheduler moderation policy catalog audit…</p>
+                                        ) : null}
+                                        {providerProvenanceSchedulerSearchModerationPolicyCatalogAuditsError ? (
+                                          <p className="market-data-workflow-feedback">
+                                            Scheduler moderation policy catalog audit failed: {providerProvenanceSchedulerSearchModerationPolicyCatalogAuditsError}
+                                          </p>
+                                        ) : null}
+                                        {providerProvenanceSchedulerSearchModerationPolicyCatalogAudits.length ? (
+                                          <table className="data-table">
+                                            <thead>
+                                              <tr>
+                                                <th>When</th>
+                                                <th>Action</th>
+                                                <th>Detail</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {providerProvenanceSchedulerSearchModerationPolicyCatalogAudits.map((entry) => (
+                                                <tr key={entry.audit_id}>
+                                                  <td>
+                                                    <strong>{formatTimestamp(entry.recorded_at)}</strong>
+                                                    <p className="run-lineage-symbol-copy">
+                                                      {entry.actor_tab_label ?? entry.actor_tab_id ?? "unknown tab"}
+                                                    </p>
+                                                  </td>
+                                                  <td>
+                                                    <strong>{formatWorkflowToken(entry.action)}</strong>
+                                                    <p className="run-lineage-symbol-copy">{entry.name}</p>
+                                                    <p className="run-lineage-symbol-copy">
+                                                      {formatWorkflowToken(entry.status)} · {formatWorkflowToken(entry.default_moderation_status)}
+                                                    </p>
+                                                  </td>
+                                                  <td>
+                                                    <p className="run-lineage-symbol-copy">{entry.detail}</p>
+                                                    <p className="run-lineage-symbol-copy">
+                                                      View {formatWorkflowToken(entry.governance_view)} · window {entry.window_days}d · stale {entry.stale_pending_hours}h · minimum {entry.minimum_score}
+                                                    </p>
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        ) : (
+                                          !providerProvenanceSchedulerSearchModerationPolicyCatalogAuditsLoading ? (
+                                            <p className="empty-state">No moderation policy catalog audit rows match the current filter.</p>
+                                          ) : null
+                                        )}
+                                      </div>
                                       <div className="market-data-provenance-history-head">
                                         <strong>Scheduler moderation approval queue</strong>
                                         <p>

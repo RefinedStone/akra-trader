@@ -189,6 +189,9 @@ creation.
 - that same scheduler governance layer now also introduces reusable moderation policy catalogs and
   a staged approval queue, so future quality work can gate learned relevance updates behind
   previewed, approved moderation plans instead of direct batch actions alone
+- those moderation policy catalogs now also have lifecycle, audit, and bulk-governance controls,
+  so scheduler search governance can safely update reusable moderation defaults without losing
+  revision traceability or team audit coverage
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

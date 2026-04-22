@@ -138,6 +138,9 @@ unclear dataset lineage.
 - that same scheduler governance path now also provides moderation policy catalogs and staged
   approval plans, so operators can stage selected search feedback, enforce score or note
   requirements, and apply approved moderation batches back into learned scheduler ranking
+- those same moderation policy catalogs now also expose revision history, audit trails, and bulk
+  governance, so teams can review lifecycle changes and roll out governance-default updates
+  across multiple moderation catalogs in one pass
 - that same retrieval path now also emits cross-occurrence semantic/vector clusters, so a handoff
   can start from grouped recovery or failure narratives instead of only a flat ranked result set
   from scratch before ranking results

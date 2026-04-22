@@ -293,6 +293,49 @@ class OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogCreateRequ
   created_by_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogUpdateRequest(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  default_moderation_status: str | None = None
+  governance_view: str | None = None
+  window_days: int | None = None
+  stale_pending_hours: int | None = None
+  minimum_score: int | None = None
+  require_note: bool | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogDeleteRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionRestoreRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkGovernanceRequest(BaseModel):
+  action: str
+  catalog_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  default_moderation_status: str | None = None
+  governance_view: str | None = None
+  window_days: int | None = None
+  stale_pending_hours: int | None = None
+  minimum_score: int | None = None
+  require_note: bool | None = None
+
+
 class OperatorProviderProvenanceSchedulerSearchModerationPlanStageRequest(BaseModel):
   feedback_ids: list[str] = Field(default_factory=list)
   policy_catalog_id: str | None = None
@@ -2307,6 +2350,198 @@ def create_router(container: Container) -> APIRouter:
     methods=["GET"],
     name="list_operator_provider_provenance_scheduler_search_moderation_policy_catalogs",
     summary="List scheduler search moderation policy catalogs",
+  )
+
+  def update_operator_provider_provenance_scheduler_search_moderation_policy_catalog(
+    catalog_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogUpdateRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.update_provider_provenance_scheduler_search_moderation_policy_catalog(
+        catalog_id,
+        name=request.name,
+        description=request.description,
+        default_moderation_status=request.default_moderation_status,
+        governance_view=request.governance_view,
+        window_days=request.window_days,
+        stale_pending_hours=request.stale_pending_hours,
+        minimum_score=request.minimum_score,
+        require_note=request.require_note,
+        actor_tab_id=request.actor_tab_id,
+        actor_tab_label=request.actor_tab_label,
+        reason=(
+          request.reason
+          if isinstance(request.reason, str) and request.reason.strip()
+          else "scheduler_search_moderation_policy_catalog_updated"
+        ),
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/{catalog_id}",
+    update_operator_provider_provenance_scheduler_search_moderation_policy_catalog,
+    methods=["PATCH"],
+    name="update_operator_provider_provenance_scheduler_search_moderation_policy_catalog",
+    summary="Update a scheduler search moderation policy catalog",
+  )
+
+  def delete_operator_provider_provenance_scheduler_search_moderation_policy_catalog(
+    catalog_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogDeleteRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.delete_provider_provenance_scheduler_search_moderation_policy_catalog(
+        catalog_id,
+        actor_tab_id=request.actor_tab_id,
+        actor_tab_label=request.actor_tab_label,
+        reason=(
+          request.reason
+          if isinstance(request.reason, str) and request.reason.strip()
+          else "scheduler_search_moderation_policy_catalog_deleted"
+        ),
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/{catalog_id}/delete",
+    delete_operator_provider_provenance_scheduler_search_moderation_policy_catalog,
+    methods=["POST"],
+    name="delete_operator_provider_provenance_scheduler_search_moderation_policy_catalog",
+    summary="Delete a scheduler search moderation policy catalog",
+  )
+
+  def list_operator_provider_provenance_scheduler_search_moderation_policy_catalog_revisions(
+    catalog_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.list_provider_provenance_scheduler_search_moderation_policy_catalog_revisions(
+        catalog_id
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/{catalog_id}/revisions",
+    list_operator_provider_provenance_scheduler_search_moderation_policy_catalog_revisions,
+    methods=["GET"],
+    name="list_operator_provider_provenance_scheduler_search_moderation_policy_catalog_revisions",
+    summary="List scheduler search moderation policy catalog revisions",
+  )
+
+  def restore_operator_provider_provenance_scheduler_search_moderation_policy_catalog_revision(
+    catalog_id: str,
+    revision_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionRestoreRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.restore_provider_provenance_scheduler_search_moderation_policy_catalog_revision(
+        catalog_id,
+        revision_id,
+        actor_tab_id=request.actor_tab_id,
+        actor_tab_label=request.actor_tab_label,
+        reason=(
+          request.reason
+          if isinstance(request.reason, str) and request.reason.strip()
+          else "scheduler_search_moderation_policy_catalog_revision_restored"
+        ),
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/{catalog_id}/revisions/{revision_id}/restore",
+    restore_operator_provider_provenance_scheduler_search_moderation_policy_catalog_revision,
+    methods=["POST"],
+    name="restore_operator_provider_provenance_scheduler_search_moderation_policy_catalog_revision",
+    summary="Restore a scheduler search moderation policy catalog revision",
+  )
+
+  def list_operator_provider_provenance_scheduler_search_moderation_policy_catalog_audits(
+    catalog_id: str | None = None,
+    action: str | None = None,
+    actor_tab_id: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return app.list_provider_provenance_scheduler_search_moderation_policy_catalog_audits(
+      catalog_id=catalog_id,
+      action=action,
+      actor_tab_id=actor_tab_id,
+      search=search,
+      limit=limit,
+    )
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/audits",
+    list_operator_provider_provenance_scheduler_search_moderation_policy_catalog_audits,
+    methods=["GET"],
+    name="list_operator_provider_provenance_scheduler_search_moderation_policy_catalog_audits",
+    summary="List scheduler search moderation policy catalog audit records",
+  )
+
+  def bulk_govern_operator_provider_provenance_scheduler_search_moderation_policy_catalogs(
+    request: OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkGovernanceRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      result = app.bulk_govern_provider_provenance_scheduler_search_moderation_policy_catalogs(
+        catalog_ids=request.catalog_ids,
+        action=request.action,
+        actor_tab_id=request.actor_tab_id,
+        actor_tab_label=request.actor_tab_label,
+        reason=request.reason,
+        name_prefix=request.name_prefix,
+        name_suffix=request.name_suffix,
+        description_append=request.description_append,
+        default_moderation_status=request.default_moderation_status,
+        governance_view=request.governance_view,
+        window_days=request.window_days,
+        stale_pending_hours=request.stale_pending_hours,
+        minimum_score=request.minimum_score,
+        require_note=request.require_note,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+      "item_type": result.item_type,
+      "action": result.action,
+      "reason": result.reason,
+      "requested_count": result.requested_count,
+      "applied_count": result.applied_count,
+      "skipped_count": result.skipped_count,
+      "failed_count": result.failed_count,
+      "results": tuple(
+        {
+          "item_id": entry.item_id,
+          "item_name": entry.item_name,
+          "outcome": entry.outcome,
+          "status": entry.status,
+          "current_revision_id": entry.current_revision_id,
+          "message": entry.message,
+        }
+        for entry in result.results
+      ),
+    }
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/bulk-governance",
+    bulk_govern_operator_provider_provenance_scheduler_search_moderation_policy_catalogs,
+    methods=["POST"],
+    name="bulk_govern_operator_provider_provenance_scheduler_search_moderation_policy_catalogs",
+    summary="Bulk govern scheduler search moderation policy catalogs",
   )
 
   def stage_operator_provider_provenance_scheduler_search_moderation_plan(

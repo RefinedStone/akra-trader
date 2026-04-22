@@ -246,6 +246,9 @@ It is not yet a finished live trading product:
 - that same scheduler search governance layer now also ships reusable moderation policy catalogs
   and a staged approval queue, so teams can preview selected feedback, require approval notes,
   and only apply governed moderation batches into learned relevance tuning
+- those scheduler moderation policy catalogs now also support edit, delete, revision restore,
+  team audit, and bulk governance, so operators can evolve or retire reusable moderation defaults
+  without losing lifecycle traceability
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

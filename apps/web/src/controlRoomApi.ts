@@ -18,8 +18,10 @@ import type {
   ProviderProvenanceSchedulerSearchDashboardPayload,
   ProviderProvenanceSchedulerSearchModerationPlanEntry,
   ProviderProvenanceSchedulerSearchModerationPlanListPayload,
+  ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditListPayload,
   ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry,
   ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload,
+  ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionListPayload,
   ProviderProvenanceSchedulerSearchFeedbackResult,
   ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult,
   ProviderProvenanceSchedulerSearchFeedbackModerationResult,
@@ -727,6 +729,169 @@ export async function createProviderProvenanceSchedulerSearchModerationPolicyCat
 export async function listProviderProvenanceSchedulerSearchModerationPolicyCatalogs() {
   return fetchJson<ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload>(
     "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+  );
+}
+
+export async function updateProviderProvenanceSchedulerSearchModerationPolicyCatalog(params: {
+  catalogId: string;
+  name?: string;
+  description?: string | null;
+  defaultModerationStatus?: "pending" | "approved" | "rejected";
+  governanceView?: string;
+  windowDays?: number;
+  stalePendingHours?: number;
+  minimumScore?: number;
+  requireNote?: boolean;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/${encodeURIComponent(params.catalogId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(typeof params.name === "string" ? { name: params.name } : {}),
+        ...(typeof params.description === "string" ? { description: params.description } : {}),
+        ...(params.defaultModerationStatus ? { default_moderation_status: params.defaultModerationStatus } : {}),
+        ...(params.governanceView ? { governance_view: params.governanceView } : {}),
+        ...(typeof params.windowDays === "number" && Number.isFinite(params.windowDays)
+          ? { window_days: Math.max(7, Math.min(Math.round(params.windowDays), 180)) }
+          : {}),
+        ...(typeof params.stalePendingHours === "number" && Number.isFinite(params.stalePendingHours)
+          ? { stale_pending_hours: Math.max(1, Math.min(Math.round(params.stalePendingHours), 24 * 30)) }
+          : {}),
+        ...(typeof params.minimumScore === "number" && Number.isFinite(params.minimumScore)
+          ? { minimum_score: Math.max(Math.round(params.minimumScore), 0) }
+          : {}),
+        ...(typeof params.requireNote === "boolean" ? { require_note: params.requireNote } : {}),
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function deleteProviderProvenanceSchedulerSearchModerationPolicyCatalog(params: {
+  catalogId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/${encodeURIComponent(params.catalogId)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisions(
+  catalogId: string,
+) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/${encodeURIComponent(catalogId)}/revisions`,
+  );
+}
+
+export async function restoreProviderProvenanceSchedulerSearchModerationPolicyCatalogRevision(params: {
+  catalogId: string;
+  revisionId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/${encodeURIComponent(params.catalogId)}/revisions/${encodeURIComponent(params.revisionId)}/restore`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerSearchModerationPolicyCatalogAudits(params: {
+  catalogId?: string;
+  action?: string;
+  actorTabId?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.catalogId?.trim()) {
+    searchParams.set("catalog_id", params.catalogId.trim());
+  }
+  if (params.action?.trim()) {
+    searchParams.set("action", params.action.trim());
+  }
+  if (params.actorTabId?.trim()) {
+    searchParams.set("actor_tab_id", params.actorTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/audits${suffix}`,
+  );
+}
+
+export async function bulkGovernProviderProvenanceSchedulerSearchModerationPolicyCatalogs(params: {
+  action: "delete" | "restore" | "update";
+  catalogIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  defaultModerationStatus?: "pending" | "approved" | "rejected";
+  governanceView?: string;
+  windowDays?: number;
+  stalePendingHours?: number;
+  minimumScore?: number;
+  requireNote?: boolean;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs/bulk-governance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: params.action,
+        catalog_ids: params.catalogIds,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend !== undefined ? { description_append: params.descriptionAppend } : {}),
+        ...(params.defaultModerationStatus ? { default_moderation_status: params.defaultModerationStatus } : {}),
+        ...(params.governanceView ? { governance_view: params.governanceView } : {}),
+        ...(typeof params.windowDays === "number" && Number.isFinite(params.windowDays)
+          ? { window_days: Math.max(7, Math.min(Math.round(params.windowDays), 180)) }
+          : {}),
+        ...(typeof params.stalePendingHours === "number" && Number.isFinite(params.stalePendingHours)
+          ? { stale_pending_hours: Math.max(1, Math.min(Math.round(params.stalePendingHours), 24 * 30)) }
+          : {}),
+        ...(typeof params.minimumScore === "number" && Number.isFinite(params.minimumScore)
+          ? { minimum_score: Math.max(Math.round(params.minimumScore), 0) }
+          : {}),
+        ...(typeof params.requireNote === "boolean" ? { require_note: params.requireNote } : {}),
+      }),
+    },
   );
 }
 

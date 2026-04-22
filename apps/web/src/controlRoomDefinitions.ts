@@ -1514,14 +1514,72 @@ export type ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry = {
   stale_pending_hours: number;
   minimum_score: number;
   require_note: boolean;
+  current_revision_id?: string | null;
+  revision_count: number;
   created_by_tab_id?: string | null;
   created_by_tab_label?: string | null;
+  deleted_at?: string | null;
+  deleted_by_tab_id?: string | null;
+  deleted_by_tab_label?: string | null;
 };
 
 export type ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload = {
   generated_at: string;
   total: number;
   items: ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry[];
+};
+
+export type ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionEntry = {
+  revision_id: string;
+  catalog_id: string;
+  action: string;
+  reason: string;
+  name: string;
+  description: string;
+  scheduler_key: string;
+  status: string;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+  recorded_at: string;
+  source_revision_id?: string | null;
+  recorded_by_tab_id?: string | null;
+  recorded_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionListPayload = {
+  catalog: ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry;
+  history: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionEntry[];
+};
+
+export type ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord = {
+  audit_id: string;
+  catalog_id: string;
+  action: string;
+  recorded_at: string;
+  reason: string;
+  detail: string;
+  revision_id?: string | null;
+  source_revision_id?: string | null;
+  scheduler_key: string;
+  name: string;
+  status: string;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+  actor_tab_id?: string | null;
+  actor_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditListPayload = {
+  items: ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord[];
+  total: number;
 };
 
 export type ProviderProvenanceSchedulerSearchModerationPlanPreviewItem = {

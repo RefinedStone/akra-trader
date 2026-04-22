@@ -2128,10 +2128,49 @@ def test_provider_provenance_scheduler_search_moderation_policy_catalog_and_plan
   assert catalog["default_moderation_status"] == "approved"
   catalogs = app.list_provider_provenance_scheduler_search_moderation_policy_catalogs()
   assert catalogs["total"] == 1
+  assert catalogs["items"][0]["revision_count"] == 1
+
+  updated_catalog = app.update_provider_provenance_scheduler_search_moderation_policy_catalog(
+    catalog["catalog_id"],
+    description="Approve and review only strong scheduler matches with a note.",
+    governance_view="pending_queue",
+    stale_pending_hours=48,
+    actor_tab_id="control-room",
+    actor_tab_label="Control room",
+  )
+  assert updated_catalog["governance_view"] == "pending_queue"
+  assert updated_catalog["revision_count"] == 2
+
+  revision_payload = app.list_provider_provenance_scheduler_search_moderation_policy_catalog_revisions(
+    catalog["catalog_id"]
+  )
+  assert revision_payload["catalog"]["catalog_id"] == catalog["catalog_id"]
+  assert revision_payload["history"][0]["action"] == "updated"
+  assert revision_payload["history"][-1]["action"] == "created"
+
+  audit_payload = app.list_provider_provenance_scheduler_search_moderation_policy_catalog_audits(
+    catalog_id=catalog["catalog_id"],
+  )
+  assert audit_payload["total"] >= 2
+  assert audit_payload["items"][0]["catalog_id"] == catalog["catalog_id"]
+
+  bulk_result = app.bulk_govern_provider_provenance_scheduler_search_moderation_policy_catalogs(
+    catalog_ids=(catalog["catalog_id"],),
+    action="update",
+    name_prefix="[Ops] ",
+    description_append=" Bulk reviewed.",
+    minimum_score=175,
+    actor_tab_id="control-room",
+    actor_tab_label="Control room",
+  )
+  assert bulk_result.applied_count == 1
+  post_bulk_catalog = app.list_provider_provenance_scheduler_search_moderation_policy_catalogs()["items"][0]
+  assert post_bulk_catalog["name"].startswith("[Ops] ")
+  assert post_bulk_catalog["minimum_score"] == 175
 
   previewed = app.stage_provider_provenance_scheduler_search_moderation_plan(
     feedback_ids=(feedback_result["feedback_id"],),
-    policy_catalog_id=catalog["catalog_id"],
+    policy_catalog_id=post_bulk_catalog["catalog_id"],
     actor="operator",
     source_tab_id="control-room",
     source_tab_label="Control room",
