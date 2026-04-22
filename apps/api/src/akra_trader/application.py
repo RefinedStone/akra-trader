@@ -507,6 +507,18 @@ class TradingApplication:
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
     ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_policy_templates: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
+    ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_policy_template_revisions: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord,
+    ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
+    ] = {}
     self._provider_provenance_scheduler_narrative_governance_hierarchy_step_templates: dict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord,
@@ -531,7 +543,23 @@ class TradingApplication:
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
     ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalogs: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
+    ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord,
+    ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
+    ] = {}
     self._provider_provenance_scheduler_narrative_governance_plans: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
+    ] = {}
+    self._provider_provenance_scheduler_stitched_report_governance_plans: dict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
     ] = {}
@@ -2120,10 +2148,36 @@ class TradingApplication:
       )
     )
 
+  @staticmethod
+  def _uses_provider_provenance_scheduler_stitched_report_governance_policy_store(
+    item_type_scope: str | None,
+  ) -> bool:
+    return item_type_scope == "stitched_report_governance_registry"
+
+  @staticmethod
+  def _uses_provider_provenance_scheduler_stitched_report_governance_plan_store(
+    item_type: str | None,
+  ) -> bool:
+    return item_type == "stitched_report_governance_registry"
+
   def _save_provider_provenance_scheduler_narrative_governance_policy_template_record(
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
+    if self._uses_provider_provenance_scheduler_stitched_report_governance_policy_store(
+      record.item_type_scope
+    ):
+      save_record = getattr(
+        self._runs,
+        "save_provider_provenance_scheduler_stitched_report_governance_policy_template",
+        None,
+      )
+      if callable(save_record):
+        return save_record(record)
+      self._provider_provenance_scheduler_stitched_report_governance_policy_templates[
+        record.policy_template_id
+      ] = record
+      return record
     save_record = getattr(
       self._runs,
       "save_provider_provenance_scheduler_narrative_governance_policy_template",
@@ -2144,8 +2198,23 @@ class TradingApplication:
       None,
     )
     if callable(get_record):
-      return get_record(policy_template_id)
-    return self._provider_provenance_scheduler_narrative_governance_policy_templates.get(policy_template_id)
+      record = get_record(policy_template_id)
+      if record is not None:
+        return record
+    else:
+      record = self._provider_provenance_scheduler_narrative_governance_policy_templates.get(policy_template_id)
+      if record is not None:
+        return record
+    stitched_get_record = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_stitched_report_governance_policy_template",
+      None,
+    )
+    if callable(stitched_get_record):
+      return stitched_get_record(policy_template_id)
+    return self._provider_provenance_scheduler_stitched_report_governance_policy_templates.get(
+      policy_template_id
+    )
 
   def _list_provider_provenance_scheduler_narrative_governance_policy_template_records(
     self,
@@ -2155,11 +2224,24 @@ class TradingApplication:
       "list_provider_provenance_scheduler_narrative_governance_policy_templates",
       None,
     )
-    if callable(list_records):
-      return tuple(list_records())
+    shared_records = (
+      tuple(list_records())
+      if callable(list_records)
+      else tuple(self._provider_provenance_scheduler_narrative_governance_policy_templates.values())
+    )
+    stitched_list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_policy_templates",
+      None,
+    )
+    stitched_records = (
+      tuple(stitched_list_records())
+      if callable(stitched_list_records)
+      else tuple(self._provider_provenance_scheduler_stitched_report_governance_policy_templates.values())
+    )
     return tuple(
       sorted(
-        self._provider_provenance_scheduler_narrative_governance_policy_templates.values(),
+        (*shared_records, *stitched_records),
         key=lambda record: (record.updated_at, record.policy_template_id),
         reverse=True,
       )
@@ -2169,6 +2251,20 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord:
+    if self._uses_provider_provenance_scheduler_stitched_report_governance_policy_store(
+      record.item_type_scope
+    ):
+      save_record = getattr(
+        self._runs,
+        "save_provider_provenance_scheduler_stitched_report_governance_policy_template_revision",
+        None,
+      )
+      if callable(save_record):
+        return save_record(record)
+      self._provider_provenance_scheduler_stitched_report_governance_policy_template_revisions[
+        record.revision_id
+      ] = record
+      return record
     save_record = getattr(
       self._runs,
       "save_provider_provenance_scheduler_narrative_governance_policy_template_revision",
@@ -2189,8 +2285,25 @@ class TradingApplication:
       None,
     )
     if callable(get_record):
-      return get_record(revision_id)
-    return self._provider_provenance_scheduler_narrative_governance_policy_template_revisions.get(revision_id)
+      record = get_record(revision_id)
+      if record is not None:
+        return record
+    else:
+      record = self._provider_provenance_scheduler_narrative_governance_policy_template_revisions.get(
+        revision_id
+      )
+      if record is not None:
+        return record
+    stitched_get_record = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_stitched_report_governance_policy_template_revision",
+      None,
+    )
+    if callable(stitched_get_record):
+      return stitched_get_record(revision_id)
+    return self._provider_provenance_scheduler_stitched_report_governance_policy_template_revisions.get(
+      revision_id
+    )
 
   def _list_provider_provenance_scheduler_narrative_governance_policy_template_revision_records(
     self,
@@ -2200,11 +2313,24 @@ class TradingApplication:
       "list_provider_provenance_scheduler_narrative_governance_policy_template_revisions",
       None,
     )
-    if callable(list_records):
-      return tuple(list_records())
+    shared_records = (
+      tuple(list_records())
+      if callable(list_records)
+      else tuple(self._provider_provenance_scheduler_narrative_governance_policy_template_revisions.values())
+    )
+    stitched_list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_policy_template_revisions",
+      None,
+    )
+    stitched_records = (
+      tuple(stitched_list_records())
+      if callable(stitched_list_records)
+      else tuple(self._provider_provenance_scheduler_stitched_report_governance_policy_template_revisions.values())
+    )
     return tuple(
       sorted(
-        self._provider_provenance_scheduler_narrative_governance_policy_template_revisions.values(),
+        (*shared_records, *stitched_records),
         key=lambda record: (record.recorded_at, record.revision_id),
         reverse=True,
       )
@@ -2214,6 +2340,20 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord:
+    if self._uses_provider_provenance_scheduler_stitched_report_governance_policy_store(
+      record.item_type_scope
+    ):
+      save_record = getattr(
+        self._runs,
+        "save_provider_provenance_scheduler_stitched_report_governance_policy_template_audit_record",
+        None,
+      )
+      if callable(save_record):
+        return save_record(record)
+      self._provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records[
+        record.audit_id
+      ] = record
+      return record
     save_record = getattr(
       self._runs,
       "save_provider_provenance_scheduler_narrative_governance_policy_template_audit_record",
@@ -2232,11 +2372,24 @@ class TradingApplication:
       "list_provider_provenance_scheduler_narrative_governance_policy_template_audit_records",
       None,
     )
-    if callable(list_records):
-      return tuple(list_records())
+    shared_records = (
+      tuple(list_records())
+      if callable(list_records)
+      else tuple(self._provider_provenance_scheduler_narrative_governance_policy_template_audit_records.values())
+    )
+    stitched_list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records",
+      None,
+    )
+    stitched_records = (
+      tuple(stitched_list_records())
+      if callable(stitched_list_records)
+      else tuple(self._provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records.values())
+    )
     return tuple(
       sorted(
-        self._provider_provenance_scheduler_narrative_governance_policy_template_audit_records.values(),
+        (*shared_records, *stitched_records),
         key=lambda record: (record.recorded_at, record.audit_id),
         reverse=True,
       )
@@ -2378,6 +2531,20 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
+    if self._uses_provider_provenance_scheduler_stitched_report_governance_policy_store(
+      record.item_type_scope
+    ):
+      save_record = getattr(
+        self._runs,
+        "save_provider_provenance_scheduler_stitched_report_governance_policy_catalog",
+        None,
+      )
+      if callable(save_record):
+        return save_record(record)
+      self._provider_provenance_scheduler_stitched_report_governance_policy_catalogs[
+        record.catalog_id
+      ] = record
+      return record
     save_record = getattr(
       self._runs,
       "save_provider_provenance_scheduler_narrative_governance_policy_catalog",
@@ -2398,8 +2565,21 @@ class TradingApplication:
       None,
     )
     if callable(get_record):
-      return get_record(catalog_id)
-    return self._provider_provenance_scheduler_narrative_governance_policy_catalogs.get(catalog_id)
+      record = get_record(catalog_id)
+      if record is not None:
+        return record
+    else:
+      record = self._provider_provenance_scheduler_narrative_governance_policy_catalogs.get(catalog_id)
+      if record is not None:
+        return record
+    stitched_get_record = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_stitched_report_governance_policy_catalog",
+      None,
+    )
+    if callable(stitched_get_record):
+      return stitched_get_record(catalog_id)
+    return self._provider_provenance_scheduler_stitched_report_governance_policy_catalogs.get(catalog_id)
 
   def _list_provider_provenance_scheduler_narrative_governance_policy_catalog_records(
     self,
@@ -2409,11 +2589,24 @@ class TradingApplication:
       "list_provider_provenance_scheduler_narrative_governance_policy_catalogs",
       None,
     )
-    if callable(list_records):
-      return tuple(list_records())
+    shared_records = (
+      tuple(list_records())
+      if callable(list_records)
+      else tuple(self._provider_provenance_scheduler_narrative_governance_policy_catalogs.values())
+    )
+    stitched_list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_policy_catalogs",
+      None,
+    )
+    stitched_records = (
+      tuple(stitched_list_records())
+      if callable(stitched_list_records)
+      else tuple(self._provider_provenance_scheduler_stitched_report_governance_policy_catalogs.values())
+    )
     return tuple(
       sorted(
-        self._provider_provenance_scheduler_narrative_governance_policy_catalogs.values(),
+        (*shared_records, *stitched_records),
         key=lambda record: (record.updated_at, record.catalog_id),
         reverse=True,
       )
@@ -2423,6 +2616,20 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord:
+    if self._uses_provider_provenance_scheduler_stitched_report_governance_policy_store(
+      record.item_type_scope
+    ):
+      save_record = getattr(
+        self._runs,
+        "save_provider_provenance_scheduler_stitched_report_governance_policy_catalog_revision",
+        None,
+      )
+      if callable(save_record):
+        return save_record(record)
+      self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions[
+        record.revision_id
+      ] = record
+      return record
     save_record = getattr(
       self._runs,
       "save_provider_provenance_scheduler_narrative_governance_policy_catalog_revision",
@@ -2443,8 +2650,23 @@ class TradingApplication:
       None,
     )
     if callable(get_record):
-      return get_record(revision_id)
-    return self._provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.get(
+      record = get_record(revision_id)
+      if record is not None:
+        return record
+    else:
+      record = self._provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.get(
+        revision_id
+      )
+      if record is not None:
+        return record
+    stitched_get_record = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_stitched_report_governance_policy_catalog_revision",
+      None,
+    )
+    if callable(stitched_get_record):
+      return stitched_get_record(revision_id)
+    return self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions.get(
       revision_id
     )
 
@@ -2456,11 +2678,24 @@ class TradingApplication:
       "list_provider_provenance_scheduler_narrative_governance_policy_catalog_revisions",
       None,
     )
-    if callable(list_records):
-      return tuple(list_records())
+    shared_records = (
+      tuple(list_records())
+      if callable(list_records)
+      else tuple(self._provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.values())
+    )
+    stitched_list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions",
+      None,
+    )
+    stitched_records = (
+      tuple(stitched_list_records())
+      if callable(stitched_list_records)
+      else tuple(self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions.values())
+    )
     return tuple(
       sorted(
-        self._provider_provenance_scheduler_narrative_governance_policy_catalog_revisions.values(),
+        (*shared_records, *stitched_records),
         key=lambda record: (record.recorded_at, record.revision_id),
         reverse=True,
       )
@@ -2470,6 +2705,20 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord:
+    if self._uses_provider_provenance_scheduler_stitched_report_governance_policy_store(
+      record.item_type_scope
+    ):
+      save_record = getattr(
+        self._runs,
+        "save_provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_record",
+        None,
+      )
+      if callable(save_record):
+        return save_record(record)
+      self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records[
+        record.audit_id
+      ] = record
+      return record
     save_record = getattr(
       self._runs,
       "save_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_record",
@@ -2490,11 +2739,24 @@ class TradingApplication:
       "list_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records",
       None,
     )
-    if callable(list_records):
-      return tuple(list_records())
+    shared_records = (
+      tuple(list_records())
+      if callable(list_records)
+      else tuple(self._provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.values())
+    )
+    stitched_list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records",
+      None,
+    )
+    stitched_records = (
+      tuple(stitched_list_records())
+      if callable(stitched_list_records)
+      else tuple(self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records.values())
+    )
     return tuple(
       sorted(
-        self._provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.values(),
+        (*shared_records, *stitched_records),
         key=lambda record: (record.recorded_at, record.audit_id),
         reverse=True,
       )
@@ -2504,6 +2766,16 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    if self._uses_provider_provenance_scheduler_stitched_report_governance_plan_store(record.item_type):
+      save_record = getattr(
+        self._runs,
+        "save_provider_provenance_scheduler_stitched_report_governance_plan",
+        None,
+      )
+      if callable(save_record):
+        return save_record(record)
+      self._provider_provenance_scheduler_stitched_report_governance_plans[record.plan_id] = record
+      return record
     save_record = getattr(self._runs, "save_provider_provenance_scheduler_narrative_governance_plan", None)
     if callable(save_record):
       return save_record(record)
@@ -2516,18 +2788,44 @@ class TradingApplication:
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord | None:
     get_record = getattr(self._runs, "get_provider_provenance_scheduler_narrative_governance_plan", None)
     if callable(get_record):
-      return get_record(plan_id)
-    return self._provider_provenance_scheduler_narrative_governance_plans.get(plan_id)
+      record = get_record(plan_id)
+      if record is not None:
+        return record
+    else:
+      record = self._provider_provenance_scheduler_narrative_governance_plans.get(plan_id)
+      if record is not None:
+        return record
+    stitched_get_record = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_stitched_report_governance_plan",
+      None,
+    )
+    if callable(stitched_get_record):
+      return stitched_get_record(plan_id)
+    return self._provider_provenance_scheduler_stitched_report_governance_plans.get(plan_id)
 
   def _list_provider_provenance_scheduler_narrative_governance_plan_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...]:
     list_records = getattr(self._runs, "list_provider_provenance_scheduler_narrative_governance_plans", None)
-    if callable(list_records):
-      return tuple(list_records())
+    shared_records = (
+      tuple(list_records())
+      if callable(list_records)
+      else tuple(self._provider_provenance_scheduler_narrative_governance_plans.values())
+    )
+    stitched_list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_stitched_report_governance_plans",
+      None,
+    )
+    stitched_records = (
+      tuple(stitched_list_records())
+      if callable(stitched_list_records)
+      else tuple(self._provider_provenance_scheduler_stitched_report_governance_plans.values())
+    )
     return tuple(
       sorted(
-        self._provider_provenance_scheduler_narrative_governance_plans.values(),
+        (*shared_records, *stitched_records),
         key=lambda record: (record.updated_at, record.plan_id),
         reverse=True,
       )
@@ -10122,15 +10420,23 @@ class TradingApplication:
   def list_provider_provenance_scheduler_narrative_governance_policy_catalogs(
     self,
     *,
+    item_type_scope: str | None = None,
     search: str | None = None,
     limit: int = 20,
   ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord, ...]:
+    normalized_item_type_scope = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_item_type_scope(item_type_scope)
+      if isinstance(item_type_scope, str) and item_type_scope.strip()
+      else None
+    )
     normalized_limit = max(1, min(limit, 100))
     filtered: list[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord] = []
     for raw_record in self._list_provider_provenance_scheduler_narrative_governance_policy_catalog_records():
       record = self._materialize_provider_provenance_scheduler_narrative_governance_policy_catalog_record(
         raw_record
       )
+      if normalized_item_type_scope is not None and record.item_type_scope != normalized_item_type_scope:
+        continue
       if not self._matches_provider_provenance_workspace_search(
         values=(
           record.catalog_id,

@@ -205,6 +205,10 @@ It is not yet a finished live trading product:
   approval-queue slice and stitched-governance-registry policy-catalog surface, so teams can
   review registry plans and apply registry-scoped queue defaults without pivoting back to the
   broader shared scheduler governance panels
+- those stitched-governance-registry policy-template, policy-catalog, and staged-plan records
+  now also persist through a dedicated stitched-registry governance store and standalone API
+  surface, so registry approvals no longer share the same backing record layer as the generic
+  scheduler narrative governance queue
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

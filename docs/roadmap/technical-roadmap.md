@@ -152,6 +152,9 @@ creation.
   queue and stitched-governance-registry policy-catalog surface, so registry bundle review and
   queue-defaulting can happen in place instead of only through the broader shared governance
   surfaces
+- those stitched-governance-registry governance records now also persist through a dedicated
+  stitched-registry plan/policy store and standalone route set, so future registry governance
+  work can evolve without coupling record lifecycle to the generic scheduler governance layer
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand

@@ -51,12 +51,15 @@ import type {
   RunSurfaceCollectionQueryRuntimeCandidateSample,
 } from "./features/query-builder";
 import {
+  applyProviderProvenanceSchedulerStitchedReportGovernancePlan,
   applyProviderProvenanceSchedulerNarrativeGovernancePlan,
+  approveProviderProvenanceSchedulerStitchedReportGovernancePlan,
   approveProviderProvenanceSchedulerNarrativeGovernancePlan,
   createProviderProvenanceAnalyticsPreset,
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
   createProviderProvenanceSchedulerStitchedReportGovernanceRegistry,
+  createProviderProvenanceSchedulerStitchedReportGovernancePlan,
   createProviderProvenanceSchedulerStitchedReportView,
   createProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy,
@@ -106,6 +109,10 @@ import {
   listProviderProvenanceSchedulerNarrativeRegistryRevisions,
   listProviderProvenanceSchedulerNarrativeTemplates,
   listProviderProvenanceSchedulerNarrativeTemplateRevisions,
+  listProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogs,
+  listProviderProvenanceSchedulerStitchedReportGovernancePolicyTemplates,
+  listProviderProvenanceSchedulerStitchedReportGovernancePlans,
+  rollbackProviderProvenanceSchedulerStitchedReportGovernancePlan,
   rollbackProviderProvenanceSchedulerNarrativeGovernancePlan,
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
@@ -4112,6 +4119,10 @@ export default function App() {
     useState("");
   const [providerProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId, setProviderProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId] =
     useState("");
+  const [providerProvenanceSchedulerStitchedReportGovernancePolicyTemplates, setProviderProvenanceSchedulerStitchedReportGovernancePolicyTemplates] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate[]>([]);
+  const [providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogEntries, setProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogEntries] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog[]>([]);
   const [providerProvenanceSchedulerNarrativeGovernanceQueueFilter, setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter] =
     useState<ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState>(
       defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter,
@@ -4697,15 +4708,7 @@ export default function App() {
   );
   const providerProvenanceSchedulerStitchedReportGovernanceRegistryPolicyCatalogs = useMemo(
     () =>
-      providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.filter((entry) => {
-        if (
-          !providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
-            entry.item_type_scope,
-            "stitched_report_governance_registry",
-          )
-        ) {
-          return false;
-        }
+      providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogEntries.filter((entry) => {
         if (!stitchedReportGovernanceRegistryPolicyCatalogSearchNormalized) {
           return true;
         }
@@ -4724,7 +4727,7 @@ export default function App() {
         return searchValues.includes(stitchedReportGovernanceRegistryPolicyCatalogSearchNormalized);
       }),
     [
-      providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs,
+      providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogEntries,
       stitchedReportGovernanceRegistryPolicyCatalogSearchNormalized,
     ],
   );
@@ -7649,8 +7652,7 @@ export default function App() {
             providerProvenanceSchedulerStitchedReportGovernanceRegistryBulkDraft,
           )
         : undefined;
-      const plan = await createProviderProvenanceSchedulerNarrativeGovernancePlan({
-        itemType: "stitched_report_governance_registry",
+      const plan = await createProviderProvenanceSchedulerStitchedReportGovernancePlan({
         itemIds: [...selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryIds],
         action,
         actorTabId: comparisonHistoryTabIdentity.tabId,
@@ -8144,8 +8146,7 @@ export default function App() {
     setProviderProvenanceSchedulerStitchedReportGovernanceRegistryPlansLoading(true);
     setProviderProvenanceSchedulerStitchedReportGovernanceRegistryPlansError(null);
     try {
-      const payload = await listProviderProvenanceSchedulerNarrativeGovernancePlans({
-        itemType: "stitched_report_governance_registry",
+      const payload = await listProviderProvenanceSchedulerStitchedReportGovernancePlans({
         queueState:
           providerProvenanceSchedulerStitchedReportGovernanceRegistryQueueFilter.queue_state !== ALL_FILTER_VALUE
             ? providerProvenanceSchedulerStitchedReportGovernanceRegistryQueueFilter.queue_state
@@ -8243,6 +8244,8 @@ export default function App() {
         narrativeRegistryPayload,
         governancePolicyTemplatePayload,
         governancePolicyCatalogPayload,
+        stitchedGovernancePolicyTemplatePayload,
+        stitchedGovernancePolicyCatalogPayload,
         governanceHierarchyStepTemplatePayload,
         governanceHierarchyStepTemplateAuditPayload,
         governancePolicyTemplateAuditPayload,
@@ -8257,6 +8260,8 @@ export default function App() {
         listProviderProvenanceSchedulerNarrativeRegistryEntries({ limit: 24 }),
         listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates({ limit: 24 }),
         listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogs({ limit: 24 }),
+        listProviderProvenanceSchedulerStitchedReportGovernancePolicyTemplates({ limit: 24 }),
+        listProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogs({ limit: 24 }),
         listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates({ limit: 24 }),
         listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAudits({
           hierarchyStepTemplateId:
@@ -8332,6 +8337,12 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeRegistryEntries(narrativeRegistryPayload.items);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates(governancePolicyTemplatePayload.items);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogs(governancePolicyCatalogPayload.items);
+      setProviderProvenanceSchedulerStitchedReportGovernancePolicyTemplates(
+        stitchedGovernancePolicyTemplatePayload.items,
+      );
+      setProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogEntries(
+        stitchedGovernancePolicyCatalogPayload.items,
+      );
       setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates(
         governanceHierarchyStepTemplatePayload.items,
       );
@@ -8384,6 +8395,13 @@ export default function App() {
         current.filter((registryId) =>
           stitchedGovernanceRegistryPayload.items.some((entry) => entry.registry_id === registryId),
         ),
+      );
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId((current) =>
+        stitchedGovernancePolicyTemplatePayload.items.some(
+          (entry) => entry.policy_template_id === current,
+        )
+          ? current
+          : "",
       );
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepIds((current) => {
         const selectedCatalog = governancePolicyCatalogPayload.items.find(
@@ -11215,11 +11233,17 @@ export default function App() {
   ) {
     setProviderProvenanceSchedulerNarrativeGovernancePlanAction("approve");
     try {
-      const updated = await approveProviderProvenanceSchedulerNarrativeGovernancePlan({
-        planId: plan.plan_id,
-        actorTabId: comparisonHistoryTabIdentity.tabId,
-        actorTabLabel: comparisonHistoryTabIdentity.label,
-      });
+      const updated = plan.item_type === "stitched_report_governance_registry"
+        ? await approveProviderProvenanceSchedulerStitchedReportGovernancePlan({
+            planId: plan.plan_id,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+          })
+        : await approveProviderProvenanceSchedulerNarrativeGovernancePlan({
+            planId: plan.plan_id,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+          });
       await loadProviderProvenanceWorkspaceRegistry();
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
       setProviderProvenanceWorkspaceFeedback(
@@ -11247,11 +11271,17 @@ export default function App() {
     }
     setProviderProvenanceSchedulerNarrativeGovernancePlanAction("apply");
     try {
-      const updated = await applyProviderProvenanceSchedulerNarrativeGovernancePlan({
-        planId: plan.plan_id,
-        actorTabId: comparisonHistoryTabIdentity.tabId,
-        actorTabLabel: comparisonHistoryTabIdentity.label,
-      });
+      const updated = plan.item_type === "stitched_report_governance_registry"
+        ? await applyProviderProvenanceSchedulerStitchedReportGovernancePlan({
+            planId: plan.plan_id,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+          })
+        : await applyProviderProvenanceSchedulerNarrativeGovernancePlan({
+            planId: plan.plan_id,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+          });
       resetProviderProvenanceSchedulerNarrativeGovernanceDraftForPlan(updated);
       await loadProviderProvenanceWorkspaceRegistry();
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
@@ -11285,11 +11315,17 @@ export default function App() {
     }
     setProviderProvenanceSchedulerNarrativeGovernancePlanAction("rollback");
     try {
-      const updated = await rollbackProviderProvenanceSchedulerNarrativeGovernancePlan({
-        planId: plan.plan_id,
-        actorTabId: comparisonHistoryTabIdentity.tabId,
-        actorTabLabel: comparisonHistoryTabIdentity.label,
-      });
+      const updated = plan.item_type === "stitched_report_governance_registry"
+        ? await rollbackProviderProvenanceSchedulerStitchedReportGovernancePlan({
+            planId: plan.plan_id,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+          })
+        : await rollbackProviderProvenanceSchedulerNarrativeGovernancePlan({
+            planId: plan.plan_id,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+          });
       resetProviderProvenanceSchedulerNarrativeGovernanceDraftForPlan(updated);
       await loadProviderProvenanceWorkspaceRegistry();
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
@@ -20282,15 +20318,7 @@ export default function App() {
                                         >
                                           <option value={ALL_FILTER_VALUE}>All policy templates</option>
                                           <option value="">No policy template</option>
-                                          {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
-                                            .filter(
-                                              (entry) =>
-                                                providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
-                                                  entry.item_type_scope,
-                                                  "stitched_report_governance_registry",
-                                                ),
-                                            )
-                                            .map((entry) => (
+                                          {providerProvenanceSchedulerStitchedReportGovernancePolicyTemplates.map((entry) => (
                                               <option key={entry.policy_template_id} value={entry.policy_template_id}>
                                                 {entry.name}
                                               </option>
@@ -20721,14 +20749,7 @@ export default function App() {
                                               value={providerProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId}
                                             >
                                               <option value="">No policy template</option>
-                                              {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
-                                                .filter((entry) =>
-                                                  providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
-                                                    entry.item_type_scope,
-                                                    "stitched_report_governance_registry",
-                                                  ),
-                                                )
-                                                .map((entry) => (
+                                              {providerProvenanceSchedulerStitchedReportGovernancePolicyTemplates.map((entry) => (
                                                   <option key={entry.policy_template_id} value={entry.policy_template_id}>
                                                     {entry.name} · {formatWorkflowToken(entry.approval_lane)} · {formatWorkflowToken(entry.approval_priority)}
                                                   </option>
@@ -20941,14 +20962,7 @@ export default function App() {
                                             >
                                               <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
                                               <option value="">No default policy template</option>
-                                              {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
-                                                .filter((entry) =>
-                                                  providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
-                                                    entry.item_type_scope,
-                                                    "stitched_report_view",
-                                                  ),
-                                                )
-                                                .map((entry) => (
+                                              {providerProvenanceSchedulerStitchedReportGovernancePolicyTemplates.map((entry) => (
                                                   <option
                                                     key={entry.policy_template_id}
                                                     value={entry.policy_template_id}
@@ -20989,14 +21003,7 @@ export default function App() {
                                               value={providerProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId}
                                             >
                                               <option value="">No policy template</option>
-                                              {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
-                                                .filter((entry) =>
-                                                  providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
-                                                    entry.item_type_scope,
-                                                    "stitched_report_governance_registry",
-                                                  ),
-                                                )
-                                                .map((entry) => (
+                                              {providerProvenanceSchedulerStitchedReportGovernancePolicyTemplates.map((entry) => (
                                                   <option key={entry.policy_template_id} value={entry.policy_template_id}>
                                                     {entry.name} · {formatWorkflowToken(entry.approval_lane)} · {formatWorkflowToken(entry.approval_priority)}
                                                   </option>

@@ -1477,6 +1477,198 @@ export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(p
   );
 }
 
+export async function listProviderProvenanceSchedulerStitchedReportGovernancePolicyTemplates(params: {
+  actionScope?: string;
+  approvalLane?: string;
+  approvalPriority?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.actionScope?.trim()) {
+    searchParams.set("action_scope", params.actionScope.trim());
+  }
+  if (params.approvalLane?.trim()) {
+    searchParams.set("approval_lane", params.approvalLane.trim());
+  }
+  if (params.approvalPriority?.trim()) {
+    searchParams.set("approval_priority", params.approvalPriority.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 200))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-governance/policy-templates${suffix}`,
+  );
+}
+
+export async function listProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogs(params: {
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 100))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-governance/policy-catalogs${suffix}`,
+  );
+}
+
+export async function createProviderProvenanceSchedulerStitchedReportGovernancePlan(params: {
+  itemIds: string[];
+  action: "delete" | "restore" | "update";
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  queueViewPatch?: Record<string, unknown>;
+  defaultPolicyTemplateId?: string;
+  defaultPolicyCatalogId?: string;
+  policyTemplateId?: string;
+  policyCatalogId?: string;
+  approvalLane?: string;
+  approvalPriority?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    "/operator/provider-provenance-analytics/scheduler-stitched-report-governance/plans",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        item_ids: params.itemIds,
+        action: params.action,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend?.trim() ? { description_append: params.descriptionAppend.trim() } : {}),
+        ...(params.queueViewPatch ? { queue_view_patch: params.queueViewPatch } : {}),
+        ...(params.defaultPolicyTemplateId !== undefined
+          ? { default_policy_template_id: params.defaultPolicyTemplateId }
+          : {}),
+        ...(params.defaultPolicyCatalogId !== undefined
+          ? { default_policy_catalog_id: params.defaultPolicyCatalogId }
+          : {}),
+        ...(params.policyTemplateId?.trim() ? { policy_template_id: params.policyTemplateId.trim() } : {}),
+        ...(params.policyCatalogId?.trim() ? { policy_catalog_id: params.policyCatalogId.trim() } : {}),
+        ...(params.approvalLane?.trim() ? { approval_lane: params.approvalLane.trim() } : {}),
+        ...(params.approvalPriority?.trim() ? { approval_priority: params.approvalPriority.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerStitchedReportGovernancePlans(params: {
+  status?: string;
+  queueState?: string;
+  approvalLane?: string;
+  approvalPriority?: string;
+  policyTemplateId?: string;
+  policyCatalogId?: string;
+  search?: string;
+  sort?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.status?.trim()) {
+    searchParams.set("status", params.status.trim());
+  }
+  if (params.queueState?.trim()) {
+    searchParams.set("queue_state", params.queueState.trim());
+  }
+  if (params.approvalLane?.trim()) {
+    searchParams.set("approval_lane", params.approvalLane.trim());
+  }
+  if (params.approvalPriority?.trim()) {
+    searchParams.set("approval_priority", params.approvalPriority.trim());
+  }
+  if (params.policyTemplateId !== undefined) {
+    searchParams.set("policy_template_id", params.policyTemplateId);
+  }
+  if (params.policyCatalogId !== undefined) {
+    searchParams.set("policy_catalog_id", params.policyCatalogId);
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (params.sort?.trim()) {
+    searchParams.set("sort", params.sort.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 100))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlanListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-governance/plans${suffix}`,
+  );
+}
+
+export async function approveProviderProvenanceSchedulerStitchedReportGovernancePlan(params: {
+  planId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  note?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-governance/plans/${encodeURIComponent(params.planId)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.note?.trim() ? { note: params.note.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function applyProviderProvenanceSchedulerStitchedReportGovernancePlan(params: {
+  planId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-governance/plans/${encodeURIComponent(params.planId)}/apply`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function rollbackProviderProvenanceSchedulerStitchedReportGovernancePlan(params: {
+  planId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  note?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
+    `/operator/provider-provenance-analytics/scheduler-stitched-report-governance/plans/${encodeURIComponent(params.planId)}/rollback`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.note?.trim() ? { note: params.note.trim() } : {}),
+      }),
+    },
+  );
+}
+
 export async function createProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate(params: {
   name: string;
   description?: string;

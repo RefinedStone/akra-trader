@@ -104,6 +104,9 @@ unclear dataset lineage.
   approval queue and stitched-governance-registry policy-catalog surface, so registry bundle
   review and queue-defaulting can stay in the stitched handoff surface instead of detouring
   through the generic scheduler governance queue
+- those same stitched-governance-registry policy templates, policy catalogs, and staged plans
+  now also live in their own stitched-registry governance record layer and API surface, so
+  stitched handoff approvals no longer depend on the generic scheduler governance backing store
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

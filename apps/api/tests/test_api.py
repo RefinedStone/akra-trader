@@ -691,6 +691,56 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "limit",
     "app",
   )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_stitched_report_governance_policy_templates"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "action_scope",
+    "approval_lane",
+    "approval_priority",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_stitched_report_governance_policy_catalogs"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_stitched_report_governance_plan"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_stitched_report_governance_plans"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "status",
+    "queue_state",
+    "approval_lane",
+    "approval_priority",
+    "policy_template_id",
+    "policy_catalog_id",
+    "search",
+    "sort",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["approve_operator_provider_provenance_scheduler_stitched_report_governance_plan"].endpoint).parameters) == (
+    "plan_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["apply_operator_provider_provenance_scheduler_stitched_report_governance_plan"].endpoint).parameters) == (
+    "plan_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["rollback_operator_provider_provenance_scheduler_stitched_report_governance_plan"].endpoint).parameters) == (
+    "plan_id",
+    "request",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_narrative_template"].endpoint).parameters) == (
     "request",
     "app",

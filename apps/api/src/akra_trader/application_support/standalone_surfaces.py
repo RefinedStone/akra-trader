@@ -903,6 +903,87 @@ def execute_standalone_surface_binding(
         limit=resolved_filters.get("limit", 50),
       )
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_policy_template_list":
+    return serialize_provider_provenance_scheduler_narrative_governance_policy_template_list(
+      app.list_provider_provenance_scheduler_narrative_governance_policy_templates(
+        item_type_scope="stitched_report_governance_registry",
+        action_scope=resolved_filters.get("action_scope"),
+        approval_lane=resolved_filters.get("approval_lane"),
+        approval_priority=resolved_filters.get("approval_priority"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_policy_catalog_list":
+    return serialize_provider_provenance_scheduler_narrative_governance_policy_catalog_list(
+      app.list_provider_provenance_scheduler_narrative_governance_policy_catalogs(
+        item_type_scope="stitched_report_governance_registry",
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 20),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_plan_create":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.create_provider_provenance_scheduler_narrative_governance_plan(
+        item_type="stitched_report_governance_registry",
+        item_ids=resolved_payload.get("item_ids", ()),
+        action=resolved_payload.get("action", ""),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        queue_view_patch=resolved_payload.get("queue_view_patch"),
+        default_policy_template_id=resolved_payload.get("default_policy_template_id"),
+        default_policy_catalog_id=resolved_payload.get("default_policy_catalog_id"),
+        policy_template_id=resolved_payload.get("policy_template_id"),
+        policy_catalog_id=resolved_payload.get("policy_catalog_id"),
+        approval_lane=resolved_payload.get("approval_lane"),
+        approval_priority=resolved_payload.get("approval_priority"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_plan_list":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_list(
+      app.list_provider_provenance_scheduler_narrative_governance_plans(
+        item_type="stitched_report_governance_registry",
+        status=resolved_filters.get("status"),
+        queue_state=resolved_filters.get("queue_state"),
+        approval_lane=resolved_filters.get("approval_lane"),
+        approval_priority=resolved_filters.get("approval_priority"),
+        policy_template_id=resolved_filters.get("policy_template_id"),
+        policy_catalog_id=resolved_filters.get("policy_catalog_id"),
+        search=resolved_filters.get("search"),
+        sort=resolved_filters.get("sort"),
+        limit=resolved_filters.get("limit", 20),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_plan_approve":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.approve_provider_provenance_scheduler_narrative_governance_plan(
+        resolved_path_params["plan_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        note=resolved_payload.get("note"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_plan_apply":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.apply_provider_provenance_scheduler_narrative_governance_plan(
+        resolved_path_params["plan_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_stitched_report_governance_plan_rollback":
+    return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
+      app.rollback_provider_provenance_scheduler_narrative_governance_plan(
+        resolved_path_params["plan_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        note=resolved_payload.get("note"),
+      )
+    )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_create":
     return serialize_provider_provenance_scheduler_narrative_template_record(
       app.create_provider_provenance_scheduler_narrative_template(

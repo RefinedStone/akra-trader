@@ -15250,6 +15250,13 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_stitched_report_governance_registry_revision_restore",
     "operator_provider_provenance_scheduler_stitched_report_governance_registry_bulk_governance",
     "operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list",
+    "operator_provider_provenance_scheduler_stitched_report_governance_policy_template_list",
+    "operator_provider_provenance_scheduler_stitched_report_governance_policy_catalog_list",
+    "operator_provider_provenance_scheduler_stitched_report_governance_plan_create",
+    "operator_provider_provenance_scheduler_stitched_report_governance_plan_list",
+    "operator_provider_provenance_scheduler_stitched_report_governance_plan_approve",
+    "operator_provider_provenance_scheduler_stitched_report_governance_plan_apply",
+    "operator_provider_provenance_scheduler_stitched_report_governance_plan_rollback",
     "operator_provider_provenance_scheduler_narrative_template_create",
     "operator_provider_provenance_scheduler_narrative_template_list",
     "operator_provider_provenance_scheduler_narrative_template_update",
@@ -15482,6 +15489,27 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_audit_list"].route_path.endswith(
     "/scheduler-stitched-report-governance-registries/audits"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_policy_template_list"].filter_param_specs[0].key == (
+    "action_scope"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_policy_catalog_list"].filter_param_specs[0].key == (
+    "search"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_create"].methods == (
+    "POST",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_list"].filter_param_specs[0].key == (
+    "status"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_approve"].path_param_keys == (
+    "plan_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_apply"].path_param_keys == (
+    "plan_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_rollback"].path_param_keys == (
+    "plan_id",
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_create"].methods == ("POST",)
   assert (
@@ -17942,6 +17970,15 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert stitched_report_governance_registry_policy_template_payload["item_type_scope"] == (
     "stitched_report_governance_registry"
   )
+  stitched_report_governance_registry_policy_template_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_policy_template_list"],
+    app=app,
+    filters={"limit": 10},
+  )
+  assert stitched_report_governance_registry_policy_template_payload["policy_template_id"] in {
+    item["policy_template_id"]
+    for item in stitched_report_governance_registry_policy_template_list_payload["items"]
+  }
 
   stitched_report_view_default_policy_catalog_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create"],
@@ -17982,12 +18019,20 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert stitched_report_governance_registry_policy_catalog_payload["item_type_scope"] == (
     "stitched_report_governance_registry"
   )
+  stitched_report_governance_registry_policy_catalog_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_policy_catalog_list"],
+    app=app,
+    filters={"limit": 10},
+  )
+  assert stitched_report_governance_registry_policy_catalog_payload["catalog_id"] in {
+    item["catalog_id"]
+    for item in stitched_report_governance_registry_policy_catalog_list_payload["items"]
+  }
 
   stitched_governance_registry_governance_plan_payload = execute_standalone_surface_binding(
-    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_create"],
     app=app,
     request_payload={
-      "item_type": "stitched_report_governance_registry",
       "item_ids": [
         stitched_governance_registry_payload["registry_id"],
         secondary_stitched_governance_registry_payload["registry_id"],
@@ -18045,10 +18090,9 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
 
   stitched_governance_registry_governance_plan_list_payload = execute_standalone_surface_binding(
-    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"],
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_list"],
     app=app,
     filters={
-      "item_type": "stitched_report_governance_registry",
       "status": "previewed",
       "limit": 10,
     },
@@ -18059,7 +18103,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   }
 
   approved_stitched_governance_registry_plan_payload = execute_standalone_surface_binding(
-    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_approve"],
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_approve"],
     app=app,
     path_params={"plan_id": stitched_governance_registry_governance_plan_payload["plan_id"]},
     request_payload={
@@ -18071,7 +18115,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert approved_stitched_governance_registry_plan_payload["status"] == "approved"
 
   applied_stitched_governance_registry_plan_payload = execute_standalone_surface_binding(
-    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_apply"],
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_apply"],
     app=app,
     path_params={"plan_id": stitched_governance_registry_governance_plan_payload["plan_id"]},
     request_payload={
@@ -18108,7 +18152,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
 
   rolled_back_stitched_governance_registry_plan_payload = execute_standalone_surface_binding(
-    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_rollback"],
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_plan_rollback"],
     app=app,
     path_params={"plan_id": stitched_governance_registry_governance_plan_payload["plan_id"]},
     request_payload={

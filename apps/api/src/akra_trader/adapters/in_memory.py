@@ -345,7 +345,15 @@ class InMemoryRunRepository(RunRepositoryPort):
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
     ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_policy_templates: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
+    ] = OrderedDict()
     self._provider_provenance_scheduler_narrative_governance_policy_template_revisions: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_policy_template_revisions: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord,
     ] = OrderedDict()
@@ -353,7 +361,15 @@ class InMemoryRunRepository(RunRepositoryPort):
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
     ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
+    ] = OrderedDict()
     self._provider_provenance_scheduler_narrative_governance_policy_catalogs: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalogs: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
     ] = OrderedDict()
@@ -361,7 +377,15 @@ class InMemoryRunRepository(RunRepositoryPort):
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord,
     ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord,
+    ] = OrderedDict()
     self._provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
     ] = OrderedDict()
@@ -378,6 +402,10 @@ class InMemoryRunRepository(RunRepositoryPort):
       ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord,
     ] = OrderedDict()
     self._provider_provenance_scheduler_narrative_governance_plans: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_stitched_report_governance_plans: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
     ] = OrderedDict()
@@ -1109,6 +1137,82 @@ class InMemoryRunRepository(RunRepositoryPort):
       )
     )
 
+  def save_provider_provenance_scheduler_stitched_report_governance_policy_template(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_policy_templates[
+      record.policy_template_id
+    ] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_policy_templates(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_policy_templates.values(),
+        key=lambda record: (record.updated_at, record.policy_template_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_policy_template(
+    self,
+    policy_template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord | None:
+    return self._provider_provenance_scheduler_stitched_report_governance_policy_templates.get(
+      policy_template_id
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_governance_policy_template_revision(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_policy_template_revisions[
+      record.revision_id
+    ] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_policy_template_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_policy_template_revisions.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_policy_template_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord | None:
+    return self._provider_provenance_scheduler_stitched_report_governance_policy_template_revisions.get(
+      revision_id
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_governance_policy_template_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records[
+      record.audit_id
+    ] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records.values(),
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
   def save_provider_provenance_scheduler_narrative_governance_policy_catalog(
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
@@ -1172,6 +1276,78 @@ class InMemoryRunRepository(RunRepositoryPort):
     return tuple(
       sorted(
         self._provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records.values(),
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_governance_policy_catalog(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalogs[record.catalog_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_policy_catalogs(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_policy_catalogs.values(),
+        key=lambda record: (record.updated_at, record.catalog_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_policy_catalog(
+    self,
+    catalog_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord | None:
+    return self._provider_provenance_scheduler_stitched_report_governance_policy_catalogs.get(catalog_id)
+
+  def save_provider_provenance_scheduler_stitched_report_governance_policy_catalog_revision(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions[
+      record.revision_id
+    ] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_policy_catalog_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord | None:
+    return self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions.get(
+      revision_id
+    )
+
+  def save_provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records[
+      record.audit_id
+    ] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records.values(),
         key=lambda record: (record.recorded_at, record.audit_id),
         reverse=True,
       )
@@ -1276,6 +1452,30 @@ class InMemoryRunRepository(RunRepositoryPort):
     plan_id: str,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord | None:
     return self._provider_provenance_scheduler_narrative_governance_plans.get(plan_id)
+
+  def save_provider_provenance_scheduler_stitched_report_governance_plan(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
+    self._provider_provenance_scheduler_stitched_report_governance_plans[record.plan_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_stitched_report_governance_plans(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_stitched_report_governance_plans.values(),
+        key=lambda record: (record.updated_at, record.plan_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_plan(
+    self,
+    plan_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord | None:
+    return self._provider_provenance_scheduler_stitched_report_governance_plans.get(plan_id)
 
   def save_provider_provenance_scheduled_report_audit_record(
     self,
