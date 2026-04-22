@@ -9,6 +9,7 @@ from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunRecord
 
 from . import launches
+from . import live_workflows
 from . import queries
 from . import reruns
 from . import support
@@ -136,7 +137,7 @@ class RunExecutionFlow:
     tags: Iterable[str] = (),
     preset_id: str | None = None,
     benchmark_family: str | None = None,
-  ) -> RunRecord:
+    ) -> RunRecord:
     return launches.start_paper_run(
       self,
       strategy_id=strategy_id,
@@ -154,11 +155,50 @@ class RunExecutionFlow:
       benchmark_family=benchmark_family,
     )
 
+  def start_live_run(
+    self,
+    *,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    initial_cash: float,
+    fee_rate: float,
+    slippage_bps: float,
+    parameters: dict,
+    replay_bars: int | None = 96,
+    operator_reason: str = "guarded_live_launch",
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
+  ) -> RunRecord:
+    return live_workflows.start_live_run(
+      self,
+      strategy_id=strategy_id,
+      symbol=symbol,
+      timeframe=timeframe,
+      initial_cash=initial_cash,
+      fee_rate=fee_rate,
+      slippage_bps=slippage_bps,
+      parameters=parameters,
+      replay_bars=replay_bars,
+      operator_reason=operator_reason,
+      start_at=start_at,
+      end_at=end_at,
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
+    )
+
   def start_sandbox_session(self, **kwargs: Any) -> RunRecord:
     return launches.start_sandbox_session(self, **kwargs)
 
   def start_paper_session(self, **kwargs: Any) -> RunRecord:
     return launches.start_paper_session(self, **kwargs)
+
+  def start_live_session(self, **kwargs: Any) -> RunRecord:
+    return live_workflows.start_live_session(self, **kwargs)
 
   def start_native_session(self, **kwargs: Any) -> RunRecord:
     return launches.start_native_session(self, **kwargs)
@@ -209,3 +249,66 @@ class RunExecutionFlow:
 
   def resolve_preview_rerun_window(self, run: RunRecord) -> tuple[datetime | None, datetime | None, int | None]:
     return support.resolve_preview_rerun_window(run)
+
+  def stop_live_run(self, run_id: str) -> RunRecord | None:
+    return live_workflows.stop_live_run(self, run_id)
+
+  def resume_guarded_live_run(
+    self,
+    *,
+    actor: str,
+    reason: str,
+  ) -> RunRecord:
+    return live_workflows.resume_guarded_live_run(
+      self,
+      actor=actor,
+      reason=reason,
+    )
+
+  def cancel_live_order(
+    self,
+    *,
+    run_id: str,
+    order_id: str,
+    actor: str,
+    reason: str,
+  ) -> RunRecord:
+    return live_workflows.cancel_live_order(
+      self,
+      run_id=run_id,
+      order_id=order_id,
+      actor=actor,
+      reason=reason,
+    )
+
+  def replace_live_order(
+    self,
+    *,
+    run_id: str,
+    order_id: str,
+    price: float,
+    quantity: float | None,
+    actor: str,
+    reason: str,
+  ) -> RunRecord:
+    return live_workflows.replace_live_order(
+      self,
+      run_id=run_id,
+      order_id=order_id,
+      price=price,
+      quantity=quantity,
+      actor=actor,
+      reason=reason,
+    )
+
+  def ensure_operator_control_runtime_allowed(self, mode: RunMode) -> None:
+    live_workflows.ensure_operator_control_runtime_allowed(self, mode)
+
+  def ensure_guarded_live_worker_start_allowed(self) -> None:
+    live_workflows.ensure_guarded_live_worker_start_allowed(self)
+
+  def ensure_guarded_live_live_order_replace_allowed(self) -> None:
+    live_workflows.ensure_guarded_live_live_order_replace_allowed(self)
+
+  def ensure_guarded_live_resume_allowed(self) -> None:
+    live_workflows.ensure_guarded_live_resume_allowed(self)
