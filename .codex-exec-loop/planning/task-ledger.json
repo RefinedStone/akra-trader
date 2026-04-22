@@ -916,18 +916,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add bulk governance and team audit workflows for saved stitched report views",
       "description": "Extend the stitched report saved-view surface beyond per-view lifecycle management by adding bulk governance actions, team-shared audit visibility, and operator-safe review workflows so saved stitched report views can be governed as a dedicated surface instead of only edited one record at a time.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 78,
       "dynamic_priority_delta": 27,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:30:00+09:00",
+      "updated_at": "2026-04-22T20:25:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-stitched-report-saved-view-management"
       ],
-      "direction_relation_note": "The latest main-session reply says saved stitched report views now have full lifecycle workflow, but this dedicated surface still does not have its own bulk governance or team audit layer.",
-      "priority_reason": "Promoted to ready because the operator explicitly wants the next queued task, and this is the closest executable continuation named by the latest main-session reply; broader scheduler narrative search remains separate larger-scope follow-up work."
+      "direction_relation_note": "Completed on main in commit 20efc63 with stitched report view bulk governance actions, dedicated team-audit list and filters, and related control-room consumers wired across backend persistence, standalone surfaces, and web workflows.",
+      "priority_reason": "Closed after backend governance and audit surfaces, control-room multi-select and audit filtering flows, targeted pytest coverage, compileall verification, web typecheck/build, docs updates, commit, and push all landed; the latest main-session reply now leaves stitched-report-specific staged approval or policy layering plus the broader deeper scheduler narrative search gap."
+    },
+    {
+      "id": "task-b1-provider-market-context-stitched-report-approval-policy-layer",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add staged approval and reusable policy layer for saved stitched report views",
+      "description": "Extend the newly governed saved stitched report view surface with staged approval workflows and reusable governance policy records so bulk edits, deletes, restores, and rollout decisions can be reviewed and applied under durable operator rules instead of immediate direct actions.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 28,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T20:25:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-stitched-report-governance-audit-layer"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says saved stitched report views now cover bulk governance and team audit, but this dedicated surface still lacks its own staged approval and reusable policy layer.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and the latest main-session reply names this as the nearest dedicated-surface follow-up, while deeper scheduler narrative search remains a broader parallel gap."
     },
     {
       "id": "task-b1-provider-market-context-hierarchy-step-template-queue-view-workspace",
@@ -1083,7 +1101,7 @@
       "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:30:00+09:00",
+      "updated_at": "2026-04-22T20:25:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
@@ -1091,8 +1109,8 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-templates",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 4b8c228 still calls out deeper server-side scheduler narrative search as the larger unchanged open area even after stitched report saved-view lifecycle workflows shipped.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the newly explicit stitched report bulk-governance or audit gap so builtin next-task advances through the nearest dedicated-surface continuation before taking on the broader search expansion."
+      "direction_relation_note": "The latest main-session reply after commit 20efc63 still calls out deeper server-side scheduler narrative search as the larger unchanged open area even after stitched report bulk governance and team audit workflows shipped.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the more immediate stitched-report staged approval or policy-layer gap so builtin next-task advances through the nearest dedicated-surface continuation before taking on the broader search expansion."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
