@@ -360,6 +360,42 @@ from akra_trader.application_support.provider_governance_orchestration import (
 from akra_trader.application_support.provider_governance_orchestration import (
   stage_provider_provenance_scheduler_search_moderation_catalog_governance_plan as stage_provider_provenance_scheduler_search_moderation_catalog_governance_plan_support,
 )
+from akra_trader.application_support.provider_governance_persistence import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_records as list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_records_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_records as list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_records_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records as list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records as list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records as list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records as list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record as save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_record as save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_record_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record as save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record as save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record as save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record_support,
+)
+from akra_trader.application_support.provider_governance_persistence import (
+  save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record as save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record_support,
+)
 from akra_trader.application_support.provider_governance_records import (
   get_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record as get_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record_support,
 )
@@ -3222,102 +3258,96 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord,
   ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord:
-    return (
-      self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record(
-        record
-      )
+    return save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record_support(
+      self,
+      record,
     )
 
   def _list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord, ...]:
-    return tuple(
-      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records()
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records_support(
+      self
     )
 
   def _save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
     self,
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord,
   ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
-    return (
-      self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
-        record
-      )
+    return save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record_support(
+      self,
+      record,
     )
 
   def _list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord, ...]:
-    return tuple(
-      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records()
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records_support(
+      self
     )
 
   def _save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
     self,
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord,
   ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord:
-    return (
-      self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
-        record
-      )
+    return save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record_support(
+      self,
+      record,
     )
 
   def _list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord, ...]:
-    return tuple(
-      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records()
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records_support(
+      self
     )
 
   def _save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
     self,
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord,
   ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord:
-    return (
-      self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
-        record
-      )
+    return save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record_support(
+      self,
+      record,
     )
 
   def _list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord, ...]:
-    return tuple(
-      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records()
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records_support(
+      self
     )
 
   def _save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_record(
     self,
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord,
   ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord:
-    return (
-      self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_record(
-        record
-      )
+    return save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_record_support(
+      self,
+      record,
     )
 
   def _list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord, ...]:
-    return tuple(
-      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_records()
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_records_support(
+      self
     )
 
   def _save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record(
     self,
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord,
   ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord:
-    return (
-      self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record(
-        record
-      )
+    return save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record_support(
+      self,
+      record,
     )
 
   def _list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord, ...]:
-    return tuple(
-      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_records()
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_records_support(
+      self
     )
 
   def _provider_provenance_scheduler_search_persistence_mode(self) -> str:
