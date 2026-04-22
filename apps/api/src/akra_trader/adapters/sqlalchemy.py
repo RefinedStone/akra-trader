@@ -63,6 +63,48 @@ from akra_trader.ports import RunRepositoryPort
 
 
 metadata = MetaData()
+
+_COMPACT_SQL_TABLE_NAMES: dict[str, str] = {
+  "replay_intent_alias_audit_export_job_audit_records": "ria_export_job_audit",
+  "provider_provenance_scheduler_stitched_report_views": "pp_sched_stitch_views",
+  "provider_provenance_scheduler_stitched_report_view_revisions": "pp_sched_stitch_view_rev",
+  "provider_provenance_scheduler_stitched_report_view_audit_records": "pp_sched_stitch_view_audit",
+  "provider_provenance_scheduler_stitched_report_governance_registries": "pp_sched_stitch_gov_reg",
+  "provider_provenance_scheduler_stitched_report_governance_registry_audit_records": "pp_sched_stitch_gov_reg_audit",
+  "provider_provenance_scheduler_stitched_report_governance_registry_revisions": "pp_sched_stitch_gov_reg_rev",
+  "provider_provenance_scheduler_narrative_templates": "pp_sched_narr_tmpl",
+  "provider_provenance_scheduler_narrative_template_revisions": "pp_sched_narr_tmpl_rev",
+  "provider_provenance_scheduler_narrative_registry": "pp_sched_narr_reg",
+  "provider_provenance_scheduler_narrative_registry_revisions": "pp_sched_narr_reg_rev",
+  "provider_provenance_scheduler_narrative_governance_policy_templates": "pp_sched_narr_gov_poltmpl",
+  "provider_provenance_scheduler_narrative_governance_policy_template_revisions": "pp_sched_narr_gov_poltmpl_rev",
+  "provider_provenance_scheduler_narrative_governance_policy_template_audit_records": "pp_sched_narr_gov_poltmpl_audit",
+  "provider_provenance_scheduler_stitched_report_governance_policy_templates": "pp_sched_stitch_gov_poltmpl",
+  "provider_provenance_scheduler_stitched_report_governance_policy_template_revisions": "pp_sched_stitch_gov_poltmpl_rev",
+  "provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records": "pp_sched_stitch_gov_poltmpl_audit",
+  "provider_provenance_scheduler_narrative_governance_policy_catalogs": "pp_sched_narr_gov_polcat",
+  "provider_provenance_scheduler_narrative_governance_policy_catalog_revisions": "pp_sched_narr_gov_polcat_rev",
+  "provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records": "pp_sched_narr_gov_polcat_audit",
+  "provider_provenance_scheduler_stitched_report_governance_policy_catalogs": "pp_sched_stitch_gov_polcat",
+  "provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions": "pp_sched_stitch_gov_polcat_rev",
+  "provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records": "pp_sched_stitch_gov_polcat_audit",
+  "provider_provenance_scheduler_narrative_governance_hierarchy_step_templates": "pp_sched_narr_gov_hierstep",
+  "provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions": "pp_sched_narr_gov_hierstep_rev",
+  "provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records": "pp_sched_narr_gov_hierstep_audit",
+  "provider_provenance_scheduler_narrative_governance_plans": "pp_sched_narr_gov_plan",
+  "provider_provenance_scheduler_stitched_report_governance_plans": "pp_sched_stitch_gov_plan",
+  "provider_provenance_scheduled_report_audit_records": "pp_sched_report_audit",
+}
+
+
+def _sql_table_name(logical_name: str) -> str:
+  return _COMPACT_SQL_TABLE_NAMES.get(logical_name, logical_name)
+
+
+def _quote_identifier(identifier: str) -> str:
+  return f"\"{identifier.replace('\"', '\"\"')}\""
+
+
 run_records = Table(
   "run_records",
   metadata,
@@ -138,7 +180,7 @@ replay_intent_alias_audit_export_artifacts = Table(
   Column("payload", JSON, nullable=False),
 )
 replay_intent_alias_audit_export_job_audit_records = Table(
-  "replay_intent_alias_audit_export_job_audit_records",
+  _sql_table_name("replay_intent_alias_audit_export_job_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("job_id", String, nullable=False, index=True),
@@ -202,7 +244,7 @@ provider_provenance_dashboard_views = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_views = Table(
-  "provider_provenance_scheduler_stitched_report_views",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_views"),
   metadata,
   Column("view_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -211,7 +253,7 @@ provider_provenance_scheduler_stitched_report_views = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_view_revisions = Table(
-  "provider_provenance_scheduler_stitched_report_view_revisions",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_view_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("view_id", String, nullable=False, index=True),
@@ -220,7 +262,7 @@ provider_provenance_scheduler_stitched_report_view_revisions = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_view_audit_records = Table(
-  "provider_provenance_scheduler_stitched_report_view_audit_records",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_view_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("view_id", String, nullable=False, index=True),
@@ -229,7 +271,7 @@ provider_provenance_scheduler_stitched_report_view_audit_records = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_registries = Table(
-  "provider_provenance_scheduler_stitched_report_governance_registries",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_registries"),
   metadata,
   Column("registry_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -239,7 +281,7 @@ provider_provenance_scheduler_stitched_report_governance_registries = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_registry_audit_records = Table(
-  "provider_provenance_scheduler_stitched_report_governance_registry_audit_records",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_registry_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("registry_id", String, nullable=False, index=True),
@@ -248,7 +290,7 @@ provider_provenance_scheduler_stitched_report_governance_registry_audit_records 
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_registry_revisions = Table(
-  "provider_provenance_scheduler_stitched_report_governance_registry_revisions",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_registry_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("registry_id", String, nullable=False, index=True),
@@ -270,7 +312,7 @@ provider_provenance_scheduled_reports = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_templates = Table(
-  "provider_provenance_scheduler_narrative_templates",
+  _sql_table_name("provider_provenance_scheduler_narrative_templates"),
   metadata,
   Column("template_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -279,7 +321,7 @@ provider_provenance_scheduler_narrative_templates = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_template_revisions = Table(
-  "provider_provenance_scheduler_narrative_template_revisions",
+  _sql_table_name("provider_provenance_scheduler_narrative_template_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("template_id", String, nullable=False, index=True),
@@ -288,7 +330,7 @@ provider_provenance_scheduler_narrative_template_revisions = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_registry = Table(
-  "provider_provenance_scheduler_narrative_registry",
+  _sql_table_name("provider_provenance_scheduler_narrative_registry"),
   metadata,
   Column("registry_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -298,7 +340,7 @@ provider_provenance_scheduler_narrative_registry = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_registry_revisions = Table(
-  "provider_provenance_scheduler_narrative_registry_revisions",
+  _sql_table_name("provider_provenance_scheduler_narrative_registry_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("registry_id", String, nullable=False, index=True),
@@ -307,7 +349,7 @@ provider_provenance_scheduler_narrative_registry_revisions = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_policy_templates = Table(
-  "provider_provenance_scheduler_narrative_governance_policy_templates",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_policy_templates"),
   metadata,
   Column("policy_template_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -320,7 +362,7 @@ provider_provenance_scheduler_narrative_governance_policy_templates = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_policy_template_revisions = Table(
-  "provider_provenance_scheduler_narrative_governance_policy_template_revisions",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_policy_template_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("policy_template_id", String, nullable=False, index=True),
@@ -329,7 +371,7 @@ provider_provenance_scheduler_narrative_governance_policy_template_revisions = T
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_policy_template_audit_records = Table(
-  "provider_provenance_scheduler_narrative_governance_policy_template_audit_records",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_policy_template_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("policy_template_id", String, nullable=False, index=True),
@@ -339,7 +381,7 @@ provider_provenance_scheduler_narrative_governance_policy_template_audit_records
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_policy_templates = Table(
-  "provider_provenance_scheduler_stitched_report_governance_policy_templates",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_policy_templates"),
   metadata,
   Column("policy_template_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -352,7 +394,7 @@ provider_provenance_scheduler_stitched_report_governance_policy_templates = Tabl
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_policy_template_revisions = Table(
-  "provider_provenance_scheduler_stitched_report_governance_policy_template_revisions",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_policy_template_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("policy_template_id", String, nullable=False, index=True),
@@ -361,7 +403,7 @@ provider_provenance_scheduler_stitched_report_governance_policy_template_revisio
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records = Table(
-  "provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_policy_template_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("policy_template_id", String, nullable=False, index=True),
@@ -371,7 +413,7 @@ provider_provenance_scheduler_stitched_report_governance_policy_template_audit_r
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_policy_catalogs = Table(
-  "provider_provenance_scheduler_narrative_governance_policy_catalogs",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_policy_catalogs"),
   metadata,
   Column("catalog_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -385,7 +427,7 @@ provider_provenance_scheduler_narrative_governance_policy_catalogs = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_policy_catalog_revisions = Table(
-  "provider_provenance_scheduler_narrative_governance_policy_catalog_revisions",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_policy_catalog_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("catalog_id", String, nullable=False, index=True),
@@ -394,7 +436,7 @@ provider_provenance_scheduler_narrative_governance_policy_catalog_revisions = Ta
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records = Table(
-  "provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("catalog_id", String, nullable=False, index=True),
@@ -404,7 +446,7 @@ provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records 
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_policy_catalogs = Table(
-  "provider_provenance_scheduler_stitched_report_governance_policy_catalogs",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_policy_catalogs"),
   metadata,
   Column("catalog_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -418,7 +460,7 @@ provider_provenance_scheduler_stitched_report_governance_policy_catalogs = Table
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions = Table(
-  "provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_policy_catalog_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("catalog_id", String, nullable=False, index=True),
@@ -427,7 +469,7 @@ provider_provenance_scheduler_stitched_report_governance_policy_catalog_revision
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records = Table(
-  "provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("catalog_id", String, nullable=False, index=True),
@@ -437,7 +479,7 @@ provider_provenance_scheduler_stitched_report_governance_policy_catalog_audit_re
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_hierarchy_step_templates = Table(
-  "provider_provenance_scheduler_narrative_governance_hierarchy_step_templates",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_hierarchy_step_templates"),
   metadata,
   Column("hierarchy_step_template_id", String, primary_key=True),
   Column("name", String, nullable=False, index=True),
@@ -448,7 +490,7 @@ provider_provenance_scheduler_narrative_governance_hierarchy_step_templates = Ta
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions = Table(
-  "provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revisions"),
   metadata,
   Column("revision_id", String, primary_key=True),
   Column("hierarchy_step_template_id", String, nullable=False, index=True),
@@ -457,7 +499,7 @@ provider_provenance_scheduler_narrative_governance_hierarchy_step_template_revis
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records = Table(
-  "provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("hierarchy_step_template_id", String, nullable=False, index=True),
@@ -467,7 +509,7 @@ provider_provenance_scheduler_narrative_governance_hierarchy_step_template_audit
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_narrative_governance_plans = Table(
-  "provider_provenance_scheduler_narrative_governance_plans",
+  _sql_table_name("provider_provenance_scheduler_narrative_governance_plans"),
   metadata,
   Column("plan_id", String, primary_key=True),
   Column("item_type", String, nullable=False, index=True),
@@ -481,7 +523,7 @@ provider_provenance_scheduler_narrative_governance_plans = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduler_stitched_report_governance_plans = Table(
-  "provider_provenance_scheduler_stitched_report_governance_plans",
+  _sql_table_name("provider_provenance_scheduler_stitched_report_governance_plans"),
   metadata,
   Column("plan_id", String, primary_key=True),
   Column("item_type", String, nullable=False, index=True),
@@ -495,7 +537,7 @@ provider_provenance_scheduler_stitched_report_governance_plans = Table(
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduled_report_audit_records = Table(
-  "provider_provenance_scheduled_report_audit_records",
+  _sql_table_name("provider_provenance_scheduled_report_audit_records"),
   metadata,
   Column("audit_id", String, primary_key=True),
   Column("report_id", String, nullable=False, index=True),
@@ -627,6 +669,7 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
     self._engine = _build_engine(database_url)
+    self._ensure_schema(prepare_only=True)
     metadata.create_all(self._engine)
     self._ensure_schema()
 
@@ -3422,160 +3465,110 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       "payload": payload,
     }
 
-  def _ensure_schema(self) -> None:
-    inspector = inspect(self._engine)
-    existing_columns = {
-      column["name"]
-      for column in inspector.get_columns("run_records")
-    }
-    missing_columns = {
-      "strategy_id": "TEXT",
-      "strategy_version": "TEXT",
-      "rerun_boundary_id": "TEXT",
-      "dataset_identity": "TEXT",
-      "preset_id": "TEXT",
-      "benchmark_family": "TEXT",
-    }
+  def _ensure_schema(self, *, prepare_only: bool = False) -> None:
     with self._engine.begin() as connection:
-      for column_name, column_type in missing_columns.items():
-        if column_name in existing_columns:
+      self._best_effort_migrate_compact_identifiers(connection)
+      inspector = inspect(connection)
+      existing_tables = set(inspector.get_table_names())
+      if run_records.name in existing_tables:
+        existing_columns = {
+          column["name"]
+          for column in inspector.get_columns(run_records.name)
+        }
+        missing_columns = {
+          "strategy_id": "TEXT",
+          "strategy_version": "TEXT",
+          "rerun_boundary_id": "TEXT",
+          "dataset_identity": "TEXT",
+          "preset_id": "TEXT",
+          "benchmark_family": "TEXT",
+        }
+        for column_name, column_type in missing_columns.items():
+          if column_name in existing_columns:
+            continue
+          connection.exec_driver_sql(
+            f"ALTER TABLE {_quote_identifier(run_records.name)} "
+            f"ADD COLUMN {_quote_identifier(column_name)} {column_type}"
+          )
+      if prepare_only:
+        return
+      inspector = inspect(connection)
+      existing_tables = set(inspector.get_table_names())
+      for table in metadata.sorted_tables:
+        if table.name not in existing_tables:
           continue
+        existing_indexes = {
+          index["name"]
+          for index in inspector.get_indexes(table.name)
+        }
+        for index in table.indexes:
+          if not index.name or index.name in existing_indexes:
+            continue
+          column_names = [column.name for column in index.columns]
+          if not column_names:
+            continue
+          quoted_columns = ", ".join(_quote_identifier(column_name) for column_name in column_names)
+          connection.exec_driver_sql(
+            f"CREATE INDEX IF NOT EXISTS {_quote_identifier(index.name)} "
+            f"ON {_quote_identifier(table.name)} ({quoted_columns})"
+          )
+
+  def _best_effort_migrate_compact_identifiers(self, connection) -> None:
+    if connection.dialect.name != "sqlite":
+      return
+    inspector = inspect(connection)
+    existing_tables = set(inspector.get_table_names())
+    for legacy_table_name, compact_table_name in _COMPACT_SQL_TABLE_NAMES.items():
+      if legacy_table_name not in existing_tables:
+        continue
+      if compact_table_name in existing_tables:
+        legacy_columns = [
+          column["name"]
+          for column in inspect(connection).get_columns(legacy_table_name)
+        ]
+        compact_columns = {
+          column["name"]
+          for column in inspect(connection).get_columns(compact_table_name)
+        }
+        shared_columns = [
+          column_name
+          for column_name in legacy_columns
+          if column_name in compact_columns
+        ]
+        if shared_columns:
+          quoted_columns = ", ".join(_quote_identifier(column_name) for column_name in shared_columns)
+          connection.exec_driver_sql(
+            f"INSERT OR IGNORE INTO {_quote_identifier(compact_table_name)} ({quoted_columns}) "
+            f"SELECT {quoted_columns} FROM {_quote_identifier(legacy_table_name)}"
+          )
+        connection.exec_driver_sql(f"DROP TABLE {_quote_identifier(legacy_table_name)}")
+      else:
         connection.exec_driver_sql(
-          f"ALTER TABLE run_records ADD COLUMN {column_name} {column_type}"
+          f"ALTER TABLE {_quote_identifier(legacy_table_name)} "
+          f"RENAME TO {_quote_identifier(compact_table_name)}"
         )
-      for index_name, column_name in (
-        ("ix_run_records_strategy_id", "strategy_id"),
-        ("ix_run_records_strategy_version", "strategy_version"),
-        ("ix_run_records_rerun_boundary_id", "rerun_boundary_id"),
-        ("ix_run_records_dataset_identity", "dataset_identity"),
-        ("ix_run_records_preset_id", "preset_id"),
-        ("ix_run_records_benchmark_family", "benchmark_family"),
-        ("ix_run_record_tags_tag", "tag"),
-        ("ix_replay_intent_alias_records_template_key", "template_key"),
-        ("ix_replay_intent_alias_records_created_at", "created_at"),
-        ("ix_replay_intent_alias_records_expires_at", "expires_at"),
-        ("ix_replay_intent_alias_records_revoked_at", "revoked_at"),
-        ("ix_replay_intent_alias_audit_records_alias_id", "alias_id"),
-        ("ix_replay_intent_alias_audit_records_template_key", "template_key"),
-        ("ix_replay_intent_alias_audit_records_action", "action"),
-        ("ix_replay_intent_alias_audit_records_recorded_at", "recorded_at"),
-        ("ix_replay_intent_alias_audit_records_expires_at", "expires_at"),
-        ("ix_replay_intent_alias_audit_export_artifacts_job_id", "job_id"),
-        ("ix_replay_intent_alias_audit_export_artifacts_created_at", "created_at"),
-        ("ix_replay_intent_alias_audit_export_artifacts_expires_at", "expires_at"),
-        ("ix_replay_intent_alias_audit_export_jobs_template_key", "template_key"),
-        ("ix_replay_intent_alias_audit_export_jobs_export_format", "export_format"),
-        ("ix_replay_intent_alias_audit_export_jobs_status", "status"),
-        ("ix_replay_intent_alias_audit_export_jobs_created_at", "created_at"),
-        ("ix_replay_intent_alias_audit_export_jobs_expires_at", "expires_at"),
-        ("ix_replay_intent_alias_audit_export_jobs_requested_by_tab_id", "requested_by_tab_id"),
-        ("ix_replay_intent_alias_audit_export_job_audit_records_job_id", "job_id"),
-        ("ix_replay_intent_alias_audit_export_job_audit_records_action", "action"),
-        ("ix_replay_intent_alias_audit_export_job_audit_records_recorded_at", "recorded_at"),
-        ("ix_replay_intent_alias_audit_export_job_audit_records_expires_at", "expires_at"),
-        ("ix_provider_provenance_analytics_presets_name", "name"),
-        ("ix_provider_provenance_analytics_presets_updated_at", "updated_at"),
-        ("ix_provider_provenance_analytics_presets_created_by_tab_id", "created_by_tab_id"),
-        ("ix_provider_provenance_dashboard_views_name", "name"),
-        ("ix_provider_provenance_dashboard_views_preset_id", "preset_id"),
-        ("ix_provider_provenance_dashboard_views_updated_at", "updated_at"),
-        ("ix_provider_provenance_dashboard_views_created_by_tab_id", "created_by_tab_id"),
-        ("ix_provider_provenance_scheduler_stitched_report_views_name", "name"),
-        ("ix_provider_provenance_scheduler_stitched_report_views_updated_at", "updated_at"),
-        ("ix_provider_provenance_scheduler_stitched_report_views_created_by_tab_id", "created_by_tab_id"),
-        ("ix_provider_provenance_scheduler_stitched_report_view_revisions_view_id", "view_id"),
-        ("ix_provider_provenance_scheduler_stitched_report_view_revisions_action", "action"),
-        ("ix_provider_provenance_scheduler_stitched_report_view_revisions_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduler_stitched_report_view_audit_records_view_id", "view_id"),
-        ("ix_provider_provenance_scheduler_stitched_report_view_audit_records_action", "action"),
-        ("ix_provider_provenance_scheduler_stitched_report_view_audit_records_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registries_name", "name"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registries_status", "status"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registries_updated_at", "updated_at"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registries_created_by_tab_id", "created_by_tab_id"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_audit_records_registry_id", "registry_id"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_audit_records_action", "action"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_audit_records_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_revisions_registry_id", "registry_id"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_revisions_action", "action"),
-        ("ix_provider_provenance_scheduler_stitched_report_governance_registry_revisions_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduled_reports_name", "name"),
-        ("ix_provider_provenance_scheduled_reports_status", "status"),
-        ("ix_provider_provenance_scheduled_reports_cadence", "cadence"),
-        ("ix_provider_provenance_scheduled_reports_updated_at", "updated_at"),
-        ("ix_provider_provenance_scheduled_reports_next_run_at", "next_run_at"),
-        ("ix_provider_provenance_scheduled_reports_last_run_at", "last_run_at"),
-        ("ix_provider_provenance_scheduled_reports_created_by_tab_id", "created_by_tab_id"),
-        ("ix_provider_provenance_scheduler_narrative_templates_name", "name"),
-        ("ix_provider_provenance_scheduler_narrative_templates_updated_at", "updated_at"),
-        ("ix_provider_provenance_scheduler_narrative_templates_created_by_tab_id", "created_by_tab_id"),
-        ("ix_provider_provenance_scheduler_narrative_template_revisions_template_id", "template_id"),
-        ("ix_provider_provenance_scheduler_narrative_template_revisions_action", "action"),
-        ("ix_provider_provenance_scheduler_narrative_template_revisions_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduler_narrative_registry_name", "name"),
-        ("ix_provider_provenance_scheduler_narrative_registry_template_id", "template_id"),
-        ("ix_provider_provenance_scheduler_narrative_registry_updated_at", "updated_at"),
-        ("ix_provider_provenance_scheduler_narrative_registry_created_by_tab_id", "created_by_tab_id"),
-        ("ix_provider_provenance_scheduler_narrative_registry_revisions_registry_id", "registry_id"),
-        ("ix_provider_provenance_scheduler_narrative_registry_revisions_action", "action"),
-        ("ix_provider_provenance_scheduler_narrative_registry_revisions_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduled_report_audit_records_report_id", "report_id"),
-        ("ix_provider_provenance_scheduled_report_audit_records_action", "action"),
-        ("ix_provider_provenance_scheduled_report_audit_records_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduled_report_audit_records_expires_at", "expires_at"),
-        ("ix_provider_provenance_scheduler_health_records_scheduler_key", "scheduler_key"),
-        ("ix_provider_provenance_scheduler_health_records_status", "status"),
-        ("ix_provider_provenance_scheduler_health_records_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduler_health_records_expires_at", "expires_at"),
-        ("ix_provider_provenance_scheduler_search_documents_scheduler_key", "scheduler_key"),
-        ("ix_provider_provenance_scheduler_search_documents_recorded_at", "recorded_at"),
-        ("ix_provider_provenance_scheduler_search_documents_expires_at", "expires_at"),
-      ):
-        table_name = (
-          "provider_provenance_scheduler_health_records"
-          if index_name.startswith("ix_provider_provenance_scheduler_health_records_")
-          else
-          "provider_provenance_scheduler_search_documents"
-          if index_name.startswith("ix_provider_provenance_scheduler_search_documents_")
-          else
-          "provider_provenance_scheduled_report_audit_records"
-          if index_name.startswith("ix_provider_provenance_scheduled_report_audit_records_")
-          else "provider_provenance_scheduled_reports"
-          if index_name.startswith("ix_provider_provenance_scheduled_reports_")
-          else "provider_provenance_dashboard_views"
-          if index_name.startswith("ix_provider_provenance_dashboard_views_")
-          else "provider_provenance_scheduler_stitched_report_views"
-          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_views_")
-          else "provider_provenance_scheduler_stitched_report_view_revisions"
-          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_view_revisions_")
-          else "provider_provenance_scheduler_stitched_report_view_audit_records"
-          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_view_audit_records_")
-          else "provider_provenance_scheduler_stitched_report_governance_registries"
-          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_governance_registries_")
-          else "provider_provenance_scheduler_stitched_report_governance_registry_audit_records"
-          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_governance_registry_audit_records_")
-          else "provider_provenance_scheduler_stitched_report_governance_registry_revisions"
-          if index_name.startswith("ix_provider_provenance_scheduler_stitched_report_governance_registry_revisions_")
-          else "provider_provenance_analytics_presets"
-          if index_name.startswith("ix_provider_provenance_analytics_presets_")
-          else
-          "run_record_tags"
-          if index_name == "ix_run_record_tags_tag"
-          else "replay_intent_alias_audit_export_artifacts"
-            if index_name.startswith("ix_replay_intent_alias_audit_export_artifacts_")
-          else "replay_intent_alias_audit_export_job_audit_records"
-            if index_name.startswith("ix_replay_intent_alias_audit_export_job_audit_records_")
-            else "replay_intent_alias_audit_export_jobs"
-            if index_name.startswith("ix_replay_intent_alias_audit_export_jobs_")
-          else "replay_intent_alias_audit_records"
-            if index_name.startswith("ix_replay_intent_alias_audit_records_")
-            else "replay_intent_alias_records"
-            if index_name.startswith("ix_replay_intent_alias_records_")
-            else "run_records"
-        )
-        connection.exec_driver_sql(
-          f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({column_name})"
-        )
+      existing_tables.discard(legacy_table_name)
+      existing_tables.add(compact_table_name)
+    existing_indexes = {
+      row[0]
+      for row in connection.exec_driver_sql(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name IS NOT NULL"
+      ).fetchall()
+      if row[0]
+    }
+    for legacy_table_name, compact_table_name in _COMPACT_SQL_TABLE_NAMES.items():
+      compact_table = metadata.tables.get(compact_table_name)
+      if compact_table is None:
+        continue
+      for index in compact_table.indexes:
+        legacy_column_names = [column.name for column in index.columns]
+        if not legacy_column_names:
+          continue
+        legacy_index_name = f"ix_{legacy_table_name}_{'_'.join(legacy_column_names)}"
+        if legacy_index_name in existing_indexes:
+          connection.exec_driver_sql(
+            f"DROP INDEX IF EXISTS {_quote_identifier(legacy_index_name)}"
+          )
 
 
 class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):

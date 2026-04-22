@@ -44,7 +44,10 @@ class ProviderProvenanceReportSchedulerJob:
     if self._task is not None and not self._task.done():
       return
     self._stop_event = asyncio.Event()
-    await asyncio.to_thread(self.run_due_reports_once)
+    try:
+      await asyncio.to_thread(self.run_due_reports_once)
+    except Exception as exc:
+      logger.warning("Provider provenance scheduler initial cycle failed: %s", exc)
     self._task = asyncio.create_task(self._run_loop())
 
   async def stop(self) -> None:

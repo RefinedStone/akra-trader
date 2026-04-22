@@ -34,6 +34,24 @@ class FakeScheduledReportRunner:
     }
 
 
+class FlakyScheduledReportRunner(FakeScheduledReportRunner):
+  def execute_provider_provenance_scheduler_cycle(
+    self,
+    *,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+    limit: int = 25,
+  ) -> dict[str, Any]:
+    result = super().execute_provider_provenance_scheduler_cycle(
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+      limit=limit,
+    )
+    if len(self.calls) == 1:
+      raise RuntimeError("startup search backend unavailable")
+    return result
+
+
 def test_provider_provenance_scheduler_runs_startup_and_periodic_cycles() -> None:
   runner = FakeScheduledReportRunner()
 
@@ -70,3 +88,24 @@ def test_provider_provenance_scheduler_requires_positive_batch_limit() -> None:
     assert str(exc) == "batch_limit must be greater than zero"
   else:
     raise AssertionError("expected ValueError for non-positive batch_limit")
+
+
+def test_provider_provenance_scheduler_start_tolerates_initial_cycle_failure() -> None:
+  runner = FlakyScheduledReportRunner()
+
+  async def exercise() -> tuple[bool, list[dict[str, Any]]]:
+    job = ProviderProvenanceReportSchedulerJob(
+      runner,
+      interval_seconds=1,
+      batch_limit=7,
+    )
+    await job.start()
+    executed = await asyncio.to_thread(runner.executed.wait, 1.5)
+    await job.stop()
+    return executed, runner.calls
+
+  executed, calls = asyncio.run(exercise())
+
+  assert executed is True
+  assert len(calls) >= 2
+  assert calls[0]["source_tab_id"] == "system:provider-provenance-scheduler"
