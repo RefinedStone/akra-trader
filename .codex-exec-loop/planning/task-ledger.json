@@ -1460,18 +1460,54 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add staged approval queue and reusable governance policy layer for moderation policy catalogs",
       "description": "Extend the newly lifecycle-aware moderation policy catalog object with catalog-specific staged approval queue workflows and a reusable governance policy layer so catalog edits, restores, and bulk-governance changes can be reviewed and routed under durable moderation rules instead of only direct lifecycle mutations.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 75,
       "dynamic_priority_delta": 26,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T20:25:00+09:00",
+      "updated_at": "2026-04-22T21:15:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-moderation-policy-catalog-management"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says moderation policy catalogs now cover lifecycle, audit, and bulk governance, but catalog-specific staged approval queues and a reusable governance policy layer are still missing, making this the clearest executable continuation.",
-      "priority_reason": "Promoted to ready because builtin next-task should keep advancing the operator-governance sequence named in the latest main-session reply before shifting to offline reranker and learned relevance infrastructure."
+      "direction_relation_note": "Completed on main in commit 4c06160 with moderation policy catalogs gaining reusable governance-policy records, staged preview or approve or apply flows, approval-note enforcement, dedicated catalog-governance queue APIs, and matching control-room surfaces plus docs updates.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web typecheck/build, docs alignment, commit, and push all landed; the latest main-session reply now leaves governance-policy lifecycle or audit or bulk-governance depth as the immediate continuation ahead of offline reranker infrastructure."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-moderation-governance-policy-management",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add lifecycle, audit, and bulk governance workflows for moderation governance policies",
+      "description": "Deepen the newly shipped reusable moderation governance-policy layer by adding policy edit or delete or versioning flows, team audit visibility, and bulk governance actions so catalog-governance defaults can be maintained safely instead of remaining write-once records attached to catalog approval plans.",
+      "status": "done",
+      "base_priority": 76,
+      "dynamic_priority_delta": 27,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T21:25:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-moderation-policy-catalog-approval-layer"
+      ],
+      "direction_relation_note": "Completed on main in commit af84244 with moderation governance policies promoted into lifecycle objects that now support update or delete or revision list or restore, team audit visibility, durable scheduler-search persistence, and multi-select bulk governance across backend and control-room surfaces.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web typecheck/build, docs current-state alignment, commit, and push all landed; the latest main-session reply now leaves governance-policy-specific staged approval queues or reusable policy layering as the immediate continuation ahead of offline reranker infrastructure."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-moderation-governance-policy-approval-layer",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add staged approval queue and reusable policy layer for moderation governance policies",
+      "description": "Extend the newly lifecycle-aware moderation governance-policy object with governance-policy-specific staged approval queue workflows plus a reusable higher-level policy layer so policy edits, restores, deletes, and bulk-governance changes can be reviewed and rolled out under durable moderation rules instead of only direct lifecycle mutations.",
+      "status": "ready",
+      "base_priority": 77,
+      "dynamic_priority_delta": 28,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T21:25:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-moderation-governance-policy-management"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says moderation governance policies now have lifecycle, audit, and bulk governance, but those policy records still do not have their own staged approval queue or reusable governance-policy layer, making this the clearest direct continuation.",
+      "priority_reason": "Promoted to ready because builtin next-task should continue the moderation-governance sequence the latest main-session reply spelled out before shifting into the larger offline reranker and learned relevance infrastructure gap."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-offline-reranker-infrastructure",
@@ -1483,13 +1519,13 @@
       "dynamic_priority_delta": 21,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T20:25:00+09:00",
+      "updated_at": "2026-04-22T21:25:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-scheduler-moderation-policy-catalog-approval-layer"
+        "task-b1-provider-market-context-scheduler-moderation-governance-policy-approval-layer"
       ],
-      "direction_relation_note": "The latest main-session reply still calls out offline reranker, learned model training, and heavier relevance infrastructure as missing after ba0286a shipped lifecycle, audit, and bulk governance for moderation policy catalogs, so this should build on the now-governed feedback baseline rather than bypass the remaining catalog approval-layer gap.",
-      "priority_reason": "This remains the next retrieval-quality investment, but it stays proposed behind the newly explicit moderation catalog staged-approval and reusable-governance continuation so builtin next-task advances through one direct operator-governance hardening step first."
+      "direction_relation_note": "The latest main-session reply still calls out offline reranker, learned model training, and heavier relevance infrastructure as the larger remaining search-quality gap after af84244, but it also says moderation governance policies still need their own staged approval queue and reusable policy layer first.",
+      "priority_reason": "This remains the next retrieval-quality investment, but it stays proposed behind the newly explicit moderation-governance-policy approval-layer slice so builtin next-task advances through one more direct operator-governance hardening step before heavier ranking infrastructure."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
