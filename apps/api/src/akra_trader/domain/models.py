@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import UTC
 from datetime import datetime
 from enum import Enum
-import hashlib
 from typing import Any
 from uuid import uuid4
 
@@ -286,44 +285,6 @@ class RunConfig:
   slippage_bps: float
   start_at: datetime | None = None
   end_at: datetime | None = None
-
-
-@dataclass(frozen=True)
-class DatasetBoundaryContract:
-  contract_version: str = "dataset_boundary.v1"
-  provider: str = "unknown"
-  venue: str = ""
-  symbols: tuple[str, ...] = ()
-  timeframe: str = ""
-  reproducibility_state: str = "range_only"
-  validation_claim: str = "window_only"
-  boundary_id: str | None = None
-  dataset_identity: str | None = None
-  sync_checkpoint_id: str | None = None
-  requested_start_at: datetime | None = None
-  requested_end_at: datetime | None = None
-  effective_start_at: datetime | None = None
-  effective_end_at: datetime | None = None
-  candle_count: int = 0
-
-
-@dataclass(frozen=True)
-class MarketDataLineage:
-  provider: str
-  venue: str
-  symbols: tuple[str, ...]
-  timeframe: str
-  dataset_identity: str | None = None
-  sync_checkpoint_id: str | None = None
-  reproducibility_state: str = "range_only"
-  requested_start_at: datetime | None = None
-  requested_end_at: datetime | None = None
-  effective_start_at: datetime | None = None
-  effective_end_at: datetime | None = None
-  candle_count: int = 0
-  sync_status: str = "unknown"
-  last_sync_at: datetime | None = None
-  issues: tuple[str, ...] = ()
 
 
 @dataclass
@@ -712,6 +673,8 @@ class RunSurfaceSharedContract:
 
 
 from akra_trader.domain.model_types.provider_provenance import *
+from akra_trader.domain.model_types.market_data_status import *
+from akra_trader.domain.model_types.sync_lineage import *
 from akra_trader.domain.model_types.operator_runtime import *
 from akra_trader.domain.model_types.guarded_live import *
 
@@ -1139,125 +1102,6 @@ class RunComparison:
   metric_rows: tuple[RunComparisonMetricRow, ...]
   intent: str = "benchmark_validation"
   narratives: tuple[RunComparisonNarrative, ...] = ()
-
-
-@dataclass(frozen=True)
-class InstrumentStatus:
-  instrument_id: str
-  timeframe: str
-  candle_count: int
-  first_timestamp: datetime | None
-  last_timestamp: datetime | None
-  sync_status: str = "empty"
-  lag_seconds: int | None = None
-  last_sync_at: datetime | None = None
-  sync_checkpoint: "SyncCheckpoint" | None = None
-  recent_failures: tuple["SyncFailure", ...] = ()
-  failure_count_24h: int = 0
-  backfill_target_candles: int | None = None
-  backfill_completion_ratio: float | None = None
-  backfill_complete: bool | None = None
-  backfill_contiguous_completion_ratio: float | None = None
-  backfill_contiguous_complete: bool | None = None
-  backfill_contiguous_missing_candles: int | None = None
-  backfill_gap_windows: tuple["GapWindow", ...] = ()
-  issues: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class MarketDataStatus:
-  provider: str
-  venue: str
-  instruments: list[InstrumentStatus]
-
-
-@dataclass(frozen=True)
-class MarketDataLineageHistoryRecord:
-  history_id: str
-  source_job_id: str | None
-  provider: str
-  venue: str
-  symbol: str
-  timeframe: str
-  recorded_at: datetime
-  sync_status: str
-  validation_claim: str
-  reproducibility_state: str = "range_only"
-  boundary_id: str | None = None
-  checkpoint_id: str | None = None
-  dataset_boundary: DatasetBoundaryContract | None = None
-  first_timestamp: datetime | None = None
-  last_timestamp: datetime | None = None
-  candle_count: int = 0
-  lag_seconds: int | None = None
-  last_sync_at: datetime | None = None
-  failure_count_24h: int = 0
-  contiguous_missing_candles: int | None = None
-  gap_window_count: int = 0
-  last_error: str | None = None
-  issues: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class MarketDataIngestionJobRecord:
-  job_id: str
-  provider: str
-  venue: str
-  symbol: str
-  timeframe: str
-  operation: str
-  status: str
-  started_at: datetime
-  finished_at: datetime
-  duration_ms: int
-  fetched_candle_count: int = 0
-  validation_claim: str | None = None
-  boundary_id: str | None = None
-  checkpoint_id: str | None = None
-  lineage_history_id: str | None = None
-  requested_start_at: datetime | None = None
-  requested_end_at: datetime | None = None
-  requested_limit: int | None = None
-  last_error: str | None = None
-
-@dataclass(frozen=True)
-class GapWindow:
-  start_at: datetime
-  end_at: datetime
-  missing_candles: int
-  gap_window_id: str = ""
-
-  def __post_init__(self) -> None:
-    if self.gap_window_id:
-      return
-    payload = "|".join([
-      self.start_at.isoformat(),
-      self.end_at.isoformat(),
-      str(self.missing_candles),
-    ])
-    digest = hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
-    object.__setattr__(
-      self,
-      "gap_window_id",
-      f"gw|0|{self.start_at.isoformat()}|{self.end_at.isoformat()}|{self.missing_candles}|{digest}",
-    )
-
-
-@dataclass(frozen=True)
-class SyncCheckpoint:
-  checkpoint_id: str
-  recorded_at: datetime
-  candle_count: int
-  first_timestamp: datetime | None = None
-  last_timestamp: datetime | None = None
-  contiguous_missing_candles: int = 0
-
-
-@dataclass(frozen=True)
-class SyncFailure:
-  failed_at: datetime
-  operation: str
-  error: str
 
 
 @dataclass(frozen=True)
