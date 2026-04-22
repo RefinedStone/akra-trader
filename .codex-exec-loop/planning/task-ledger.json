@@ -838,30 +838,30 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add server-side source-template queue search, sort, and saved views for hierarchy-step approvals",
       "description": "Extend the newly shipped source-template queue filter and batch stage workflow with server-side source-template-aware search or sort plus persisted saved queue views so operators can reopen common hierarchy-step approval slices without rebuilding client-side state each time.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 35,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T10:30:28+09:00",
+      "updated_at": "2026-04-22T10:58:06+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-hierarchy-step-template-queue-filters-batch-stage"
       ],
-      "direction_relation_note": "The latest main-session reply after commit c3105bf says the queue now supports source-template filtering and batch stage, but source-template server-side search or sort and persisted saved queue views are still missing from that approval workflow.",
-      "priority_reason": "Promoted to ready because the latest main-session reply names this as the immediate executable continuation of the just-shipped hierarchy-step queue slice, while stitched scheduler narratives and deeper narrative search remain larger adjacent gaps."
+      "direction_relation_note": "Completed on main in commit 0d32b2c with hierarchy-step approval queue search and sort moved server-side, queue summary counts aligned to the new server query, and shared dashboard views persisting governance_queue_view state including source-template slice, search text, and sort order across backend and control-room surfaces.",
+      "priority_reason": "Closed after targeted API pytest coverage, compileall verification, web typecheck and build, docs status updates, commit, and push all landed; the latest main-session reply now leaves a dedicated source-template queue-view product surface plus the larger stitched scheduler narrative and deeper narrative search gaps."
     },
     {
       "id": "task-b1-provider-market-context-cross-incident-narrative-reporting",
       "direction_id": "operator-trust-and-discipline",
       "title": "Add stitched multi-occurrence scheduler narrative artifacts and reporting",
       "description": "Extend the new mixed-status scheduler narrative workflow beyond one occurrence window by adding stitched multi-occurrence artifacts and cross-incident reporting so operators can review longer recovery patterns and repeated scheduler incidents in one narrative output.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 74,
-      "dynamic_priority_delta": 24,
+      "dynamic_priority_delta": 27,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T10:30:28+09:00",
+      "updated_at": "2026-04-22T10:58:06+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-mixed-status-narrative-artifact",
@@ -870,8 +870,26 @@
         "task-b1-provider-market-context-scheduler-narrative-governance-bulk-ops",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit c3105bf says scheduler narrative review is still occurrence or facet centered even after hierarchy-step template queue filtering and batch stage shipped, so stitched multi-occurrence artifacts and cross-incident reporting remain missing from the operator narrative lane.",
-      "priority_reason": "This remains an explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted queue search or saved-view slice so builtin next-task clears the remaining direct hierarchy-step approval queue hardening before broader narrative stitching."
+      "direction_relation_note": "The latest main-session reply after commit 0d32b2c says scheduler narrative review is still occurrence or facet centered even after hierarchy-step template queue search, sort, and saved-view round-tripping shipped, so stitched multi-occurrence artifacts and cross-incident reporting remain the clearest next operator-facing narrative gap.",
+      "priority_reason": "Promoted to ready because the latest main-session reply names stitched multi-occurrence narrative artifacts as the larger unfinished area after the queue search or saved-view slice landed, while deeper server-side narrative search remains a parallel but subsequent follow-up."
+    },
+    {
+      "id": "task-b1-provider-market-context-hierarchy-step-template-queue-view-workspace",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Promote hierarchy-step queue saved views into a dedicated source-template workspace surface",
+      "description": "Separate the newly persisted hierarchy-step approval queue views from the generic shared dashboard-view layer by adding a dedicated source-template queue-view product surface with its own list or apply workflow and operator-facing ownership semantics.",
+      "status": "proposed",
+      "base_priority": 73,
+      "dynamic_priority_delta": 20,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T10:58:06+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-hierarchy-step-template-queue-search-saved-views"
+      ],
+      "direction_relation_note": "The latest main-session reply says source-template queue views now round-trip through shared dashboard views, but they are not yet split into a dedicated product surface above governance_queue_view for hierarchy-step approvals.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind the explicit stitched multi-occurrence narrative and deeper scheduler narrative search gaps so builtin next-task advances through the main-session continuation order first."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
@@ -1009,7 +1027,7 @@
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T10:30:28+09:00",
+      "updated_at": "2026-04-22T10:58:06+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
@@ -1017,8 +1035,8 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-templates",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit c3105bf still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after hierarchy-step template queue filtering and source-template batch stage shipped.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the promoted queue search or saved-view slice and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
+      "direction_relation_note": "The latest main-session reply after commit 0d32b2c still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after hierarchy-step template queue search, sort, and shared saved-view round-tripping shipped.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the now-ready stitched multi-occurrence artifact slice so builtin next-task follows the latest explicit continuation order from the main session."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
