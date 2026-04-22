@@ -23,6 +23,8 @@ class Settings:
   runs_database_url: str | None = None
   market_data_database_url: str | None = None
   provider_provenance_scheduler_search_database_url: str | None = None
+  provider_provenance_scheduler_search_service_url: str | None = None
+  provider_provenance_scheduler_search_service_auth_token: str | None = None
   market_data_symbols: tuple[str, ...] = ("BTC/USDT", "ETH/USDT", "SOL/USDT")
   market_data_sync_timeframes: tuple[str, ...] = ("5m",)
   market_data_sync_interval_seconds: int = 60
@@ -269,6 +271,12 @@ def load_settings() -> Settings:
     market_data_database_url=os.getenv("AKRA_TRADER_MARKET_DATA_DATABASE_URL") or None,
     provider_provenance_scheduler_search_database_url=(
       os.getenv("AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_DATABASE_URL") or None
+    ),
+    provider_provenance_scheduler_search_service_url=(
+      os.getenv("AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_SERVICE_URL") or None
+    ),
+    provider_provenance_scheduler_search_service_auth_token=(
+      os.getenv("AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_SERVICE_AUTH_TOKEN") or None
     ),
     market_data_symbols=_parse_csv_env(
       os.getenv("AKRA_TRADER_MARKET_DATA_SYMBOLS", "BTC/USDT,ETH/USDT,SOL/USDT")

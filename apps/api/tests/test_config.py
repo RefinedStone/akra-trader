@@ -11,6 +11,14 @@ def test_load_settings_parses_provider_provenance_report_scheduler_settings(monk
     "AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_DATABASE_URL",
     "sqlite:////tmp/provider-provenance-scheduler-search.sqlite3",
   )
+  monkeypatch.setenv(
+    "AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_SERVICE_URL",
+    "http://search-service.internal:8042",
+  )
+  monkeypatch.setenv(
+    "AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_SERVICE_AUTH_TOKEN",
+    "scheduler-search-token",
+  )
 
   settings = load_settings()
 
@@ -20,4 +28,12 @@ def test_load_settings_parses_provider_provenance_report_scheduler_settings(monk
   assert (
     settings.provider_provenance_scheduler_search_database_url
     == "sqlite:////tmp/provider-provenance-scheduler-search.sqlite3"
+  )
+  assert (
+    settings.provider_provenance_scheduler_search_service_url
+    == "http://search-service.internal:8042"
+  )
+  assert (
+    settings.provider_provenance_scheduler_search_service_auth_token
+    == "scheduler-search-token"
   )

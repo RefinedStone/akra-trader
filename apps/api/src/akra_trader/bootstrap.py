@@ -12,7 +12,19 @@ from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateReposito
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.operator_delivery import OperatorAlertDeliveryAdapter
 from akra_trader.adapters.provider_provenance_search import (
-  SqlAlchemyProviderProvenanceSchedulerSearchBackend,
+  EmbeddedProviderProvenanceSchedulerSearchServiceClient,
+)
+from akra_trader.adapters.provider_provenance_search import (
+  HttpProviderProvenanceSchedulerSearchServiceClient,
+)
+from akra_trader.adapters.provider_provenance_search import (
+  InMemoryProviderProvenanceSchedulerSearchStore,
+)
+from akra_trader.adapters.provider_provenance_search import (
+  ProviderProvenanceSchedulerSearchService,
+)
+from akra_trader.adapters.provider_provenance_search import (
+  SqlAlchemyProviderProvenanceSchedulerSearchStore,
 )
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
@@ -89,6 +101,10 @@ def build_default_provider_provenance_scheduler_search_database_url(
     repo_root / ".local" / "state" / "provider-provenance-scheduler-search.sqlite3"
   ).resolve()
   return f"sqlite:///{database_path}"
+
+
+def build_default_provider_provenance_scheduler_search_service_url() -> str:
+  return "http://127.0.0.1:8042"
 
 
 def build_market_data_adapter(settings: Settings, repo_root: Path):
@@ -498,15 +514,39 @@ def build_container(settings: Settings) -> Container:
   presets = SqlAlchemyExperimentPresetCatalog(
     settings.runs_database_url or build_default_runs_database_url(repo_root)
   )
-  provider_provenance_scheduler_search_backend = (
-    SqlAlchemyProviderProvenanceSchedulerSearchBackend(
-      settings.provider_provenance_scheduler_search_database_url
-      or build_default_provider_provenance_scheduler_search_database_url(
-        repo_root,
-        runs_database_url=settings.runs_database_url,
+  search_service_url = (
+    settings.provider_provenance_scheduler_search_service_url
+    or build_default_provider_provenance_scheduler_search_service_url()
+  )
+  if search_service_url.startswith("embedded://"):
+    provider_provenance_scheduler_search_backend = (
+      EmbeddedProviderProvenanceSchedulerSearchServiceClient(
+        ProviderProvenanceSchedulerSearchService(
+          store=SqlAlchemyProviderProvenanceSchedulerSearchStore(
+            settings.provider_provenance_scheduler_search_database_url
+            or build_default_provider_provenance_scheduler_search_database_url(
+              repo_root,
+              runs_database_url=settings.runs_database_url,
+            )
+          )
+        )
       )
     )
-  )
+  elif search_service_url.startswith("memory://"):
+    provider_provenance_scheduler_search_backend = (
+      EmbeddedProviderProvenanceSchedulerSearchServiceClient(
+        ProviderProvenanceSchedulerSearchService(
+          store=InMemoryProviderProvenanceSchedulerSearchStore()
+        )
+      )
+    )
+  else:
+    provider_provenance_scheduler_search_backend = (
+      HttpProviderProvenanceSchedulerSearchServiceClient(
+        service_url=search_service_url,
+        auth_token=settings.provider_provenance_scheduler_search_service_auth_token,
+      )
+    )
   guarded_live_state = SqlAlchemyGuardedLiveStateRepository(
     settings.runs_database_url or build_default_runs_database_url(repo_root)
   )

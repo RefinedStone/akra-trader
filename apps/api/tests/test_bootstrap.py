@@ -6,6 +6,7 @@ from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.bootstrap import build_container
 from akra_trader.bootstrap import build_default_market_data_database_url
 from akra_trader.bootstrap import build_default_provider_provenance_scheduler_search_database_url
+from akra_trader.bootstrap import build_default_provider_provenance_scheduler_search_service_url
 from akra_trader.bootstrap import build_default_runs_database_url
 from akra_trader.config import Settings
 
@@ -80,6 +81,10 @@ def test_build_default_provider_provenance_scheduler_search_database_url_can_fol
   )
 
   assert database_url == "sqlite:////tmp/akra/provider-provenance-scheduler-search.sqlite3"
+
+
+def test_build_default_provider_provenance_scheduler_search_service_url_points_to_local_service() -> None:
+  assert build_default_provider_provenance_scheduler_search_service_url() == "http://127.0.0.1:8042"
 
 
 def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> None:

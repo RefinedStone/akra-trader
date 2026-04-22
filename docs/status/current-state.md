@@ -230,7 +230,7 @@ It is not yet a finished live trading product:
   semantic/vector retrieval groups, so operators can review stitched recovery or failure
   narratives as ranked clusters instead of scanning one occurrence row at a time
 - that same scheduler search layer now also writes those lexical/semantic projections into a
-  dedicated external scheduler search backend and uses tuned ranked relevance, so the
+  dedicated external scheduler search service and uses tuned ranked relevance, so the
   boolean/full-text path can reuse dedicated scheduler index material instead of reading search
   payloads back out of health records or the run repository
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore

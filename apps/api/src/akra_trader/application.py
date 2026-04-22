@@ -21,6 +21,15 @@ from typing import Iterable
 from typing import Mapping
 from uuid import uuid4
 
+from akra_trader.adapters.provider_provenance_search import (
+  EmbeddedProviderProvenanceSchedulerSearchServiceClient,
+)
+from akra_trader.adapters.provider_provenance_search import (
+  InMemoryProviderProvenanceSchedulerSearchStore,
+)
+from akra_trader.adapters.provider_provenance_search import (
+  ProviderProvenanceSchedulerSearchService,
+)
 from akra_trader.domain.models import RunComparison
 from akra_trader.domain.models import RunComparisonNarrative
 from akra_trader.domain.models import RunComparisonMetricRow
@@ -369,6 +378,11 @@ class TradingApplication:
     self._runs = runs
     self._provider_provenance_scheduler_search_backend = (
       provider_provenance_scheduler_search_backend
+      or EmbeddedProviderProvenanceSchedulerSearchServiceClient(
+        ProviderProvenanceSchedulerSearchService(
+          store=InMemoryProviderProvenanceSchedulerSearchStore()
+        )
+      )
     )
     self._guarded_live_state = guarded_live_state or _EphemeralGuardedLiveStateStore()
     self._venue_state = venue_state or UnavailableVenueStateAdapter(self._clock)
@@ -573,10 +587,6 @@ class TradingApplication:
     ] = {}
     self._provider_provenance_scheduled_report_audit_records: dict[str, ProviderProvenanceScheduledReportAuditRecord] = {}
     self._provider_provenance_scheduler_health_records: dict[str, ProviderProvenanceSchedulerHealthRecord] = {}
-    self._provider_provenance_scheduler_search_documents: dict[
-      str,
-      ProviderProvenanceSchedulerSearchDocumentRecord,
-    ] = {}
     self._provider_provenance_scheduler_health_lock = Lock()
     self._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
       generated_at=self._clock(),
@@ -2930,55 +2940,34 @@ class TradingApplication:
     self,
     record: ProviderProvenanceSchedulerSearchDocumentRecord,
   ) -> ProviderProvenanceSchedulerSearchDocumentRecord:
-    if self._provider_provenance_scheduler_search_backend is not None:
-      return self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_document_record(
-        record
-      )
-    self._provider_provenance_scheduler_search_documents[record.record_id] = record
-    return record
+    return self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_document_record(
+      record
+    )
 
   def _list_provider_provenance_scheduler_search_document_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchDocumentRecord, ...]:
-    if self._provider_provenance_scheduler_search_backend is not None:
-      return tuple(
-        self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_document_records()
-      )
     return tuple(
-      sorted(
-        self._provider_provenance_scheduler_search_documents.values(),
-        key=lambda record: (record.recorded_at, record.record_id),
-        reverse=True,
-      )
+      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_document_records()
     )
 
   def _prune_provider_provenance_scheduler_search_document_records(self) -> int:
     current_time = self._clock()
-    if self._provider_provenance_scheduler_search_backend is not None:
-      return int(
-        self._provider_provenance_scheduler_search_backend.prune_provider_provenance_scheduler_search_document_records(
-          current_time
-        )
+    return int(
+      self._provider_provenance_scheduler_search_backend.prune_provider_provenance_scheduler_search_document_records(
+        current_time
       )
-    original_count = len(self._provider_provenance_scheduler_search_documents)
-    self._provider_provenance_scheduler_search_documents = {
-      record_id: record
-      for record_id, record in self._provider_provenance_scheduler_search_documents.items()
-      if record.expires_at is None or record.expires_at > current_time
-    }
-    return original_count - len(self._provider_provenance_scheduler_search_documents)
+    )
 
   def _provider_provenance_scheduler_search_persistence_mode(self) -> str:
-    if self._provider_provenance_scheduler_search_backend is not None:
-      persistence_mode = getattr(
-        self._provider_provenance_scheduler_search_backend,
-        "persistence_mode",
-        None,
-      )
-      if isinstance(persistence_mode, str) and persistence_mode.strip():
-        return persistence_mode.strip()
-      return "external_scheduler_search_backend"
-    return "embedded_scheduler_search_backend"
+    persistence_mode = getattr(
+      self._provider_provenance_scheduler_search_backend,
+      "persistence_mode",
+      None,
+    )
+    if isinstance(persistence_mode, str) and persistence_mode.strip():
+      return persistence_mode.strip()
+    return "embedded_scheduler_search_service"
 
   @staticmethod
   def _build_provider_provenance_scheduler_search_document_record(

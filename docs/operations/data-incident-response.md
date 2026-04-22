@@ -122,7 +122,7 @@ unclear dataset lineage.
 - that scheduler narrative search now also executes against a dedicated full-text index with
   boolean query support, so incident review can combine `AND` / `OR` / `NOT` clauses and market
   context operators before exporting a stitched handoff narrative
-- that full-text path now also reuses a dedicated external scheduler search backend plus tuned
+- that full-text path now also reuses a dedicated external scheduler search service plus tuned
   relevance scoring, so repeated incident review searches do not depend on rebuilding every
   lexical hint from health-record payloads or the run repository
 - that same retrieval path now also emits cross-occurrence semantic/vector clusters, so a handoff
