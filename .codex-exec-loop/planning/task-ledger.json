@@ -766,18 +766,54 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add edit, delete, versioning, and bulk governance for hierarchy-step templates",
       "description": "Deepen the newly shipped hierarchy-step template layer beyond create or list or apply by adding template edit or delete or version workflows plus bulk governance actions so named rollout steps can be maintained safely across catalogs instead of only accumulated and reapplied.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 31,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:14:00+09:00",
+      "updated_at": "2026-04-22T19:30:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-policy-catalog-hierarchy-step-template-governance"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 101f7e3 says hierarchy-step templates now exist as named reusable assets with cross-catalog apply, but template edit or delete or versioning and a bulk governance layer are still missing.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task and the latest main-session reply lists hierarchy-step template lifecycle or governance depth before stitched multi-occurrence narrative artifacts and deeper server-side narrative search."
+      "direction_relation_note": "Completed on main in commit d503bfe with hierarchy-step template revision records and lifecycle surfaces added across backend persistence, API routes, and control-room workflows, including update or delete or revision restore or list plus bulk governance while excluding deleted templates from cross-catalog apply.",
+      "priority_reason": "Closed after backend lifecycle and revision plumbing, control-room edit or delete or versions plus multi-select bulk governance flows, targeted pytest and compileall coverage, web typecheck/build verification, docs status updates, commit, and push all landed; the latest main-session reply now leaves a template-specific team audit surface plus broader stitched narrative and deeper search work."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-policy-catalog-hierarchy-step-template-team-audit",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add team audit surface for hierarchy-step template lifecycle and bulk governance",
+      "description": "Complete the newly shipped hierarchy-step template lifecycle layer by exposing template-specific team audit records and operator-visible audit workflows so edits, deletes, restores, and bulk governance actions can be reviewed without relying on generic catalog history or shell inspection.",
+      "status": "done",
+      "base_priority": 78,
+      "dynamic_priority_delta": 32,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T19:45:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-policy-catalog-hierarchy-step-template-lifecycle"
+      ],
+      "direction_relation_note": "Completed on main in commit 19216d7 with hierarchy-step template audit records and a dedicated /api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/audits surface, covering create or update or delete or restore plus bulk governance actions with actor or action or search or template filters across backend and control-room workflows.",
+      "priority_reason": "Closed after backend audit-trail plumbing, control-room team-audit filters, targeted pytest coverage, compileall verification, web typecheck and build, docs status updates, commit, and push all landed; the latest main-session reply now leaves template-specific approval queue or reusable governance policy layering plus the broader stitched narrative and deeper search gaps."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-policy-catalog-hierarchy-step-template-approval-policy",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add approval queue and reusable governance policy layer for hierarchy-step templates",
+      "description": "Extend the newly audited hierarchy-step template lifecycle layer with template-specific approval-queue workflows and reusable governance policy records so reusable rollout steps can be reviewed, prioritized, and applied under durable governance rules instead of direct lifecycle or bulk-governance actions alone.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 33,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T19:45:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-policy-catalog-hierarchy-step-template-team-audit"
+      ],
+      "direction_relation_note": "The latest main-session reply after commit 19216d7 says hierarchy-step templates now have lifecycle, bulk governance, and team audit coverage, but template-specific approval queues and a reusable governance policy layer are still missing.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task and this is the direct executable remainder named first in the latest main-session reply before returning to the larger stitched scheduler narrative backlog."
     },
     {
       "id": "task-b1-provider-market-context-cross-incident-narrative-reporting",
@@ -789,7 +825,7 @@
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:14:00+09:00",
+      "updated_at": "2026-04-22T19:45:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-mixed-status-narrative-artifact",
@@ -798,8 +834,8 @@
         "task-b1-provider-market-context-scheduler-narrative-governance-bulk-ops",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 101f7e3 says scheduler narrative review is still occurrence or facet centered even after named hierarchy-step templates and cross-catalog apply shipped, so stitched multi-occurrence artifacts and cross-incident reporting remain missing from the operator narrative lane.",
-      "priority_reason": "This remains an explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted hierarchy-step template lifecycle or bulk-governance slice so builtin next-task clears the remaining template-management gap before broader narrative stitching."
+      "direction_relation_note": "The latest main-session reply after commit 19216d7 says scheduler narrative review is still occurrence or facet centered even after hierarchy-step template team audit shipped, so stitched multi-occurrence artifacts and cross-incident reporting remain missing from the operator narrative lane.",
+      "priority_reason": "This remains an explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted hierarchy-step template approval-queue or policy-layer slice so builtin next-task clears the direct template-governance remainder before broader narrative stitching."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
@@ -937,7 +973,7 @@
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:14:00+09:00",
+      "updated_at": "2026-04-22T19:45:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
@@ -945,8 +981,8 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-templates",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 101f7e3 still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after named hierarchy-step templates and cross-catalog apply shipped.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the promoted hierarchy-step template lifecycle or bulk-governance slice and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
+      "direction_relation_note": "The latest main-session reply after commit 19216d7 still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after hierarchy-step template team audit shipped.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the promoted hierarchy-step template approval-queue or policy-layer slice and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
