@@ -45,6 +45,7 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportV
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult
@@ -567,6 +568,10 @@ class TradingApplication:
     ] = {}
     self._provider_provenance_scheduled_report_audit_records: dict[str, ProviderProvenanceScheduledReportAuditRecord] = {}
     self._provider_provenance_scheduler_health_records: dict[str, ProviderProvenanceSchedulerHealthRecord] = {}
+    self._provider_provenance_scheduler_search_documents: dict[
+      str,
+      ProviderProvenanceSchedulerSearchDocumentRecord,
+    ] = {}
     self._provider_provenance_scheduler_health_lock = Lock()
     self._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
       generated_at=self._clock(),
@@ -2904,14 +2909,105 @@ class TradingApplication:
     current_time = self._clock()
     prune_records = getattr(self._runs, "prune_provider_provenance_scheduler_health_records", None)
     if callable(prune_records):
-      return int(prune_records(current_time))
+      pruned_count = int(prune_records(current_time))
+      self._prune_provider_provenance_scheduler_search_document_records()
+      return pruned_count
     original_count = len(self._provider_provenance_scheduler_health_records)
     self._provider_provenance_scheduler_health_records = {
       record_id: record
       for record_id, record in self._provider_provenance_scheduler_health_records.items()
       if record.expires_at is None or record.expires_at > current_time
     }
+    self._prune_provider_provenance_scheduler_search_document_records()
     return original_count - len(self._provider_provenance_scheduler_health_records)
+
+  def _save_provider_provenance_scheduler_search_document_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchDocumentRecord,
+  ) -> ProviderProvenanceSchedulerSearchDocumentRecord:
+    save_record = getattr(
+      self._runs,
+      "save_provider_provenance_scheduler_search_document_record",
+      None,
+    )
+    if callable(save_record):
+      return save_record(record)
+    self._provider_provenance_scheduler_search_documents[record.record_id] = record
+    return record
+
+  def _list_provider_provenance_scheduler_search_document_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchDocumentRecord, ...]:
+    list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_search_document_records",
+      None,
+    )
+    if callable(list_records):
+      return tuple(list_records())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_search_documents.values(),
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+
+  def _prune_provider_provenance_scheduler_search_document_records(self) -> int:
+    current_time = self._clock()
+    prune_records = getattr(
+      self._runs,
+      "prune_provider_provenance_scheduler_search_document_records",
+      None,
+    )
+    if callable(prune_records):
+      return int(prune_records(current_time))
+    original_count = len(self._provider_provenance_scheduler_search_documents)
+    self._provider_provenance_scheduler_search_documents = {
+      record_id: record
+      for record_id, record in self._provider_provenance_scheduler_search_documents.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._provider_provenance_scheduler_search_documents)
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_search_document_record(
+    *,
+    record: ProviderProvenanceSchedulerHealthRecord,
+    search_projection: Mapping[str, Any],
+  ) -> ProviderProvenanceSchedulerSearchDocumentRecord:
+    normalized_fields = {
+      key: tuple(
+        value
+        for value in values
+        if isinstance(value, str) and value.strip()
+      )
+      for key, values in (search_projection.get("fields", {}) or {}).items()
+      if isinstance(key, str)
+    }
+    return ProviderProvenanceSchedulerSearchDocumentRecord(
+      record_id=record.record_id,
+      recorded_at=record.recorded_at,
+      scheduler_key=record.scheduler_key,
+      expires_at=record.expires_at,
+      index_version=(
+        search_projection.get("index_version")
+        if isinstance(search_projection.get("index_version"), str)
+        and search_projection.get("index_version").strip()
+        else "scheduler-search-store.v1"
+      ),
+      lexical_terms=tuple(
+        token
+        for token in (search_projection.get("lexical_terms", ()) or ())
+        if isinstance(token, str) and token.strip()
+      ),
+      semantic_concepts=tuple(
+        concept
+        for concept in (search_projection.get("semantic_concepts", ()) or ())
+        if isinstance(concept, str) and concept.strip()
+      ),
+      fields=normalized_fields,
+    )
 
   def _record_provider_provenance_scheduler_health(
     self,
@@ -2921,6 +3017,9 @@ class TradingApplication:
     source_tab_label: str | None = None,
   ) -> ProviderProvenanceSchedulerHealthRecord:
     self._prune_provider_provenance_scheduler_health_records()
+    search_projection = self._build_provider_provenance_scheduler_health_search_projection(
+      snapshot=snapshot
+    )
     record = ProviderProvenanceSchedulerHealthRecord(
       record_id=uuid4().hex[:12],
       recorded_at=snapshot.generated_at,
@@ -2959,11 +3058,15 @@ class TradingApplication:
         else None
       ),
       issues=tuple(snapshot.issues),
-      search_projection=self._build_provider_provenance_scheduler_health_search_projection(
-        snapshot=snapshot
-      ),
     )
-    return self._save_provider_provenance_scheduler_health_record(record)
+    saved_record = self._save_provider_provenance_scheduler_health_record(record)
+    self._save_provider_provenance_scheduler_search_document_record(
+      self._build_provider_provenance_scheduler_search_document_record(
+        record=saved_record,
+        search_projection=search_projection,
+      )
+    )
+    return saved_record
 
   @staticmethod
   def _build_provider_provenance_scheduler_alert_workflow_reason(status: str) -> str:
@@ -36696,7 +36799,7 @@ class TradingApplication:
       for value in values:
         lexical_terms.extend(cls._tokenize_provider_provenance_scheduler_alert_search_query(value))
     return {
-      "index_version": "scheduler-search-index.v2",
+      "index_version": "scheduler-search-store.v1",
       "lexical_terms": tuple(dict.fromkeys(lexical_terms)),
       "semantic_concepts": tuple(dict.fromkeys(semantic_concepts)),
       "fields": {
@@ -36705,6 +36808,35 @@ class TradingApplication:
         if values
       },
     }
+
+  def _build_provider_provenance_scheduler_search_projection_lookup(
+    self,
+    *,
+    record_ids: Iterable[str],
+  ) -> dict[str, dict[str, Any]]:
+    normalized_record_ids = {
+      record_id
+      for record_id in record_ids
+      if isinstance(record_id, str) and record_id.strip()
+    }
+    if not normalized_record_ids:
+      return {}
+    self._prune_provider_provenance_scheduler_search_document_records()
+    lookup: dict[str, dict[str, Any]] = {}
+    for record in self._list_provider_provenance_scheduler_search_document_records():
+      if record.record_id not in normalized_record_ids:
+        continue
+      lookup[record.record_id] = {
+        "index_version": record.index_version,
+        "lexical_terms": tuple(record.lexical_terms),
+        "semantic_concepts": tuple(record.semantic_concepts),
+        "fields": {
+          key: tuple(values)
+          for key, values in record.fields.items()
+        },
+        "projection_source": "standalone_persistent_scheduler_search_store",
+      }
+    return lookup
 
   @classmethod
   def _matches_provider_provenance_scheduler_alert_occurrence_search(
@@ -37428,6 +37560,7 @@ class TradingApplication:
     *,
     row: Mapping[str, Any],
     document_id: int,
+    search_projection_lookup: Mapping[str, Mapping[str, Any]] | None = None,
   ) -> dict[str, Any]:
     search_fields = cls._build_provider_provenance_scheduler_alert_occurrence_search_fields(row=row)
     normalized_fields: dict[str, tuple[str, ...]] = {}
@@ -37454,13 +37587,26 @@ class TradingApplication:
     persisted_projection_terms: list[str] = []
     persisted_projection_semantic_concepts: list[str] = []
     persisted_projection_fields: dict[str, list[str]] = {}
+    projection_source = "ephemeral_occurrence_projection"
     for record in row.get("narrative_records", ()) or ():
       if not isinstance(record, ProviderProvenanceSchedulerHealthRecord):
         continue
-      projection = record.search_projection if isinstance(record.search_projection, dict) else {}
+      projection = (
+        search_projection_lookup.get(record.record_id, {})
+        if isinstance(search_projection_lookup, Mapping)
+        else {}
+      )
+      if not projection:
+        projection = record.search_projection if isinstance(record.search_projection, dict) else {}
       if not projection:
         continue
       persisted_projection_count += 1
+      projection_source = (
+        projection.get("projection_source")
+        if isinstance(projection.get("projection_source"), str)
+        and projection.get("projection_source").strip()
+        else "record_backed_scheduler_search_projection"
+      )
       projection_version = projection.get("index_version")
       if isinstance(projection_version, str) and projection_version.strip():
         persisted_projection_versions.append(projection_version.strip())
@@ -37507,7 +37653,7 @@ class TradingApplication:
         )
       ),
       "persistence_mode": (
-        "record_backed_scheduler_search_projection"
+        projection_source
         if persisted_projection_count > 0
         else "ephemeral_occurrence_projection"
       ),
@@ -37521,11 +37667,13 @@ class TradingApplication:
     cls,
     *,
     rows: tuple[Mapping[str, Any], ...],
+    search_projection_lookup: Mapping[str, Mapping[str, Any]] | None = None,
   ) -> dict[str, Any]:
     documents = tuple(
       cls._build_provider_provenance_scheduler_alert_occurrence_search_document(
         row=row,
         document_id=index,
+        search_projection_lookup=search_projection_lookup,
       )
       for index, row in enumerate(rows)
     )
@@ -38516,8 +38664,17 @@ class TradingApplication:
       else None
     )
     if normalized_search is not None:
+      search_projection_lookup = self._build_provider_provenance_scheduler_search_projection_lookup(
+        record_ids=(
+          record.record_id
+          for row in eligible_history
+          for record in row.get("narrative_records", ()) or ()
+          if isinstance(record, ProviderProvenanceSchedulerHealthRecord)
+        )
+      )
       search_index = self._build_provider_provenance_scheduler_alert_occurrence_search_index(
-        rows=tuple(eligible_history)
+        rows=tuple(eligible_history),
+        search_projection_lookup=search_projection_lookup,
       )
       matched_document_ids = self._evaluate_provider_provenance_scheduler_alert_search_query(
         index=search_index,
@@ -38604,6 +38761,14 @@ class TradingApplication:
     )
     search_summary = None
     if normalized_search is not None:
+      persistence_modes = tuple(
+        dict.fromkeys(
+          str(document.get("persistence_mode"))
+          for document in search_index.get("documents", ())
+          if isinstance(document.get("persistence_mode"), str)
+          and document.get("persistence_mode") != "ephemeral_occurrence_projection"
+        )
+      )
       search_summary = {
         "query": normalized_search,
         "mode": "persistent_full_text_boolean_semantic_ranking",
@@ -38632,11 +38797,8 @@ class TradingApplication:
         "indexed_occurrence_count": len(eligible_history),
         "indexed_term_count": int(search_index.get("indexed_term_count", 0)),
         "persistence_mode": (
-          "record_backed_scheduler_search_projection"
-          if any(
-            int(document.get("persisted_projection_count", 0)) > 0
-            for document in search_index.get("documents", ())
-          )
+          persistence_modes[0]
+          if persistence_modes
           else "ephemeral_occurrence_projection"
         ),
         "relevance_model": "tfidf_field_weight_v1",

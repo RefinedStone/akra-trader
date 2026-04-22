@@ -1590,6 +1590,18 @@ class ProviderProvenanceSchedulerHealthRecord:
   search_projection: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchDocumentRecord:
+  record_id: str
+  recorded_at: datetime
+  scheduler_key: str = "provider_provenance_reports"
+  expires_at: datetime | None = None
+  index_version: str = "scheduler-search-store.v1"
+  lexical_terms: tuple[str, ...] = ()
+  semantic_concepts: tuple[str, ...] = ()
+  fields: dict[str, tuple[str, ...]] = field(default_factory=dict)
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "

@@ -229,9 +229,10 @@ It is not yet a finished live trading product:
 - that same scheduler search now also clusters matched occurrences into cross-occurrence
   semantic/vector retrieval groups, so operators can review stitched recovery or failure
   narratives as ranked clusters instead of scanning one occurrence row at a time
-- that same scheduler search layer now also persists record-backed search projections and uses
-  tuned ranked relevance, so the boolean/full-text path can reuse saved scheduler index material
-  and score matches with stronger lexical weighting than the earlier flat scan
+- that same scheduler search layer now also writes those lexical/semantic projections into a
+  standalone persistent search store and uses tuned ranked relevance, so the boolean/full-text
+  path can reuse dedicated scheduler index material instead of reading search payloads back out of
+  health records
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

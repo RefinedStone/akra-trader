@@ -1945,7 +1945,7 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   assert search_payload["search_summary"]["boolean_operator_count"] >= 4
   assert search_payload["search_summary"]["indexed_occurrence_count"] >= 1
   assert search_payload["search_summary"]["indexed_term_count"] > 0
-  assert search_payload["search_summary"]["persistence_mode"] == "record_backed_scheduler_search_projection"
+  assert search_payload["search_summary"]["persistence_mode"] == "standalone_persistent_scheduler_search_store"
   assert search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_v1"
   assert (
     search_payload["search_summary"]["retrieval_cluster_mode"]

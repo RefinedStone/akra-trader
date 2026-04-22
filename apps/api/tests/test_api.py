@@ -5021,7 +5021,7 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert search_payload["search_summary"]["boolean_operator_count"] >= 4
   assert search_payload["search_summary"]["indexed_occurrence_count"] >= 1
   assert search_payload["search_summary"]["indexed_term_count"] > 0
-  assert search_payload["search_summary"]["persistence_mode"] == "record_backed_scheduler_search_projection"
+  assert search_payload["search_summary"]["persistence_mode"] == "standalone_persistent_scheduler_search_store"
   assert search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_v1"
   assert (
     search_payload["search_summary"]["retrieval_cluster_mode"]
@@ -5229,7 +5229,7 @@ def test_operator_visibility_endpoint_can_export_stitched_scheduler_narrative_re
   assert stitched_report["stitched_occurrence_report"]["search_summary"]["mode"] == "persistent_full_text_boolean_semantic_ranking"
   assert stitched_report["stitched_occurrence_report"]["search_summary"]["operator_count"] == 2
   assert stitched_report["stitched_occurrence_report"]["search_summary"]["boolean_operator_count"] >= 4
-  assert stitched_report["stitched_occurrence_report"]["search_summary"]["persistence_mode"] == "record_backed_scheduler_search_projection"
+  assert stitched_report["stitched_occurrence_report"]["search_summary"]["persistence_mode"] == "standalone_persistent_scheduler_search_store"
   assert (
     stitched_report["stitched_occurrence_report"]["search_summary"]["retrieval_cluster_mode"]
     == "cross_occurrence_semantic_vector_cluster_v1"

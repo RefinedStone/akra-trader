@@ -32,6 +32,7 @@ from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportViewAuditRecord
@@ -411,6 +412,10 @@ class InMemoryRunRepository(RunRepositoryPort):
     ] = OrderedDict()
     self._provider_provenance_scheduled_report_audit_records: OrderedDict[str, ProviderProvenanceScheduledReportAuditRecord] = OrderedDict()
     self._provider_provenance_scheduler_health_records: OrderedDict[str, ProviderProvenanceSchedulerHealthRecord] = OrderedDict()
+    self._provider_provenance_scheduler_search_document_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerSearchDocumentRecord,
+    ] = OrderedDict()
     self._replay_intent_alias_signing_secret: str | None = None
 
   def save_run(self, run: RunRecord) -> RunRecord:
@@ -1542,6 +1547,36 @@ class InMemoryRunRepository(RunRepositoryPort):
       if record.expires_at is None or record.expires_at > current_time
     )
     return original_count - len(self._provider_provenance_scheduler_health_records)
+
+  def save_provider_provenance_scheduler_search_document_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchDocumentRecord,
+  ) -> ProviderProvenanceSchedulerSearchDocumentRecord:
+    self._provider_provenance_scheduler_search_document_records[record.record_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_search_document_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchDocumentRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_search_document_records.values(),
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+
+  def prune_provider_provenance_scheduler_search_document_records(self, current_time: datetime) -> int:
+    original_count = len(self._provider_provenance_scheduler_search_document_records)
+    self._provider_provenance_scheduler_search_document_records = OrderedDict(
+      (
+        record_id,
+        record,
+      )
+      for record_id, record in self._provider_provenance_scheduler_search_document_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._provider_provenance_scheduler_search_document_records)
 
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     return self._replay_intent_alias_signing_secret
