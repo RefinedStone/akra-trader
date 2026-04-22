@@ -440,16 +440,31 @@
       "id": "task-llm-sensitivity-domain-models-core-run-trading-family-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split core run and trading execution model family out of domain/models.py",
-      "description": "Continue shrinking `domain/models.py` by moving the remaining core trading and run-execution ownership around `AssetType`, `MarketType`, `RunMode`, `RunStatus`, `OrderSide`, `OrderType`, `OrderStatus`, `SignalAction`, `Instrument`, `Candle`, `SignalDecision`, `ExecutionPlan`, `StrategyExecutionState`, `StrategyDecisionContext`, `StrategyDecisionEnvelope`, `Order`, `Fill`, `Position`, `ClosedTrade`, `EquityPoint`, `RunConfig`, `RuntimeSessionState`, `RunProvenance`, and `RunRecord` into a bounded `domain/model_types/core_run_models.py`-style module while keeping `models.py` and `model_types/__init__.py` as compatibility re-export surfaces.",
-      "status": "ready",
+      "description": "Completed the core run/trading extraction by moving the `AssetType` through `RunRecord` family, including execution enums/dataclasses, benchmark artifacts, and run provenance ownership, into `domain/model_types/run_execution.py` while keeping `domain/models.py` and `domain/model_types/__init__.py` as compatibility re-export surfaces.",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 29,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T00:30:00+09:00",
+      "updated_at": "2026-04-23T00:45:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "With the strategy catalog, run-comparison, run-surface, market-data, sync-lineage, provider-provenance, operator-runtime, and guarded-live families moved out, `domain/models.py` now mainly owns the core trading and run-execution contracts plus their enums. That block is the clearest remaining bounded family and can follow the same compatibility re-export pattern without changing import paths.",
-      "priority_reason": "Promoted to ready because the previous queue head is now complete, and the remaining core run/trading family is the next directly executable `domain/models.py` decomposition step with a clear bounded ownership target."
+      "direction_relation_note": "The latest main-session reply confirms commit `a9c2d7d` moved the core execution enums/dataclasses, order/position/fill/equity models, `ReferenceSource` and `BenchmarkArtifact`, and `RunProvenance`/`RunRecord` ownership into `domain/model_types/run_execution.py`, with `strategy_catalog.py` and `run_comparison.py` updated to point at the new boundary and compatibility re-exports preserved from `models.py` and `model_types/__init__.py`.",
+      "priority_reason": "Marked done because the main session completed the extraction, validated it with `python -m py_compile`, focused domain/lineage/application regressions, focused API regressions, committed it as `a9c2d7d`, and pushed it to `origin/main`."
+    },
+    {
+      "id": "task-llm-sensitivity-domain-models-benchmark-remediation-utility-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split benchmark utility helpers and remediation result out of domain/models.py",
+      "description": "Finish the remaining `domain/models.py` ownership cleanup by moving `BENCHMARK_ARTIFACT_RUNTIME_CANDIDATE_ID_*`, `extract_benchmark_artifact_runtime_candidate_id`, `is_benchmark_artifact_metadata_key`, and `MarketDataRemediationResult` into a bounded `domain/model_types/benchmark_remediation.py`-style module while keeping `domain/models.py` and `domain/model_types/__init__.py` as compatibility re-export surfaces.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 31,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T00:45:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly says `domain/models.py` now directly owns only the benchmark utility helpers and `MarketDataRemediationResult` after the core run/trading family moved to `run_execution.py`, making this the next bounded and directly executable residual ownership split in the compatibility file.",
+      "priority_reason": "Promoted to ready because there are no remaining open tasks after the just-completed core run/trading extraction, and the residual benchmark/remediation ownership is the clearest next executable step to finish shrinking `domain/models.py` without API surface churn."
     }
   ]
 }
