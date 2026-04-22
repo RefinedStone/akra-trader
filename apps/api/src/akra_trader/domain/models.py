@@ -1667,6 +1667,83 @@ class ProviderProvenanceSchedulerSearchFeedbackRecord:
   moderated_by_tab_label: str | None = None
 
 
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+  catalog_id: str
+  created_at: datetime
+  updated_at: datetime
+  name: str
+  scheduler_key: str = "provider_provenance_reports"
+  description: str = ""
+  status: str = "active"
+  default_moderation_status: str = "approved"
+  governance_view: str = "pending_queue"
+  window_days: int = 30
+  stale_pending_hours: int = 24
+  minimum_score: int = 0
+  require_note: bool = False
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchModerationPlanPreviewItem:
+  feedback_id: str
+  occurrence_id: str
+  query: str
+  signal: str
+  current_moderation_status: str
+  proposed_moderation_status: str
+  score: int = 0
+  age_hours: int = 0
+  stale_pending: bool = False
+  high_score_pending: bool = False
+  query_run_count: int = 0
+  eligible: bool = True
+  reason_tags: tuple[str, ...] = ()
+  matched_fields: tuple[str, ...] = ()
+  semantic_concepts: tuple[str, ...] = ()
+  operator_hits: tuple[str, ...] = ()
+  note: str | None = None
+  ranking_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchModerationPlanRecord:
+  plan_id: str
+  created_at: datetime
+  updated_at: datetime
+  scheduler_key: str = "provider_provenance_reports"
+  status: str = "previewed"
+  queue_state: str = "pending_approval"
+  policy_catalog_id: str | None = None
+  policy_catalog_name: str | None = None
+  proposed_moderation_status: str = "approved"
+  governance_view: str = "pending_queue"
+  window_days: int = 30
+  stale_pending_hours: int = 24
+  minimum_score: int = 0
+  require_note: bool = False
+  requested_feedback_ids: tuple[str, ...] = ()
+  feedback_ids: tuple[str, ...] = ()
+  missing_feedback_ids: tuple[str, ...] = ()
+  preview_items: tuple[ProviderProvenanceSchedulerSearchModerationPlanPreviewItem, ...] = ()
+  created_by: str = "operator"
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+  approved_at: datetime | None = None
+  approved_by: str | None = None
+  approved_by_tab_id: str | None = None
+  approved_by_tab_label: str | None = None
+  approval_note: str | None = None
+  applied_at: datetime | None = None
+  applied_by: str | None = None
+  applied_by_tab_id: str | None = None
+  applied_by_tab_label: str | None = None
+  apply_note: str | None = None
+  applied_result: dict[str, Any] | None = None
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "

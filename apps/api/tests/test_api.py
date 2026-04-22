@@ -5139,6 +5139,169 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert tuned_search_payload["items"][0]["search_match"]["feedback_signal_count"] >= 1
 
 
+def test_scheduler_search_moderation_policy_catalog_and_plan_routes(
+  tmp_path: Path,
+) -> None:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    provider_provenance_report_scheduler_enabled=False,
+  ) as client:
+    app = client.app.state.container.app
+    fixed_time = datetime(2026, 4, 22, 12, 0, tzinfo=UTC)
+    app._clock = lambda: fixed_time
+    app._provider_provenance_report_scheduler_interval_seconds = 60
+    app._provider_provenance_report_scheduler_batch_limit = 1
+    app._provider_provenance_scheduler_health_records = {}
+    app._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
+      generated_at=fixed_time,
+      enabled=True,
+      status="starting",
+      summary="Background scheduler has not completed a provider provenance automation cycle yet.",
+      interval_seconds=60,
+      batch_limit=1,
+    )
+
+    report = app.create_provider_provenance_scheduled_report(name="Moderation policy route watch")
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report, next_run_at=fixed_time - timedelta(minutes=10))
+    )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(minutes=1)
+    app._clock = lambda: fixed_time
+    current_report = app.get_provider_provenance_scheduled_report(report.report_id)
+    app._save_provider_provenance_scheduled_report_record(
+      replace(current_report, next_run_at=fixed_time + timedelta(days=7))
+    )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+
+    search_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-alerts",
+      params={
+        "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
+        "limit": 10,
+        "offset": 0,
+      },
+    )
+    assert search_response.status_code == 200
+    search_payload = search_response.json()
+
+    feedback_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-alerts/search-feedback",
+      json={
+        "query_id": search_payload["search_summary"]["query_id"],
+        "query": search_payload["query"]["search"],
+        "occurrence_id": search_payload["items"][0]["occurrence_id"],
+        "signal": "relevant",
+        "matched_fields": search_payload["items"][0]["search_match"]["matched_fields"],
+        "semantic_concepts": search_payload["items"][0]["search_match"]["semantic_concepts"],
+        "operator_hits": search_payload["items"][0]["search_match"]["operator_hits"],
+        "lexical_score": search_payload["items"][0]["search_match"]["lexical_score"],
+        "semantic_score": search_payload["items"][0]["search_match"]["semantic_score"],
+        "operator_score": search_payload["items"][0]["search_match"]["operator_score"],
+        "score": search_payload["items"][0]["search_match"]["score"],
+        "ranking_reason": search_payload["items"][0]["search_match"]["ranking_reason"],
+      },
+    )
+    assert feedback_response.status_code == 200
+    feedback_payload = feedback_response.json()
+
+    catalog_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+      json={
+        "name": "High-signal scheduler approvals",
+        "description": "Approve only high-signal scheduler matches with a note.",
+        "default_moderation_status": "approved",
+        "governance_view": "high_score_pending",
+        "window_days": 30,
+        "stale_pending_hours": 24,
+        "minimum_score": 150,
+        "require_note": True,
+        "created_by_tab_id": "control-room",
+        "created_by_tab_label": "Control room",
+      },
+    )
+    assert catalog_response.status_code == 200
+    catalog_payload = catalog_response.json()
+    assert catalog_payload["default_moderation_status"] == "approved"
+
+    list_catalogs_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+    )
+    assert list_catalogs_response.status_code == 200
+    assert list_catalogs_response.json()["total"] == 1
+
+    stage_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-plans",
+      json={
+        "feedback_ids": [feedback_payload["feedback_id"]],
+        "policy_catalog_id": catalog_payload["catalog_id"],
+        "actor": "operator",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert stage_response.status_code == 200
+    stage_payload = stage_response.json()
+    assert stage_payload["queue_state"] == "pending_approval"
+    assert stage_payload["preview_items"][0]["eligible"] is True
+
+    queue_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-plans",
+      params={"queue_state": "pending_approval"},
+    )
+    assert queue_response.status_code == 200
+    queue_payload = queue_response.json()
+    assert queue_payload["summary"]["pending_approval_count"] == 1
+    assert queue_payload["items"][0]["plan_id"] == stage_payload["plan_id"]
+
+    approve_response = client.post(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-plans/{stage_payload['plan_id']}/approve",
+      json={
+        "actor": "operator",
+        "note": "High-signal recovery query approved for tuning.",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert approve_response.status_code == 200
+    approve_payload = approve_response.json()
+    assert approve_payload["queue_state"] == "ready_to_apply"
+
+    apply_response = client.post(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-plans/{stage_payload['plan_id']}/apply",
+      json={
+        "actor": "operator",
+        "note": "Apply approved moderation decision.",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert apply_response.status_code == 200
+    apply_payload = apply_response.json()
+    assert apply_payload["queue_state"] == "completed"
+    assert apply_payload["applied_result"]["updated_count"] == 1
+
+    tuned_search_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-alerts",
+      params={
+        "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
+        "limit": 10,
+        "offset": 0,
+      },
+    )
+    assert tuned_search_response.status_code == 200
+    tuned_search_payload = tuned_search_response.json()
+    assert tuned_search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
+    assert tuned_search_payload["search_analytics"]["approved_feedback_count"] == 1
+    assert tuned_search_payload["search_analytics"]["learned_relevance_active"] is True
+
+
 def test_operator_visibility_endpoint_can_reconstruct_mixed_status_scheduler_narrative(
   tmp_path: Path,
 ) -> None:

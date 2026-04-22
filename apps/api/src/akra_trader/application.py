@@ -56,6 +56,9 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanPreviewItem
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchQueryAnalyticsRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceResult
@@ -3009,6 +3012,40 @@ class TradingApplication:
       self._provider_provenance_scheduler_search_backend.prune_provider_provenance_scheduler_search_feedback_records(
         current_time
       )
+    )
+
+  def _save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+    return (
+      self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+        record
+      )
+    )
+
+  def _list_provider_provenance_scheduler_search_moderation_policy_catalog_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord, ...]:
+    return tuple(
+      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_moderation_policy_catalog_records()
+    )
+
+  def _save_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord:
+    return (
+      self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_moderation_plan_record(
+        record
+      )
+    )
+
+  def _list_provider_provenance_scheduler_search_moderation_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPlanRecord, ...]:
+    return tuple(
+      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_moderation_plan_records()
     )
 
   def _provider_provenance_scheduler_search_persistence_mode(self) -> str:
@@ -38004,6 +38041,493 @@ class TradingApplication:
       "top_queries": tuple(top_queries),
       "feedback_items": recent_feedback,
     }
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_search_moderation_plan_status(
+    status: str | None,
+  ) -> str | None:
+    if not isinstance(status, str):
+      return None
+    normalized = status.strip().lower().replace("-", "_")
+    if normalized in {"previewed", "approved", "applied"}:
+      return normalized
+    return None
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_search_moderation_plan_queue_state(
+    queue_state: str | None,
+  ) -> str | None:
+    if not isinstance(queue_state, str):
+      return None
+    normalized = queue_state.strip().lower().replace("-", "_")
+    if normalized in {"pending_approval", "ready_to_apply", "completed"}:
+      return normalized
+    return None
+
+  @staticmethod
+  def _serialize_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+  ) -> dict[str, Any]:
+    return {
+      "catalog_id": record.catalog_id,
+      "created_at": record.created_at,
+      "updated_at": record.updated_at,
+      "scheduler_key": record.scheduler_key,
+      "name": record.name,
+      "description": record.description,
+      "status": record.status,
+      "default_moderation_status": record.default_moderation_status,
+      "governance_view": record.governance_view,
+      "window_days": record.window_days,
+      "stale_pending_hours": record.stale_pending_hours,
+      "minimum_score": record.minimum_score,
+      "require_note": record.require_note,
+      "created_by_tab_id": record.created_by_tab_id,
+      "created_by_tab_label": record.created_by_tab_label,
+    }
+
+  @staticmethod
+  def _serialize_provider_provenance_scheduler_search_moderation_plan_preview_item(
+    item: ProviderProvenanceSchedulerSearchModerationPlanPreviewItem,
+  ) -> dict[str, Any]:
+    return {
+      "feedback_id": item.feedback_id,
+      "occurrence_id": item.occurrence_id,
+      "query": item.query,
+      "signal": item.signal,
+      "current_moderation_status": item.current_moderation_status,
+      "proposed_moderation_status": item.proposed_moderation_status,
+      "score": item.score,
+      "age_hours": item.age_hours,
+      "stale_pending": item.stale_pending,
+      "high_score_pending": item.high_score_pending,
+      "query_run_count": item.query_run_count,
+      "eligible": item.eligible,
+      "reason_tags": tuple(item.reason_tags),
+      "matched_fields": tuple(item.matched_fields),
+      "semantic_concepts": tuple(item.semantic_concepts),
+      "operator_hits": tuple(item.operator_hits),
+      "note": item.note,
+      "ranking_reason": item.ranking_reason,
+    }
+
+  def _serialize_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+  ) -> dict[str, Any]:
+    return {
+      "plan_id": record.plan_id,
+      "created_at": record.created_at,
+      "updated_at": record.updated_at,
+      "scheduler_key": record.scheduler_key,
+      "status": record.status,
+      "queue_state": record.queue_state,
+      "policy_catalog_id": record.policy_catalog_id,
+      "policy_catalog_name": record.policy_catalog_name,
+      "proposed_moderation_status": record.proposed_moderation_status,
+      "governance_view": record.governance_view,
+      "window_days": record.window_days,
+      "stale_pending_hours": record.stale_pending_hours,
+      "minimum_score": record.minimum_score,
+      "require_note": record.require_note,
+      "requested_feedback_ids": tuple(record.requested_feedback_ids),
+      "feedback_ids": tuple(record.feedback_ids),
+      "missing_feedback_ids": tuple(record.missing_feedback_ids),
+      "preview_count": len(record.preview_items),
+      "preview_items": tuple(
+        self._serialize_provider_provenance_scheduler_search_moderation_plan_preview_item(item)
+        for item in record.preview_items
+      ),
+      "created_by": record.created_by,
+      "created_by_tab_id": record.created_by_tab_id,
+      "created_by_tab_label": record.created_by_tab_label,
+      "approved_at": record.approved_at,
+      "approved_by": record.approved_by,
+      "approved_by_tab_id": record.approved_by_tab_id,
+      "approved_by_tab_label": record.approved_by_tab_label,
+      "approval_note": record.approval_note,
+      "applied_at": record.applied_at,
+      "applied_by": record.applied_by,
+      "applied_by_tab_id": record.applied_by_tab_id,
+      "applied_by_tab_label": record.applied_by_tab_label,
+      "apply_note": record.apply_note,
+      "applied_result": record.applied_result,
+    }
+
+  def _get_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    self,
+    catalog_id: str,
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+    normalized_catalog_id = catalog_id.strip() if isinstance(catalog_id, str) else ""
+    for record in self._list_provider_provenance_scheduler_search_moderation_policy_catalog_records():
+      if record.catalog_id == normalized_catalog_id:
+        return record
+    raise LookupError("Scheduler search moderation policy catalog not found.")
+
+  def _get_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    plan_id: str,
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord:
+    normalized_plan_id = plan_id.strip() if isinstance(plan_id, str) else ""
+    for record in self._list_provider_provenance_scheduler_search_moderation_plan_records():
+      if record.plan_id == normalized_plan_id:
+        return record
+    raise LookupError("Scheduler search moderation plan not found.")
+
+  def create_provider_provenance_scheduler_search_moderation_policy_catalog(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    default_moderation_status: str = "approved",
+    governance_view: str = "pending_queue",
+    window_days: int = 30,
+    stale_pending_hours: int = 24,
+    minimum_score: int = 0,
+    require_note: bool = False,
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> dict[str, Any]:
+    normalized_name = name.strip() if isinstance(name, str) and name.strip() else None
+    normalized_default_status = self._normalize_provider_provenance_scheduler_search_feedback_moderation_status(
+      default_moderation_status
+    )
+    normalized_governance_view = self._normalize_provider_provenance_scheduler_search_governance_view(
+      governance_view
+    )
+    if normalized_name is None or normalized_default_status is None or normalized_governance_view is None:
+      raise ValueError("Scheduler search moderation policy catalogs require a name, moderation status, and governance view.")
+    current_time = self._clock()
+    record = ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord(
+      catalog_id=uuid4().hex[:12],
+      created_at=current_time,
+      updated_at=current_time,
+      name=normalized_name,
+      description=description.strip() if isinstance(description, str) else "",
+      default_moderation_status=normalized_default_status,
+      governance_view=normalized_governance_view,
+      window_days=max(7, min(int(window_days), 180)),
+      stale_pending_hours=max(1, min(int(stale_pending_hours), 24 * 30)),
+      minimum_score=max(int(minimum_score), 0),
+      require_note=bool(require_note),
+      created_by_tab_id=(
+        created_by_tab_id.strip()
+        if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+        else None
+      ),
+      created_by_tab_label=(
+        created_by_tab_label.strip()
+        if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+        else None
+      ),
+    )
+    saved = self._save_provider_provenance_scheduler_search_moderation_policy_catalog_record(record)
+    return self._serialize_provider_provenance_scheduler_search_moderation_policy_catalog_record(saved)
+
+  def list_provider_provenance_scheduler_search_moderation_policy_catalogs(
+    self,
+  ) -> dict[str, Any]:
+    records = self._list_provider_provenance_scheduler_search_moderation_policy_catalog_records()
+    return {
+      "generated_at": self._clock(),
+      "total": len(records),
+      "items": tuple(
+        self._serialize_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+          record
+        )
+        for record in records
+      ),
+    }
+
+  def stage_provider_provenance_scheduler_search_moderation_plan(
+    self,
+    *,
+    feedback_ids: tuple[str, ...] | list[str],
+    policy_catalog_id: str | None = None,
+    moderation_status: str | None = None,
+    actor: str = "operator",
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> dict[str, Any]:
+    normalized_feedback_ids = tuple(
+      dict.fromkeys(
+        feedback_id.strip()
+        for feedback_id in feedback_ids
+        if isinstance(feedback_id, str) and feedback_id.strip()
+      )
+    )
+    if not normalized_feedback_ids:
+      raise ValueError("Select at least one scheduler search feedback item to stage.")
+    resolved_catalog = None
+    if isinstance(policy_catalog_id, str) and policy_catalog_id.strip():
+      resolved_catalog = self._get_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+        policy_catalog_id
+      )
+    normalized_status = self._normalize_provider_provenance_scheduler_search_feedback_moderation_status(
+      moderation_status
+    ) or (
+      resolved_catalog.default_moderation_status if resolved_catalog is not None else "approved"
+    )
+    if normalized_status is None:
+      raise ValueError("Scheduler search moderation plans require a valid moderation status.")
+    normalized_governance_view = (
+      resolved_catalog.governance_view if resolved_catalog is not None else "pending_queue"
+    )
+    normalized_window_days = (
+      resolved_catalog.window_days if resolved_catalog is not None else 30
+    )
+    normalized_stale_pending_hours = (
+      resolved_catalog.stale_pending_hours if resolved_catalog is not None else 24
+    )
+    minimum_score = resolved_catalog.minimum_score if resolved_catalog is not None else 0
+    require_note = resolved_catalog.require_note if resolved_catalog is not None else False
+    current_time = self._clock()
+    feedback_lookup = {
+      record.feedback_id: record
+      for record in self._list_provider_provenance_scheduler_search_feedback_records()
+    }
+    analytics_window_started_at = current_time - timedelta(days=normalized_window_days)
+    analytics_lookup: dict[str, int] = {}
+    for record in self._list_provider_provenance_scheduler_search_query_analytics_records():
+      if record.recorded_at < analytics_window_started_at:
+        continue
+      query_key = record.query.strip().lower()
+      analytics_lookup[query_key] = analytics_lookup.get(query_key, 0) + 1
+    stale_pending_cutoff_seconds = normalized_stale_pending_hours * 3600
+    high_score_pending_threshold = 150
+    preview_items: list[ProviderProvenanceSchedulerSearchModerationPlanPreviewItem] = []
+    eligible_feedback_ids: list[str] = []
+    missing_feedback_ids: list[str] = []
+    for feedback_id in normalized_feedback_ids:
+      record = feedback_lookup.get(feedback_id)
+      if record is None:
+        missing_feedback_ids.append(feedback_id)
+        continue
+      age_hours = int(max((current_time - record.recorded_at).total_seconds(), 0.0) // 3600)
+      stale_pending = (
+        record.moderation_status == "pending"
+        and max((current_time - record.recorded_at).total_seconds(), 0.0) >= stale_pending_cutoff_seconds
+      )
+      high_score_pending = (
+        record.moderation_status == "pending"
+        and int(record.score) >= high_score_pending_threshold
+      )
+      eligible = int(record.score) >= int(minimum_score)
+      reason_tags: list[str] = []
+      if stale_pending:
+        reason_tags.append("stale_pending")
+      if high_score_pending:
+        reason_tags.append("high_score_pending")
+      if not eligible:
+        reason_tags.append("below_minimum_score")
+      preview_items.append(
+        ProviderProvenanceSchedulerSearchModerationPlanPreviewItem(
+          feedback_id=record.feedback_id,
+          occurrence_id=record.occurrence_id,
+          query=record.query,
+          signal=record.signal,
+          current_moderation_status=record.moderation_status,
+          proposed_moderation_status=normalized_status,
+          score=int(record.score),
+          age_hours=age_hours,
+          stale_pending=stale_pending,
+          high_score_pending=high_score_pending,
+          query_run_count=analytics_lookup.get(record.query.strip().lower(), 0),
+          eligible=eligible,
+          reason_tags=tuple(reason_tags),
+          matched_fields=tuple(record.matched_fields),
+          semantic_concepts=tuple(record.semantic_concepts),
+          operator_hits=tuple(record.operator_hits),
+          note=record.note,
+          ranking_reason=record.ranking_reason,
+        )
+      )
+      if eligible:
+        eligible_feedback_ids.append(record.feedback_id)
+    if not eligible_feedback_ids:
+      raise ValueError("No selected scheduler search feedback items satisfy the staged moderation policy.")
+    plan_record = ProviderProvenanceSchedulerSearchModerationPlanRecord(
+      plan_id=uuid4().hex[:12],
+      created_at=current_time,
+      updated_at=current_time,
+      status="previewed",
+      queue_state="pending_approval",
+      policy_catalog_id=resolved_catalog.catalog_id if resolved_catalog is not None else None,
+      policy_catalog_name=resolved_catalog.name if resolved_catalog is not None else None,
+      proposed_moderation_status=normalized_status,
+      governance_view=normalized_governance_view,
+      window_days=normalized_window_days,
+      stale_pending_hours=normalized_stale_pending_hours,
+      minimum_score=int(minimum_score),
+      require_note=bool(require_note),
+      requested_feedback_ids=normalized_feedback_ids,
+      feedback_ids=tuple(eligible_feedback_ids),
+      missing_feedback_ids=tuple(missing_feedback_ids),
+      preview_items=tuple(preview_items),
+      created_by=actor.strip() if isinstance(actor, str) and actor.strip() else "operator",
+      created_by_tab_id=(
+        source_tab_id.strip()
+        if isinstance(source_tab_id, str) and source_tab_id.strip()
+        else None
+      ),
+      created_by_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+    )
+    saved = self._save_provider_provenance_scheduler_search_moderation_plan_record(plan_record)
+    return self._serialize_provider_provenance_scheduler_search_moderation_plan_record(saved)
+
+  def list_provider_provenance_scheduler_search_moderation_plans(
+    self,
+    *,
+    queue_state: str | None = None,
+    policy_catalog_id: str | None = None,
+  ) -> dict[str, Any]:
+    records = self._list_provider_provenance_scheduler_search_moderation_plan_records()
+    normalized_queue_state = (
+      self._normalize_provider_provenance_scheduler_search_moderation_plan_queue_state(
+        queue_state
+      )
+      if isinstance(queue_state, str) and queue_state.strip()
+      else None
+    )
+    normalized_policy_catalog_id = (
+      policy_catalog_id.strip()
+      if isinstance(policy_catalog_id, str) and policy_catalog_id.strip()
+      else None
+    )
+    filtered_records = tuple(
+      record
+      for record in records
+      if (
+        (normalized_queue_state is None or record.queue_state == normalized_queue_state)
+        and (
+          normalized_policy_catalog_id is None
+          or (record.policy_catalog_id or "") == normalized_policy_catalog_id
+        )
+      )
+    )
+    policy_catalogs = self._list_provider_provenance_scheduler_search_moderation_policy_catalog_records()
+    return {
+      "generated_at": self._clock(),
+      "query": {
+        "queue_state": normalized_queue_state,
+        "policy_catalog_id": normalized_policy_catalog_id,
+      },
+      "available_filters": {
+        "queue_states": ("pending_approval", "ready_to_apply", "completed"),
+        "policy_catalogs": tuple(
+          {
+            "catalog_id": catalog.catalog_id,
+            "name": catalog.name,
+          }
+          for catalog in policy_catalogs
+        ),
+      },
+      "summary": {
+        "total": len(filtered_records),
+        "pending_approval_count": sum(
+          1 for record in filtered_records if record.queue_state == "pending_approval"
+        ),
+        "ready_to_apply_count": sum(
+          1 for record in filtered_records if record.queue_state == "ready_to_apply"
+        ),
+        "completed_count": sum(
+          1 for record in filtered_records if record.queue_state == "completed"
+        ),
+      },
+      "items": tuple(
+        self._serialize_provider_provenance_scheduler_search_moderation_plan_record(record)
+        for record in filtered_records
+      ),
+    }
+
+  def approve_provider_provenance_scheduler_search_moderation_plan(
+    self,
+    *,
+    plan_id: str,
+    actor: str = "operator",
+    note: str | None = None,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> dict[str, Any]:
+    current = self._get_provider_provenance_scheduler_search_moderation_plan_record(plan_id)
+    if current.status == "applied":
+      raise RuntimeError("Applied scheduler search moderation plans cannot be approved again.")
+    normalized_note = note.strip() if isinstance(note, str) and note.strip() else None
+    if current.require_note and normalized_note is None:
+      raise ValueError("This scheduler search moderation plan requires an approval note.")
+    saved = self._save_provider_provenance_scheduler_search_moderation_plan_record(
+      replace(
+        current,
+        status="approved",
+        queue_state="ready_to_apply",
+        updated_at=self._clock(),
+        approved_at=self._clock(),
+        approved_by=actor.strip() if isinstance(actor, str) and actor.strip() else "operator",
+        approved_by_tab_id=(
+          source_tab_id.strip()
+          if isinstance(source_tab_id, str) and source_tab_id.strip()
+          else None
+        ),
+        approved_by_tab_label=(
+          source_tab_label.strip()
+          if isinstance(source_tab_label, str) and source_tab_label.strip()
+          else None
+        ),
+        approval_note=normalized_note,
+      )
+    )
+    return self._serialize_provider_provenance_scheduler_search_moderation_plan_record(saved)
+
+  def apply_provider_provenance_scheduler_search_moderation_plan(
+    self,
+    *,
+    plan_id: str,
+    actor: str = "operator",
+    note: str | None = None,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> dict[str, Any]:
+    current = self._get_provider_provenance_scheduler_search_moderation_plan_record(plan_id)
+    if current.status != "approved":
+      raise RuntimeError("Approve the scheduler search moderation plan before applying it.")
+    moderation_note = current.approval_note
+    if moderation_note is None and isinstance(note, str) and note.strip():
+      moderation_note = note.strip()
+    batch_result = self.moderate_provider_provenance_scheduler_search_feedback_batch(
+      feedback_ids=tuple(current.feedback_ids),
+      moderation_status=current.proposed_moderation_status,
+      actor=actor,
+      note=moderation_note,
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+    )
+    saved = self._save_provider_provenance_scheduler_search_moderation_plan_record(
+      replace(
+        current,
+        status="applied",
+        queue_state="completed",
+        updated_at=self._clock(),
+        applied_at=self._clock(),
+        applied_by=actor.strip() if isinstance(actor, str) and actor.strip() else "operator",
+        applied_by_tab_id=(
+          source_tab_id.strip()
+          if isinstance(source_tab_id, str) and source_tab_id.strip()
+          else None
+        ),
+        applied_by_tab_label=(
+          source_tab_label.strip()
+          if isinstance(source_tab_label, str) and source_tab_label.strip()
+          else None
+        ),
+        apply_note=note.strip() if isinstance(note, str) and note.strip() else None,
+        applied_result=batch_result,
+      )
+    )
+    return self._serialize_provider_provenance_scheduler_search_moderation_plan_record(saved)
 
   @classmethod
   def _matches_provider_provenance_scheduler_alert_occurrence_search(

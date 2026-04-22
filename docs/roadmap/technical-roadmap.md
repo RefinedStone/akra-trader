@@ -186,6 +186,9 @@ creation.
 - that same quality layer now also ships a long-horizon scheduler search dashboard plus
   moderation governance controls, so future relevance work can inspect trend lines, backlog age,
   moderator behavior, and batch decisions before moving to heavier learned ranking infrastructure
+- that same scheduler governance layer now also introduces reusable moderation policy catalogs and
+  a staged approval queue, so future quality work can gate learned relevance updates behind
+  previewed, approved moderation plans instead of direct batch actions alone
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

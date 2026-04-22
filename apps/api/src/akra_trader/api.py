@@ -280,6 +280,42 @@ class OperatorProviderProvenanceSchedulerSearchFeedbackBatchModerationRequest(Ba
   source_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogCreateRequest(BaseModel):
+  name: str
+  description: str = ""
+  default_moderation_status: str = "approved"
+  governance_view: str = "pending_queue"
+  window_days: int = 30
+  stale_pending_hours: int = 24
+  minimum_score: int = 0
+  require_note: bool = False
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationPlanStageRequest(BaseModel):
+  feedback_ids: list[str] = Field(default_factory=list)
+  policy_catalog_id: str | None = None
+  moderation_status: str | None = None
+  actor: str = "operator"
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationPlanApprovalRequest(BaseModel):
+  actor: str = "operator"
+  note: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationPlanApplyRequest(BaseModel):
+  actor: str = "operator"
+  note: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -2230,6 +2266,143 @@ def create_router(container: Container) -> APIRouter:
     methods=["POST"],
     name="moderate_operator_provider_provenance_scheduler_search_feedback_batch",
     summary="Moderate scheduler search feedback in batch",
+  )
+
+  def create_operator_provider_provenance_scheduler_search_moderation_policy_catalog(
+    request: OperatorProviderProvenanceSchedulerSearchModerationPolicyCatalogCreateRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.create_provider_provenance_scheduler_search_moderation_policy_catalog(
+        name=request.name,
+        description=request.description,
+        default_moderation_status=request.default_moderation_status,
+        governance_view=request.governance_view,
+        window_days=request.window_days,
+        stale_pending_hours=request.stale_pending_hours,
+        minimum_score=request.minimum_score,
+        require_note=request.require_note,
+        created_by_tab_id=request.created_by_tab_id,
+        created_by_tab_label=request.created_by_tab_label,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+    create_operator_provider_provenance_scheduler_search_moderation_policy_catalog,
+    methods=["POST"],
+    name="create_operator_provider_provenance_scheduler_search_moderation_policy_catalog",
+    summary="Create a reusable moderation policy catalog for scheduler search governance",
+  )
+
+  def list_operator_provider_provenance_scheduler_search_moderation_policy_catalogs(
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return app.list_provider_provenance_scheduler_search_moderation_policy_catalogs()
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+    list_operator_provider_provenance_scheduler_search_moderation_policy_catalogs,
+    methods=["GET"],
+    name="list_operator_provider_provenance_scheduler_search_moderation_policy_catalogs",
+    summary="List scheduler search moderation policy catalogs",
+  )
+
+  def stage_operator_provider_provenance_scheduler_search_moderation_plan(
+    request: OperatorProviderProvenanceSchedulerSearchModerationPlanStageRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.stage_provider_provenance_scheduler_search_moderation_plan(
+        feedback_ids=tuple(request.feedback_ids),
+        policy_catalog_id=request.policy_catalog_id,
+        moderation_status=request.moderation_status,
+        actor=request.actor,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-plans",
+    stage_operator_provider_provenance_scheduler_search_moderation_plan,
+    methods=["POST"],
+    name="stage_operator_provider_provenance_scheduler_search_moderation_plan",
+    summary="Stage scheduler search moderation feedback into an approval queue plan",
+  )
+
+  def list_operator_provider_provenance_scheduler_search_moderation_plans(
+    queue_state: str | None = None,
+    policy_catalog_id: str | None = None,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return app.list_provider_provenance_scheduler_search_moderation_plans(
+      queue_state=queue_state,
+      policy_catalog_id=policy_catalog_id,
+    )
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-plans",
+    list_operator_provider_provenance_scheduler_search_moderation_plans,
+    methods=["GET"],
+    name="list_operator_provider_provenance_scheduler_search_moderation_plans",
+    summary="List staged scheduler search moderation approval queue plans",
+  )
+
+  def approve_operator_provider_provenance_scheduler_search_moderation_plan(
+    plan_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationPlanApprovalRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.approve_provider_provenance_scheduler_search_moderation_plan(
+        plan_id=plan_id,
+        actor=request.actor,
+        note=request.note,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-plans/{plan_id}/approve",
+    approve_operator_provider_provenance_scheduler_search_moderation_plan,
+    methods=["POST"],
+    name="approve_operator_provider_provenance_scheduler_search_moderation_plan",
+    summary="Approve a staged scheduler search moderation plan",
+  )
+
+  def apply_operator_provider_provenance_scheduler_search_moderation_plan(
+    plan_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationPlanApplyRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.apply_provider_provenance_scheduler_search_moderation_plan(
+        plan_id=plan_id,
+        actor=request.actor,
+        note=request.note,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-plans/{plan_id}/apply",
+    apply_operator_provider_provenance_scheduler_search_moderation_plan,
+    methods=["POST"],
+    name="apply_operator_provider_provenance_scheduler_search_moderation_plan",
+    summary="Apply an approved scheduler search moderation plan",
   )
 
   return router

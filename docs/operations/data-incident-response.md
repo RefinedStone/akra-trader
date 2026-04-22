@@ -135,6 +135,9 @@ unclear dataset lineage.
   moderator and actor rollups, stale/high-score moderation backlog signals, and batch moderation
   actions, so governance can clear or review search feedback as an operational queue instead of
   one row at a time
+- that same scheduler governance path now also provides moderation policy catalogs and staged
+  approval plans, so operators can stage selected search feedback, enforce score or note
+  requirements, and apply approved moderation batches back into learned scheduler ranking
 - that same retrieval path now also emits cross-occurrence semantic/vector clusters, so a handoff
   can start from grouped recovery or failure narratives instead of only a flat ranked result set
   from scratch before ranking results

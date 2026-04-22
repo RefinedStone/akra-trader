@@ -16,6 +16,10 @@ import type {
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerAlertHistoryPayload,
   ProviderProvenanceSchedulerSearchDashboardPayload,
+  ProviderProvenanceSchedulerSearchModerationPlanEntry,
+  ProviderProvenanceSchedulerSearchModerationPlanListPayload,
+  ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry,
+  ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload,
   ProviderProvenanceSchedulerSearchFeedbackResult,
   ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult,
   ProviderProvenanceSchedulerSearchFeedbackModerationResult,
@@ -679,6 +683,127 @@ export async function moderateProviderProvenanceSchedulerSearchFeedbackBatch(par
       body: JSON.stringify({
         feedback_ids: params.feedbackIds,
         moderation_status: params.moderationStatus,
+        actor: params.actor?.trim() || "operator",
+        note: params.note ?? null,
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function createProviderProvenanceSchedulerSearchModerationPolicyCatalog(params: {
+  name: string;
+  description?: string | null;
+  defaultModerationStatus?: "pending" | "approved" | "rejected";
+  governanceView?: string;
+  windowDays?: number;
+  stalePendingHours?: number;
+  minimumScore?: number;
+  requireNote?: boolean;
+  createdByTabId?: string;
+  createdByTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry>(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: params.name,
+        description: params.description ?? "",
+        default_moderation_status: params.defaultModerationStatus ?? "approved",
+        governance_view: params.governanceView ?? "pending_queue",
+        window_days: params.windowDays ?? 30,
+        stale_pending_hours: params.stalePendingHours ?? 24,
+        minimum_score: params.minimumScore ?? 0,
+        require_note: params.requireNote ?? false,
+        created_by_tab_id: params.createdByTabId?.trim() || null,
+        created_by_tab_label: params.createdByTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerSearchModerationPolicyCatalogs() {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload>(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+  );
+}
+
+export async function stageProviderProvenanceSchedulerSearchModerationPlan(params: {
+  feedbackIds: string[];
+  policyCatalogId?: string;
+  moderationStatus?: "pending" | "approved" | "rejected";
+  actor?: string;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPlanEntry>(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-plans",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        feedback_ids: params.feedbackIds,
+        policy_catalog_id: params.policyCatalogId?.trim() || null,
+        moderation_status: params.moderationStatus ?? null,
+        actor: params.actor?.trim() || "operator",
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerSearchModerationPlans(params: {
+  queueState?: string;
+  policyCatalogId?: string;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.queueState?.trim()) {
+    searchParams.set("queue_state", params.queueState.trim());
+  }
+  if (params.policyCatalogId?.trim()) {
+    searchParams.set("policy_catalog_id", params.policyCatalogId.trim());
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPlanListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-plans${suffix}`,
+  );
+}
+
+export async function approveProviderProvenanceSchedulerSearchModerationPlan(params: {
+  planId: string;
+  actor?: string;
+  note?: string | null;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPlanEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-plans/${encodeURIComponent(params.planId)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        actor: params.actor?.trim() || "operator",
+        note: params.note ?? null,
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function applyProviderProvenanceSchedulerSearchModerationPlan(params: {
+  planId: string;
+  actor?: string;
+  note?: string | null;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationPlanEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-plans/${encodeURIComponent(params.planId)}/apply`,
+    {
+      method: "POST",
+      body: JSON.stringify({
         actor: params.actor?.trim() || "operator",
         note: params.note ?? null,
         source_tab_id: params.sourceTabId?.trim() || null,

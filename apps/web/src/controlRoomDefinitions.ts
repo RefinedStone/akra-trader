@@ -1500,6 +1500,109 @@ export type ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult = {
   learned_relevance_hint?: string | null;
 };
 
+export type ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry = {
+  catalog_id: string;
+  created_at: string;
+  updated_at: string;
+  scheduler_key: string;
+  name: string;
+  description: string;
+  status: string;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload = {
+  generated_at: string;
+  total: number;
+  items: ProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry[];
+};
+
+export type ProviderProvenanceSchedulerSearchModerationPlanPreviewItem = {
+  feedback_id: string;
+  occurrence_id: string;
+  query: string;
+  signal: string;
+  current_moderation_status: string;
+  proposed_moderation_status: string;
+  score: number;
+  age_hours: number;
+  stale_pending: boolean;
+  high_score_pending: boolean;
+  query_run_count: number;
+  eligible: boolean;
+  reason_tags: string[];
+  matched_fields: string[];
+  semantic_concepts: string[];
+  operator_hits: string[];
+  note?: string | null;
+  ranking_reason?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationPlanEntry = {
+  plan_id: string;
+  created_at: string;
+  updated_at: string;
+  scheduler_key: string;
+  status: string;
+  queue_state: string;
+  policy_catalog_id?: string | null;
+  policy_catalog_name?: string | null;
+  proposed_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+  requested_feedback_ids: string[];
+  feedback_ids: string[];
+  missing_feedback_ids: string[];
+  preview_count: number;
+  preview_items: ProviderProvenanceSchedulerSearchModerationPlanPreviewItem[];
+  created_by: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  approved_by_tab_id?: string | null;
+  approved_by_tab_label?: string | null;
+  approval_note?: string | null;
+  applied_at?: string | null;
+  applied_by?: string | null;
+  applied_by_tab_id?: string | null;
+  applied_by_tab_label?: string | null;
+  apply_note?: string | null;
+  applied_result?: ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationPlanListPayload = {
+  generated_at: string;
+  query: {
+    queue_state?: string | null;
+    policy_catalog_id?: string | null;
+  };
+  available_filters: {
+    queue_states: string[];
+    policy_catalogs: {
+      catalog_id: string;
+      name: string;
+    }[];
+  };
+  summary: {
+    total: number;
+    pending_approval_count: number;
+    ready_to_apply_count: number;
+    completed_count: number;
+  };
+  items: ProviderProvenanceSchedulerSearchModerationPlanEntry[];
+};
+
 export type ProviderProvenanceSchedulerSearchDashboardPayload = {
   generated_at: string;
   query: {

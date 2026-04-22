@@ -28,6 +28,8 @@ from sqlalchemy.engine import make_url
 
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchQueryAnalyticsRecord
 from akra_trader.port_contracts.search import ProviderProvenanceSchedulerSearchBackendPort
 
@@ -78,6 +80,29 @@ provider_provenance_scheduler_search_feedback = Table(
   Column("signal", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_search_moderation_policy_catalogs = Table(
+  "provider_provenance_scheduler_search_moderation_policy_catalogs",
+  metadata,
+  Column("catalog_id", String, primary_key=True),
+  Column("scheduler_key", String, nullable=False, index=True),
+  Column("created_at", String, nullable=False, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("name", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_search_moderation_plans = Table(
+  "provider_provenance_scheduler_search_moderation_plans",
+  metadata,
+  Column("plan_id", String, primary_key=True),
+  Column("scheduler_key", String, nullable=False, index=True),
+  Column("created_at", String, nullable=False, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("queue_state", String, nullable=False, index=True),
+  Column("policy_catalog_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 
 
 class _SchedulerSearchDocumentPruneRequest(BaseModel):
@@ -116,6 +141,14 @@ class _SchedulerSearchFeedbackListResponse(BaseModel):
   items: list[ProviderProvenanceSchedulerSearchFeedbackRecord]
 
 
+class _SchedulerSearchModerationPolicyCatalogListResponse(BaseModel):
+  items: list[ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord]
+
+
+class _SchedulerSearchModerationPlanListResponse(BaseModel):
+  items: list[ProviderProvenanceSchedulerSearchModerationPlanRecord]
+
+
 def _normalize_service_auth_token(value: str | None) -> str | None:
   if not isinstance(value, str):
     return None
@@ -135,6 +168,14 @@ class InMemoryProviderProvenanceSchedulerSearchStore:
     self._feedback_records: OrderedDict[
       str,
       ProviderProvenanceSchedulerSearchFeedbackRecord,
+    ] = OrderedDict()
+    self._moderation_policy_catalog_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+    ] = OrderedDict()
+    self._moderation_plan_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerSearchModerationPlanRecord,
     ] = OrderedDict()
 
   def save_provider_provenance_scheduler_search_document_record(
@@ -236,11 +277,53 @@ class InMemoryProviderProvenanceSchedulerSearchStore:
     )
     return original_count - len(self._feedback_records)
 
+  def save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+    self._moderation_policy_catalog_records[record.catalog_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_search_moderation_policy_catalog_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord, ...]:
+    return tuple(
+      sorted(
+        self._moderation_policy_catalog_records.values(),
+        key=lambda record: (record.updated_at, record.catalog_id),
+        reverse=True,
+      )
+    )
+
+  def save_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord:
+    self._moderation_plan_records[record.plan_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_search_moderation_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPlanRecord, ...]:
+    return tuple(
+      sorted(
+        self._moderation_plan_records.values(),
+        key=lambda record: (record.updated_at, record.plan_id),
+        reverse=True,
+      )
+    )
+
 
 class SqlAlchemyProviderProvenanceSchedulerSearchStore:
   _record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchDocumentRecord)
   _analytics_record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchQueryAnalyticsRecord)
   _feedback_record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchFeedbackRecord)
+  _moderation_policy_catalog_record_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
+  )
+  _moderation_plan_record_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerSearchModerationPlanRecord
+  )
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
@@ -418,6 +501,102 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
       )
     return result.rowcount or 0
 
+  def save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+    payload = self._moderation_policy_catalog_record_adapter.dump_python(record, mode="json")
+    row = {
+      "catalog_id": record.catalog_id,
+      "scheduler_key": record.scheduler_key,
+      "created_at": record.created_at.isoformat(),
+      "updated_at": record.updated_at.isoformat(),
+      "status": record.status,
+      "name": record.name,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_search_moderation_policy_catalogs.c.catalog_id).where(
+          provider_provenance_scheduler_search_moderation_policy_catalogs.c.catalog_id == record.catalog_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(provider_provenance_scheduler_search_moderation_policy_catalogs).values(**row)
+        )
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_search_moderation_policy_catalogs)
+          .where(
+            provider_provenance_scheduler_search_moderation_policy_catalogs.c.catalog_id
+            == record.catalog_id
+          )
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_search_moderation_policy_catalog_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord, ...]:
+    statement = select(
+      provider_provenance_scheduler_search_moderation_policy_catalogs.c.payload
+    ).order_by(
+      provider_provenance_scheduler_search_moderation_policy_catalogs.c.updated_at.desc(),
+      provider_provenance_scheduler_search_moderation_policy_catalogs.c.catalog_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._moderation_policy_catalog_record_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def save_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord:
+    payload = self._moderation_plan_record_adapter.dump_python(record, mode="json")
+    row = {
+      "plan_id": record.plan_id,
+      "scheduler_key": record.scheduler_key,
+      "created_at": record.created_at.isoformat(),
+      "updated_at": record.updated_at.isoformat(),
+      "status": record.status,
+      "queue_state": record.queue_state,
+      "policy_catalog_id": record.policy_catalog_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_search_moderation_plans.c.plan_id).where(
+          provider_provenance_scheduler_search_moderation_plans.c.plan_id == record.plan_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_search_moderation_plans).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_search_moderation_plans)
+          .where(provider_provenance_scheduler_search_moderation_plans.c.plan_id == record.plan_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_search_moderation_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPlanRecord, ...]:
+    statement = select(provider_provenance_scheduler_search_moderation_plans.c.payload).order_by(
+      provider_provenance_scheduler_search_moderation_plans.c.updated_at.desc(),
+      provider_provenance_scheduler_search_moderation_plans.c.plan_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._moderation_plan_record_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
   def _ensure_schema(self) -> None:
     inspector = inspect(self._engine)
     existing_indexes_by_table = {
@@ -429,6 +608,8 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
         "provider_provenance_scheduler_search_documents",
         "provider_provenance_scheduler_search_query_analytics",
         "provider_provenance_scheduler_search_feedback",
+        "provider_provenance_scheduler_search_moderation_policy_catalogs",
+        "provider_provenance_scheduler_search_moderation_plans",
       )
     }
     index_specs = (
@@ -501,6 +682,61 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
         "provider_provenance_scheduler_search_feedback",
         "ix_provider_provenance_scheduler_search_feedback_signal",
         "signal",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_policy_catalogs",
+        "ix_provider_provenance_scheduler_search_moderation_policy_catalogs_scheduler_key",
+        "scheduler_key",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_policy_catalogs",
+        "ix_provider_provenance_scheduler_search_moderation_policy_catalogs_created_at",
+        "created_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_policy_catalogs",
+        "ix_provider_provenance_scheduler_search_moderation_policy_catalogs_updated_at",
+        "updated_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_policy_catalogs",
+        "ix_provider_provenance_scheduler_search_moderation_policy_catalogs_status",
+        "status",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_policy_catalogs",
+        "ix_provider_provenance_scheduler_search_moderation_policy_catalogs_name",
+        "name",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_plans",
+        "ix_provider_provenance_scheduler_search_moderation_plans_scheduler_key",
+        "scheduler_key",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_plans",
+        "ix_provider_provenance_scheduler_search_moderation_plans_created_at",
+        "created_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_plans",
+        "ix_provider_provenance_scheduler_search_moderation_plans_updated_at",
+        "updated_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_plans",
+        "ix_provider_provenance_scheduler_search_moderation_plans_status",
+        "status",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_plans",
+        "ix_provider_provenance_scheduler_search_moderation_plans_queue_state",
+        "queue_state",
+      ),
+      (
+        "provider_provenance_scheduler_search_moderation_plans",
+        "ix_provider_provenance_scheduler_search_moderation_plans_policy_catalog_id",
+        "policy_catalog_id",
       ),
     )
     with self._engine.begin() as connection:
@@ -575,6 +811,30 @@ class ProviderProvenanceSchedulerSearchService:
     current_time: datetime,
   ) -> int:
     return self._store.prune_provider_provenance_scheduler_search_feedback_records(current_time)
+
+  def save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+    return self._store.save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+      record
+    )
+
+  def list_provider_provenance_scheduler_search_moderation_policy_catalog_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord, ...]:
+    return self._store.list_provider_provenance_scheduler_search_moderation_policy_catalog_records()
+
+  def save_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord:
+    return self._store.save_provider_provenance_scheduler_search_moderation_plan_record(record)
+
+  def list_provider_provenance_scheduler_search_moderation_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPlanRecord, ...]:
+    return self._store.list_provider_provenance_scheduler_search_moderation_plan_records()
 
 
 def create_provider_provenance_scheduler_search_service_app(
@@ -679,6 +939,42 @@ def create_provider_provenance_scheduler_search_service_app(
       )
     )
 
+  @app.post("/provider-provenance-scheduler-search/moderation-policy-catalogs")
+  def save_moderation_policy_catalog(
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+    authorization: str | None = Header(default=None),
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+    _require_authorization(authorization)
+    return service.save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+      record
+    )
+
+  @app.get("/provider-provenance-scheduler-search/moderation-policy-catalogs")
+  def list_moderation_policy_catalogs(
+    authorization: str | None = Header(default=None),
+  ) -> _SchedulerSearchModerationPolicyCatalogListResponse:
+    _require_authorization(authorization)
+    return _SchedulerSearchModerationPolicyCatalogListResponse(
+      items=list(service.list_provider_provenance_scheduler_search_moderation_policy_catalog_records())
+    )
+
+  @app.post("/provider-provenance-scheduler-search/moderation-plans")
+  def save_moderation_plan(
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+    authorization: str | None = Header(default=None),
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord:
+    _require_authorization(authorization)
+    return service.save_provider_provenance_scheduler_search_moderation_plan_record(record)
+
+  @app.get("/provider-provenance-scheduler-search/moderation-plans")
+  def list_moderation_plans(
+    authorization: str | None = Header(default=None),
+  ) -> _SchedulerSearchModerationPlanListResponse:
+    _require_authorization(authorization)
+    return _SchedulerSearchModerationPlanListResponse(
+      items=list(service.list_provider_provenance_scheduler_search_moderation_plan_records())
+    )
+
   return app
 
 
@@ -745,6 +1041,30 @@ class EmbeddedProviderProvenanceSchedulerSearchServiceClient(
       current_time
     )
 
+  def save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+    return self._service.save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+      record
+    )
+
+  def list_provider_provenance_scheduler_search_moderation_policy_catalog_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord, ...]:
+    return self._service.list_provider_provenance_scheduler_search_moderation_policy_catalog_records()
+
+  def save_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord:
+    return self._service.save_provider_provenance_scheduler_search_moderation_plan_record(record)
+
+  def list_provider_provenance_scheduler_search_moderation_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPlanRecord, ...]:
+    return self._service.list_provider_provenance_scheduler_search_moderation_plan_records()
+
 
 class HttpProviderProvenanceSchedulerSearchServiceClient(
   ProviderProvenanceSchedulerSearchBackendPort
@@ -753,12 +1073,24 @@ class HttpProviderProvenanceSchedulerSearchServiceClient(
   _record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchDocumentRecord)
   _analytics_record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchQueryAnalyticsRecord)
   _feedback_record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchFeedbackRecord)
+  _moderation_policy_catalog_record_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
+  )
+  _moderation_plan_record_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerSearchModerationPlanRecord
+  )
   _list_response_adapter = TypeAdapter(_SchedulerSearchDocumentListResponse)
   _prune_response_adapter = TypeAdapter(_SchedulerSearchDocumentPruneResponse)
   _analytics_list_response_adapter = TypeAdapter(_SchedulerSearchAnalyticsListResponse)
   _analytics_prune_response_adapter = TypeAdapter(_SchedulerSearchAnalyticsPruneResponse)
   _feedback_list_response_adapter = TypeAdapter(_SchedulerSearchFeedbackListResponse)
   _feedback_prune_response_adapter = TypeAdapter(_SchedulerSearchFeedbackPruneResponse)
+  _moderation_policy_catalog_list_response_adapter = TypeAdapter(
+    _SchedulerSearchModerationPolicyCatalogListResponse
+  )
+  _moderation_plan_list_response_adapter = TypeAdapter(
+    _SchedulerSearchModerationPlanListResponse
+  )
 
   def __init__(
     self,
@@ -877,6 +1209,50 @@ class HttpProviderProvenanceSchedulerSearchServiceClient(
     )
     parsed = self._feedback_prune_response_adapter.validate_python(response)
     return parsed.deleted_count
+
+  def save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord:
+    payload = self._moderation_policy_catalog_record_adapter.dump_python(record, mode="json")
+    response = self._request(
+      method="POST",
+      path="/provider-provenance-scheduler-search/moderation-policy-catalogs",
+      payload=payload,
+    )
+    return self._moderation_policy_catalog_record_adapter.validate_python(response)
+
+  def list_provider_provenance_scheduler_search_moderation_policy_catalog_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord, ...]:
+    response = self._request(
+      method="GET",
+      path="/provider-provenance-scheduler-search/moderation-policy-catalogs",
+    )
+    parsed = self._moderation_policy_catalog_list_response_adapter.validate_python(response)
+    return tuple(parsed.items)
+
+  def save_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord:
+    payload = self._moderation_plan_record_adapter.dump_python(record, mode="json")
+    response = self._request(
+      method="POST",
+      path="/provider-provenance-scheduler-search/moderation-plans",
+      payload=payload,
+    )
+    return self._moderation_plan_record_adapter.validate_python(response)
+
+  def list_provider_provenance_scheduler_search_moderation_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPlanRecord, ...]:
+    response = self._request(
+      method="GET",
+      path="/provider-provenance-scheduler-search/moderation-plans",
+    )
+    parsed = self._moderation_plan_list_response_adapter.validate_python(response)
+    return tuple(parsed.items)
 
   def _request(
     self,

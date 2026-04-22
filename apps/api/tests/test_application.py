@@ -2047,6 +2047,139 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   assert tuned_payload["items"][0]["search_match"]["feedback_signal_count"] >= 1
 
 
+def test_provider_provenance_scheduler_search_moderation_policy_catalog_and_plan_flow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 14, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+  bindings_by_key = {
+    binding.surface_key: binding
+    for binding in list_standalone_surface_runtime_bindings()
+  }
+
+  report_a = app.create_provider_provenance_scheduled_report(name="Moderation policy watch A")
+  report_b = app.create_provider_provenance_scheduled_report(name="Moderation policy watch B")
+  overdue_at = clock.current - timedelta(minutes=10)
+  app._save_provider_provenance_scheduled_report_record(
+    replace(report_a, next_run_at=overdue_at)
+  )
+  app._save_provider_provenance_scheduled_report_record(
+    replace(report_b, next_run_at=overdue_at)
+  )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  clock.advance(timedelta(minutes=1))
+  for current_report in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(current_report, next_run_at=clock.current + timedelta(days=7))
+    )
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+
+  search_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
+    app=app,
+    filters={
+      "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
+      "limit": 10,
+      "offset": 0,
+    },
+  )
+  feedback_result = app.record_provider_provenance_scheduler_alert_search_feedback(
+    query_id=search_payload["search_summary"]["query_id"],
+    query=search_payload["query"]["search"],
+    occurrence_id=search_payload["items"][0]["occurrence_id"],
+    signal="relevant",
+    matched_fields=tuple(search_payload["items"][0]["search_match"]["matched_fields"]),
+    semantic_concepts=tuple(search_payload["items"][0]["search_match"]["semantic_concepts"]),
+    operator_hits=tuple(search_payload["items"][0]["search_match"]["operator_hits"]),
+    lexical_score=search_payload["items"][0]["search_match"]["lexical_score"],
+    semantic_score=search_payload["items"][0]["search_match"]["semantic_score"],
+    operator_score=search_payload["items"][0]["search_match"]["operator_score"],
+    score=search_payload["items"][0]["search_match"]["score"],
+    ranking_reason=search_payload["items"][0]["search_match"]["ranking_reason"],
+  )
+
+  catalog = app.create_provider_provenance_scheduler_search_moderation_policy_catalog(
+    name="High-signal scheduler approvals",
+    description="Approve only strong scheduler matches with an explicit note.",
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    minimum_score=150,
+    require_note=True,
+    created_by_tab_id="control-room",
+    created_by_tab_label="Control room",
+  )
+  assert catalog["default_moderation_status"] == "approved"
+  catalogs = app.list_provider_provenance_scheduler_search_moderation_policy_catalogs()
+  assert catalogs["total"] == 1
+
+  previewed = app.stage_provider_provenance_scheduler_search_moderation_plan(
+    feedback_ids=(feedback_result["feedback_id"],),
+    policy_catalog_id=catalog["catalog_id"],
+    actor="operator",
+    source_tab_id="control-room",
+    source_tab_label="Control room",
+  )
+  assert previewed["queue_state"] == "pending_approval"
+  assert previewed["preview_count"] == 1
+  assert previewed["preview_items"][0]["eligible"] is True
+
+  queue_payload = app.list_provider_provenance_scheduler_search_moderation_plans(
+    queue_state="pending_approval",
+  )
+  assert queue_payload["summary"]["pending_approval_count"] == 1
+  assert queue_payload["items"][0]["plan_id"] == previewed["plan_id"]
+
+  approved = app.approve_provider_provenance_scheduler_search_moderation_plan(
+    plan_id=previewed["plan_id"],
+    actor="operator",
+    note="High-signal recovery query approved for tuning.",
+    source_tab_id="control-room",
+    source_tab_label="Control room",
+  )
+  assert approved["queue_state"] == "ready_to_apply"
+  assert approved["approval_note"]
+
+  applied = app.apply_provider_provenance_scheduler_search_moderation_plan(
+    plan_id=previewed["plan_id"],
+    actor="operator",
+    note="Apply approved moderation decision to feedback.",
+    source_tab_id="control-room",
+    source_tab_label="Control room",
+  )
+  assert applied["queue_state"] == "completed"
+  assert applied["applied_result"]["updated_count"] == 1
+
+  tuned_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
+    app=app,
+    filters={
+      "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
+      "limit": 10,
+      "offset": 0,
+    },
+  )
+  assert tuned_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
+  assert tuned_payload["search_analytics"]["approved_feedback_count"] == 1
+  assert tuned_payload["search_analytics"]["learned_relevance_active"] is True
+
+
 def test_provider_provenance_scheduler_history_and_analytics_persist(
   monkeypatch,
   tmp_path: Path,

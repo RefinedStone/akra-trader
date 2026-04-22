@@ -125,9 +125,14 @@ import {
   listProviderProvenanceSchedulerStitchedReportViewAudits,
   listProviderProvenanceSchedulerStitchedReportViewRevisions,
   getProviderProvenanceSchedulerSearchDashboard,
+  listProviderProvenanceSchedulerSearchModerationPolicyCatalogs,
+  listProviderProvenanceSchedulerSearchModerationPlans,
   listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
+  approveProviderProvenanceSchedulerSearchModerationPlan,
+  applyProviderProvenanceSchedulerSearchModerationPlan,
+  createProviderProvenanceSchedulerSearchModerationPolicyCatalog,
   moderateProviderProvenanceSchedulerSearchFeedbackBatch,
   moderateProviderProvenanceSchedulerSearchFeedback,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
@@ -147,6 +152,7 @@ import {
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernance,
+  stageProviderProvenanceSchedulerSearchModerationPlan,
   stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates,
   stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
   stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
@@ -363,6 +369,8 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerSearchModerationPlanListPayload,
+  ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload,
   ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult,
   ProviderProvenanceSchedulerSearchDashboardPayload,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord,
@@ -506,6 +514,28 @@ type ProviderProvenanceSchedulerSearchDashboardFilterState = {
   stale_pending_hours: number;
 };
 
+type ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft = {
+  name: string;
+  description: string;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+};
+
+type ProviderProvenanceSchedulerSearchModerationQueueFilterState = {
+  queue_state: string;
+  policy_catalog_id: string;
+};
+
+type ProviderProvenanceSchedulerSearchModerationStageDraft = {
+  policy_catalog_id: string;
+  moderation_status: string;
+  note: string;
+};
+
 type ProviderProvenanceSchedulerExportPolicyDraft = {
   job_id: string | null;
   routing_policy_id: string;
@@ -538,6 +568,28 @@ const defaultProviderProvenanceSchedulerSearchDashboardFilterState: ProviderProv
   governance_view: "all_feedback",
   window_days: 30,
   stale_pending_hours: 24,
+};
+
+const defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft: ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft = {
+  name: "",
+  description: "",
+  default_moderation_status: "approved",
+  governance_view: "pending_queue",
+  window_days: 30,
+  stale_pending_hours: 24,
+  minimum_score: 0,
+  require_note: false,
+};
+
+const defaultProviderProvenanceSchedulerSearchModerationQueueFilterState: ProviderProvenanceSchedulerSearchModerationQueueFilterState = {
+  queue_state: "pending_approval",
+  policy_catalog_id: ALL_FILTER_VALUE,
+};
+
+const defaultProviderProvenanceSchedulerSearchModerationStageDraft: ProviderProvenanceSchedulerSearchModerationStageDraft = {
+  policy_catalog_id: ALL_FILTER_VALUE,
+  moderation_status: "approved",
+  note: "",
 };
 
 function normalizeProviderProvenanceSchedulerRoutingPolicyDraftValue(policyId?: string | null) {
@@ -4326,6 +4378,30 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerSearchDashboardError, setProviderProvenanceSchedulerSearchDashboardError] =
     useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogs, setProviderProvenanceSchedulerSearchModerationPolicyCatalogs] =
+    useState<ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload | null>(null);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogsLoading, setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogsError, setProviderProvenanceSchedulerSearchModerationPolicyCatalogsError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationPolicyCatalogDraft, setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft] =
+    useState<ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft>(
+      defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft,
+    );
+  const [providerProvenanceSchedulerSearchModerationPlans, setProviderProvenanceSchedulerSearchModerationPlans] =
+    useState<ProviderProvenanceSchedulerSearchModerationPlanListPayload | null>(null);
+  const [providerProvenanceSchedulerSearchModerationPlansLoading, setProviderProvenanceSchedulerSearchModerationPlansLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerSearchModerationPlansError, setProviderProvenanceSchedulerSearchModerationPlansError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationQueueFilter, setProviderProvenanceSchedulerSearchModerationQueueFilter] =
+    useState<ProviderProvenanceSchedulerSearchModerationQueueFilterState>(
+      defaultProviderProvenanceSchedulerSearchModerationQueueFilterState,
+    );
+  const [providerProvenanceSchedulerSearchModerationStageDraft, setProviderProvenanceSchedulerSearchModerationStageDraft] =
+    useState<ProviderProvenanceSchedulerSearchModerationStageDraft>(
+      defaultProviderProvenanceSchedulerSearchModerationStageDraft,
+    );
   const [providerProvenanceSchedulerSearchDashboardFilter, setProviderProvenanceSchedulerSearchDashboardFilter] =
     useState<ProviderProvenanceSchedulerSearchDashboardFilterState>(
       defaultProviderProvenanceSchedulerSearchDashboardFilterState,
@@ -4333,6 +4409,8 @@ export default function App() {
   const [providerProvenanceSchedulerSearchFeedbackPendingOccurrenceKey, setProviderProvenanceSchedulerSearchFeedbackPendingOccurrenceKey] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerSearchFeedbackModerationPendingId, setProviderProvenanceSchedulerSearchFeedbackModerationPendingId] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationPlanPendingId, setProviderProvenanceSchedulerSearchModerationPlanPendingId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerSearchFeedbackIds, setSelectedProviderProvenanceSchedulerSearchFeedbackIds] =
     useState<string[]>([]);
@@ -4513,6 +4591,8 @@ export default function App() {
   const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerSearchDashboardRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerSearchModerationPlanRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
   const providerProvenanceSchedulerStitchedReportViewRequestIdRef = useRef(0);
   const providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef = useRef(0);
@@ -6154,6 +6234,8 @@ export default function App() {
     providerProvenanceSchedulerSearchDashboardFilter.governance_view,
     providerProvenanceSchedulerSearchDashboardFilter.window_days,
     providerProvenanceSchedulerSearchDashboardFilter.stale_pending_hours,
+    providerProvenanceSchedulerSearchModerationQueueFilter.queue_state,
+    providerProvenanceSchedulerSearchModerationQueueFilter.policy_catalog_id,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.view_id,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.action,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.actor_tab_id,
@@ -6909,6 +6991,14 @@ export default function App() {
     providerProvenanceSchedulerAlertHistoryRequestIdRef.current = alertHistoryRequestId;
     const searchDashboardRequestId = providerProvenanceSchedulerSearchDashboardRequestIdRef.current + 1;
     providerProvenanceSchedulerSearchDashboardRequestIdRef.current = searchDashboardRequestId;
+    const searchModerationPolicyCatalogRequestId =
+      providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef.current + 1;
+    providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef.current =
+      searchModerationPolicyCatalogRequestId;
+    const searchModerationPlanRequestId =
+      providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current + 1;
+    providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current =
+      searchModerationPlanRequestId;
     const exportRequestId = providerProvenanceSchedulerExportRequestIdRef.current + 1;
     providerProvenanceSchedulerExportRequestIdRef.current = exportRequestId;
     const stitchedViewRequestId = providerProvenanceSchedulerStitchedReportViewRequestIdRef.current + 1;
@@ -6919,6 +7009,8 @@ export default function App() {
     setProviderProvenanceSchedulerHistoryLoading(true);
     setProviderProvenanceSchedulerAlertHistoryLoading(true);
     setProviderProvenanceSchedulerSearchDashboardLoading(true);
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(true);
+    setProviderProvenanceSchedulerSearchModerationPlansLoading(true);
     setProviderProvenanceSchedulerExportsLoading(true);
     setProviderProvenanceSchedulerStitchedReportViewsLoading(true);
     setProviderProvenanceSchedulerStitchedReportViewAuditsLoading(true);
@@ -6926,6 +7018,8 @@ export default function App() {
     setProviderProvenanceSchedulerHistoryError(null);
     setProviderProvenanceSchedulerAlertHistoryError(null);
     setProviderProvenanceSchedulerSearchDashboardError(null);
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogsError(null);
+    setProviderProvenanceSchedulerSearchModerationPlansError(null);
     setProviderProvenanceSchedulerExportsError(null);
     setProviderProvenanceSchedulerStitchedReportViewsError(null);
     setProviderProvenanceSchedulerStitchedReportViewAuditsError(null);
@@ -6935,6 +7029,8 @@ export default function App() {
         historyPayload,
         alertHistoryPayload,
         searchDashboardPayload,
+        searchModerationPolicyCatalogPayload,
+        searchModerationPlanPayload,
         exportListPayload,
         stitchedViewPayload,
         stitchedViewAuditPayload,
@@ -6987,6 +7083,17 @@ export default function App() {
           queryLimit: 8,
           feedbackLimit: 12,
         }),
+        listProviderProvenanceSchedulerSearchModerationPolicyCatalogs(),
+        listProviderProvenanceSchedulerSearchModerationPlans({
+          queueState:
+            providerProvenanceSchedulerSearchModerationQueueFilter.queue_state !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerSearchModerationQueueFilter.queue_state
+              : undefined,
+          policyCatalogId:
+            providerProvenanceSchedulerSearchModerationQueueFilter.policy_catalog_id !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerSearchModerationQueueFilter.policy_catalog_id
+              : undefined,
+        }),
         listProviderProvenanceExportJobs({
           exportScope: "provider_provenance_scheduler_health",
           limit: schedulerHistoryLimit,
@@ -7030,6 +7137,20 @@ export default function App() {
           ),
         );
       }
+      if (
+        providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef.current
+        === searchModerationPolicyCatalogRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogs(
+          searchModerationPolicyCatalogPayload,
+        );
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
+        === searchModerationPlanRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPlans(searchModerationPlanPayload);
+      }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExports(exportListPayload.items);
       }
@@ -7065,6 +7186,20 @@ export default function App() {
         setProviderProvenanceSchedulerSearchDashboard(null);
         setProviderProvenanceSchedulerSearchDashboardError(message);
       }
+      if (
+        providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef.current
+        === searchModerationPolicyCatalogRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogs(null);
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogsError(message);
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
+        === searchModerationPlanRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPlans(null);
+        setProviderProvenanceSchedulerSearchModerationPlansError(message);
+      }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExports([]);
         setProviderProvenanceSchedulerExportsError(message);
@@ -7089,6 +7224,18 @@ export default function App() {
       }
       if (providerProvenanceSchedulerSearchDashboardRequestIdRef.current === searchDashboardRequestId) {
         setProviderProvenanceSchedulerSearchDashboardLoading(false);
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef.current
+        === searchModerationPolicyCatalogRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(false);
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
+        === searchModerationPlanRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationPlansLoading(false);
       }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExportsLoading(false);
@@ -7207,6 +7354,144 @@ export default function App() {
       );
     } finally {
       setProviderProvenanceSchedulerSearchFeedbackModerationPendingId(null);
+    }
+  }
+
+  async function createProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry() {
+    const normalizedName = providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.name.trim();
+    if (!normalizedName) {
+      setProviderProvenanceWorkspaceFeedback("Name the moderation policy catalog before saving it.");
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(true);
+    try {
+      const result = await createProviderProvenanceSchedulerSearchModerationPolicyCatalog({
+        name: normalizedName,
+        description: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.description,
+        defaultModerationStatus:
+          providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.default_moderation_status
+            === "pending"
+            || providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.default_moderation_status
+              === "rejected"
+            ? providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.default_moderation_status
+            : "approved",
+        governanceView: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.governance_view,
+        windowDays: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.window_days,
+        stalePendingHours:
+          providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.stale_pending_hours,
+        minimumScore: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.minimum_score,
+        requireNote: providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.require_note,
+        createdByTabId: activeWorkspace,
+        createdByTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Saved moderation policy catalog ${result.name} with ${formatWorkflowToken(result.default_moderation_status)} defaults.`,
+      );
+      setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft(
+        defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft,
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler moderation policy catalog failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(false);
+    }
+  }
+
+  async function stageProviderProvenanceSchedulerSearchModerationSelection() {
+    if (!selectedProviderProvenanceSchedulerSearchFeedbackIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select scheduler feedback rows before staging an approval plan.");
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationPlanPendingId("stage");
+    try {
+      const result = await stageProviderProvenanceSchedulerSearchModerationPlan({
+        feedbackIds: selectedProviderProvenanceSchedulerSearchFeedbackIds,
+        policyCatalogId:
+          providerProvenanceSchedulerSearchModerationStageDraft.policy_catalog_id !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerSearchModerationStageDraft.policy_catalog_id
+            : undefined,
+        moderationStatus:
+          providerProvenanceSchedulerSearchModerationStageDraft.policy_catalog_id === ALL_FILTER_VALUE
+          && (
+            providerProvenanceSchedulerSearchModerationStageDraft.moderation_status === "pending"
+            || providerProvenanceSchedulerSearchModerationStageDraft.moderation_status === "rejected"
+          )
+            ? providerProvenanceSchedulerSearchModerationStageDraft.moderation_status
+            : providerProvenanceSchedulerSearchModerationStageDraft.policy_catalog_id === ALL_FILTER_VALUE
+              ? "approved"
+              : undefined,
+        actor: "operator",
+        sourceTabId: activeWorkspace,
+        sourceTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Staged moderation plan ${shortenIdentifier(result.plan_id, 10)} with ${result.preview_count} preview item(s).`,
+      );
+      setSelectedProviderProvenanceSchedulerSearchFeedbackIds([]);
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler moderation plan staging failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationPlanPendingId(null);
+    }
+  }
+
+  async function approveProviderProvenanceSchedulerSearchModerationQueuePlan(planId: string) {
+    const normalizedPlanId = planId.trim();
+    if (!normalizedPlanId) {
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationPlanPendingId(normalizedPlanId);
+    try {
+      const result = await approveProviderProvenanceSchedulerSearchModerationPlan({
+        planId: normalizedPlanId,
+        actor: "operator",
+        note: providerProvenanceSchedulerSearchModerationStageDraft.note.trim() || null,
+        sourceTabId: activeWorkspace,
+        sourceTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Approved scheduler moderation plan ${shortenIdentifier(result.plan_id, 10)} for ${formatWorkflowToken(result.proposed_moderation_status)}.`,
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler moderation plan approval failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationPlanPendingId(null);
+    }
+  }
+
+  async function applyProviderProvenanceSchedulerSearchModerationQueuePlan(planId: string) {
+    const normalizedPlanId = planId.trim();
+    if (!normalizedPlanId) {
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationPlanPendingId(normalizedPlanId);
+    try {
+      const result = await applyProviderProvenanceSchedulerSearchModerationPlan({
+        planId: normalizedPlanId,
+        actor: "operator",
+        note: providerProvenanceSchedulerSearchModerationStageDraft.note.trim() || null,
+        sourceTabId: activeWorkspace,
+        sourceTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Applied scheduler moderation plan ${shortenIdentifier(result.plan_id, 10)} and updated ${result.applied_result?.updated_count ?? 0} feedback item(s).`,
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler moderation plan apply failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationPlanPendingId(null);
     }
   }
 
@@ -19841,6 +20126,404 @@ export default function App() {
                                           {selectedProviderProvenanceSchedulerSearchFeedbackIds.length} selected
                                         </span>
                                       </div>
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Scheduler moderation policy catalogs</strong>
+                                        <p>
+                                          Save reusable moderation defaults and route selected feedback through a staged
+                                          approval queue before it changes learned ranking.
+                                        </p>
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <label className="run-form-field">
+                                          <span>Name</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft((current) => ({
+                                                ...current,
+                                                name: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="Pending scheduler approvals"
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.name}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Description</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft((current) => ({
+                                                ...current,
+                                                description: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="Moderate high-signal scheduler feedback before tuning"
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.description}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Default outcome</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.default_moderation_status}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft((current) => ({
+                                                ...current,
+                                                default_moderation_status: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value="approved">Approved</option>
+                                            <option value="rejected">Rejected</option>
+                                            <option value="pending">Pending</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Governance view</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.governance_view}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft((current) => ({
+                                                ...current,
+                                                governance_view: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value="pending_queue">Pending queue</option>
+                                            <option value="stale_pending">Stale pending</option>
+                                            <option value="high_score_pending">High-score pending</option>
+                                            <option value="conflicting_queries">Conflicting queries</option>
+                                            <option value="all_feedback">All feedback</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Window</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.window_days}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft((current) => ({
+                                                ...current,
+                                                window_days: Number.parseInt(event.target.value, 10) || 30,
+                                              }));
+                                            }}
+                                          >
+                                            {[14, 30, 60, 90].map((value) => (
+                                              <option key={`provider-scheduler-search-policy-window-${value}`} value={value}>
+                                                {value}d
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Stale pending</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.stale_pending_hours}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft((current) => ({
+                                                ...current,
+                                                stale_pending_hours: Number.parseInt(event.target.value, 10) || 24,
+                                              }));
+                                            }}
+                                          >
+                                            {[12, 24, 48, 72].map((value) => (
+                                              <option key={`provider-scheduler-search-policy-stale-${value}`} value={value}>
+                                                {value}h
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Minimum score</span>
+                                          <input
+                                            min={0}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft((current) => ({
+                                                ...current,
+                                                minimum_score: Math.max(Number.parseInt(event.target.value, 10) || 0, 0),
+                                              }));
+                                            }}
+                                            type="number"
+                                            value={providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.minimum_score}
+                                          />
+                                        </label>
+                                        <label className="run-form-field checkbox-field">
+                                          <span>Require note</span>
+                                          <input
+                                            checked={providerProvenanceSchedulerSearchModerationPolicyCatalogDraft.require_note}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft((current) => ({
+                                                ...current,
+                                                require_note: event.target.checked,
+                                              }));
+                                            }}
+                                            type="checkbox"
+                                          />
+                                        </label>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={providerProvenanceSchedulerSearchModerationPolicyCatalogsLoading}
+                                          onClick={() => {
+                                            void createProviderProvenanceSchedulerSearchModerationPolicyCatalogEntry();
+                                          }}
+                                          type="button"
+                                        >
+                                          Save policy catalog
+                                        </button>
+                                      </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Catalog</th>
+                                            <th>Defaults</th>
+                                            <th>Governance</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerSearchModerationPolicyCatalogs?.items.length ? (
+                                            providerProvenanceSchedulerSearchModerationPolicyCatalogs.items.map((entry) => (
+                                              <tr key={`provider-scheduler-search-policy-catalog-${entry.catalog_id}`}>
+                                                <td>
+                                                  <strong>{entry.name}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.description || "No description"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {shortenIdentifier(entry.catalog_id, 10)} · created {formatTimestamp(entry.created_at)}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Outcome {formatWorkflowToken(entry.default_moderation_status)}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Minimum score {entry.minimum_score} · note {entry.require_note ? "required" : "optional"}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    View {formatWorkflowToken(entry.governance_view)}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Window {entry.window_days}d · stale {entry.stale_pending_hours}h
+                                                  </p>
+                                                </td>
+                                              </tr>
+                                            ))
+                                          ) : (
+                                            <tr>
+                                              <td colSpan={3}>
+                                                <p className="empty-state">
+                                                  No scheduler moderation policy catalogs saved yet.
+                                                </p>
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Scheduler moderation approval queue</strong>
+                                        <p>
+                                          Stage selected feedback, review the plan preview, then approve and apply it
+                                          as a governed moderation batch.
+                                        </p>
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <label className="run-form-field">
+                                          <span>Stage policy catalog</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationStageDraft.policy_catalog_id}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationStageDraft((current) => ({
+                                                ...current,
+                                                policy_catalog_id: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value={ALL_FILTER_VALUE}>No catalog</option>
+                                            {(providerProvenanceSchedulerSearchModerationPolicyCatalogs?.items ?? []).map((entry) => (
+                                              <option key={`provider-scheduler-search-stage-policy-${entry.catalog_id}`} value={entry.catalog_id}>
+                                                {entry.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Fallback outcome</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationStageDraft.moderation_status}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationStageDraft((current) => ({
+                                                ...current,
+                                                moderation_status: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value="approved">Approved</option>
+                                            <option value="rejected">Rejected</option>
+                                            <option value="pending">Pending</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Approval/apply note</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationStageDraft((current) => ({
+                                                ...current,
+                                                note: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="required by policy catalogs that gate approval on notes"
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationStageDraft.note}
+                                          />
+                                        </label>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            !selectedProviderProvenanceSchedulerSearchFeedbackIds.length
+                                            || providerProvenanceSchedulerSearchModerationPlanPendingId !== null
+                                          }
+                                          onClick={() => {
+                                            void stageProviderProvenanceSchedulerSearchModerationSelection();
+                                          }}
+                                          type="button"
+                                        >
+                                          Stage selected feedback
+                                        </button>
+                                        <label className="run-form-field">
+                                          <span>Queue state</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationQueueFilter.queue_state}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationQueueFilter((current) => ({
+                                                ...current,
+                                                queue_state: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value={ALL_FILTER_VALUE}>All states</option>
+                                            <option value="pending_approval">Pending approval</option>
+                                            <option value="ready_to_apply">Ready to apply</option>
+                                            <option value="completed">Completed</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Policy catalog</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationQueueFilter.policy_catalog_id}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationQueueFilter((current) => ({
+                                                ...current,
+                                                policy_catalog_id: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value={ALL_FILTER_VALUE}>All catalogs</option>
+                                            {(providerProvenanceSchedulerSearchModerationPlans?.available_filters.policy_catalogs ?? []).map((entry) => (
+                                              <option key={`provider-scheduler-search-queue-policy-${entry.catalog_id}`} value={entry.catalog_id}>
+                                                {entry.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <span className="run-lineage-symbol-copy">
+                                          {providerProvenanceSchedulerSearchModerationPlans?.summary.pending_approval_count ?? 0} pending · {providerProvenanceSchedulerSearchModerationPlans?.summary.ready_to_apply_count ?? 0} ready · {providerProvenanceSchedulerSearchModerationPlans?.summary.completed_count ?? 0} completed
+                                        </span>
+                                      </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Plan</th>
+                                            <th>Preview</th>
+                                            <th>Queue</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerSearchModerationPlans?.items.length ? (
+                                            providerProvenanceSchedulerSearchModerationPlans.items.map((entry) => (
+                                              <tr key={`provider-scheduler-search-moderation-plan-${entry.plan_id}`}>
+                                                <td>
+                                                  <strong>{shortenIdentifier(entry.plan_id, 10)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.policy_catalog_name ?? "No catalog"} · {formatWorkflowToken(entry.proposed_moderation_status)}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Created {formatTimestamp(entry.created_at)} · by {entry.created_by}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    View {formatWorkflowToken(entry.governance_view)} · window {entry.window_days}d · stale {entry.stale_pending_hours}h
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Eligible {entry.feedback_ids.length}/{entry.requested_feedback_ids.length} · minimum score {entry.minimum_score}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{entry.preview_count} preview item(s)</strong>
+                                                  {entry.preview_items.slice(0, 4).map((preview) => (
+                                                    <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-moderation-preview-${entry.plan_id}-${preview.feedback_id}`}>
+                                                      {preview.occurrence_id} · {formatWorkflowToken(preview.current_moderation_status)} → {formatWorkflowToken(preview.proposed_moderation_status)} · score {preview.score} · {preview.eligible ? "eligible" : "skipped"}
+                                                      {preview.reason_tags.length ? ` · ${preview.reason_tags.join(" · ")}` : ""}
+                                                    </p>
+                                                  ))}
+                                                  {entry.missing_feedback_ids.length ? (
+                                                    <p className="run-lineage-symbol-copy">
+                                                      Missing {entry.missing_feedback_ids.join(" · ")}
+                                                    </p>
+                                                  ) : null}
+                                                </td>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(entry.queue_state)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Approved {formatTimestamp(entry.approved_at ?? null)} · by {entry.approved_by ?? "n/a"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Applied {formatTimestamp(entry.applied_at ?? null)} · by {entry.applied_by ?? "n/a"}
+                                                  </p>
+                                                  {entry.approval_note ? (
+                                                    <p className="run-lineage-symbol-copy">{entry.approval_note}</p>
+                                                  ) : null}
+                                                  <div className="market-data-provenance-history-actions">
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={
+                                                        entry.queue_state !== "pending_approval"
+                                                        || providerProvenanceSchedulerSearchModerationPlanPendingId === entry.plan_id
+                                                      }
+                                                      onClick={() => {
+                                                        void approveProviderProvenanceSchedulerSearchModerationQueuePlan(entry.plan_id);
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Approve
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={
+                                                        entry.queue_state !== "ready_to_apply"
+                                                        || providerProvenanceSchedulerSearchModerationPlanPendingId === entry.plan_id
+                                                      }
+                                                      onClick={() => {
+                                                        void applyProviderProvenanceSchedulerSearchModerationQueuePlan(entry.plan_id);
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Apply
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            ))
+                                          ) : (
+                                            <tr>
+                                              <td colSpan={3}>
+                                                <p className="empty-state">
+                                                  No staged scheduler moderation plans match the current queue filter.
+                                                </p>
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
                                     </>
                                   ) : null}
                                   {providerProvenanceSchedulerSearchDashboardLoading ? (
@@ -19849,6 +20532,20 @@ export default function App() {
                                   {providerProvenanceSchedulerSearchDashboardError ? (
                                     <p className="market-data-workflow-feedback">
                                       Scheduler search dashboard failed: {providerProvenanceSchedulerSearchDashboardError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerSearchModerationPolicyCatalogsLoading
+                                  || providerProvenanceSchedulerSearchModerationPlansLoading ? (
+                                    <p className="empty-state">Loading scheduler moderation governance…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerSearchModerationPolicyCatalogsError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduler moderation policy catalogs failed: {providerProvenanceSchedulerSearchModerationPolicyCatalogsError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerSearchModerationPlansError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduler moderation approval queue failed: {providerProvenanceSchedulerSearchModerationPlansError}
                                     </p>
                                   ) : null}
                                   {providerProvenanceSchedulerAlertRetrievalClusters.length ? (

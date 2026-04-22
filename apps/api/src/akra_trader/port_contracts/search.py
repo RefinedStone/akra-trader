@@ -5,6 +5,8 @@ from typing import Protocol
 
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchQueryAnalyticsRecord
 
 
@@ -53,3 +55,21 @@ class ProviderProvenanceSchedulerSearchBackendPort(Protocol):
     self,
     current_time: datetime,
   ) -> int: ...
+
+  def save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord: ...
+
+  def list_provider_provenance_scheduler_search_moderation_policy_catalog_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord, ...]: ...
+
+  def save_provider_provenance_scheduler_search_moderation_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationPlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationPlanRecord: ...
+
+  def list_provider_provenance_scheduler_search_moderation_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationPlanRecord, ...]: ...

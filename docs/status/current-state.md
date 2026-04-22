@@ -243,6 +243,9 @@ It is not yet a finished live trading product:
 - that same scheduler search quality layer now also tracks long-horizon daily trends, actor and
   moderator rollups, governance backlog signals, and batch moderation actions, so ranking quality
   review is no longer limited to one query's recent feedback queue
+- that same scheduler search governance layer now also ships reusable moderation policy catalogs
+  and a staged approval queue, so teams can preview selected feedback, require approval notes,
+  and only apply governed moderation batches into learned relevance tuning
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

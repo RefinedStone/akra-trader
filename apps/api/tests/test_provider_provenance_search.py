@@ -22,6 +22,9 @@ from akra_trader.adapters.provider_provenance_search import (
 )
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanPreviewItem
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchQueryAnalyticsRecord
 
 
@@ -179,3 +182,97 @@ def test_http_scheduler_search_service_client_round_trips_analytics_and_feedback
   assert listed_feedback[0].signal == "relevant"
   assert deleted_analytics == 1
   assert deleted_feedback == 1
+
+
+def test_http_scheduler_search_service_client_round_trips_moderation_catalogs_and_plans() -> None:
+  service = ProviderProvenanceSchedulerSearchService(
+    store=InMemoryProviderProvenanceSchedulerSearchStore()
+  )
+  service_app = create_provider_provenance_scheduler_search_service_app(
+    service=service,
+    auth_token="search-token",
+  )
+  catalog_record = ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord(
+    catalog_id="catalog-1",
+    created_at=datetime(2026, 4, 22, 13, 0, tzinfo=UTC),
+    updated_at=datetime(2026, 4, 22, 13, 0, tzinfo=UTC),
+    name="Pending scheduler approvals",
+    description="Moderate high-signal scheduler feedback before ranking learns from it.",
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=30,
+    stale_pending_hours=24,
+    minimum_score=150,
+    require_note=True,
+  )
+  plan_record = ProviderProvenanceSchedulerSearchModerationPlanRecord(
+    plan_id="plan-1",
+    created_at=datetime(2026, 4, 22, 13, 5, tzinfo=UTC),
+    updated_at=datetime(2026, 4, 22, 13, 5, tzinfo=UTC),
+    policy_catalog_id="catalog-1",
+    policy_catalog_name="Pending scheduler approvals",
+    proposed_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=30,
+    stale_pending_hours=24,
+    minimum_score=150,
+    require_note=True,
+    requested_feedback_ids=("feedback-1",),
+    feedback_ids=("feedback-1",),
+    preview_items=(
+      ProviderProvenanceSchedulerSearchModerationPlanPreviewItem(
+        feedback_id="feedback-1",
+        occurrence_id="occ-1",
+        query="status:resolved AND recovered",
+        signal="relevant",
+        current_moderation_status="pending",
+        proposed_moderation_status="approved",
+        score=530,
+        age_hours=2,
+        stale_pending=False,
+        high_score_pending=True,
+        query_run_count=3,
+      ),
+    ),
+  )
+
+  with TestClient(service_app) as service_client:
+    def fake_urlopen(request, timeout: float):
+      response = service_client.request(
+        request.get_method(),
+        request.full_url,
+        content=request.data,
+        headers=dict(request.headers),
+      )
+      body = response.content
+      if response.status_code >= 400:
+        raise urllib_error.HTTPError(
+          request.full_url,
+          response.status_code,
+          getattr(response, "reason_phrase", "search service error"),
+          hdrs=response.headers,
+          fp=BytesIO(body),
+        )
+      return FakeResponse(response.status_code, body)
+
+    backend = HttpProviderProvenanceSchedulerSearchServiceClient(
+      service_url="https://search-service.example",
+      auth_token="search-token",
+      urlopen=fake_urlopen,
+    )
+
+    saved_catalog = backend.save_provider_provenance_scheduler_search_moderation_policy_catalog_record(
+      catalog_record
+    )
+    saved_plan = backend.save_provider_provenance_scheduler_search_moderation_plan_record(
+      plan_record
+    )
+    listed_catalogs = backend.list_provider_provenance_scheduler_search_moderation_policy_catalog_records()
+    listed_plans = backend.list_provider_provenance_scheduler_search_moderation_plan_records()
+
+  assert saved_catalog.catalog_id == "catalog-1"
+  assert saved_plan.plan_id == "plan-1"
+  assert len(listed_catalogs) == 1
+  assert listed_catalogs[0].require_note is True
+  assert len(listed_plans) == 1
+  assert listed_plans[0].preview_items[0].feedback_id == "feedback-1"
