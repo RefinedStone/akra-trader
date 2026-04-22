@@ -26,6 +26,14 @@ import { buildControlWorkspaceDescriptors, ControlWorkspaceDescriptor, ControlSt
 import { useWorkspaceRoute } from "./app/useWorkspaceRoute";
 import { WorkspaceRouteContent } from "./routes/WorkspaceRouteContent";
 import {
+  buildRunHistoryWorkspacePanels,
+  type LiveOrderReplacementDraft,
+  type RunHistoryWorkspaceSectionProps,
+  type RunOrderControls,
+  type RunSectionComparisonControls,
+  type RunSectionRerunAction,
+} from "./routes/runHistoryWorkspacePanels";
+import {
   getRunListBoundaryContractSnapshot,
   getRunListBoundarySurfaceLabel,
   getRunSurfaceCapabilityFamily,
@@ -14372,6 +14380,255 @@ export default function App() {
     setSelectedComparisonRunIds([nativeRun.config.run_id, referenceRun.config.run_id]);
   }
 
+  const runHistoryWorkspacePanels = buildRunHistoryWorkspacePanels({
+    renderRunSection: (props: RunHistoryWorkspaceSectionProps) => <RunSection {...props} />,
+    research: {
+      runs: backtests,
+      presets,
+      runSurfaceCapabilities,
+      strategies,
+      filter: backtestRunFilter,
+      setFilter: setBacktestRunFilter,
+      comparison: {
+        selectedRunIds: selectedComparisonRunIds,
+        comparisonIntent,
+        latestWorkspaceSyncState,
+        expandedHistoryConflictReviewIds,
+        expandedWorkspaceScoreDetailIds,
+        focusedWorkspaceScoreDetailSources,
+        focusedWorkspaceScoreDetailSignalKeys,
+        expandedWorkspaceScoreSignalDetailIds,
+        collapsedWorkspaceScoreSignalSubviewIds,
+        collapsedWorkspaceScoreSignalNestedSubviewIds,
+        focusedWorkspaceScoreSignalMicroViews,
+        focusedWorkspaceScoreSignalMicroInteractions,
+        hoveredWorkspaceScoreSignalMicroTargets,
+        scrubbedWorkspaceScoreSignalMicroSteps,
+        selectedWorkspaceScoreSignalMicroNotePages,
+        activeWorkspaceOverviewRowId,
+        historyStep: comparisonHistoryStep,
+        historyTabIdentity: comparisonHistoryTabIdentity,
+        historySharedSync: comparisonHistorySharedSyncState,
+        historySyncAuditTrail: comparisonHistorySyncAuditTrail,
+        historyEntries: comparisonHistoryPanel.entries,
+        visibleHistoryEntries: visibleComparisonHistoryEntries,
+        activeHistoryEntryId: comparisonHistoryPanel.activeEntryId,
+        historyBrowserOpen: comparisonHistoryPanelOpen,
+        historySearchQuery: comparisonHistorySearchQuery,
+        showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
+        historyAuditFilter: comparisonHistoryAuditFilter,
+        showResolvedHistoryAudits: comparisonHistoryShowResolvedAuditEntries,
+        canNavigateHistoryBackward: visibleComparisonHistoryActiveIndex > 0,
+        canNavigateHistoryForward:
+          visibleComparisonHistoryActiveIndex >= 0
+          && visibleComparisonHistoryActiveIndex < visibleComparisonHistoryEntries.length - 1,
+        selectedScoreLink: selectedComparisonScoreLink,
+        payload: runComparison,
+        loading: runComparisonLoading,
+        error: runComparisonError,
+        onChangeComparisonIntent: handleComparisonIntentChange,
+        onChangeSelectedScoreLink: handleSelectedComparisonScoreLinkChange,
+        onToggleHistoryBrowser: () => setComparisonHistoryPanelOpen((current) => !current),
+        onChangeHistorySearchQuery: setComparisonHistorySearchQuery,
+        onChangeShowPinnedHistoryOnly: setComparisonHistoryShowPinnedOnly,
+        onChangeHistoryAuditFilter: setComparisonHistoryAuditFilter,
+        onChangeShowResolvedHistoryAudits: setComparisonHistoryShowResolvedAuditEntries,
+        onToggleHistoryConflictReview: (auditId) =>
+          setExpandedHistoryConflictReviewIds((current) => ({
+            ...current,
+            [auditId]: !current[auditId],
+          })),
+        onToggleWorkspaceScoreDetail: (scoreDetailKey) =>
+          setExpandedWorkspaceScoreDetailIds((current) => ({
+            ...current,
+            [scoreDetailKey]: !current[scoreDetailKey],
+          })),
+        onChangeFocusedWorkspaceScoreDetailSource: (scoreDetailKey, source) =>
+          setFocusedWorkspaceScoreDetailSources((current) =>
+            current[scoreDetailKey] === source
+              ? current
+              : {
+                  ...current,
+                  [scoreDetailKey]: source,
+                }
+          ),
+        onChangeFocusedWorkspaceScoreDetailSignalKey: (scoreDetailKey, signalKey) =>
+          setFocusedWorkspaceScoreDetailSignalKeys((current) => {
+            if (!signalKey) {
+              if (!(scoreDetailKey in current)) {
+                return current;
+              }
+              const next = { ...current };
+              delete next[scoreDetailKey];
+              return next;
+            }
+            if (current[scoreDetailKey] === signalKey) {
+              return current;
+            }
+            return {
+              ...current,
+              [scoreDetailKey]: signalKey,
+            };
+          }),
+        onToggleWorkspaceScoreSignalDetail: (scoreDetailKey) =>
+          setExpandedWorkspaceScoreSignalDetailIds((current) => ({
+            ...current,
+            [scoreDetailKey]: !current[scoreDetailKey],
+          })),
+        onToggleWorkspaceScoreSignalSubview: (subviewId) =>
+          setCollapsedWorkspaceScoreSignalSubviewIds((current) => ({
+            ...current,
+            [subviewId]: !current[subviewId],
+          })),
+        onToggleWorkspaceScoreSignalNestedSubview: (subviewId) =>
+          setCollapsedWorkspaceScoreSignalNestedSubviewIds((current) => ({
+            ...current,
+            [subviewId]: !current[subviewId],
+          })),
+        onChangeWorkspaceScoreSignalMicroView: (subviewId, value) =>
+          setFocusedWorkspaceScoreSignalMicroViews((current) =>
+            current[subviewId] === value
+              ? current
+              : {
+                  ...current,
+                  [subviewId]: value,
+                }
+          ),
+        onChangeWorkspaceScoreSignalMicroInteraction: (interactionId, value) =>
+          setFocusedWorkspaceScoreSignalMicroInteractions((current) =>
+            current[interactionId] === value
+              ? current
+              : {
+                  ...current,
+                  [interactionId]: value,
+                }
+          ),
+        onChangeWorkspaceScoreSignalMicroHoverTarget: (interactionId, value) =>
+          setHoveredWorkspaceScoreSignalMicroTargets((current) =>
+            current[interactionId] === value
+              ? current
+              : {
+                  ...current,
+                  [interactionId]: value,
+                }
+          ),
+        onChangeWorkspaceScoreSignalMicroScrubStep: (interactionId, value) =>
+          setScrubbedWorkspaceScoreSignalMicroSteps((current) =>
+            current[interactionId] === value
+              ? current
+              : {
+                  ...current,
+                  [interactionId]: value,
+                }
+          ),
+        onChangeWorkspaceScoreSignalMicroNotePage: (interactionId, value) =>
+          setSelectedWorkspaceScoreSignalMicroNotePages((current) =>
+            current[interactionId] === value
+              ? current
+              : {
+                  ...current,
+                  [interactionId]: value,
+                }
+          ),
+        onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
+        onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
+        onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
+        onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
+        onTrimHistoryEntries: handleTrimComparisonHistoryEntries,
+        onSetHistoryConflictFieldSource: handleSetComparisonHistoryConflictFieldSource,
+        onSetHistoryConflictFieldSourceAll: handleSetComparisonHistoryConflictFieldSourceAll,
+        onApplyHistoryConflictResolution: handleApplyComparisonHistoryConflictResolution,
+        onSetHistoryPreferenceFieldSource: handleSetComparisonHistoryPreferenceFieldSource,
+        onSetHistoryPreferenceFieldSourceAll: handleSetComparisonHistoryPreferenceFieldSourceAll,
+        onApplyHistoryPreferenceResolution: handleApplyComparisonHistoryPreferenceResolution,
+        onSetHistoryWorkspaceFieldSource: handleSetComparisonHistoryWorkspaceFieldSource,
+        onSetHistoryWorkspaceFieldSourceAll: handleSetComparisonHistoryWorkspaceFieldSourceAll,
+        onUseHistoryWorkspaceRankedSources: handleUseComparisonHistoryWorkspaceRankedSources,
+        onApplyHistoryWorkspaceResolution: handleApplyComparisonHistoryWorkspaceResolution,
+        onToggleRunSelection: toggleComparisonRun,
+        onClearSelection: clearComparisonRuns,
+        onSelectBenchmarkPair: selectBenchmarkPair,
+      },
+      rerunActions: [
+        {
+          availabilityKey: "rerun_backtest",
+          label: "Rerun backtest",
+          onRerun: rerunBacktest,
+        },
+        {
+          availabilityKey: "rerun_sandbox",
+          label: "Start sandbox worker",
+          onRerun: rerunSandbox,
+        },
+        {
+          availabilityKey: "rerun_paper",
+          label: "Start paper session",
+          onRerun: rerunPaper,
+        },
+      ],
+    },
+    runtime: {
+      sandbox: {
+        runs: sandboxRuns,
+        presets,
+        runSurfaceCapabilities,
+        strategies,
+        filter: sandboxRunFilter,
+        setFilter: setSandboxRunFilter,
+        rerunActions: [
+          {
+            availabilityKey: "rerun_sandbox",
+            label: "Restore sandbox worker",
+            onRerun: rerunSandbox,
+          },
+          {
+            availabilityKey: "rerun_paper",
+            label: "Start paper session",
+            onRerun: rerunPaper,
+          },
+        ],
+        onStop: stopSandboxRun,
+      },
+      paper: {
+        runs: paperRuns,
+        presets,
+        runSurfaceCapabilities,
+        strategies,
+        filter: paperRunFilter,
+        setFilter: setPaperRunFilter,
+        rerunActions: [
+          {
+            availabilityKey: "rerun_sandbox",
+            label: "Start sandbox worker",
+            onRerun: rerunSandbox,
+          },
+          {
+            availabilityKey: "rerun_paper",
+            label: "Start paper session",
+            onRerun: rerunPaper,
+          },
+        ],
+        onStop: stopPaperRun,
+      },
+    },
+    live: {
+      runs: liveRuns,
+      presets,
+      runSurfaceCapabilities,
+      strategies,
+      filter: liveRunFilter,
+      setFilter: setLiveRunFilter,
+      onStop: stopLiveRun,
+      getOrderControls: (run) => ({
+        getReplacementDraft: (_orderId, order) => getLiveOrderReplacementDraft(run.config.run_id, order),
+        onChangeReplacementDraft: (orderId, draft) =>
+          setLiveOrderReplacementDraft(run.config.run_id, orderId, draft),
+        onCancelOrder: (orderId) => cancelLiveOrder(run.config.run_id, orderId),
+        onReplaceOrder: (orderId, draft) => replaceLiveOrder(run.config.run_id, orderId, draft),
+      }),
+    },
+  });
+
   return (
     <WorkspaceShell
       activeWorkspace={activeWorkspace}
@@ -14466,195 +14723,7 @@ export default function App() {
                 <ReferenceCatalog references={references} />
               </section>
             ),
-            runsPanel: (
-              <RunSection
-                surfaceKey="backtest"
-                title="Recent backtests"
-                runs={backtests}
-                presets={presets}
-                runSurfaceCapabilities={runSurfaceCapabilities}
-                strategies={strategies}
-                filter={backtestRunFilter}
-                setFilter={setBacktestRunFilter}
-                comparison={{
-                  selectedRunIds: selectedComparisonRunIds,
-                  comparisonIntent,
-                  latestWorkspaceSyncState,
-                  expandedHistoryConflictReviewIds,
-                  expandedWorkspaceScoreDetailIds,
-                  focusedWorkspaceScoreDetailSources,
-                  focusedWorkspaceScoreDetailSignalKeys,
-                  expandedWorkspaceScoreSignalDetailIds,
-                  collapsedWorkspaceScoreSignalSubviewIds,
-                  collapsedWorkspaceScoreSignalNestedSubviewIds,
-                  focusedWorkspaceScoreSignalMicroViews,
-                  focusedWorkspaceScoreSignalMicroInteractions,
-                  hoveredWorkspaceScoreSignalMicroTargets,
-                  scrubbedWorkspaceScoreSignalMicroSteps,
-                  selectedWorkspaceScoreSignalMicroNotePages,
-                  activeWorkspaceOverviewRowId,
-                  historyStep: comparisonHistoryStep,
-                  historyTabIdentity: comparisonHistoryTabIdentity,
-                  historySharedSync: comparisonHistorySharedSyncState,
-                  historySyncAuditTrail: comparisonHistorySyncAuditTrail,
-                  historyEntries: comparisonHistoryPanel.entries,
-                  visibleHistoryEntries: visibleComparisonHistoryEntries,
-                  activeHistoryEntryId: comparisonHistoryPanel.activeEntryId,
-                  historyBrowserOpen: comparisonHistoryPanelOpen,
-                  historySearchQuery: comparisonHistorySearchQuery,
-                  showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
-                  historyAuditFilter: comparisonHistoryAuditFilter,
-                  showResolvedHistoryAudits: comparisonHistoryShowResolvedAuditEntries,
-                  canNavigateHistoryBackward: visibleComparisonHistoryActiveIndex > 0,
-                  canNavigateHistoryForward:
-                    visibleComparisonHistoryActiveIndex >= 0
-                    && visibleComparisonHistoryActiveIndex < visibleComparisonHistoryEntries.length - 1,
-                  selectedScoreLink: selectedComparisonScoreLink,
-                  payload: runComparison,
-                  loading: runComparisonLoading,
-                  error: runComparisonError,
-                  onChangeComparisonIntent: handleComparisonIntentChange,
-                  onChangeSelectedScoreLink: handleSelectedComparisonScoreLinkChange,
-                  onToggleHistoryBrowser: () => setComparisonHistoryPanelOpen((current) => !current),
-                  onChangeHistorySearchQuery: setComparisonHistorySearchQuery,
-                  onChangeShowPinnedHistoryOnly: setComparisonHistoryShowPinnedOnly,
-                  onChangeHistoryAuditFilter: setComparisonHistoryAuditFilter,
-                  onChangeShowResolvedHistoryAudits: setComparisonHistoryShowResolvedAuditEntries,
-                  onToggleHistoryConflictReview: (auditId) =>
-                    setExpandedHistoryConflictReviewIds((current) => ({
-                      ...current,
-                      [auditId]: !current[auditId],
-                    })),
-                  onToggleWorkspaceScoreDetail: (scoreDetailKey) =>
-                    setExpandedWorkspaceScoreDetailIds((current) => ({
-                      ...current,
-                      [scoreDetailKey]: !current[scoreDetailKey],
-                    })),
-                  onChangeFocusedWorkspaceScoreDetailSource: (scoreDetailKey, source) =>
-                    setFocusedWorkspaceScoreDetailSources((current) =>
-                      current[scoreDetailKey] === source
-                        ? current
-                        : {
-                            ...current,
-                            [scoreDetailKey]: source,
-                          }
-                    ),
-                  onChangeFocusedWorkspaceScoreDetailSignalKey: (scoreDetailKey, signalKey) =>
-                    setFocusedWorkspaceScoreDetailSignalKeys((current) => {
-                      if (!signalKey) {
-                        if (!(scoreDetailKey in current)) {
-                          return current;
-                        }
-                        const next = { ...current };
-                        delete next[scoreDetailKey];
-                        return next;
-                      }
-                      if (current[scoreDetailKey] === signalKey) {
-                        return current;
-                      }
-                      return {
-                        ...current,
-                        [scoreDetailKey]: signalKey,
-                      };
-                    }),
-                  onToggleWorkspaceScoreSignalDetail: (scoreDetailKey) =>
-                    setExpandedWorkspaceScoreSignalDetailIds((current) => ({
-                      ...current,
-                      [scoreDetailKey]: !current[scoreDetailKey],
-                    })),
-                  onToggleWorkspaceScoreSignalSubview: (subviewId) =>
-                    setCollapsedWorkspaceScoreSignalSubviewIds((current) => ({
-                      ...current,
-                      [subviewId]: !current[subviewId],
-                    })),
-                  onToggleWorkspaceScoreSignalNestedSubview: (subviewId) =>
-                    setCollapsedWorkspaceScoreSignalNestedSubviewIds((current) => ({
-                      ...current,
-                      [subviewId]: !current[subviewId],
-                    })),
-                  onChangeWorkspaceScoreSignalMicroView: (subviewId, value) =>
-                    setFocusedWorkspaceScoreSignalMicroViews((current) =>
-                      current[subviewId] === value
-                        ? current
-                        : {
-                            ...current,
-                            [subviewId]: value,
-                          }
-                    ),
-                  onChangeWorkspaceScoreSignalMicroInteraction: (interactionId, value) =>
-                    setFocusedWorkspaceScoreSignalMicroInteractions((current) =>
-                      current[interactionId] === value
-                        ? current
-                        : {
-                            ...current,
-                            [interactionId]: value,
-                          }
-                    ),
-                  onChangeWorkspaceScoreSignalMicroHoverTarget: (interactionId, value) =>
-                    setHoveredWorkspaceScoreSignalMicroTargets((current) =>
-                      current[interactionId] === value
-                        ? current
-                        : {
-                            ...current,
-                            [interactionId]: value,
-                          }
-                    ),
-                  onChangeWorkspaceScoreSignalMicroScrubStep: (interactionId, value) =>
-                    setScrubbedWorkspaceScoreSignalMicroSteps((current) =>
-                      current[interactionId] === value
-                        ? current
-                        : {
-                            ...current,
-                            [interactionId]: value,
-                          }
-                    ),
-                  onChangeWorkspaceScoreSignalMicroNotePage: (interactionId, value) =>
-                    setSelectedWorkspaceScoreSignalMicroNotePages((current) =>
-                      current[interactionId] === value
-                        ? current
-                        : {
-                            ...current,
-                            [interactionId]: value,
-                          }
-                    ),
-                  onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
-                  onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
-                  onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
-                  onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
-                  onTrimHistoryEntries: handleTrimComparisonHistoryEntries,
-                  onSetHistoryConflictFieldSource: handleSetComparisonHistoryConflictFieldSource,
-                  onSetHistoryConflictFieldSourceAll: handleSetComparisonHistoryConflictFieldSourceAll,
-                  onApplyHistoryConflictResolution: handleApplyComparisonHistoryConflictResolution,
-                  onSetHistoryPreferenceFieldSource: handleSetComparisonHistoryPreferenceFieldSource,
-                  onSetHistoryPreferenceFieldSourceAll: handleSetComparisonHistoryPreferenceFieldSourceAll,
-                  onApplyHistoryPreferenceResolution: handleApplyComparisonHistoryPreferenceResolution,
-                  onSetHistoryWorkspaceFieldSource: handleSetComparisonHistoryWorkspaceFieldSource,
-                  onSetHistoryWorkspaceFieldSourceAll: handleSetComparisonHistoryWorkspaceFieldSourceAll,
-                  onUseHistoryWorkspaceRankedSources: handleUseComparisonHistoryWorkspaceRankedSources,
-                  onApplyHistoryWorkspaceResolution: handleApplyComparisonHistoryWorkspaceResolution,
-                  onToggleRunSelection: toggleComparisonRun,
-                  onClearSelection: clearComparisonRuns,
-                  onSelectBenchmarkPair: selectBenchmarkPair,
-                }}
-                rerunActions={[
-                  {
-                    availabilityKey: "rerun_backtest",
-                    label: "Rerun backtest",
-                    onRerun: rerunBacktest,
-                  },
-                  {
-                    availabilityKey: "rerun_sandbox",
-                    label: "Start sandbox worker",
-                    onRerun: rerunSandbox,
-                  },
-                  {
-                    availabilityKey: "rerun_paper",
-                    label: "Start paper session",
-                    onRerun: rerunPaper,
-                  },
-                ]}
-              />
-            ),
+            ...runHistoryWorkspacePanels.research,
           },
           runtime: {
             launchPanel: (
@@ -27596,56 +27665,7 @@ export default function App() {
           )}
               </section>
             ),
-            sandboxRunsPanel: (
-              <RunSection
-                surfaceKey="sandbox"
-                title="Sandbox runs"
-                runs={sandboxRuns}
-                presets={presets}
-                runSurfaceCapabilities={runSurfaceCapabilities}
-                strategies={strategies}
-                filter={sandboxRunFilter}
-                setFilter={setSandboxRunFilter}
-                rerunActions={[
-                  {
-                    availabilityKey: "rerun_sandbox",
-                    label: "Restore sandbox worker",
-                    onRerun: rerunSandbox,
-                  },
-                  {
-                    availabilityKey: "rerun_paper",
-                    label: "Start paper session",
-                    onRerun: rerunPaper,
-                  },
-                ]}
-                onStop={stopSandboxRun}
-              />
-            ),
-            paperRunsPanel: (
-              <RunSection
-                surfaceKey="paper"
-                title="Paper runs"
-                runs={paperRuns}
-                presets={presets}
-                runSurfaceCapabilities={runSurfaceCapabilities}
-                strategies={strategies}
-                filter={paperRunFilter}
-                setFilter={setPaperRunFilter}
-                rerunActions={[
-                  {
-                    availabilityKey: "rerun_sandbox",
-                    label: "Start sandbox worker",
-                    onRerun: rerunSandbox,
-                  },
-                  {
-                    availabilityKey: "rerun_paper",
-                    label: "Start paper session",
-                    onRerun: rerunPaper,
-                  },
-                ]}
-                onStop={stopPaperRun}
-              />
-            ),
+            ...runHistoryWorkspacePanels.runtime,
           },
           live: {
             launchPanel: (
@@ -28874,26 +28894,7 @@ export default function App() {
           )}
               </section>
             ),
-            runsPanel: (
-              <RunSection
-                surfaceKey="live"
-                title="Guarded live runs"
-                runs={liveRuns}
-                presets={presets}
-                runSurfaceCapabilities={runSurfaceCapabilities}
-                strategies={strategies}
-                filter={liveRunFilter}
-                setFilter={setLiveRunFilter}
-                onStop={stopLiveRun}
-                getOrderControls={(run) => ({
-                  getReplacementDraft: (_orderId, order) => getLiveOrderReplacementDraft(run.config.run_id, order),
-                  onChangeReplacementDraft: (orderId, draft) =>
-                    setLiveOrderReplacementDraft(run.config.run_id, orderId, draft),
-                  onCancelOrder: (orderId) => cancelLiveOrder(run.config.run_id, orderId),
-                  onReplaceOrder: (orderId, draft) => replaceLiveOrder(run.config.run_id, orderId, draft),
-                })}
-              />
-            ),
+            ...runHistoryWorkspacePanels.live,
           },
         }}
       />
@@ -34678,134 +34679,6 @@ function RunSurfaceCapabilityDiscoveryPanel({
     </section>
   );
 }
-
-type RunSectionComparisonControls = {
-  selectedRunIds: string[];
-  comparisonIntent: ComparisonIntent;
-  latestWorkspaceSyncState: ComparisonHistorySyncWorkspaceState;
-  expandedHistoryConflictReviewIds: Record<string, boolean>;
-  expandedWorkspaceScoreDetailIds: Record<string, boolean>;
-  focusedWorkspaceScoreDetailSources: Record<string, ComparisonHistorySyncConflictFieldSource>;
-  focusedWorkspaceScoreDetailSignalKeys: Record<string, string>;
-  expandedWorkspaceScoreSignalDetailIds: Record<string, boolean>;
-  collapsedWorkspaceScoreSignalSubviewIds: Record<string, boolean>;
-  collapsedWorkspaceScoreSignalNestedSubviewIds: Record<string, boolean>;
-  focusedWorkspaceScoreSignalMicroViews: Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>;
-  focusedWorkspaceScoreSignalMicroInteractions: Record<string, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey>;
-  hoveredWorkspaceScoreSignalMicroTargets: Record<string, string>;
-  scrubbedWorkspaceScoreSignalMicroSteps: Record<string, number>;
-  selectedWorkspaceScoreSignalMicroNotePages: Record<string, number>;
-  activeWorkspaceOverviewRowId: string | null;
-  historyStep: ComparisonHistoryStepDescriptor;
-  historyTabIdentity: ComparisonHistoryTabIdentity;
-  historySharedSync: ComparisonHistoryPanelSyncState | null;
-  historySyncAuditTrail: ComparisonHistorySyncAuditEntry[];
-  historyEntries: ComparisonHistoryPanelEntry[];
-  visibleHistoryEntries: ComparisonHistoryPanelEntry[];
-  activeHistoryEntryId: string | null;
-  historyBrowserOpen: boolean;
-  historySearchQuery: string;
-  showPinnedHistoryOnly: boolean;
-  historyAuditFilter: ComparisonHistorySyncAuditFilter;
-  showResolvedHistoryAudits: boolean;
-  canNavigateHistoryBackward: boolean;
-  canNavigateHistoryForward: boolean;
-  selectedScoreLink: ComparisonScoreLinkTarget | null;
-  payload: RunComparison | null;
-  loading: boolean;
-  error: string | null;
-  onChangeComparisonIntent: (intent: ComparisonIntent) => void;
-  onChangeSelectedScoreLink: (
-    value: ComparisonScoreLinkTarget | null,
-    historyMode?: ComparisonHistoryWriteMode,
-  ) => void;
-  onToggleHistoryBrowser: () => void;
-  onChangeHistorySearchQuery: (value: string) => void;
-  onChangeShowPinnedHistoryOnly: (value: boolean) => void;
-  onChangeHistoryAuditFilter: (value: ComparisonHistorySyncAuditFilter) => void;
-  onChangeShowResolvedHistoryAudits: (value: boolean) => void;
-  onToggleHistoryConflictReview: (auditId: string) => void;
-  onToggleWorkspaceScoreDetail: (scoreDetailKey: string) => void;
-  onChangeFocusedWorkspaceScoreDetailSource: (
-    scoreDetailKey: string,
-    source: ComparisonHistorySyncConflictFieldSource,
-  ) => void;
-  onChangeFocusedWorkspaceScoreDetailSignalKey: (
-    scoreDetailKey: string,
-    signalKey: string | null,
-  ) => void;
-  onToggleWorkspaceScoreSignalDetail: (scoreDetailKey: string) => void;
-  onToggleWorkspaceScoreSignalSubview: (subviewId: string) => void;
-  onToggleWorkspaceScoreSignalNestedSubview: (subviewId: string) => void;
-  onChangeWorkspaceScoreSignalMicroView: (
-    subviewId: string,
-    value: ComparisonHistorySyncWorkspaceSignalMicroViewKey,
-  ) => void;
-  onChangeWorkspaceScoreSignalMicroInteraction: (
-    interactionId: string,
-    value: ComparisonHistorySyncWorkspaceSignalMicroInteractionKey,
-  ) => void;
-  onChangeWorkspaceScoreSignalMicroHoverTarget: (interactionId: string, value: string) => void;
-  onChangeWorkspaceScoreSignalMicroScrubStep: (interactionId: string, value: number) => void;
-  onChangeWorkspaceScoreSignalMicroNotePage: (interactionId: string, value: number) => void;
-  onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
-  onNavigateHistoryEntry: (entryId: string) => void;
-  onNavigateHistoryRelative: (delta: number) => void;
-  onToggleHistoryEntryPinned: (entryId: string) => void;
-  onTrimHistoryEntries: () => void;
-  onSetHistoryConflictFieldSource: (
-    auditId: string,
-    fieldKey: ComparisonHistorySyncConflictFieldKey,
-    source: ComparisonHistorySyncConflictFieldSource,
-  ) => void;
-  onSetHistoryConflictFieldSourceAll: (
-    auditId: string,
-    source: ComparisonHistorySyncConflictFieldSource,
-  ) => void;
-  onApplyHistoryConflictResolution: (auditId: string) => void;
-  onSetHistoryPreferenceFieldSource: (
-    auditId: string,
-    fieldKey: ComparisonHistorySyncPreferenceFieldKey,
-    source: ComparisonHistorySyncConflictFieldSource,
-  ) => void;
-  onSetHistoryPreferenceFieldSourceAll: (
-    auditId: string,
-    source: ComparisonHistorySyncConflictFieldSource,
-  ) => void;
-  onApplyHistoryPreferenceResolution: (auditId: string) => void;
-  onSetHistoryWorkspaceFieldSource: (
-    auditId: string,
-    fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
-    source: ComparisonHistorySyncConflictFieldSource,
-  ) => void;
-  onSetHistoryWorkspaceFieldSourceAll: (
-    auditId: string,
-    source: ComparisonHistorySyncConflictFieldSource,
-  ) => void;
-  onUseHistoryWorkspaceRankedSources: (auditId: string) => void;
-  onApplyHistoryWorkspaceResolution: (auditId: string) => void;
-  onToggleRunSelection: (runId: string) => void;
-  onClearSelection: () => void;
-  onSelectBenchmarkPair: () => void;
-};
-
-type RunSectionRerunAction = {
-  availabilityKey: keyof NonNullable<Run["action_availability"]>;
-  label: string;
-  onRerun: (rerunBoundaryId: string) => Promise<void>;
-};
-
-type LiveOrderReplacementDraft = {
-  price: string;
-  quantity: string;
-};
-
-type RunOrderControls = {
-  getReplacementDraft: (orderId: string, order: Run["orders"][number]) => LiveOrderReplacementDraft;
-  onChangeReplacementDraft: (orderId: string, draft: LiveOrderReplacementDraft) => void;
-  onCancelOrder: (orderId: string) => Promise<void>;
-  onReplaceOrder: (orderId: string, draft: LiveOrderReplacementDraft) => Promise<void>;
-};
 
 function RunSection({
   surfaceKey,
