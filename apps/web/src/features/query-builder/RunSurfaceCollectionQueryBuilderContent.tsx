@@ -365,6 +365,8 @@ import type {
   RunSurfaceCollectionQueryRuntimePathToken,
   RunSurfaceCollectionQueryRuntimeQuantifierOutcome,
 } from "./model";
+import { useQueryBuilderAuthoringState } from "./useQueryBuilderAuthoringState";
+import { useQueryBuilderReplayLinkState } from "./useQueryBuilderReplayLinkState";
 
 export function RunSurfaceCollectionQueryBuilder({
   contracts,
@@ -392,64 +394,103 @@ export function RunSurfaceCollectionQueryBuilder({
     options?: { artifactHoverKey?: string | null },
   ) => void) | null;
 }) {
-  const [activeContractKey, setActiveContractKey] = useState<string>(contracts[0]?.contract_key ?? "");
-  const lastHydratedExpressionRef = useRef<string | null>(null);
-  const [pendingHydratedState, setPendingHydratedState] =
-    useState<HydratedRunSurfaceCollectionQueryBuilderState | null>(null);
-  const [expressionMode, setExpressionMode] = useState<"single" | "grouped">("single");
-  const [groupLogic, setGroupLogic] = useState<"and" | "or">("and");
-  const [rootNegated, setRootNegated] = useState(false);
-  const [expressionChildren, setExpressionChildren] = useState<RunSurfaceCollectionQueryBuilderChildState[]>([]);
-  const [predicates, setPredicates] = useState<RunSurfaceCollectionQueryBuilderPredicateState[]>([]);
-  const [predicateTemplates, setPredicateTemplates] = useState<RunSurfaceCollectionQueryBuilderPredicateTemplateState[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID);
-  const [editorTarget, setEditorTarget] = useState<RunSurfaceCollectionQueryBuilderEditorTarget>({ kind: "draft" });
-  const [predicateDraftKey, setPredicateDraftKey] = useState("");
-  const [templateDraftKey, setTemplateDraftKey] = useState("");
-  const [predicateRefDraftKey, setPredicateRefDraftKey] = useState("");
-  const [predicateRefDraftBindings, setPredicateRefDraftBindings] = useState<Record<string, string>>({});
-  const [templateDraftAuthoringTarget, setTemplateDraftAuthoringTarget] = useState<"clause" | "subtree">("clause");
-  const [templateParameterDraftDefaultsByContext, setTemplateParameterDraftDefaultsByContext] =
-    useState<Record<string, Record<string, string>>>({});
-  const [templateParameterDraftLabelsByContext, setTemplateParameterDraftLabelsByContext] =
-    useState<Record<string, Record<string, string>>>({});
-  const [templateParameterDraftGroupsByContext, setTemplateParameterDraftGroupsByContext] =
-    useState<Record<string, Record<string, string>>>({});
-  const [templateParameterDraftHelpNotesByContext, setTemplateParameterDraftHelpNotesByContext] =
-    useState<Record<string, Record<string, string>>>({});
-  const [templateParameterGroupDraftMetadataByContext, setTemplateParameterGroupDraftMetadataByContext] =
-    useState<Record<string, Record<string, Omit<RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState, "key">>>>({});
-  const [templateParameterDraftBindingPresetsByContext, setTemplateParameterDraftBindingPresetsByContext] =
-    useState<Record<string, Record<string, string>>>({});
-  const [templateParameterDraftOrderByContext, setTemplateParameterDraftOrderByContext] =
-    useState<Record<string, string[]>>({});
-  const [templateGroupExpansionByKey, setTemplateGroupExpansionByKey] = useState<Record<string, boolean>>({});
-  const [predicateRefGroupBundleSelections, setPredicateRefGroupBundleSelections] =
-    useState<Record<string, string>>({});
-  const [predicateRefGroupAutoBundleSelections, setPredicateRefGroupAutoBundleSelections] =
-    useState<Record<string, string>>({});
-  const [bundleCoordinationSimulationScope, setBundleCoordinationSimulationScope] =
-    useState<"all" | string>("all");
-  const [bundleCoordinationSimulationPolicy, setBundleCoordinationSimulationPolicy] =
-    useState<RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"] | "current">("current");
-  const [bundleCoordinationSimulationReplayIndex, setBundleCoordinationSimulationReplayIndex] =
-    useState(0);
-  const [bundleCoordinationSimulationReplayGroupFilter, setBundleCoordinationSimulationReplayGroupFilter] =
-    useState<"all" | string>("all");
-  const [bundleCoordinationSimulationReplayActionTypeFilter, setBundleCoordinationSimulationReplayActionTypeFilter] =
-    useState<"all" | "manual_anchor" | "dependency_selection" | "direct_auto_selection" | "conflict_blocked" | "idle">("all");
-  const [bundleCoordinationSimulationReplayEdgeFilter, setBundleCoordinationSimulationReplayEdgeFilter] =
-    useState<"all" | string>("all");
-  const [bundleCoordinationSimulationPromotionDecisionsByGroupKey, setBundleCoordinationSimulationPromotionDecisionsByGroupKey] =
-    useState<Record<string, boolean>>({});
-  const [bundleCoordinationSimulationApprovalOpen, setBundleCoordinationSimulationApprovalOpen] =
-    useState(false);
-  const [bundleCoordinationSimulationApprovalDiffOnly, setBundleCoordinationSimulationApprovalDiffOnly] =
-    useState(true);
-  const [bundleCoordinationSimulationApprovalDecisionsByGroupKey, setBundleCoordinationSimulationApprovalDecisionsByGroupKey] =
-    useState<Record<string, boolean>>({});
-  const [bundleCoordinationSimulationFinalSummaryOpen, setBundleCoordinationSimulationFinalSummaryOpen] =
-    useState(false);
+  const {
+    activeContract,
+    activeContractKey,
+    activeField,
+    activeFieldKey,
+    activeOperator,
+    activeOperatorKey,
+    activeSchema,
+    activeSchemaId,
+    builderValue,
+    bundleCoordinationSimulationApprovalDecisionsByGroupKey,
+    bundleCoordinationSimulationApprovalDiffOnly,
+    bundleCoordinationSimulationApprovalOpen,
+    bundleCoordinationSimulationFinalSummaryOpen,
+    bundleCoordinationSimulationPolicy,
+    bundleCoordinationSimulationPromotionDecisionsByGroupKey,
+    bundleCoordinationSimulationReplayActionTypeFilter,
+    bundleCoordinationSimulationReplayEdgeFilter,
+    bundleCoordinationSimulationReplayGroupFilter,
+    bundleCoordinationSimulationReplayIndex,
+    bundleCoordinationSimulationScope,
+    editorNegated,
+    editorTarget,
+    expressionAuthoring,
+    expressionChildren,
+    expressionMode,
+    groupLogic,
+    lastHydratedExpressionRef,
+    parameterBindingKeys,
+    parameterDomains,
+    parameterValues,
+    pendingHydratedState,
+    predicateDraftKey,
+    predicateRefDraftBindings,
+    predicateRefDraftKey,
+    predicateRefGroupAutoBundleSelections,
+    predicateRefGroupBundleSelections,
+    predicateTemplates,
+    predicates,
+    quantifier,
+    rootNegated,
+    selectedGroupId,
+    setActiveContractKey,
+    setActiveFieldKey,
+    setActiveOperatorKey,
+    setActiveSchemaId,
+    setBuilderValue,
+    setBundleCoordinationSimulationApprovalDecisionsByGroupKey,
+    setBundleCoordinationSimulationApprovalDiffOnly,
+    setBundleCoordinationSimulationApprovalOpen,
+    setBundleCoordinationSimulationFinalSummaryOpen,
+    setBundleCoordinationSimulationPolicy,
+    setBundleCoordinationSimulationPromotionDecisionsByGroupKey,
+    setBundleCoordinationSimulationReplayActionTypeFilter,
+    setBundleCoordinationSimulationReplayEdgeFilter,
+    setBundleCoordinationSimulationReplayGroupFilter,
+    setBundleCoordinationSimulationReplayIndex,
+    setBundleCoordinationSimulationScope,
+    setEditorNegated,
+    setEditorTarget,
+    setExpressionChildren,
+    setExpressionMode,
+    setGroupLogic,
+    setParameterBindingKeys,
+    setParameterValues,
+    setPendingHydratedState,
+    setPredicateDraftKey,
+    setPredicateRefDraftBindings,
+    setPredicateRefDraftKey,
+    setPredicateRefGroupAutoBundleSelections,
+    setPredicateRefGroupBundleSelections,
+    setPredicateTemplates,
+    setPredicates,
+    setQuantifier,
+    setRootNegated,
+    setSelectedGroupId,
+    setTemplateDraftAuthoringTarget,
+    setTemplateDraftKey,
+    setTemplateGroupExpansionByKey,
+    setTemplateParameterDraftBindingPresetsByContext,
+    setTemplateParameterDraftDefaultsByContext,
+    setTemplateParameterDraftGroupsByContext,
+    setTemplateParameterDraftHelpNotesByContext,
+    setTemplateParameterDraftLabelsByContext,
+    setTemplateParameterDraftOrderByContext,
+    setTemplateParameterGroupDraftMetadataByContext,
+    templateDraftAuthoringTarget,
+    templateDraftKey,
+    templateGroupExpansionByKey,
+    templateParameterDraftBindingPresetsByContext,
+    templateParameterDraftDefaultsByContext,
+    templateParameterDraftGroupsByContext,
+    templateParameterDraftHelpNotesByContext,
+    templateParameterDraftLabelsByContext,
+    templateParameterDraftOrderByContext,
+    templateParameterGroupDraftMetadataByContext,
+  } = useQueryBuilderAuthoringState(contracts);
   const bundleCoordinationSimulationPanelRef = useRef<HTMLDivElement | null>(null);
   const predicateRefReplayApplyHistoryTabIdentity = useMemo(
     () => loadRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabIdentity(),
@@ -498,43 +539,11 @@ export function RunSurfaceCollectionQueryBuilder({
   const [predicateRefReplayApplyConflictFocusedDecision, setPredicateRefReplayApplyConflictFocusedDecision] =
     useState<{ conflictId: string; decisionKey: string } | null>(null);
   const predicateRefReplayApplyConflictRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const activeContract = useMemo(
-    () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
-    [activeContractKey, contracts],
-  );
-  const expressionAuthoring = useMemo(
-    () => getRunSurfaceCollectionQueryExpressionAuthoring(activeContract),
-    [activeContract],
-  );
   const collectionSchemas = useMemo(
     () => getRunSurfaceCollectionQuerySchemas(activeContract),
     [activeContract],
   );
-  const parameterDomains = useMemo(
-    () => getRunSurfaceCollectionQueryParameterDomains(activeContract),
-    [activeContract],
-  );
-  const [activeSchemaId, setActiveSchemaId] = useState<string>("");
-  const activeSchema = useMemo(
-    () => collectionSchemas.find((schema) => getCollectionQuerySchemaId(schema) === activeSchemaId) ?? collectionSchemas[0] ?? null,
-    [activeSchemaId, collectionSchemas],
-  );
-  const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
-  const [parameterBindingKeys, setParameterBindingKeys] = useState<Record<string, string>>({});
-  const [quantifier, setQuantifier] = useState<"any" | "all" | "none">("any");
-  const [activeFieldKey, setActiveFieldKey] = useState<string>("");
-  const activeField = useMemo(
-    () => activeSchema?.elementSchema.find((field) => field.key === activeFieldKey) ?? activeSchema?.elementSchema[0] ?? null,
-    [activeFieldKey, activeSchema],
-  );
-  const [activeOperatorKey, setActiveOperatorKey] = useState<string>("");
-  const activeOperator = useMemo(
-    () => activeField?.operators.find((operator) => operator.key === activeOperatorKey) ?? activeField?.operators[0] ?? null,
-    [activeField, activeOperatorKey],
-  );
-  const [builderValue, setBuilderValue] = useState<string>("");
   const [valueBindingKey, setValueBindingKey] = useState("");
-  const [editorNegated, setEditorNegated] = useState(false);
   const [runtimeCandidateTraceDrillthroughByKey, setRuntimeCandidateTraceDrillthroughByKey] =
     useState<Record<string, boolean>>({});
   const [pinnedRuntimeCandidateClauseOriginKey, setPinnedRuntimeCandidateClauseOriginKey] =
@@ -549,91 +558,79 @@ export function RunSurfaceCollectionQueryBuilder({
       groupKey: null,
       traceKey: null,
     });
-  const lastHydratedReplayIntentTemplateIdRef = useRef<string | null>(null);
-  const [replayIntentUrlTemplateKey, setReplayIntentUrlTemplateKey] = useState<string | null>(
-    () => loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl()?.templateKey ?? null,
-  );
-  const initialReplayLinkGovernanceState = useMemo(
-    () => loadRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState(),
-    [],
-  );
-  const [replayIntentShareMode, setReplayIntentShareMode] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkShareMode>(initialReplayLinkGovernanceState.shareMode);
-  const [replayIntentRedactionPolicy, setReplayIntentRedactionPolicy] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy>(initialReplayLinkGovernanceState.redactionPolicy);
-  const [replayIntentRetentionPolicy, setReplayIntentRetentionPolicy] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy>(initialReplayLinkGovernanceState.retentionPolicy);
-  const [replayIntentGovernanceSyncMode, setReplayIntentGovernanceSyncMode] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode>(initialReplayLinkGovernanceState.syncMode);
-  const [replayIntentGovernanceConflicts, setReplayIntentGovernanceConflicts] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictEntry[]>([]);
-  const [replayIntentGovernanceReviewedConflictKeys, setReplayIntentGovernanceReviewedConflictKeys] =
-    useState<string[]>(
-      limitRunSurfaceCollectionQueryBuilderReplayLinkGovernanceReviewedConflictKeys(
-        initialReplayLinkGovernanceState.reviewedConflictKeys,
-      ),
-    );
-  const [replayIntentGovernanceAuditTrail, setReplayIntentGovernanceAuditTrail] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditEntry[]>(() =>
-      loadRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditTrail(),
-    );
-  const [replayIntentGovernancePayloadDraft, setReplayIntentGovernancePayloadDraft] = useState("");
-  const [replayIntentGovernanceStatus, setReplayIntentGovernanceStatus] = useState<{
-    message: string;
-    tone: "error" | "muted" | "success";
-  } | null>(null);
-  const [replayIntentShareStatus, setReplayIntentShareStatus] = useState<{
-    message: string;
-    tone: "error" | "muted" | "success";
-  } | null>(null);
-  const [replayIntentServerAuditReadToken, setReplayIntentServerAuditReadToken] = useState("");
-  const [replayIntentServerAuditWriteToken, setReplayIntentServerAuditWriteToken] = useState("");
-  const [replayIntentServerAuditTemplateFilter, setReplayIntentServerAuditTemplateFilter] = useState("");
-  const [replayIntentServerAuditAliasFilter, setReplayIntentServerAuditAliasFilter] = useState("");
-  const [replayIntentServerAuditActionFilter, setReplayIntentServerAuditActionFilter] =
-    useState<"all" | "created" | "resolved" | "revoked">("all");
-  const [replayIntentServerAuditRetentionFilter, setReplayIntentServerAuditRetentionFilter] =
-    useState<"all" | RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy>("all");
-  const [replayIntentServerAuditSourceTabFilter, setReplayIntentServerAuditSourceTabFilter] = useState("");
-  const [replayIntentServerAuditSearch, setReplayIntentServerAuditSearch] = useState("");
-  const [replayIntentServerAuditLimit, setReplayIntentServerAuditLimit] = useState("25");
-  const [replayIntentServerAuditRecordedBefore, setReplayIntentServerAuditRecordedBefore] = useState("");
-  const [replayIntentServerAuditIncludeManual, setReplayIntentServerAuditIncludeManual] = useState(false);
-  const [replayIntentServerAuditItems, setReplayIntentServerAuditItems] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditEntry[]>([]);
-  const [replayIntentServerAuditTotal, setReplayIntentServerAuditTotal] = useState(0);
-  const [replayIntentServerAuditStatus, setReplayIntentServerAuditStatus] = useState<{
-    message: string;
-    tone: "error" | "muted" | "success";
-  } | null>(null);
-  const [replayIntentServerAuditLoading, setReplayIntentServerAuditLoading] = useState(false);
-  const [replayIntentServerAuditExportJobs, setReplayIntentServerAuditExportJobs] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry[]>([]);
-  const [replayIntentServerAuditExportJobTotal, setReplayIntentServerAuditExportJobTotal] = useState(0);
-  const [replayIntentServerAuditExportJobStatus, setReplayIntentServerAuditExportJobStatus] = useState<{
-    message: string;
-    tone: "error" | "muted" | "success";
-  } | null>(null);
-  const [replayIntentServerAuditExportJobLoading, setReplayIntentServerAuditExportJobLoading] = useState(false);
-  const [replayIntentServerAuditExportJobHistory, setReplayIntentServerAuditExportJobHistory] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryPayload | null>(null);
-  const [replayIntentLinkAuditTrail, setReplayIntentLinkAuditTrail] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[]>(() =>
-      loadRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(),
-    );
-  const [replayIntentLinkAliases, setReplayIntentLinkAliases] =
-    useState<RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry[]>(() =>
-      loadRunSurfaceCollectionQueryBuilderReplayLinkAliases(),
-    );
-  const replayIntentGovernancePreviousStateRef = useRef<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot>({
-    redactionPolicy: initialReplayLinkGovernanceState.redactionPolicy,
-    retentionPolicy: initialReplayLinkGovernanceState.retentionPolicy,
-    shareMode: initialReplayLinkGovernanceState.shareMode,
-    syncMode: initialReplayLinkGovernanceState.syncMode,
-  });
-  const replayIntentGovernancePendingSourceRef =
-    useRef<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceChangeSource | null>(null);
-  const lastResolvedServerReplayLinkAliasTokenRef = useRef<string | null>(null);
+  const {
+    initialReplayLinkGovernanceState,
+    lastHydratedReplayIntentTemplateIdRef,
+    lastResolvedServerReplayLinkAliasTokenRef,
+    replayIntentGovernanceAuditTrail,
+    replayIntentGovernanceConflicts,
+    replayIntentGovernancePayloadDraft,
+    replayIntentGovernancePendingSourceRef,
+    replayIntentGovernancePreviousStateRef,
+    replayIntentGovernanceReviewedConflictKeys,
+    replayIntentGovernanceStatus,
+    replayIntentGovernanceSyncMode,
+    replayIntentLinkAliases,
+    replayIntentLinkAuditTrail,
+    replayIntentRedactionPolicy,
+    replayIntentRetentionPolicy,
+    replayIntentServerAuditActionFilter,
+    replayIntentServerAuditAliasFilter,
+    replayIntentServerAuditExportJobHistory,
+    replayIntentServerAuditExportJobLoading,
+    replayIntentServerAuditExportJobStatus,
+    replayIntentServerAuditExportJobTotal,
+    replayIntentServerAuditExportJobs,
+    replayIntentServerAuditIncludeManual,
+    replayIntentServerAuditItems,
+    replayIntentServerAuditLimit,
+    replayIntentServerAuditLoading,
+    replayIntentServerAuditReadToken,
+    replayIntentServerAuditRecordedBefore,
+    replayIntentServerAuditRetentionFilter,
+    replayIntentServerAuditSearch,
+    replayIntentServerAuditSourceTabFilter,
+    replayIntentServerAuditStatus,
+    replayIntentServerAuditTemplateFilter,
+    replayIntentServerAuditTotal,
+    replayIntentServerAuditWriteToken,
+    replayIntentShareMode,
+    replayIntentShareStatus,
+    replayIntentUrlTemplateKey,
+    setReplayIntentGovernanceAuditTrail,
+    setReplayIntentGovernanceConflicts,
+    setReplayIntentGovernancePayloadDraft,
+    setReplayIntentGovernanceReviewedConflictKeys,
+    setReplayIntentGovernanceStatus,
+    setReplayIntentGovernanceSyncMode,
+    setReplayIntentLinkAliases,
+    setReplayIntentLinkAuditTrail,
+    setReplayIntentRedactionPolicy,
+    setReplayIntentRetentionPolicy,
+    setReplayIntentServerAuditActionFilter,
+    setReplayIntentServerAuditAliasFilter,
+    setReplayIntentServerAuditExportJobHistory,
+    setReplayIntentServerAuditExportJobLoading,
+    setReplayIntentServerAuditExportJobStatus,
+    setReplayIntentServerAuditExportJobTotal,
+    setReplayIntentServerAuditExportJobs,
+    setReplayIntentServerAuditIncludeManual,
+    setReplayIntentServerAuditItems,
+    setReplayIntentServerAuditLimit,
+    setReplayIntentServerAuditLoading,
+    setReplayIntentServerAuditReadToken,
+    setReplayIntentServerAuditRecordedBefore,
+    setReplayIntentServerAuditRetentionFilter,
+    setReplayIntentServerAuditSearch,
+    setReplayIntentServerAuditSourceTabFilter,
+    setReplayIntentServerAuditStatus,
+    setReplayIntentServerAuditTemplateFilter,
+    setReplayIntentServerAuditTotal,
+    setReplayIntentServerAuditWriteToken,
+    setReplayIntentShareMode,
+    setReplayIntentShareStatus,
+    setReplayIntentUrlTemplateKey,
+  } = useQueryBuilderReplayLinkState();
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
   const clauseReevaluationPreviewTraceRefs = useRef(new Map<string, HTMLDivElement>());
   const clauseReevaluationPreviewDiffItemRefs = useRef(new Map<string, HTMLDivElement>());
@@ -12815,4 +12812,3 @@ export function RunSurfaceCollectionQueryBuilder({
     </div>
   );
 }
-

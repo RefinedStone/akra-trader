@@ -5,4 +5,4 @@ export {
   DEFAULT_COMPARISON_INTENT,
   resolveComparisonHistorySyncConflictReviewEntry,
   resolveComparisonHistorySyncWorkspaceReview,
-} from "./RunSectionContent";
+} from "../../control-room/ControlRoomViewHelpers";

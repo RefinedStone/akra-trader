@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+import inspect
 from datetime import datetime
 
+from akra_trader.application_support import guarded_live_alert_state_refresh as guarded_live_alert_state_refresh_support
+from akra_trader.application_support import guarded_live_alert_workflows as guarded_live_alert_workflows_support
+from akra_trader.application_support import guarded_live_external_sync_orchestration as guarded_live_external_sync_orchestration_support
+from akra_trader.application_support import guarded_live_market_context_support as guarded_live_market_context_support
+from akra_trader.application_support import guarded_live_market_context_workflows as guarded_live_market_context_workflows_support
+from akra_trader.application_support import guarded_live_payload_helpers as guarded_live_payload_helpers_support
+from akra_trader.application_support import guarded_live_provider_recovery as guarded_live_provider_recovery_support
 from akra_trader.domain.models import GuardedLiveReconciliationFinding
 from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import RunMode
@@ -1036,3 +1044,49 @@ class GuardedLiveAlertCompatibilityMixin:
     resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
     return list(dict.fromkeys(findings)), resolved_detected_at, has_critical
 
+
+_GUARDED_LIVE_SUPPORT_MODULES = (
+  guarded_live_alert_state_refresh_support,
+  guarded_live_alert_workflows_support,
+  guarded_live_external_sync_orchestration_support,
+  guarded_live_payload_helpers_support,
+  guarded_live_provider_recovery_support,
+  guarded_live_market_context_support,
+  guarded_live_market_context_workflows_support,
+)
+
+_GUARDED_LIVE_PUBLIC_DELEGATES = {
+  "acknowledge_guarded_live_incident",
+  "escalate_guarded_live_incident",
+  "get_guarded_live_status",
+  "recover_guarded_live_runtime_state",
+  "remediate_guarded_live_incident",
+  "sync_guarded_live_incident_from_external",
+}
+
+
+def _guarded_live_delegate_descriptor(value):
+  params = tuple(inspect.signature(value).parameters.values())
+  if params and params[0].name in {"self", "app", "application"}:
+    return value
+  if params and params[0].name == "cls":
+    return classmethod(value)
+  return staticmethod(value)
+
+
+for _support_module in _GUARDED_LIVE_SUPPORT_MODULES:
+  for _name in dir(_support_module):
+    if _name.startswith("__"):
+      continue
+    if not (_name.startswith("_") or _name in _GUARDED_LIVE_PUBLIC_DELEGATES):
+      continue
+    if _name in GuardedLiveAlertCompatibilityMixin.__dict__:
+      continue
+    _value = getattr(_support_module, _name)
+    if not callable(_value):
+      continue
+    setattr(
+      GuardedLiveAlertCompatibilityMixin,
+      _name,
+      _guarded_live_delegate_descriptor(_value),
+    )
