@@ -1244,18 +1244,72 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add advanced query operators and semantic retrieval for scheduler narrative search",
       "description": "Build the next search layer above weighted occurrence ranking by adding full-text-style ranking improvements, advanced query operators, and cross-occurrence semantic retrieval so operators can express richer scheduler narrative queries and discover related recovery stories beyond field-weighted matches alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 77,
       "dynamic_priority_delta": 38,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T15:12:04+09:00",
+      "updated_at": "2026-04-22T15:40:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-narrative-retrieval-layer"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 6fdc3a1 says the new weighted ranking and explainable highlights are in place, but the remaining direct continuation is a deeper search layer with full-text-style richer ranking, advanced query operators, and cross-occurrence semantic search across scheduler occurrences and stitched exports.",
-      "priority_reason": "Promoted to ready because the previous scheduler retrieval layer is now complete, the operator asked to continue with one next queued task, and the latest main-session reply identifies this deeper semantic or operator-aware search layer as the immediate executable follow-up."
+      "direction_relation_note": "Completed on main in commit dec9e47 with operator-aware scheduler query parsing and semantic retrieval wired through application and control-room surfaces, including parsed operator summaries, semantic concept expansion, explainable search_match metadata, and updated advanced-search UX copy.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web typecheck/build, docs updates, commit, and push all landed; the latest main-session reply now leaves a heavier search infrastructure layer: separate full-text indexing, richer boolean query semantics, and broader cross-occurrence semantic retrieval."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-fulltext-boolean-search-layer",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add dedicated full-text index and boolean query engine for scheduler narrative search",
+      "description": "Replace the current operator-aware semantic ranking path with a dedicated scheduler narrative search layer that builds a separate full-text index and supports richer boolean query semantics so operators can execute larger and more precise occurrence searches without leaning on ad hoc field scans.",
+      "status": "done",
+      "base_priority": 78,
+      "dynamic_priority_delta": 39,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T19:35:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-semantic-query-layer"
+      ],
+      "direction_relation_note": "Completed on main in commit 92e5705 with dedicated scheduler search documents, inverted full-text indexing, RPN-based boolean query evaluation for AND/OR/NOT/parentheses/field operators, and control-room query-plan visibility wired through application and UI surfaces.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web build validation, docs updates, commit, and push all landed; the latest main-session reply now leaves heavier search infrastructure follow-ups around persistence, ranked relevance tuning, and cross-occurrence vector retrieval."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-persistent-index-relevance-tuning",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Persist scheduler search indexes and tune ranked full-text relevance",
+      "description": "Build the next scheduler narrative search layer by moving the new full-text index beyond request-local or rebuild-only behavior into a persistent search index with explicit ranked relevance tuning so larger occurrence corpora can be queried consistently across restarts and ranking quality can improve before broader retrieval expansion.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 40,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T19:35:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-fulltext-boolean-search-layer"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says the remaining heavier search layer starts with persistent search index work and ranked full-text relevance tuning now that the dedicated full-text index plus boolean evaluator has shipped.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task, the previous full-text or boolean slice is complete, and persistence plus relevance tuning is the clearest executable infrastructure step before cross-occurrence vector retrieval."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-cross-occurrence-semantic-retrieval",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Extend scheduler search into cross-occurrence semantic or vector retrieval clusters",
+      "description": "Build the next layer above the persistent full-text search engine by retrieving and ranking semantically related scheduler occurrences and stitched reports across separate incident windows with cross-occurrence semantic or vector retrieval so operators can follow recurring recovery patterns instead of only matching one occurrence at a time.",
+      "status": "proposed",
+      "base_priority": 77,
+      "dynamic_priority_delta": 33,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T19:35:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-persistent-index-relevance-tuning"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly keeps cross-occurrence semantic or vector retrieval as a remaining gap after the full-text or boolean layer shipped, but it is cleaner to stage it after persistent indexing and relevance tuning exist.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind the new persistent-index queue head so builtin next-task advances through one ranking and storage foundation before adding broader occurrence clustering."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
