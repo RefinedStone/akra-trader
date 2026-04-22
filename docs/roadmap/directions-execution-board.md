@@ -185,6 +185,35 @@ These should follow immediately after the queue above:
 4. live candidacy checklist plus drill validation
 5. venue lifecycle recovery scope plus deployment and credential governance
 
+## Cross-Cutting Lane: LLM Sensitivity Decomposition
+
+Status:
+
+- `Now`
+- overall state: `Partial`
+- direction: `llm-sensitivity-decomposition`
+
+Why now:
+
+- the remaining giant compatibility files are now a delivery risk, not just a style issue
+- Batch 1 through Batch 3 all still depend on being able to change one bounded flow without
+  reopening `App.tsx` or `application.py`
+
+Active move map:
+
+1. keep `controlRoomApi.ts` and `controlRoomDefinitions.ts` as compatibility barrels while the
+   real provider/query-builder families move under bounded submodules
+2. keep `domain/models.py` import-compatible while model families move under `domain/model_types/*`
+3. keep shrinking `application.py` by moving pure comparison and serializer flows into
+   `application_support/*`
+4. use route smoke tests as a floor before further `App.tsx` extraction
+
+Exit evidence:
+
+- new frontend/backend work no longer lands by default in the giant compatibility entrypoints
+- one flow usually resolves from one entry module plus a few direct collaborators
+- route and serializer regressions are caught without reopening the full control room
+
 ## Cross-Cutting Discipline
 
 - `Program 5` work is not a final cleanup pass. It must ship with each batch.

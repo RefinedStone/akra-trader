@@ -1,6 +1,6 @@
 # Backend Architecture Target
 
-Updated for the refactor baseline as of April 21, 2026.
+Updated for the refactor baseline as of April 22, 2026.
 
 ## Summary
 
@@ -11,6 +11,8 @@ This is not fully complete yet. The current wave introduces the first executable
 
 - `ports.py` is now a compatibility shim over `port_contracts/*`
 - shared application defaults and comparison policy moved into `application_support/*`
+- comparison serialization now lives in
+  `application_support/comparison_serialization.py`
 - standalone surface/runtime query types and filter/sort helpers moved into
   `application_support/runtime_queries.py`
 - standalone surface binding catalog moved into
@@ -20,6 +22,8 @@ This is not fully complete yet. The current wave introduces the first executable
 - incident delivery dispatch is now driven by `adapters/operator_delivery_registry.py`
 - core workflow provider methods for PagerDuty, Opsgenie, incident.io, FireHydrant, and Rootly now
   live in `adapters/operator_delivery_core_providers.py`
+- provider-provenance model families now live in `domain/model_types/provider_provenance.py`
+  behind `domain/models.py` compatibility imports
 
 Use [LLM Sensitivity](architecture-llm-sensitivity.md) for the repository-wide rule that one
 backend flow should be understandable from one entrypoint and a few direct collaborators.
@@ -35,6 +39,8 @@ backend flow should be understandable from one entrypoint and a few direct colla
 - `application_support/`
   - shared policy, fallback adapters, and pure helper modules
   - no FastAPI or adapter-specific imports
+- `domain/model_types/*`
+  - bounded model families behind `domain/models.py`
 - `port_contracts/`
   - split protocol definitions by concern
   - `ports.py` re-exports these contracts for compatibility
@@ -83,6 +89,8 @@ backend flow should be understandable from one entrypoint and a few direct colla
 - `application.py` is still too large and still mixes too many use cases.
 - `operator_delivery.py` still contains provider implementation bodies in one file.
 - `domain/models.py` remains too broad and should split by bounded feature area.
+- comparison flow extraction is now real, but guarded-live and provider-governance orchestration
+  still need the same treatment in `application.py`
 - standalone surface binding catalogs are isolated now, but the catalog module is still broad and
   should split further by bounded flow.
 

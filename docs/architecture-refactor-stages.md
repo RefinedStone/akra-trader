@@ -1,6 +1,6 @@
 # Architecture Refactor Stages
 
-Updated for the current refactor wave as of April 21, 2026.
+Updated for the current refactor wave as of April 22, 2026.
 
 ## Stage 1: Compatibility Skeleton
 
@@ -10,6 +10,7 @@ Goal: introduce real boundaries without breaking the product surface.
 - move shared application defaults/policy into support modules
 - replace incident provider dispatch chains with a registry
 - move workspace routing and shell layout out of `App.tsx`
+- convert top-level control-room API/type modules into compatibility barrels
 - keep API paths and current UI flows stable
 
 Exit criteria:
@@ -24,6 +25,7 @@ Goal: shrink `application.py` into a facade.
 
 - extract preset lifecycle orchestration
 - extract comparison/query-contract helpers
+- extract comparison serialization into support modules before adding more comparison surface area
 - extract guarded-live control use cases
 - extract replay-alias and audit surfaces
 
@@ -54,6 +56,7 @@ Goal: move the control room from one giant feature file to route-owned modules.
 - extract runtime ops workspace
 - extract guarded-live workspace
 - group feature-local API helpers with their route/features
+- keep route smoke tests in place while those extractions land
 
 Exit criteria:
 

@@ -22,86 +22,18 @@ detail_doc_path = ".codex-exec-loop/planning/directions/data-trust-and-lineage.m
 state = "active"
 
 [[directions]]
-id = "experiment-os"
-title = "Experiment OS"
-summary = "Turn run history into a durable experiment operating system with strategy lifecycle, presets, tags, benchmark packs, and queryable metadata that support promotion decisions instead of one-off backtest inspection."
+id = "llm-sensitivity-decomposition"
+title = "LLM sensitivity decomposition"
+summary = "Break giant compatibility files into bounded route, model, and serializer modules while keeping the existing product/API surface stable."
 success_criteria = [
-    "Strategy registration and lifecycle state are durable and queryable across restarts.",
-    "Runs can be filtered and compared by dataset, preset, tag, benchmark family, and strategy version without relying on payload-only scans for common paths.",
-    "Native and reference runs share one experiment model with consistent provenance, artifact, and export posture.",
+    "Compatibility barrels remain import-stable, but real ownership moves into bounded modules under frontend and backend feature/support paths.",
+    "App.tsx, application.py, controlRoomApi.ts, controlRoomDefinitions.ts, and domain/models.py stop absorbing new feature logic and shrink through extraction milestones.",
+    "Frontend route composition has smoke-test coverage so decomposition can continue without re-opening the whole control room by default.",
 ]
 scope_hints = [
-    "Use docs/blueprint/platform-program.md Workstream B, docs/blueprint/product-program.md Program Phase 1 and Program Phase 2, and docs/blueprint/backlog-map.md Program 1 as the target shape.",
-    "Prioritize reproducibility, presets, tags, lifecycle, and benchmark promotion flows before optimization automation or collaboration features.",
-    "Keep reference strategies visible as benchmark lanes and do not let external-runtime behavior define core experiment contracts.",
+    "Treat this as a cross-cutting architecture lane that supports every product batch rather than as a one-off cleanup pass.",
+    "Prefer compatibility re-exports and delegation shims over API/path/schema churn.",
+    "Split by bounded flow first: provider provenance, query-builder replay governance, comparison serialization, and model families.",
 ]
-detail_doc_path = ".codex-exec-loop/planning/directions/experiment-os.md"
-state = "active"
-
-[[directions]]
-id = "runtime-ops"
-title = "Runtime ops"
-summary = "Convert replay-style sandbox semantics into continuous runtime operations with worker sessions, heartbeat, restart recovery, runtime health, and a control room that reflects real active execution rather than previews."
-success_criteria = [
-    "Preview runs and active worker sessions are modeled and surfaced separately in backend and operator-facing views.",
-    "Sandbox workers report heartbeat, recoverable state, recent decisions, lag, positions, and fills through one operator surface.",
-    "Alerts connect stale data, worker failure, and runtime health to actionable operator state rather than raw background logs.",
-]
-scope_hints = [
-    "Use docs/blueprint/platform-program.md Workstream C, docs/blueprint/operating-model.md, and docs/blueprint/metrics-and-gates.md Gate 2 as the controlling guidance.",
-    "Favor worker-session semantics, runtime recoverability, and operator-visible health over premature live exchange work.",
-    "Preserve the shared runtime core; mode differences should stay in adapters, policies, and supervision layers.",
-]
-detail_doc_path = ".codex-exec-loop/planning/directions/runtime-ops.md"
-state = "active"
-
-[[directions]]
-id = "guarded-live-execution"
-title = "Guarded live execution"
-summary = "Make live candidacy a gated safety program, not an execution shortcut, by requiring audit coverage, operator events, risk controls, kill switch behavior, and reconciliation before any venue-backed live path is considered real."
-success_criteria = [
-    "Live-affecting actions are blocked unless safety configuration, audit capture, and operator event logging are present.",
-    "Reconciliation and emergency-stop drills are first-class product flows rather than ad hoc procedures.",
-    "Live candidacy is explicit and distinct from sandbox worker readiness, with promotion blocked until safety gates pass.",
-]
-scope_hints = [
-    "Use docs/blueprint/platform-program.md Workstream D, docs/blueprint/metrics-and-gates.md Gate 3, and docs/blueprint/risk-register.md Risk 5 as the governing rules.",
-    "Do not ship execution-first shortcuts or unattended live behavior before audit and reconciliation exist.",
-    "Treat account state, exposure state, operator events, audit views, and reconciliation results as required interfaces.",
-]
-detail_doc_path = ".codex-exec-loop/planning/directions/guarded-live-execution.md"
-state = "active"
-
-[[directions]]
-id = "intelligence-research-lane"
-title = "Intelligence research lane"
-summary = "Evolve DecisionEnginePort into a traceable intelligence research lane with prompt registry, trace storage, replay harnesses, evaluation, and mandatory fallback or review so LLM work stays isolated from deterministic execution guarantees."
-success_criteria = [
-    "Every intelligence run captures prompt version, raw response, normalized decision, and post-risk trace metadata.",
-    "Replay and evaluation flows can benchmark intelligence-assisted decisions against deterministic baselines.",
-    "No sandbox or live promotion path exists without deterministic fallback or human review.",
-]
-scope_hints = [
-    "Use docs/blueprint/llm-lane.md, docs/blueprint/platform-program.md Workstream E, and docs/blueprint/metrics-and-gates.md Gate 4 as the target shape.",
-    "Treat trace, replay, fallback, and evaluation as mandatory infrastructure rather than optional research tooling.",
-    "Keep intelligence-assisted strategies isolated from deterministic core behavior and forbid unattended live promotion.",
-]
-detail_doc_path = ".codex-exec-loop/planning/directions/intelligence-research-lane.md"
-state = "active"
-
-[[directions]]
-id = "operator-trust-and-discipline"
-title = "Operator trust and discipline"
-summary = "Make the control room, alerts, operator events, runbooks, and documentation strong enough for single-operator daily use, incident response, and promotion decisions without depending on shell knowledge or drifting docs."
-success_criteria = [
-    "The control room can answer what is running, what changed, why it changed, whether it is safe, and what the operator should do next.",
-    "Daily, weekly, and incident workflows from the operating model are supported by product surfaces and durable operator-visible records.",
-    "Current-state, roadmap, blueprint, and operational docs stay aligned as implementation changes over time.",
-]
-scope_hints = [
-    "Use docs/blueprint/operating-model.md, docs/blueprint/risk-register.md Risk 4 and Risk 10, and docs/blueprint/backlog-map.md Program 5 as the main guidance.",
-    "Prioritize operator-visible trust surfaces over UI ornament or speculative multi-user workflow design.",
-    "Tie alerts, operator events, runbooks, and doc hygiene back to single-operator decision quality.",
-]
-detail_doc_path = ".codex-exec-loop/planning/directions/operator-trust-and-discipline.md"
+detail_doc_path = ".codex-exec-loop/planning/directions/llm-sensitivity-decomposition.md"
 state = "active"

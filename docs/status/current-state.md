@@ -42,6 +42,8 @@ It is not yet a finished live trading product:
 - FastAPI backend with explicit domain, application, adapter, and runtime boundaries
 - split port contracts under `port_contracts/*` with `ports.py` kept as a compatibility shim
 - shared application fallback adapters and comparison policy moved into `application_support/*`
+- comparison serialization helpers moved into
+  `application_support/comparison_serialization.py`
 - run-surface enforcement and run serialization helpers moved into `application_support/run_surfaces.py`
 - standalone surface/runtime query types plus filter/sort helpers moved into
   `application_support/runtime_queries.py`
@@ -104,11 +106,14 @@ It is not yet a finished live trading product:
 - route-aware React control-room shell with dedicated workspace routing metadata and shell layout
   modules under `apps/web/src/app/*`
 - workspace-level panel grouping now lives under `apps/web/src/routes/*`
-- shared control-room type/constant definitions now live in `apps/web/src/controlRoomDefinitions.ts`
-- shared control-room transport helpers now live in `apps/web/src/controlRoomApi.ts`
+- shared control-room type families now live under `apps/web/src/controlRoomDefinitions/*`
+  behind `apps/web/src/controlRoomDefinitions.ts`
+- shared control-room transport helpers now live under `apps/web/src/controlRoomApi/*` behind
+  `apps/web/src/controlRoomApi.ts`
 - run-surface capability and comparison-boundary helpers now live in
   `apps/web/src/runSurfaceCapabilities.tsx`
 - query-builder feature logic now lives under `apps/web/src/features/query-builder/*`
+- route smoke tests now cover `WorkspaceRouteContent` plus the dedicated workspace route shells
 - query-builder now separates a tiny entry module, a feature model module, a main component
   module, and a replay-governance section module so parser/storage and replay governance are no
   longer mixed into the feature entrypoint
@@ -178,6 +183,8 @@ It is not yet a finished live trading product:
   feature modules still own too much dense state and rendering logic
 - the query-builder feature, standalone surface catalogs, `application.py`, and the remaining
   long-tail provider modules still need further decomposition by bounded flow
+- `domain/models.py` now re-exports extracted provider-provenance records, but the remaining
+  operator and guarded-live model families still need the same treatment
 - sandbox workers exist, but active-session-first views for recent decisions, lag interpretation,
   positions, and fills are still weaker than the backend capabilities
 - guarded-live recovery restores meaningful control-plane and order-lifecycle state, but it does not

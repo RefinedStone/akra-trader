@@ -1,6 +1,6 @@
 # Frontend Architecture Target
 
-Updated for the refactor baseline as of April 21, 2026.
+Updated for the refactor baseline as of April 22, 2026.
 
 ## Summary
 
@@ -20,13 +20,17 @@ This wave introduces the first routing skeleton:
 - shell/header/nav layout moved into `apps/web/src/app/WorkspaceShell.tsx`
 - workspace panel grouping moved into `apps/web/src/routes/*`
 - `App.tsx` now delegates active route composition to `WorkspaceRouteContent.tsx`
-- shared control-room types/constants moved into `apps/web/src/controlRoomDefinitions.ts`
-- transport helpers moved into `apps/web/src/controlRoomApi.ts`
+- shared control-room type families now fan out under `apps/web/src/controlRoomDefinitions/*`
+  behind `apps/web/src/controlRoomDefinitions.ts`
+- transport helpers now fan out under `apps/web/src/controlRoomApi/*` behind
+  `apps/web/src/controlRoomApi.ts`
 - run-surface capability contracts and comparison-boundary helpers now live in
   `apps/web/src/runSurfaceCapabilities.tsx`
 - the query-builder feature now has its own package under `apps/web/src/features/query-builder/*`
   with a tiny entrypoint, a feature model module, a dedicated component module, and a separate
   replay-governance section module
+- Vitest + Testing Library route smoke coverage now guards `WorkspaceRouteContent` and the route
+  shells
 
 The large control-room feature file still exists, but the top-level app shell is no longer the place
 where routing and presentation structure are decided.
@@ -77,8 +81,7 @@ where routing and presentation structure are decided.
 - dense feature JSX still lives mostly in `App.tsx`, but query-builder no longer does
 - query-builder entry no longer mixes parser/storage/model helpers with the main component body
 - query-builder replay-link governance UI no longer lives inline with the rest of the feature body
-- top-level control-room type/constant, transport, and run-surface contract context no longer
-  lives inline in that file
+- top-level control-room type/constant and transport barrels no longer own the full implementation
   - next waves should split comparison/history and run-panel bodies into feature-owned modules behind
     each route
 
