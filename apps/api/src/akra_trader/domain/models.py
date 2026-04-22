@@ -1587,6 +1587,7 @@ class ProviderProvenanceSchedulerHealthRecord:
   source_tab_id: str | None = None
   source_tab_label: str | None = None
   issues: tuple[str, ...] = ()
+  search_projection: dict[str, Any] = field(default_factory=dict)
 
 
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"

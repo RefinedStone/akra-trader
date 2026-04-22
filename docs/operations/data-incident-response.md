@@ -122,6 +122,9 @@ unclear dataset lineage.
 - that scheduler narrative search now also executes against a dedicated full-text index with
   boolean query support, so incident review can combine `AND` / `OR` / `NOT` clauses and market
   context operators before exporting a stitched handoff narrative
+- that full-text path now also reuses persisted scheduler search projections and tuned relevance
+  scoring, so repeated incident review searches do not depend on rebuilding every lexical hint
+  from scratch before ranking results
 - those saved scheduler narrative templates and boards now also support edit, delete, and
   revision-restore workflow, so teams can correct or retire shared review lenses without losing
   the previous incident-handoff snapshot

@@ -1321,6 +1321,8 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     boolean_operator_count: number;
     indexed_occurrence_count: number;
     indexed_term_count: number;
+    persistence_mode?: string | null;
+    relevance_model?: string | null;
     parsed_terms: string[];
     parsed_phrases: string[];
     parsed_operators: string[];
@@ -1355,6 +1357,7 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
       lexical_score: number;
       semantic_score: number;
       operator_score: number;
+      relevance_model?: string | null;
       ranking_reason?: string | null;
     } | null;
   })[];

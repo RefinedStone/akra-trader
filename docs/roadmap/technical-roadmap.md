@@ -170,6 +170,9 @@ creation.
 - that same scheduler search surface now also materializes a dedicated full-text index and boolean
   query evaluator, so future narrative tooling can build on indexed `AND` / `OR` / `NOT`
   retrieval instead of re-implementing linear scan matching in each workflow
+- that same scheduler search layer now also persists record-backed search projections and tuned
+  relevance weighting, so future narrative retrieval can build on durable lexical projections
+  instead of recomputing every token stream on demand
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

@@ -18924,6 +18924,13 @@ export default function App() {
                                         Index {providerProvenanceSchedulerAlertHistory.search_summary.indexed_occurrence_count} occurrence(s) · {providerProvenanceSchedulerAlertHistory.search_summary.indexed_term_count} term(s)
                                       </span>
                                     ) : null}
+                                    {providerProvenanceSchedulerAlertHistory?.search_summary?.relevance_model ? (
+                                      <span className="run-filter-summary-chip">
+                                        {providerProvenanceSchedulerAlertHistory.search_summary.persistence_mode === "record_backed_scheduler_search_projection"
+                                          ? "Persistent index"
+                                          : "Ephemeral index"} · {providerProvenanceSchedulerAlertHistory.search_summary.relevance_model}
+                                      </span>
+                                    ) : null}
                                   </div>
                                   <div className="market-data-provenance-history-actions">
                                     <label className="run-form-field">
@@ -19177,6 +19184,11 @@ export default function App() {
                                                 ) : null}
                                                 {alert.search_match?.ranking_reason ? (
                                                   <p className="run-lineage-symbol-copy">{alert.search_match.ranking_reason}</p>
+                                                ) : null}
+                                                {alert.search_match?.relevance_model ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Relevance {alert.search_match.relevance_model} · lexical {alert.search_match.lexical_score} · semantic {alert.search_match.semantic_score} · operator {alert.search_match.operator_score}
+                                                  </p>
                                                 ) : null}
                                                 <div className="market-data-provenance-history-actions">
                                                   <button

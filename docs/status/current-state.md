@@ -226,6 +226,9 @@ It is not yet a finished live trading product:
   boolean query engine, so operators can issue structured searches like
   `status:resolved AND (recovered OR healthy) AND NOT category:failure` and get ranked results
   from indexed scheduler narrative documents instead of only linear scan filtering
+- that same scheduler search layer now also persists record-backed search projections and uses
+  tuned ranked relevance, so the boolean/full-text path can reuse saved scheduler index material
+  and score matches with stronger lexical weighting than the earlier flat scan
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

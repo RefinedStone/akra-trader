@@ -2958,6 +2958,9 @@ class TradingApplication:
         else None
       ),
       issues=tuple(snapshot.issues),
+      search_projection=self._build_provider_provenance_scheduler_health_search_projection(
+        snapshot=snapshot
+      ),
     )
     return self._save_provider_provenance_scheduler_health_record(record)
 
@@ -36640,6 +36643,69 @@ class TradingApplication:
     return None
 
   @classmethod
+  def _build_provider_provenance_scheduler_health_search_projection(
+    cls,
+    *,
+    snapshot: ProviderProvenanceSchedulerHealth,
+  ) -> dict[str, Any]:
+    normalized_summary = cls._normalize_provider_provenance_scheduler_alert_search_text(snapshot.summary)
+    normalized_error = cls._normalize_provider_provenance_scheduler_alert_search_text(snapshot.last_error)
+    normalized_issues = tuple(
+      normalized_issue
+      for issue in snapshot.issues
+      for normalized_issue in (
+        cls._normalize_provider_provenance_scheduler_alert_search_text(issue.replace("_", " ")),
+      )
+      if normalized_issue is not None
+    )
+    semantic_concepts: list[str] = []
+    if snapshot.status == "lagging":
+      semantic_concepts.append("lag")
+    if snapshot.status == "failed":
+      semantic_concepts.append("failure")
+    if snapshot.status == "healthy":
+      semantic_concepts.append("healthy")
+    if snapshot.status == "starting":
+      semantic_concepts.append("active")
+    if snapshot.last_success_at is not None:
+      semantic_concepts.append("recovery")
+    if snapshot.active_alert_key:
+      semantic_concepts.append("focus")
+    if snapshot.consecutive_failure_count > 1 or snapshot.failure_count > 1:
+      semantic_concepts.append("recurring")
+    lexical_terms: list[str] = []
+    field_map = {
+      "status": (snapshot.status,),
+      "summary": tuple(value for value in (normalized_summary, normalized_error) if value is not None),
+      "issues": normalized_issues,
+      "workflow": tuple(
+        value
+        for value in (
+          snapshot.active_alert_key,
+          snapshot.alert_workflow_state,
+          snapshot.alert_workflow_summary,
+        )
+        for normalized_value in (
+          cls._normalize_provider_provenance_scheduler_alert_search_text(value),
+        )
+        if normalized_value is not None
+      ),
+    }
+    for values in field_map.values():
+      for value in values:
+        lexical_terms.extend(cls._tokenize_provider_provenance_scheduler_alert_search_query(value))
+    return {
+      "index_version": "scheduler-search-index.v2",
+      "lexical_terms": tuple(dict.fromkeys(lexical_terms)),
+      "semantic_concepts": tuple(dict.fromkeys(semantic_concepts)),
+      "fields": {
+        key: tuple(dict.fromkeys(values))
+        for key, values in field_map.items()
+        if values
+      },
+    }
+
+  @classmethod
   def _matches_provider_provenance_scheduler_alert_occurrence_search(
     cls,
     *,
@@ -37365,6 +37431,7 @@ class TradingApplication:
     search_fields = cls._build_provider_provenance_scheduler_alert_occurrence_search_fields(row=row)
     normalized_fields: dict[str, tuple[str, ...]] = {}
     lexical_terms: list[str] = []
+    lexical_term_frequencies: dict[str, int] = {}
     for field_name, _, field_values in search_fields:
       normalized_values = tuple(
         dict.fromkeys(
@@ -37378,18 +37445,74 @@ class TradingApplication:
       )
       normalized_fields[field_name] = normalized_values
       for normalized_value in normalized_values:
-        lexical_terms.extend(cls._tokenize_provider_provenance_scheduler_alert_search_query(normalized_value))
+        for token in cls._tokenize_provider_provenance_scheduler_alert_search_query(normalized_value):
+          lexical_terms.append(token)
+          lexical_term_frequencies[token] = lexical_term_frequencies.get(token, 0) + 1
+    persisted_projection_versions: list[str] = []
+    persisted_projection_count = 0
+    persisted_projection_terms: list[str] = []
+    persisted_projection_semantic_concepts: list[str] = []
+    persisted_projection_fields: dict[str, list[str]] = {}
+    for record in row.get("narrative_records", ()) or ():
+      if not isinstance(record, ProviderProvenanceSchedulerHealthRecord):
+        continue
+      projection = record.search_projection if isinstance(record.search_projection, dict) else {}
+      if not projection:
+        continue
+      persisted_projection_count += 1
+      projection_version = projection.get("index_version")
+      if isinstance(projection_version, str) and projection_version.strip():
+        persisted_projection_versions.append(projection_version.strip())
+      for token in projection.get("lexical_terms", ()) or ():
+        if isinstance(token, str) and token.strip():
+          normalized_token = token.strip().lower()
+          persisted_projection_terms.append(normalized_token)
+          lexical_terms.append(normalized_token)
+          lexical_term_frequencies[normalized_token] = lexical_term_frequencies.get(normalized_token, 0) + 1
+      for concept in projection.get("semantic_concepts", ()) or ():
+        if isinstance(concept, str) and concept.strip():
+          persisted_projection_semantic_concepts.append(concept.strip())
+      for field_name, values in (projection.get("fields", {}) or {}).items():
+        if not isinstance(field_name, str):
+          continue
+        bucket = persisted_projection_fields.setdefault(field_name, [])
+        if isinstance(values, (list, tuple)):
+          for value in values:
+            normalized_value = cls._normalize_provider_provenance_scheduler_alert_search_text(value)
+            if normalized_value is not None:
+              bucket.append(normalized_value)
     return {
       "document_id": document_id,
       "row": row,
-      "normalized_fields": normalized_fields,
+      "normalized_fields": {
+        **normalized_fields,
+        **{
+          f"persisted_{field_name}": tuple(dict.fromkeys(values))
+          for field_name, values in persisted_projection_fields.items()
+          if values
+        },
+      },
       "lexical_terms": tuple(dict.fromkeys(lexical_terms)),
+      "lexical_term_frequencies": lexical_term_frequencies,
       "operator_fields": cls._build_provider_provenance_scheduler_alert_occurrence_operator_fields(
         row=row
       ),
-      "semantic_concepts": cls._build_provider_provenance_scheduler_alert_occurrence_semantic_concepts(
-        row=row
+      "semantic_concepts": tuple(
+        dict.fromkeys(
+          (
+            *cls._build_provider_provenance_scheduler_alert_occurrence_semantic_concepts(row=row),
+            *persisted_projection_semantic_concepts,
+          )
+        )
       ),
+      "persistence_mode": (
+        "record_backed_scheduler_search_projection"
+        if persisted_projection_count > 0
+        else "ephemeral_occurrence_projection"
+      ),
+      "persisted_projection_count": persisted_projection_count,
+      "persisted_projection_versions": tuple(dict.fromkeys(persisted_projection_versions)),
+      "persisted_projection_terms": tuple(dict.fromkeys(persisted_projection_terms)),
     }
 
   @classmethod
@@ -37413,12 +37536,23 @@ class TradingApplication:
         lexical_postings.setdefault(term, set()).add(document_id)
       for concept in document["semantic_concepts"]:
         semantic_postings.setdefault(concept, set()).add(document_id)
+    document_lengths = tuple(
+      sum(document.get("lexical_term_frequencies", {}).values())
+      for document in documents
+    )
+    average_document_length = (
+      sum(document_lengths) / len(document_lengths)
+      if document_lengths
+      else 0.0
+    )
     return {
       "documents": documents,
       "all_document_ids": frozenset(document["document_id"] for document in documents),
       "lexical_postings": {term: frozenset(postings) for term, postings in lexical_postings.items()},
       "semantic_postings": {term: frozenset(postings) for term, postings in semantic_postings.items()},
       "indexed_term_count": len(lexical_postings),
+      "document_count": len(documents),
+      "average_document_length": average_document_length,
     }
 
   @classmethod
@@ -37517,6 +37651,8 @@ class TradingApplication:
     *,
     row: Mapping[str, Any],
     parsed_query: Mapping[str, Any],
+    index: Mapping[str, Any] | None = None,
+    document: Mapping[str, Any] | None = None,
   ) -> dict[str, Any] | None:
     terms = parsed_query["terms"]
     phrases = parsed_query["phrases"]
@@ -37537,6 +37673,22 @@ class TradingApplication:
     exact_match = False
     field_hits = 0
     operator_hits: list[str] = []
+    total_documents = int(index.get("document_count", 0)) if isinstance(index, Mapping) else 0
+    average_document_length = (
+      float(index.get("average_document_length", 0.0))
+      if isinstance(index, Mapping)
+      else 0.0
+    )
+    document_term_frequencies = (
+      document.get("lexical_term_frequencies", {})
+      if isinstance(document, Mapping)
+      else {}
+    )
+    document_length = (
+      sum(document_term_frequencies.values())
+      if isinstance(document_term_frequencies, dict)
+      else 0
+    )
     for operator in operators:
       if operator.get("negated"):
         continue
@@ -37577,15 +37729,41 @@ class TradingApplication:
             field_matched_phrases.add(phrase)
             field_phrase_match = True
         for token in terms:
+          document_frequency = (
+            len(index.get("lexical_postings", {}).get(token, ()))
+            if isinstance(index, Mapping)
+            else 0
+          )
+          token_frequency = (
+            int(document_term_frequencies.get(token, 0))
+            if isinstance(document_term_frequencies, dict)
+            else 0
+          )
+          inverse_document_frequency = (
+            1.0 + ((total_documents + 1) / (document_frequency + 1))
+            if total_documents > 0
+            else 1.0
+          )
+          tf_bonus = (
+            1.0 + min(token_frequency, 4) * 0.15
+            if token_frequency > 0
+            else 1.0
+          )
+          length_normalizer = (
+            1.0
+            if average_document_length <= 0
+            else 1.0
+            + min(document_length / average_document_length, 3.0) * 0.05
+          )
           if token == normalized_value:
-            value_score += field_weight * 3
+            value_score += int(round(field_weight * 3 * inverse_document_frequency * tf_bonus * length_normalizer))
             field_matched_terms.add(token)
             field_exact_match = True
           elif normalized_value.startswith(token):
-            value_score += field_weight * 2
+            value_score += int(round(field_weight * 2 * inverse_document_frequency * tf_bonus))
             field_matched_terms.add(token)
           elif token in normalized_value:
-            value_score += field_weight
+            value_score += int(round(field_weight * inverse_document_frequency * tf_bonus))
             field_matched_terms.add(token)
         if value_score > best_field_score:
           best_field_score = value_score
@@ -37653,6 +37831,7 @@ class TradingApplication:
       "lexical_score": lexical_score,
       "semantic_score": semantic_score,
       "operator_score": operator_score,
+      "relevance_model": "tfidf_field_weight_v1",
       "ranking_reason": " · ".join(ranking_reason_parts),
     }
 
@@ -37667,6 +37846,7 @@ class TradingApplication:
       return None
     parsed_query = cls._parse_provider_provenance_scheduler_alert_search_query(search)
     index = cls._build_provider_provenance_scheduler_alert_occurrence_search_index(rows=(row,))
+    document = next(iter(index.get("documents", ())), None)
     matched_document_ids = cls._evaluate_provider_provenance_scheduler_alert_search_query(
       index=index,
       parsed_query=parsed_query,
@@ -37676,6 +37856,8 @@ class TradingApplication:
     return cls._score_provider_provenance_scheduler_alert_occurrence_search_match(
       row=row,
       parsed_query=parsed_query,
+      index=index,
+      document=document,
     )
 
   @staticmethod
@@ -37832,6 +38014,9 @@ class TradingApplication:
                 ),
                 "next_occurrence_detected_at": next_occurrence_detected_at,
               },
+              "occurrence_records": occurrence_records,
+              "narrative_records": tuple(narrative_records),
+              "latest_record": latest_record,
             }
           )
         index = end_index + 1
@@ -37989,9 +38174,12 @@ class TradingApplication:
         if not (0 <= matched_document_id < len(eligible_history)):
           continue
         row = eligible_history[matched_document_id]
+        document = search_index.get("documents", ())[matched_document_id]
         search_match = self._score_provider_provenance_scheduler_alert_occurrence_search_match(
           row=row,
           parsed_query=parsed_search or {},
+          index=search_index,
+          document=document,
         )
         if search_match is None:
           continue
@@ -38054,7 +38242,7 @@ class TradingApplication:
     if normalized_search is not None:
       search_summary = {
         "query": normalized_search,
-        "mode": "full_text_boolean_semantic_ranking",
+        "mode": "persistent_full_text_boolean_semantic_ranking",
         "token_count": len(parsed_search.get("terms", ())) + len(parsed_search.get("phrases", ())),
         "matched_occurrences": total,
         "top_score": max(
@@ -38079,6 +38267,15 @@ class TradingApplication:
         "boolean_operator_count": int(parsed_search.get("boolean_operator_count", 0)),
         "indexed_occurrence_count": len(eligible_history),
         "indexed_term_count": int(search_index.get("indexed_term_count", 0)),
+        "persistence_mode": (
+          "record_backed_scheduler_search_projection"
+          if any(
+            int(document.get("persisted_projection_count", 0)) > 0
+            for document in search_index.get("documents", ())
+          )
+          else "ephemeral_occurrence_projection"
+        ),
+        "relevance_model": "tfidf_field_weight_v1",
         "parsed_terms": tuple(parsed_search.get("terms", ())),
         "parsed_phrases": tuple(parsed_search.get("phrases", ())),
         "parsed_operators": tuple(
@@ -42256,6 +42453,8 @@ def serialize_provider_provenance_scheduler_alert_history(
           payload.get("search_summary", {}).get("indexed_occurrence_count", 0)
         ),
         "indexed_term_count": int(payload.get("search_summary", {}).get("indexed_term_count", 0)),
+        "persistence_mode": payload.get("search_summary", {}).get("persistence_mode"),
+        "relevance_model": payload.get("search_summary", {}).get("relevance_model"),
         "parsed_terms": list(payload.get("search_summary", {}).get("parsed_terms", ())),
         "parsed_phrases": list(payload.get("search_summary", {}).get("parsed_phrases", ())),
         "parsed_operators": list(payload.get("search_summary", {}).get("parsed_operators", ())),
@@ -42344,6 +42543,7 @@ def serialize_provider_provenance_scheduler_alert_history(
             "lexical_score": int(item.get("search_match", {}).get("lexical_score", 0)),
             "semantic_score": int(item.get("search_match", {}).get("semantic_score", 0)),
             "operator_score": int(item.get("search_match", {}).get("operator_score", 0)),
+            "relevance_model": item.get("search_match", {}).get("relevance_model"),
             "ranking_reason": item.get("search_match", {}).get("ranking_reason"),
           }
           if isinstance(item, dict) and isinstance(item.get("search_match"), dict)

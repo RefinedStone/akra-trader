@@ -5015,12 +5015,14 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert search_response.status_code == 200
   search_payload = search_response.json()
   assert search_payload["query"]["search"] == "status:resolved AND (recovered OR healthy) AND NOT category:failure"
-  assert search_payload["search_summary"]["mode"] == "full_text_boolean_semantic_ranking"
+  assert search_payload["search_summary"]["mode"] == "persistent_full_text_boolean_semantic_ranking"
   assert search_payload["search_summary"]["top_score"] > 0
   assert search_payload["search_summary"]["operator_count"] == 2
   assert search_payload["search_summary"]["boolean_operator_count"] >= 4
   assert search_payload["search_summary"]["indexed_occurrence_count"] >= 1
   assert search_payload["search_summary"]["indexed_term_count"] > 0
+  assert search_payload["search_summary"]["persistence_mode"] == "record_backed_scheduler_search_projection"
+  assert search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_v1"
   assert "recovery" in search_payload["search_summary"]["semantic_concepts"]
   assert "AND" in search_payload["search_summary"]["query_plan"]
   assert "OR" in search_payload["search_summary"]["query_plan"]
@@ -5033,6 +5035,7 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert search_payload["items"][0]["search_match"]["score"] > 0
   assert "status:resolved" in search_payload["items"][0]["search_match"]["operator_hits"]
   assert "recovery" in search_payload["items"][0]["search_match"]["semantic_concepts"]
+  assert search_payload["items"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_v1"
 
 
 def test_operator_visibility_endpoint_can_reconstruct_mixed_status_scheduler_narrative(
@@ -5215,13 +5218,15 @@ def test_operator_visibility_endpoint_can_export_stitched_scheduler_narrative_re
   assert stitched_report["query"]["narrative_mode"] == "stitched_multi_occurrence"
   assert stitched_report["query"]["narrative_facet"] == "resolved_narratives"
   assert stitched_report["query"]["search"] == "status:resolved AND (recovered OR healthy) AND NOT category:failure"
-  assert stitched_report["stitched_occurrence_report"]["search_summary"]["mode"] == "full_text_boolean_semantic_ranking"
+  assert stitched_report["stitched_occurrence_report"]["search_summary"]["mode"] == "persistent_full_text_boolean_semantic_ranking"
   assert stitched_report["stitched_occurrence_report"]["search_summary"]["operator_count"] == 2
   assert stitched_report["stitched_occurrence_report"]["search_summary"]["boolean_operator_count"] >= 4
+  assert stitched_report["stitched_occurrence_report"]["search_summary"]["persistence_mode"] == "record_backed_scheduler_search_projection"
   assert stitched_report["stitched_occurrence_report"]["summary"]["occurrence_count"] == 2
   assert len(stitched_report["stitched_occurrence_report"]["occurrences"]) == 2
   assert stitched_report["stitched_occurrence_report"]["occurrences"][0]["search_match"]["score"] > 0
   assert "recovery" in stitched_report["stitched_occurrence_report"]["occurrences"][0]["search_match"]["semantic_concepts"]
+  assert stitched_report["stitched_occurrence_report"]["occurrences"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_v1"
   assert stitched_report["stitched_occurrence_report"]["stitched_status_sequence"]
 
 
