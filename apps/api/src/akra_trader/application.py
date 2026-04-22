@@ -21,6 +21,7 @@ from typing import Iterable
 from typing import Mapping
 from uuid import uuid4
 
+from akra_trader.application_flows.run_execution import RunExecutionFlow
 from akra_trader.application_flows.strategy_catalog import StrategyCatalogFlow
 from akra_trader.application_flows.strategy_catalog import _apply_registration_snapshot_metadata
 from akra_trader.application_flows.strategy_catalog import _build_run_experiment_metadata
@@ -519,7 +520,6 @@ from akra_trader.application_support.standalone_surfaces import serialize_standa
 from akra_trader.domain.services import apply_signal
 from akra_trader.domain.services import build_equity_point
 from akra_trader.domain.services import summarize_performance
-from akra_trader.lineage import assess_rerun_validation
 from akra_trader.lineage import build_dataset_boundary_contract
 from akra_trader.lineage import build_rerun_boundary_identity
 from akra_trader.ports import GuardedLiveStatePort
@@ -616,6 +616,7 @@ class TradingApplication:
       presets=self._presets,
       clock=self._clock,
     )
+    self._run_execution_flow = RunExecutionFlow(app=self)
     self._runs = runs
     self._provider_provenance_scheduler_search_backend = (
       provider_provenance_scheduler_search_backend
@@ -976,40 +977,28 @@ class TradingApplication:
     dataset_identity: str | None = None,
     tags: Iterable[str] = (),
   ) -> list[RunRecord]:
-    return self._runs.list_runs(
-      mode=self._mode_service.normalize(mode),
+    return self._run_execution_flow.list_runs(
+      mode,
       strategy_id=strategy_id,
       strategy_version=strategy_version,
       rerun_boundary_id=rerun_boundary_id,
-      preset_id=_normalize_experiment_identifier(preset_id),
-      benchmark_family=_normalize_experiment_identifier(benchmark_family),
-      dataset_identity=_normalize_experiment_filter_value(dataset_identity),
-      tags=_normalize_experiment_tags(tags),
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
+      dataset_identity=dataset_identity,
+      tags=tags,
     )
 
   def get_run(self, run_id: str) -> RunRecord | None:
-    return self._runs.get_run(run_id)
+    return self._run_execution_flow.get_run(run_id)
 
   def rerun_backtest_from_boundary(self, *, rerun_boundary_id: str) -> RunRecord:
-    return self._rerun_from_boundary(
-      rerun_boundary_id=rerun_boundary_id,
-      target_mode=RunMode.BACKTEST,
-      requested_mode_label=RunMode.BACKTEST.value,
-    )
+    return self._run_execution_flow.rerun_backtest_from_boundary(rerun_boundary_id=rerun_boundary_id)
 
   def rerun_sandbox_from_boundary(self, *, rerun_boundary_id: str) -> RunRecord:
-    return self._rerun_from_boundary(
-      rerun_boundary_id=rerun_boundary_id,
-      target_mode=RunMode.SANDBOX,
-      requested_mode_label=RunMode.SANDBOX.value,
-    )
+    return self._run_execution_flow.rerun_sandbox_from_boundary(rerun_boundary_id=rerun_boundary_id)
 
   def rerun_paper_from_boundary(self, *, rerun_boundary_id: str) -> RunRecord:
-    return self._rerun_from_boundary(
-      rerun_boundary_id=rerun_boundary_id,
-      target_mode=RunMode.PAPER,
-      requested_mode_label=RunMode.PAPER.value,
-    )
+    return self._run_execution_flow.rerun_paper_from_boundary(rerun_boundary_id=rerun_boundary_id)
 
   def compare_runs(self, *, run_ids: list[str], intent: str | None = None) -> RunComparison:
     normalized_run_ids = _normalize_run_ids(run_ids)
@@ -19754,64 +19743,20 @@ class TradingApplication:
     preset_id: str | None = None,
     benchmark_family: str | None = None,
   ) -> RunRecord:
-    preset = self._resolve_experiment_preset(
-      preset_id=preset_id,
+    return self._run_execution_flow.run_backtest(
       strategy_id=strategy_id,
       timeframe=timeframe,
-    )
-    resolved_parameters = _merge_preset_parameters(preset=preset, requested_parameters=parameters)
-    strategy, metadata, strategy_snapshot = self._prepare_strategy(
-      strategy_id=strategy_id,
-      parameters=resolved_parameters,
-    )
-    experiment_metadata = _build_run_experiment_metadata(
-      tags=tags,
-      preset=preset,
-      benchmark_family=benchmark_family,
-      strategy_metadata=metadata,
-    )
-    config = RunConfig(
-      run_id=str(uuid4()),
-      mode=RunMode.BACKTEST,
-      strategy_id=metadata.strategy_id,
-      strategy_version=metadata.version,
-      venue="binance",
-      symbols=(symbol,),
-      timeframe=timeframe,
-      parameters=resolved_parameters,
+      symbol=symbol,
       initial_cash=initial_cash,
       fee_rate=fee_rate,
       slippage_bps=slippage_bps,
+      parameters=parameters,
       start_at=start_at,
       end_at=end_at,
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
     )
-    if metadata.runtime == "freqtrade_reference":
-      run = RunRecord(
-        config=config,
-        status=RunStatus.PENDING,
-        provenance=RunProvenance(
-          lane="reference",
-          strategy=strategy_snapshot,
-          experiment=experiment_metadata,
-        ),
-      )
-      if self._freqtrade_reference is None:
-        run.status = RunStatus.FAILED
-        run.notes.append("Freqtrade reference adapter is not configured.")
-      else:
-        run = self._freqtrade_reference.execute_backtest(run, metadata)
-      self._attach_rerun_boundary(run)
-      return self._runs.save_run(run)
-    run = self._simulate_run(
-      config=config,
-      strategy=strategy,
-      strategy_snapshot=strategy_snapshot,
-      active_bars=None,
-    )
-    run.provenance.experiment = experiment_metadata
-    if run.status != RunStatus.FAILED:
-      self._run_supervisor.complete(run)
-    return self._runs.save_run(run)
 
   def start_sandbox_run(
     self,
@@ -19830,7 +19775,7 @@ class TradingApplication:
     preset_id: str | None = None,
     benchmark_family: str | None = None,
   ) -> RunRecord:
-    return self._start_sandbox_session(
+    return self._run_execution_flow.start_sandbox_run(
       strategy_id=strategy_id,
       symbol=symbol,
       timeframe=timeframe,
@@ -19863,7 +19808,7 @@ class TradingApplication:
     preset_id: str | None = None,
     benchmark_family: str | None = None,
   ) -> RunRecord:
-    return self._start_paper_session(
+    return self._run_execution_flow.start_paper_run(
       strategy_id=strategy_id,
       symbol=symbol,
       timeframe=timeframe,
@@ -19931,12 +19876,7 @@ class TradingApplication:
     preset_id: str | None = None,
     benchmark_family: str | None = None,
   ) -> RunRecord:
-    return self._start_native_session(
-      target_mode=RunMode.SANDBOX,
-      reference_failure_copy="Sandbox worker sessions remain on the native engine for now.",
-      primed_note_prefix="Sandbox worker session primed from the latest market snapshot",
-      insufficient_candles_copy="Sandbox worker session requires at least",
-      attach_runtime_session=True,
+    return self._run_execution_flow.start_sandbox_session(
       strategy_id=strategy_id,
       symbol=symbol,
       timeframe=timeframe,
@@ -19969,12 +19909,7 @@ class TradingApplication:
     preset_id: str | None = None,
     benchmark_family: str | None = None,
   ) -> RunRecord:
-    return self._start_native_session(
-      target_mode=RunMode.PAPER,
-      reference_failure_copy="Paper trading remains on the native engine for now.",
-      primed_note_prefix="Paper session primed from the latest market snapshot",
-      insufficient_candles_copy="Paper session requires at least",
-      attach_runtime_session=False,
+    return self._run_execution_flow.start_paper_session(
       strategy_id=strategy_id,
       symbol=symbol,
       timeframe=timeframe,
@@ -20171,124 +20106,26 @@ class TradingApplication:
     preset_id: str | None = None,
     benchmark_family: str | None = None,
   ) -> RunRecord:
-    preset = self._resolve_experiment_preset(
-      preset_id=preset_id,
+    return self._run_execution_flow.start_native_session(
+      target_mode=target_mode,
+      reference_failure_copy=reference_failure_copy,
+      primed_note_prefix=primed_note_prefix,
+      insufficient_candles_copy=insufficient_candles_copy,
+      attach_runtime_session=attach_runtime_session,
       strategy_id=strategy_id,
+      symbol=symbol,
       timeframe=timeframe,
-    )
-    resolved_parameters = _merge_preset_parameters(preset=preset, requested_parameters=parameters)
-    strategy, metadata, strategy_snapshot = self._prepare_strategy(
-      strategy_id=strategy_id,
-      parameters=resolved_parameters,
-    )
-    experiment_metadata = _build_run_experiment_metadata(
-      tags=tags,
-      preset=preset,
-      benchmark_family=benchmark_family,
-      strategy_metadata=metadata,
-    )
-    config = RunConfig(
-      run_id=str(uuid4()),
-      mode=target_mode,
-      strategy_id=metadata.strategy_id,
-      strategy_version=metadata.version,
-      venue="binance",
-      symbols=(symbol,),
-      timeframe=timeframe,
-      parameters=resolved_parameters,
       initial_cash=initial_cash,
       fee_rate=fee_rate,
       slippage_bps=slippage_bps,
+      parameters=parameters,
+      replay_bars=replay_bars,
       start_at=start_at,
       end_at=end_at,
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
     )
-    self._ensure_operator_control_runtime_allowed(target_mode)
-    if metadata.runtime == "freqtrade_reference":
-      run = RunRecord(
-        config=config,
-        status=RunStatus.FAILED,
-        provenance=RunProvenance(
-          lane="reference",
-          strategy=strategy_snapshot,
-          experiment=experiment_metadata,
-        ),
-      )
-      run.notes.append(
-        "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
-        + reference_failure_copy
-      )
-      return self._runs.save_run(run)
-
-    loaded = self._data_engine.load_frame(config=config, active_bars=replay_bars)
-    run = self._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
-    run.provenance.experiment = experiment_metadata
-    run.provenance.market_data = loaded.lineage
-    run.provenance.market_data_by_symbol = loaded.lineage_by_symbol
-    self._attach_rerun_boundary(run)
-    data = loaded.frame
-    if data.empty:
-      run.notes.append("No candles available for the requested range.")
-      run.status = RunStatus.FAILED
-      return self._runs.save_run(run)
-
-    enriched = strategy.build_feature_frame(data, config.parameters)
-    required_bars = max(strategy.warmup_spec().required_bars, 2)
-    if len(enriched) < required_bars:
-      run.status = RunStatus.FAILED
-      run.notes.append(
-        f"{insufficient_candles_copy} {required_bars} candles to prime the current strategy state."
-      )
-      return self._runs.save_run(run)
-
-    cache = StateCache(
-      instrument_id=f"{config.venue}:{config.symbols[0]}",
-      cash=config.initial_cash,
-    )
-    history = enriched.iloc[:]
-    latest_row = history.iloc[-1]
-    state = cache.snapshot(
-      timestamp=latest_row["timestamp"].to_pydatetime(),
-      parameters=config.parameters,
-    )
-    decision = strategy.evaluate(history, config.parameters, state)
-    self._execution_engine.apply_decision(
-      run=run,
-      config=config,
-      decision=decision,
-      cache=cache,
-      market_price=float(latest_row["close"]),
-    )
-    run.metrics = summarize_performance(
-      initial_cash=config.initial_cash,
-      equity_curve=run.equity_curve,
-      closed_trades=run.closed_trades,
-    )
-    self._run_supervisor.start_mode(
-      run=run,
-      mode=target_mode,
-      mode_service=self._mode_service,
-      replay_bars=replay_bars if target_mode == RunMode.SANDBOX else None,
-    )
-    if attach_runtime_session:
-      primed_timestamp = latest_row["timestamp"].to_pydatetime()
-      primed_candle_count = run.provenance.market_data.candle_count if run.provenance.market_data is not None else 0
-      self._run_supervisor.start_worker_session(
-        run=run,
-        worker_kind=self._sandbox_worker_kind,
-        heartbeat_interval_seconds=self._sandbox_worker_heartbeat_interval_seconds,
-        heartbeat_timeout_seconds=self._sandbox_worker_heartbeat_timeout_seconds,
-        now=self._clock(),
-        primed_candle_count=primed_candle_count,
-        processed_tick_count=1,
-        last_processed_candle_at=primed_timestamp,
-        last_seen_candle_at=primed_timestamp,
-      )
-    primed_candle_count = run.provenance.market_data.candle_count if run.provenance.market_data is not None else 0
-    run.notes.insert(
-      0,
-      f"{primed_note_prefix} using {primed_candle_count} candles.",
-    )
-    return self._runs.save_run(run)
 
   def stop_sandbox_run(self, run_id: str) -> RunRecord | None:
     run = self._runs.get_run(run_id)
@@ -32045,11 +31882,7 @@ class TradingApplication:
     return self._strategy_catalog_flow.migrate_legacy_preset_from_run(run)
 
   def _resolve_rerun_source(self, *, rerun_boundary_id: str) -> RunRecord:
-    candidates = self._runs.list_runs(rerun_boundary_id=rerun_boundary_id)
-    if not candidates:
-      raise LookupError(f"Rerun boundary not found: {rerun_boundary_id}")
-    completed = [run for run in candidates if run.status == RunStatus.COMPLETED]
-    return completed[0] if completed else candidates[0]
+    return self._run_execution_flow.resolve_rerun_source(rerun_boundary_id=rerun_boundary_id)
 
   def _rerun_from_boundary(
     self,
@@ -32058,92 +31891,10 @@ class TradingApplication:
     target_mode: RunMode,
     requested_mode_label: str,
   ) -> RunRecord:
-    source_run = self._resolve_rerun_source(rerun_boundary_id=rerun_boundary_id)
-    _ensure_run_action_allowed(
-      run=source_run,
-      capabilities=self.get_run_surface_capabilities(),
-      action_key=f"rerun_{target_mode.value}",
-    )
-    if len(source_run.config.symbols) != 1:
-      raise ValueError(f"Explicit rerun currently supports only single-symbol {requested_mode_label} runs.")
-    self._migrate_legacy_preset_from_run(source_run)
-
-    rerun_start_at = self._resolve_rerun_start_at(source_run)
-    rerun_end_at = self._resolve_rerun_end_at(source_run)
-    rerun_parameters = self._resolve_rerun_parameters(source_run)
-    symbol = source_run.config.symbols[0]
-    session_window_note: str | None = None
-
-    if target_mode == RunMode.BACKTEST:
-      rerun = self.run_backtest(
-        strategy_id=source_run.config.strategy_id,
-        symbol=symbol,
-        timeframe=source_run.config.timeframe,
-        initial_cash=source_run.config.initial_cash,
-        fee_rate=source_run.config.fee_rate,
-        slippage_bps=source_run.config.slippage_bps,
-        parameters=rerun_parameters,
-        start_at=rerun_start_at,
-        end_at=rerun_end_at,
-        tags=source_run.provenance.experiment.tags,
-        preset_id=source_run.provenance.experiment.preset_id,
-        benchmark_family=source_run.provenance.experiment.benchmark_family,
-      )
-    elif target_mode in {RunMode.SANDBOX, RunMode.PAPER}:
-      preview_start_at, preview_end_at, preview_replay_bars = self._resolve_preview_rerun_window(source_run)
-      if target_mode == RunMode.SANDBOX:
-        if preview_replay_bars is None:
-          session_window_note = (
-            "Sandbox rerun restored the worker session from the stored effective market-data window."
-          )
-        else:
-          session_window_note = (
-            "Sandbox rerun restored the stored worker-session priming window."
-          )
-        rerun = self._start_sandbox_session(
-          strategy_id=source_run.config.strategy_id,
-          symbol=symbol,
-          timeframe=source_run.config.timeframe,
-          initial_cash=source_run.config.initial_cash,
-          fee_rate=source_run.config.fee_rate,
-          slippage_bps=source_run.config.slippage_bps,
-          parameters=rerun_parameters,
-          replay_bars=preview_replay_bars,
-          start_at=preview_start_at,
-          end_at=preview_end_at,
-          tags=source_run.provenance.experiment.tags,
-          preset_id=source_run.provenance.experiment.preset_id,
-          benchmark_family=source_run.provenance.experiment.benchmark_family,
-        )
-      else:
-        if preview_replay_bars is None:
-          session_window_note = "Paper rerun seeded the current paper session from the stored effective market-data window."
-        else:
-          session_window_note = "Paper rerun seeded the current paper session from the stored priming window."
-        rerun = self._start_paper_session(
-          strategy_id=source_run.config.strategy_id,
-          symbol=symbol,
-          timeframe=source_run.config.timeframe,
-          initial_cash=source_run.config.initial_cash,
-          fee_rate=source_run.config.fee_rate,
-          slippage_bps=source_run.config.slippage_bps,
-          parameters=rerun_parameters,
-          replay_bars=preview_replay_bars,
-          start_at=preview_start_at,
-          end_at=preview_end_at,
-          tags=source_run.provenance.experiment.tags,
-          preset_id=source_run.provenance.experiment.preset_id,
-          benchmark_family=source_run.provenance.experiment.benchmark_family,
-        )
-    else:
-      raise ValueError(f"Unsupported rerun target mode: {target_mode.value}")
-
-    return self._persist_explicit_rerun(
-      rerun=rerun,
-      source_run=source_run,
+    return self._run_execution_flow.rerun_from_boundary(
       rerun_boundary_id=rerun_boundary_id,
+      target_mode=target_mode,
       requested_mode_label=requested_mode_label,
-      preview_window_note=session_window_note,
     )
 
   def _persist_explicit_rerun(
@@ -32155,81 +31906,25 @@ class TradingApplication:
     requested_mode_label: str,
     preview_window_note: str | None = None,
   ) -> RunRecord:
-    rerun.provenance.rerun_source_run_id = source_run.config.run_id
-    rerun.provenance.rerun_target_boundary_id = rerun_boundary_id
-    validation = assess_rerun_validation(
-      source_run=source_run,
+    return self._run_execution_flow.persist_explicit_rerun(
       rerun=rerun,
-      expected_boundary_id=rerun_boundary_id,
+      source_run=source_run,
+      rerun_boundary_id=rerun_boundary_id,
+      requested_mode_label=requested_mode_label,
+      preview_window_note=preview_window_note,
     )
-    rerun.provenance.rerun_match_status = validation.status
-    rerun.provenance.rerun_validation_category = validation.category
-    rerun.provenance.rerun_validation_summary = validation.summary
-    rerun.notes.insert(
-      0,
-      f"Explicit {requested_mode_label} rerun from boundary {rerun_boundary_id} using source run {source_run.config.run_id}.",
-    )
-    if rerun.config.mode in {RunMode.SANDBOX, RunMode.PAPER} and preview_window_note is not None:
-      rerun.notes.insert(
-        1,
-        preview_window_note,
-      )
-    if rerun.provenance.rerun_match_status == "matched":
-      rerun.notes.append(validation.summary)
-    elif rerun.provenance.rerun_match_status == "unavailable":
-      rerun.notes.append(validation.summary)
-    else:
-      rerun.notes.append(
-        "Explicit rerun drifted from the stored rerun boundary. "
-        f"Expected {rerun_boundary_id}, got {rerun.provenance.rerun_boundary_id or 'unavailable'}."
-      )
-      rerun.notes.append(validation.summary)
-    return self._runs.save_run(rerun)
 
   def _resolve_rerun_parameters(self, run: RunRecord) -> dict:
-    strategy = run.provenance.strategy
-    if strategy is not None:
-      return deepcopy(strategy.parameter_snapshot.resolved)
-    return deepcopy(run.config.parameters)
+    return self._run_execution_flow.resolve_rerun_parameters(run)
 
-  @staticmethod
-  def _resolve_rerun_start_at(run: RunRecord) -> datetime | None:
-    market_data = run.provenance.market_data
-    if market_data is None:
-      return run.config.start_at
-    return (
-      market_data.effective_start_at
-      or market_data.requested_start_at
-      or run.config.start_at
-    )
+  def _resolve_rerun_start_at(self, run: RunRecord) -> datetime | None:
+    return self._run_execution_flow.resolve_rerun_start_at(run)
 
-  @staticmethod
-  def _resolve_rerun_end_at(run: RunRecord) -> datetime | None:
-    market_data = run.provenance.market_data
-    if market_data is None:
-      return run.config.end_at
-    return (
-      market_data.effective_end_at
-      or market_data.requested_end_at
-      or run.config.end_at
-    )
+  def _resolve_rerun_end_at(self, run: RunRecord) -> datetime | None:
+    return self._run_execution_flow.resolve_rerun_end_at(run)
 
-  @staticmethod
-  def _resolve_preview_rerun_window(run: RunRecord) -> tuple[datetime | None, datetime | None, int | None]:
-    market_data = run.provenance.market_data
-    if (
-      run.config.mode in {RunMode.SANDBOX, RunMode.PAPER}
-      and run.config.start_at is None
-      and run.config.end_at is None
-      and market_data is not None
-      and market_data.candle_count > 0
-    ):
-      return None, None, market_data.candle_count
-    return (
-      TradingApplication._resolve_rerun_start_at(run),
-      TradingApplication._resolve_rerun_end_at(run),
-      None,
-    )
+  def _resolve_preview_rerun_window(self, run: RunRecord) -> tuple[datetime | None, datetime | None, int | None]:
+    return self._run_execution_flow.resolve_preview_rerun_window(run)
 
 def serialize_replay_intent_alias_record(record: ReplayIntentAliasRecord) -> dict[str, Any]:
   return {
