@@ -19829,3 +19829,1662 @@ class ProviderProvenanceCompatibilityMixin:
       )
 
     return health, alerts, audit_events
+
+  def export_replay_intent_alias_audits(
+    self,
+    *,
+    export_format: str = "json",
+    alias_id: str | None = None,
+    template_key: str | None = None,
+    action: str | None = None,
+    retention_policy: str | None = None,
+    source_tab_id: str | None = None,
+    search: str | None = None,
+  ) -> dict[str, Any]:
+    normalized_format = export_format.strip().lower() if isinstance(export_format, str) else "json"
+    if normalized_format not in {"json", "csv"}:
+      raise ValueError("Unsupported replay alias audit export format")
+    audit_records = self.list_replay_intent_alias_audits(
+      alias_id=alias_id,
+      template_key=template_key,
+      action=action,
+      retention_policy=retention_policy,
+      source_tab_id=source_tab_id,
+      search=search,
+      limit=None,
+    )
+    serialized_items = [
+      serialize_replay_intent_alias_audit_record(record)
+      for record in audit_records
+    ]
+    exported_at = self._clock().isoformat()
+    normalized_template_key = template_key.strip() if isinstance(template_key, str) and template_key.strip() else "all"
+    base_filename = f"replay-alias-audits-{normalized_template_key}"
+    if normalized_format == "json":
+      content = json.dumps(
+        {
+          "exported_at": exported_at,
+          "filters": {
+            "alias_id": alias_id,
+            "template_key": template_key,
+            "action": action,
+            "retention_policy": retention_policy,
+            "source_tab_id": source_tab_id,
+            "search": search,
+          },
+          "total": len(serialized_items),
+          "items": serialized_items,
+        },
+        indent=2,
+        sort_keys=True,
+      )
+      return {
+        "content": content,
+        "content_type": "application/json",
+        "exported_at": exported_at,
+        "filename": f"{base_filename}.json",
+        "format": "json",
+        "record_count": len(serialized_items),
+      }
+    buffer = io.StringIO()
+    fieldnames = (
+      "audit_id",
+      "alias_id",
+      "action",
+      "template_key",
+      "template_label",
+      "redaction_policy",
+      "retention_policy",
+      "source_tab_id",
+      "source_tab_label",
+      "detail",
+      "recorded_at",
+      "expires_at",
+      "alias_created_at",
+      "alias_expires_at",
+      "alias_revoked_at",
+    )
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for item in serialized_items:
+      writer.writerow({fieldname: item.get(fieldname) for fieldname in fieldnames})
+    return {
+      "content": buffer.getvalue(),
+      "content_type": "text/csv; charset=utf-8",
+      "exported_at": exported_at,
+      "filename": f"{base_filename}.csv",
+      "format": "csv",
+      "record_count": len(serialized_items),
+    }
+
+  def download_replay_intent_alias_audit_export_job(
+    self,
+    job_id: str,
+  ) -> dict[str, Any]:
+    record = self.get_replay_intent_alias_audit_export_job(job_id)
+    artifact_content = record.content
+    if record.artifact_id:
+      artifact_record = self.get_replay_intent_alias_audit_export_artifact(record.artifact_id)
+      artifact_content = artifact_record.content
+    self._record_replay_intent_alias_audit_export_job_event(record=record, action="downloaded")
+    return serialize_replay_intent_alias_audit_export_job_record(
+      record,
+      include_content=True,
+      content=artifact_content,
+    )
+
+  def get_provider_provenance_export_analytics(
+    self,
+    *,
+    focus_key: str | None = None,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    provider_label: str | None = None,
+    vendor_field: str | None = None,
+    market_data_provider: str | None = None,
+    venue: str | None = None,
+    requested_by_tab_id: str | None = None,
+    status: str | None = None,
+    search: str | None = None,
+    result_limit: int = 12,
+    window_days: int = 14,
+  ) -> dict[str, Any]:
+    from akra_trader.application_flows.provider_provenance.serialization import (
+      serialize_provider_provenance_export_job_record,
+    )
+
+    self._prune_provider_provenance_export_artifact_records()
+    self._prune_provider_provenance_export_job_records()
+    self._prune_provider_provenance_export_job_audit_records()
+    records = self._filter_provider_provenance_export_job_records(
+      focus_key=focus_key,
+      symbol=symbol,
+      timeframe=timeframe,
+      provider_label=provider_label,
+      vendor_field=vendor_field,
+      market_data_provider=market_data_provider,
+      venue=venue,
+      requested_by_tab_id=requested_by_tab_id,
+      status=status,
+      search=search,
+    )
+    normalized_result_limit = max(1, min(result_limit, 50))
+    matching_job_ids = {record.job_id for record in records}
+    audit_records = tuple(
+      audit_record
+      for audit_record in self._list_provider_provenance_export_job_audit_records()
+      if audit_record.job_id in matching_job_ids
+    )
+    download_stats_by_job: dict[str, dict[str, Any]] = {}
+    for audit_record in audit_records:
+      if audit_record.action != "downloaded":
+        continue
+      job_stats = download_stats_by_job.setdefault(
+        audit_record.job_id,
+        {"download_count": 0, "last_downloaded_at": None},
+      )
+      job_stats["download_count"] += 1
+      last_downloaded_at = job_stats["last_downloaded_at"]
+      if (
+        last_downloaded_at is None
+        or audit_record.recorded_at > last_downloaded_at
+      ):
+        job_stats["last_downloaded_at"] = audit_record.recorded_at
+
+    def build_rollup_entry(
+      *,
+      key: str,
+      label: str,
+      records_for_rollup: list[ProviderProvenanceExportJobRecord],
+      extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+      download_count = sum(
+        int(download_stats_by_job.get(record.job_id, {}).get("download_count", 0))
+        for record in records_for_rollup
+      )
+      download_timestamps = [
+        download_stats_by_job[record.job_id]["last_downloaded_at"]
+        for record in records_for_rollup
+        if record.job_id in download_stats_by_job
+        and download_stats_by_job[record.job_id].get("last_downloaded_at") is not None
+      ]
+      exported_timestamps = [
+        record.exported_at or record.created_at
+        for record in records_for_rollup
+      ]
+      provider_labels_for_rollup = self._normalize_provider_provenance_export_strings(
+        provider
+        for record in records_for_rollup
+        for provider in record.provider_labels
+      )
+      vendor_fields_for_rollup = self._normalize_provider_provenance_export_strings(
+        field
+        for record in records_for_rollup
+        for field in record.vendor_fields
+      )
+      payload = {
+        "key": key,
+        "label": label,
+        "export_count": len(records_for_rollup),
+        "result_count": sum(record.result_count for record in records_for_rollup),
+        "provider_provenance_count": sum(
+          record.provider_provenance_count
+          for record in records_for_rollup
+        ),
+        "download_count": download_count,
+        "focus_count": len({
+          record.focus_key
+          for record in records_for_rollup
+          if isinstance(record.focus_key, str) and record.focus_key
+        }),
+        "requested_by_tab_count": len({
+          record.requested_by_tab_id
+          for record in records_for_rollup
+          if isinstance(record.requested_by_tab_id, str) and record.requested_by_tab_id
+        }),
+        "provider_labels": list(provider_labels_for_rollup),
+        "vendor_fields": list(vendor_fields_for_rollup),
+        "last_exported_at": max(exported_timestamps).isoformat() if exported_timestamps else None,
+        "last_downloaded_at": max(download_timestamps).isoformat() if download_timestamps else None,
+      }
+      if extra:
+        payload.update(extra)
+      return payload
+
+    provider_rollups: dict[str, list[ProviderProvenanceExportJobRecord]] = {}
+    vendor_field_rollups: dict[str, list[ProviderProvenanceExportJobRecord]] = {}
+    focus_rollups: dict[str, list[ProviderProvenanceExportJobRecord]] = {}
+    requester_rollups: dict[str, list[ProviderProvenanceExportJobRecord]] = {}
+    for record in records:
+      for provider in record.provider_labels:
+        provider_rollups.setdefault(provider, []).append(record)
+      for field_name in record.vendor_fields:
+        vendor_field_rollups.setdefault(field_name, []).append(record)
+      focus_rollups.setdefault(record.focus_key or "unknown_focus", []).append(record)
+      requester_rollups.setdefault(
+        record.requested_by_tab_id or "unknown_requester",
+        [],
+      ).append(record)
+
+    focus_items = [
+      build_rollup_entry(
+        key=focus_key_value,
+        label=records_for_rollup[0].focus_label or focus_key_value,
+        records_for_rollup=records_for_rollup,
+        extra={
+          "symbol": records_for_rollup[0].symbol,
+          "timeframe": records_for_rollup[0].timeframe,
+          "market_data_provider": records_for_rollup[0].market_data_provider,
+          "venue": records_for_rollup[0].venue,
+        },
+      )
+      for focus_key_value, records_for_rollup in focus_rollups.items()
+    ]
+    provider_items = [
+      build_rollup_entry(
+        key=provider_value,
+        label=provider_value,
+        records_for_rollup=records_for_rollup,
+      )
+      for provider_value, records_for_rollup in provider_rollups.items()
+    ]
+    vendor_field_items = [
+      build_rollup_entry(
+        key=field_value,
+        label=field_value,
+        records_for_rollup=records_for_rollup,
+      )
+      for field_value, records_for_rollup in vendor_field_rollups.items()
+    ]
+    requester_items = [
+      build_rollup_entry(
+        key=requester_value,
+        label=(
+          records_for_rollup[0].requested_by_tab_label
+          or records_for_rollup[0].requested_by_tab_id
+          or requester_value
+        ),
+        records_for_rollup=records_for_rollup,
+      )
+      for requester_value, records_for_rollup in requester_rollups.items()
+    ]
+
+    def sort_rollup_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+      return sorted(
+        items,
+        key=lambda item: (
+          int(item["provider_provenance_count"]),
+          int(item["export_count"]),
+          item["label"],
+        ),
+        reverse=True,
+      )
+
+    all_provider_labels = self._normalize_provider_provenance_export_strings(
+      provider
+      for record in records
+      for provider in record.provider_labels
+    )
+    all_vendor_fields = self._normalize_provider_provenance_export_strings(
+      field
+      for record in records
+      for field in record.vendor_fields
+    )
+    all_market_data_providers = self._normalize_provider_provenance_export_strings(
+      record.market_data_provider
+      for record in records
+    )
+    all_venues = self._normalize_provider_provenance_export_strings(record.venue for record in records)
+    all_timeframes = self._normalize_provider_provenance_export_strings(record.timeframe for record in records)
+    all_requested_by_tab_ids = self._normalize_provider_provenance_export_strings(
+      record.requested_by_tab_id
+      for record in records
+    )
+    all_statuses = self._normalize_provider_provenance_export_strings(record.status for record in records)
+
+    recent_exports = list(records[:normalized_result_limit])
+    time_series = self._build_provider_provenance_export_time_series(
+      records=records,
+      audit_records=audit_records,
+      window_days=window_days,
+      now=self._clock(),
+    )
+    return {
+      "generated_at": self._clock().isoformat(),
+      "query": {
+        "focus_key": focus_key,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "provider_label": provider_label,
+        "vendor_field": vendor_field,
+        "market_data_provider": market_data_provider,
+        "venue": venue,
+        "requested_by_tab_id": requested_by_tab_id,
+        "status": status,
+        "search": search,
+        "result_limit": normalized_result_limit,
+        "window_days": time_series["window_days"],
+      },
+      "totals": {
+        "export_count": len(records),
+        "result_count": sum(record.result_count for record in records),
+        "provider_provenance_count": sum(
+          record.provider_provenance_count
+          for record in records
+        ),
+        "download_count": sum(
+          int(job_stats.get("download_count", 0))
+          for job_stats in download_stats_by_job.values()
+        ),
+        "unique_focus_count": len({
+          record.focus_key
+          for record in records
+          if isinstance(record.focus_key, str) and record.focus_key
+        }),
+        "provider_label_count": len(all_provider_labels),
+        "vendor_field_count": len(all_vendor_fields),
+        "market_data_provider_count": len(all_market_data_providers),
+        "requester_count": len(all_requested_by_tab_ids),
+      },
+      "available_filters": {
+        "provider_labels": list(all_provider_labels),
+        "vendor_fields": list(all_vendor_fields),
+        "market_data_providers": list(all_market_data_providers),
+        "venues": list(all_venues),
+        "timeframes": list(all_timeframes),
+        "requested_by_tab_ids": list(all_requested_by_tab_ids),
+        "statuses": list(all_statuses),
+      },
+      "rollups": {
+        "providers": sort_rollup_items(provider_items)[:5],
+        "vendor_fields": sort_rollup_items(vendor_field_items)[:5],
+        "focuses": sort_rollup_items(focus_items)[:6],
+        "requesters": sort_rollup_items(requester_items)[:5],
+      },
+      "time_series": time_series,
+      "recent_exports": [
+        serialize_provider_provenance_export_job_record(record)
+        for record in recent_exports
+      ],
+    }
+
+  def download_provider_provenance_export_job(
+    self,
+    job_id: str,
+    *,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> dict[str, Any]:
+    record = self.get_provider_provenance_export_job(job_id)
+    artifact_content = record.content
+    if record.artifact_id:
+      artifact_record = self.get_provider_provenance_export_artifact(record.artifact_id)
+      artifact_content = artifact_record.content
+    self._record_provider_provenance_export_job_event(
+      record=record,
+      action="downloaded",
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+    )
+    return serialize_provider_provenance_export_job_record(
+      record,
+      include_content=True,
+      content=artifact_content,
+    )
+
+  @classmethod
+  def _build_provider_provenance_scheduler_health_hourly_drill_down(
+    cls,
+    *,
+    records: tuple[ProviderProvenanceSchedulerHealthRecord, ...],
+    bucket_key: str | None,
+    history_limit: int,
+  ) -> dict[str, Any] | None:
+    from akra_trader.application_flows.provider_provenance.serialization import (
+      serialize_provider_provenance_scheduler_health_record,
+    )
+
+    bucket_start = cls._resolve_provider_provenance_scheduler_bucket_start(bucket_key)
+    if bucket_start is None:
+      return None
+    bucket_end = bucket_start + timedelta(days=1)
+    selected_records = tuple(
+      sorted(
+        (
+          record
+          for record in records
+          if bucket_start <= cls._normalize_provider_provenance_export_bucket_start(record.recorded_at)
+          < bucket_end
+        ),
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+    normalized_history_limit = max(1, min(history_limit, 100))
+    health_status_series: list[dict[str, Any]] = []
+    lag_trend_series: list[dict[str, Any]] = []
+
+    for hour_offset in range(24):
+      hour_start = bucket_start + timedelta(hours=hour_offset)
+      hour_end = hour_start + timedelta(hours=1)
+      hour_records = tuple(
+        sorted(
+          (
+            record
+            for record in selected_records
+            if hour_start <= (record.recorded_at.astimezone(UTC) if record.recorded_at.tzinfo is not None else record.recorded_at.replace(tzinfo=UTC))
+            < hour_end
+          ),
+          key=lambda record: (record.recorded_at, record.record_id),
+        )
+      )
+      counts_by_status = {
+        "healthy": 0,
+        "lagging": 0,
+        "failed": 0,
+        "disabled": 0,
+        "starting": 0,
+      }
+      for record in hour_records:
+        counts_by_status[record.status] = counts_by_status.get(record.status, 0) + 1
+      dominant_status, dominant_count = max(
+        counts_by_status.items(),
+        key=lambda item: (item[1], item[0]),
+      )
+      latest_record = hour_records[-1] if hour_records else None
+      lag_values = [max(record.max_due_lag_seconds, 0) for record in hour_records]
+      due_counts = [max(record.due_report_count, 0) for record in hour_records]
+      bucket_hour_key = hour_start.isoformat()
+      bucket_hour_label = hour_start.strftime("%H:00")
+      executed_report_count = sum(record.last_executed_count for record in hour_records)
+      failure_count = sum(1 for record in hour_records if record.status == "failed")
+      health_status_series.append(
+        {
+          "bucket_key": bucket_hour_key,
+          "bucket_label": bucket_hour_label,
+          "started_at": hour_start.isoformat(),
+          "ended_at": hour_end.isoformat(),
+          "cycle_count": len(hour_records),
+          "healthy_count": counts_by_status["healthy"],
+          "lagging_count": counts_by_status["lagging"],
+          "failed_count": counts_by_status["failed"],
+          "disabled_count": counts_by_status["disabled"],
+          "starting_count": counts_by_status["starting"],
+          "dominant_status": dominant_status if dominant_count > 0 else "no_data",
+          "dominant_count": dominant_count,
+          "latest_status": latest_record.status if latest_record is not None else "no_data",
+          "latest_summary": latest_record.summary if latest_record is not None else "",
+          "executed_report_count": executed_report_count,
+        }
+      )
+      lag_trend_series.append(
+        {
+          "bucket_key": bucket_hour_key,
+          "bucket_label": bucket_hour_label,
+          "started_at": hour_start.isoformat(),
+          "ended_at": hour_end.isoformat(),
+          "cycle_count": len(hour_records),
+          "peak_lag_seconds": max(lag_values) if lag_values else 0,
+          "latest_lag_seconds": lag_values[-1] if lag_values else 0,
+          "average_lag_seconds": round(sum(lag_values) / len(lag_values), 1) if lag_values else 0.0,
+          "peak_due_report_count": max(due_counts) if due_counts else 0,
+          "latest_due_report_count": due_counts[-1] if due_counts else 0,
+          "failure_count": failure_count,
+          "executed_report_count": executed_report_count,
+        }
+      )
+
+    peak_cycle_bucket = max(
+      health_status_series,
+      key=lambda item: (
+        int(item["cycle_count"]),
+        int(item["failed_count"]),
+        item["bucket_key"],
+      ),
+      default=None,
+    )
+    peak_lag_bucket = max(
+      lag_trend_series,
+      key=lambda item: (
+        int(item["peak_lag_seconds"]),
+        int(item["peak_due_report_count"]),
+        item["bucket_key"],
+      ),
+      default=None,
+    )
+    latest_health_bucket = health_status_series[-1] if health_status_series else None
+    latest_lag_bucket = lag_trend_series[-1] if lag_trend_series else None
+
+    return {
+      "bucket_key": bucket_start.date().isoformat(),
+      "bucket_label": bucket_start.strftime("%b %d"),
+      "bucket_size": "hour",
+      "window_started_at": bucket_start.isoformat(),
+      "window_ended_at": bucket_end.isoformat(),
+      "total_record_count": len(selected_records),
+      "history_limit": normalized_history_limit,
+      "history": [
+        serialize_provider_provenance_scheduler_health_record(record)
+        for record in selected_records[:normalized_history_limit]
+      ],
+      "health_status": {
+        "series": health_status_series,
+        "summary": {
+          "peak_cycle_bucket_key": peak_cycle_bucket["bucket_key"] if peak_cycle_bucket is not None else None,
+          "peak_cycle_bucket_label": peak_cycle_bucket["bucket_label"] if peak_cycle_bucket is not None else None,
+          "peak_cycle_count": int(peak_cycle_bucket["cycle_count"]) if peak_cycle_bucket is not None else 0,
+          "latest_bucket_key": latest_health_bucket["bucket_key"] if latest_health_bucket is not None else None,
+          "latest_bucket_label": latest_health_bucket["bucket_label"] if latest_health_bucket is not None else None,
+          "latest_status": latest_health_bucket["latest_status"] if latest_health_bucket is not None else "no_data",
+          "latest_cycle_count": int(latest_health_bucket["cycle_count"]) if latest_health_bucket is not None else 0,
+        },
+      },
+      "lag_trend": {
+        "series": lag_trend_series,
+        "summary": {
+          "peak_lag_bucket_key": peak_lag_bucket["bucket_key"] if peak_lag_bucket is not None else None,
+          "peak_lag_bucket_label": peak_lag_bucket["bucket_label"] if peak_lag_bucket is not None else None,
+          "peak_lag_seconds": int(peak_lag_bucket["peak_lag_seconds"]) if peak_lag_bucket is not None else 0,
+          "latest_bucket_key": latest_lag_bucket["bucket_key"] if latest_lag_bucket is not None else None,
+          "latest_bucket_label": latest_lag_bucket["bucket_label"] if latest_lag_bucket is not None else None,
+          "latest_lag_seconds": int(latest_lag_bucket["latest_lag_seconds"]) if latest_lag_bucket is not None else 0,
+          "latest_due_report_count": int(latest_lag_bucket["latest_due_report_count"]) if latest_lag_bucket is not None else 0,
+          "latest_failure_count": int(latest_lag_bucket["failure_count"]) if latest_lag_bucket is not None else 0,
+        },
+      },
+    }
+
+  def get_provider_provenance_scheduler_health_analytics(
+    self,
+    *,
+    status: str | None = None,
+    window_days: int = 14,
+    history_limit: int = 12,
+    drilldown_bucket_key: str | None = None,
+    drilldown_history_limit: int = 24,
+  ) -> dict[str, Any]:
+    from akra_trader.application_flows.provider_provenance.serialization import (
+      serialize_provider_provenance_scheduler_health,
+      serialize_provider_provenance_scheduler_health_record,
+    )
+
+    self._prune_provider_provenance_scheduler_health_records()
+    normalized_status = self._normalize_provider_provenance_scheduler_health_status(status)
+    records = tuple(
+      record
+      for record in self._list_provider_provenance_scheduler_health_records()
+      if normalized_status is None or record.status == normalized_status
+    )
+    normalized_history_limit = max(1, min(history_limit, 50))
+    time_series = self._build_provider_provenance_scheduler_health_time_series(
+      records=records,
+      window_days=window_days,
+      now=self._clock(),
+    )
+    drill_down = self._build_provider_provenance_scheduler_health_hourly_drill_down(
+      records=records,
+      bucket_key=drilldown_bucket_key,
+      history_limit=drilldown_history_limit,
+    )
+    all_statuses = tuple(
+      sorted(
+        {
+          record.status
+          for record in self._list_provider_provenance_scheduler_health_records()
+          if isinstance(record.status, str) and record.status
+        }
+      )
+    )
+    current_snapshot = self.get_provider_provenance_scheduler_health()
+    return {
+      "generated_at": self._clock().isoformat(),
+      "query": {
+        "status": normalized_status,
+        "window_days": time_series["window_days"],
+        "history_limit": normalized_history_limit,
+        "drilldown_bucket_key": (
+          drill_down["bucket_key"]
+          if isinstance(drill_down, dict)
+          else None
+        ),
+        "drilldown_history_limit": max(1, min(drilldown_history_limit, 100)),
+      },
+      "current": serialize_provider_provenance_scheduler_health(current_snapshot),
+      "totals": {
+        "record_count": len(records),
+        "healthy_count": sum(1 for record in records if record.status == "healthy"),
+        "lagging_count": sum(1 for record in records if record.status == "lagging"),
+        "failed_count": sum(1 for record in records if record.status == "failed"),
+        "disabled_count": sum(1 for record in records if record.status == "disabled"),
+        "starting_count": sum(1 for record in records if record.status == "starting"),
+        "executed_report_count": sum(record.last_executed_count for record in records),
+        "peak_lag_seconds": max((record.max_due_lag_seconds for record in records), default=0),
+        "peak_due_report_count": max((record.due_report_count for record in records), default=0),
+      },
+      "available_filters": {
+        "statuses": list(all_statuses),
+      },
+      "time_series": time_series,
+      "drill_down": drill_down,
+      "recent_history": [
+        serialize_provider_provenance_scheduler_health_record(record)
+        for record in records[:normalized_history_limit]
+      ],
+    }
+
+  def _build_provider_provenance_scheduler_occurrence_reconstruction_context(
+    self,
+    *,
+    alert_category: str,
+    detected_at: datetime,
+    resolved_at: datetime | None = None,
+    narrative_mode: str = "matched_status",
+    history_limit: int = 25,
+    drilldown_history_limit: int = 24,
+    all_records: tuple[ProviderProvenanceSchedulerHealthRecord, ...] | None = None,
+  ) -> dict[str, Any]:
+    from akra_trader.application_flows.provider_provenance.serialization import (
+      serialize_provider_provenance_scheduler_health,
+      serialize_provider_provenance_scheduler_health_history,
+      serialize_provider_provenance_scheduler_health_record,
+    )
+
+    normalized_category = self._normalize_provider_provenance_scheduler_alert_category(alert_category)
+    normalized_narrative_mode = self._normalize_provider_provenance_scheduler_narrative_mode(
+      narrative_mode,
+    )
+    target_status = "failed" if normalized_category == "scheduler_failure" else "lagging"
+    detected_at_utc = self._normalize_provider_provenance_scheduler_export_datetime(
+      detected_at,
+      field_name="detected_at",
+    )
+    resolved_at_utc = (
+      self._normalize_provider_provenance_scheduler_export_datetime(
+        resolved_at,
+        field_name="resolved_at",
+      )
+      if resolved_at is not None
+      else None
+    )
+    if resolved_at_utc is not None and resolved_at_utc < detected_at_utc:
+      raise ValueError("resolved_at must be on or after detected_at for scheduler export reconstruction.")
+    if normalized_narrative_mode == "mixed_status_post_resolution" and resolved_at_utc is None:
+      raise ValueError("mixed_status_post_resolution requires a resolved scheduler alert row.")
+    if all_records is None:
+      self._prune_provider_provenance_scheduler_health_records()
+      ordered_records = tuple(
+        sorted(
+          self._list_provider_provenance_scheduler_health_records(),
+          key=lambda record: (record.recorded_at, record.record_id),
+        )
+      )
+    else:
+      ordered_records = tuple(
+        sorted(
+          all_records,
+          key=lambda record: (record.recorded_at, record.record_id),
+        )
+      )
+    occurrence_window_end = resolved_at_utc or max(
+      (record.recorded_at for record in ordered_records),
+      default=detected_at_utc,
+    )
+    occurrence_records = tuple(
+      record
+      for record in ordered_records
+      if detected_at_utc <= record.recorded_at <= occurrence_window_end
+    )
+    matching_records = tuple(
+      record
+      for record in occurrence_records
+      if record.status == target_status
+    )
+    if not matching_records:
+      raise LookupError("No scheduler health history could be reconstructed for the selected alert row.")
+    latest_matching_record = max(
+      matching_records,
+      key=lambda record: (record.recorded_at, record.record_id),
+    )
+    current_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(
+      latest_matching_record,
+    )
+    normalized_history_limit = max(1, min(history_limit, 200))
+    normalized_drilldown_history_limit = max(1, min(drilldown_history_limit, 100))
+    occurrence_window_days = max(
+      3,
+      min(
+        int((occurrence_window_end.date() - detected_at_utc.date()).days) + 1,
+        90,
+      ),
+    )
+    occurrence_drilldown_bucket_key = latest_matching_record.recorded_at.date().isoformat()
+    recent_matching_records = tuple(
+      sorted(
+        matching_records,
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+    selected_occurrence_history_payload = {
+      "query": {
+        "status": target_status,
+        "limit": normalized_history_limit,
+        "offset": 0,
+      },
+      "items": recent_matching_records[:normalized_history_limit],
+      "total": len(matching_records),
+      "returned": min(len(matching_records), normalized_history_limit),
+      "has_more": len(matching_records) > normalized_history_limit,
+      "next_offset": normalized_history_limit if len(matching_records) > normalized_history_limit else None,
+      "previous_offset": None,
+    }
+    selected_occurrence_payload = {
+      "status": target_status,
+      "current": serialize_provider_provenance_scheduler_health(current_snapshot),
+      "history_page": serialize_provider_provenance_scheduler_health_history(
+        current_snapshot,
+        selected_occurrence_history_payload,
+      ),
+      "record_count": len(matching_records),
+      "window_record_count": len(occurrence_records),
+    }
+
+    export_records = matching_records
+    export_status: str | None = target_status
+    export_window_end = occurrence_window_end
+    export_snapshot = current_snapshot
+    export_window_days = occurrence_window_days
+    export_drilldown_bucket_key = occurrence_drilldown_bucket_key
+    next_occurrence_detected_at: datetime | None = None
+    mixed_status_narrative_payload: dict[str, Any] | None = None
+    post_resolution_records: tuple[ProviderProvenanceSchedulerHealthRecord, ...] = ()
+
+    if normalized_narrative_mode == "mixed_status_post_resolution":
+      next_target_status_record = next(
+        (
+          record
+          for record in ordered_records
+          if record.recorded_at > resolved_at_utc
+          and record.status == target_status
+        ),
+        None,
+      )
+      next_occurrence_detected_at = (
+        next_target_status_record.recorded_at
+        if next_target_status_record is not None
+        else None
+      )
+      export_records = tuple(
+        record
+        for record in ordered_records
+        if detected_at_utc <= record.recorded_at
+        and (
+          next_occurrence_detected_at is None
+          or record.recorded_at < next_occurrence_detected_at
+        )
+      )
+      latest_export_record = max(
+        export_records,
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+      export_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(
+        latest_export_record,
+      )
+      export_status = None
+      export_window_end = latest_export_record.recorded_at
+      export_window_days = max(
+        3,
+        min(
+          int((export_window_end.date() - detected_at_utc.date()).days) + 1,
+          90,
+        ),
+      )
+      export_drilldown_bucket_key = latest_export_record.recorded_at.date().isoformat()
+      post_resolution_records = tuple(
+        record
+        for record in export_records
+        if resolved_at_utc is not None and record.recorded_at >= resolved_at_utc
+      )
+      recent_post_resolution_records = tuple(
+        sorted(
+          post_resolution_records,
+          key=lambda record: (record.recorded_at, record.record_id),
+          reverse=True,
+        )
+      )
+      post_resolution_history_payload = {
+        "query": {
+          "status": None,
+          "limit": normalized_history_limit,
+          "offset": 0,
+        },
+        "items": recent_post_resolution_records[:normalized_history_limit],
+        "total": len(post_resolution_records),
+        "returned": min(len(post_resolution_records), normalized_history_limit),
+        "has_more": len(post_resolution_records) > normalized_history_limit,
+        "next_offset": (
+          normalized_history_limit
+          if len(post_resolution_records) > normalized_history_limit
+          else None
+        ),
+        "previous_offset": None,
+      }
+      mixed_status_narrative_payload = {
+        "mode": "mixed_status_post_resolution",
+        "window_started_at": detected_at_utc.isoformat(),
+        "window_ended_at": export_window_end.isoformat(),
+        "resolution_at": resolved_at_utc.isoformat(),
+        "next_occurrence_detected_at": (
+          next_occurrence_detected_at.isoformat()
+          if next_occurrence_detected_at is not None
+          else None
+        ),
+        "available_statuses": list(
+          sorted(
+            {
+              record.status
+              for record in export_records
+              if isinstance(record.status, str) and record.status
+            }
+          )
+        ),
+        "latest_status": latest_export_record.status,
+        "latest_summary": latest_export_record.summary,
+        "current": serialize_provider_provenance_scheduler_health(export_snapshot),
+        "selected_occurrence": selected_occurrence_payload,
+        "status_sequence": list(
+          self._build_provider_provenance_scheduler_status_narrative_segments(
+            records=export_records,
+            resolution_at=resolved_at_utc,
+          )
+        ),
+        "post_resolution_history": serialize_provider_provenance_scheduler_health_history(
+          export_snapshot,
+          post_resolution_history_payload,
+        ),
+      }
+
+    time_series = self._build_provider_provenance_scheduler_health_time_series(
+      records=export_records,
+      window_days=export_window_days,
+      now=export_window_end,
+    )
+    drill_down = self._build_provider_provenance_scheduler_health_hourly_drill_down(
+      records=export_records,
+      bucket_key=export_drilldown_bucket_key,
+      history_limit=normalized_drilldown_history_limit,
+    )
+    all_statuses = tuple(sorted({record.status for record in export_records if record.status}))
+    history_payload = {
+      "query": {
+        "status": export_status,
+        "limit": normalized_history_limit,
+        "offset": 0,
+      },
+      "items": tuple(
+        sorted(
+          export_records,
+          key=lambda record: (record.recorded_at, record.record_id),
+          reverse=True,
+        )
+      )[:normalized_history_limit],
+      "total": len(export_records),
+      "returned": min(len(export_records), normalized_history_limit),
+      "has_more": len(export_records) > normalized_history_limit,
+      "next_offset": normalized_history_limit if len(export_records) > normalized_history_limit else None,
+      "previous_offset": None,
+    }
+    analytics_payload = {
+      "query": {
+        "status": export_status,
+        "window_days": time_series["window_days"],
+        "history_limit": min(normalized_history_limit, 50),
+        "drilldown_bucket_key": (
+          drill_down["bucket_key"]
+          if isinstance(drill_down, dict)
+          else None
+        ),
+        "drilldown_history_limit": normalized_drilldown_history_limit,
+        "reconstruction_mode": "resolved_alert_row",
+        "narrative_mode": normalized_narrative_mode,
+        "alert_category": normalized_category,
+        "occurrence_status": target_status,
+        "alert_detected_at": detected_at_utc.isoformat(),
+        "alert_resolved_at": occurrence_window_end.isoformat(),
+        "narrative_window_ended_at": export_window_end.isoformat(),
+        "next_occurrence_detected_at": (
+          next_occurrence_detected_at.isoformat()
+          if next_occurrence_detected_at is not None
+          else None
+        ),
+      },
+      "current": serialize_provider_provenance_scheduler_health(export_snapshot),
+      "totals": {
+        "record_count": len(export_records),
+        "healthy_count": sum(1 for record in export_records if record.status == "healthy"),
+        "lagging_count": sum(1 for record in export_records if record.status == "lagging"),
+        "failed_count": sum(1 for record in export_records if record.status == "failed"),
+        "disabled_count": sum(1 for record in export_records if record.status == "disabled"),
+        "starting_count": sum(1 for record in export_records if record.status == "starting"),
+        "executed_report_count": sum(record.last_executed_count for record in export_records),
+        "peak_lag_seconds": max((record.max_due_lag_seconds for record in export_records), default=0),
+        "peak_due_report_count": max((record.due_report_count for record in export_records), default=0),
+      },
+      "available_filters": {
+        "statuses": list(all_statuses),
+      },
+      "time_series": time_series,
+      "drill_down": drill_down,
+      "recent_history": [
+        serialize_provider_provenance_scheduler_health_record(record)
+        for record in history_payload["items"][:min(normalized_history_limit, 50)]
+      ],
+    }
+    reconstruction_payload = {
+      "mode": "resolved_alert_row",
+      "narrative_mode": normalized_narrative_mode,
+      "alert_category": normalized_category,
+      "alert_status": target_status,
+      "alert_detected_at": detected_at_utc.isoformat(),
+      "alert_resolved_at": occurrence_window_end.isoformat(),
+      "matched_record_count": len(matching_records),
+      "occurrence_window_record_count": len(occurrence_records),
+      "window_record_count": len(export_records),
+      "current_record_id": (
+        history_payload["items"][0].record_id
+        if history_payload["items"]
+        else latest_matching_record.record_id
+      ),
+      "latest_window_status": (
+        history_payload["items"][0].status
+        if history_payload["items"]
+        else target_status
+      ),
+      "next_occurrence_detected_at": (
+        next_occurrence_detected_at.isoformat()
+        if next_occurrence_detected_at is not None
+        else None
+      ),
+      "selected_occurrence_record_count": len(matching_records),
+    }
+    return {
+      "normalized_category": normalized_category,
+      "normalized_narrative_mode": normalized_narrative_mode,
+      "target_status": target_status,
+      "detected_at": detected_at_utc,
+      "resolved_at": resolved_at_utc,
+      "occurrence_window_end": occurrence_window_end,
+      "occurrence_records": occurrence_records,
+      "matching_records": matching_records,
+      "selected_occurrence_payload": selected_occurrence_payload,
+      "export_records": export_records,
+      "export_status": export_status,
+      "export_window_end": export_window_end,
+      "export_snapshot": export_snapshot,
+      "next_occurrence_detected_at": next_occurrence_detected_at,
+      "mixed_status_narrative_payload": mixed_status_narrative_payload,
+      "post_resolution_records": post_resolution_records,
+      "history_payload": history_payload,
+      "analytics_payload": analytics_payload,
+      "reconstruction_payload": reconstruction_payload,
+    }
+
+  def reconstruct_provider_provenance_scheduler_health_export(
+    self,
+    *,
+    alert_category: str,
+    detected_at: datetime,
+    resolved_at: datetime | None = None,
+    narrative_mode: str = "matched_status",
+    export_format: str = "json",
+    history_limit: int = 25,
+    drilldown_history_limit: int = 24,
+  ) -> dict[str, Any]:
+    from akra_trader.application_flows.provider_provenance.serialization import (
+      serialize_provider_provenance_scheduler_health_history,
+      serialize_provider_provenance_scheduler_health_record,
+    )
+
+    normalized_format = export_format.strip().lower() if isinstance(export_format, str) else "json"
+    if normalized_format not in {"json", "csv"}:
+      raise ValueError("Unsupported provider provenance scheduler health export format.")
+    context = self._build_provider_provenance_scheduler_occurrence_reconstruction_context(
+      alert_category=alert_category,
+      detected_at=detected_at,
+      resolved_at=resolved_at,
+      narrative_mode=narrative_mode,
+      history_limit=history_limit,
+      drilldown_history_limit=drilldown_history_limit,
+    )
+    normalized_category = context["normalized_category"]
+    normalized_narrative_mode = context["normalized_narrative_mode"]
+    resolved_at_utc = context["resolved_at"]
+    history_payload = context["history_payload"]
+    export_snapshot = context["export_snapshot"]
+    reconstruction_payload = context["reconstruction_payload"]
+    analytics_payload = {
+      "generated_at": self._clock().isoformat(),
+      **context["analytics_payload"],
+    }
+    mixed_status_narrative_payload = context["mixed_status_narrative_payload"]
+    selected_occurrence_payload = context["selected_occurrence_payload"]
+    if normalized_format == "json":
+      payload: dict[str, Any] = {
+        "export_scope": "provider_provenance_scheduler_health",
+        "exported_at": analytics_payload["generated_at"],
+        "query": analytics_payload["query"],
+        "reconstruction": reconstruction_payload,
+        "current": analytics_payload["current"],
+        "history_page": serialize_provider_provenance_scheduler_health_history(
+          export_snapshot,
+          history_payload,
+        ),
+        "analytics": analytics_payload,
+      }
+      if mixed_status_narrative_payload is not None:
+        payload["mixed_status_narrative"] = mixed_status_narrative_payload
+        payload["selected_occurrence"] = selected_occurrence_payload
+      content = json.dumps(payload, indent=2, sort_keys=True)
+      return {
+        "content": content,
+        "content_type": "application/json; charset=utf-8",
+        "exported_at": analytics_payload["generated_at"],
+        "filename": f"provider-provenance-scheduler-history-{normalized_category}.json",
+        "format": "json",
+        "record_count": history_payload["returned"],
+        "total_count": history_payload["total"],
+      }
+    buffer = io.StringIO()
+    fieldnames = (
+      "record_id",
+      "recorded_at",
+      "status",
+      "summary",
+      "cycle_count",
+      "last_executed_count",
+      "total_executed_count",
+      "due_report_count",
+      "max_due_lag_seconds",
+      "last_error",
+      "source_tab_id",
+      "source_tab_label",
+      "narrative_phase",
+      "issues",
+    )
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for item in history_payload["items"]:
+      serialized = serialize_provider_provenance_scheduler_health_record(item)
+      writer.writerow(
+        {
+          "record_id": serialized["record_id"],
+          "recorded_at": serialized["recorded_at"],
+          "status": serialized["status"],
+          "summary": serialized["summary"],
+          "cycle_count": serialized["cycle_count"],
+          "last_executed_count": serialized["last_executed_count"],
+          "total_executed_count": serialized["total_executed_count"],
+          "due_report_count": serialized["due_report_count"],
+          "max_due_lag_seconds": serialized["max_due_lag_seconds"],
+          "last_error": serialized["last_error"],
+          "source_tab_id": serialized["source_tab_id"],
+          "source_tab_label": serialized["source_tab_label"],
+          "narrative_phase": (
+            self._build_provider_provenance_scheduler_narrative_phase(
+              record=item,
+              resolution_at=resolved_at_utc,
+            )
+            if normalized_narrative_mode == "mixed_status_post_resolution"
+            else ""
+          ),
+          "issues": " | ".join(serialized["issues"]),
+        }
+      )
+    return {
+      "content": buffer.getvalue(),
+      "content_type": "text/csv; charset=utf-8",
+      "exported_at": analytics_payload["generated_at"],
+      "filename": f"provider-provenance-scheduler-history-{normalized_category}.csv",
+      "format": "csv",
+      "record_count": history_payload["returned"],
+      "total_count": history_payload["total"],
+    }
+
+  def export_provider_provenance_scheduler_stitched_narrative_report(
+    self,
+    *,
+    category: str | None = None,
+    status: str | None = None,
+    narrative_facet: str | None = None,
+    search: str | None = None,
+    offset: int = 0,
+    occurrence_limit: int = 8,
+    history_limit: int = 25,
+    drilldown_history_limit: int = 24,
+    export_format: str = "json",
+  ) -> dict[str, Any]:
+    from akra_trader.application_flows.provider_provenance.serialization import (
+      serialize_provider_provenance_scheduler_health,
+      serialize_provider_provenance_scheduler_health_history,
+      serialize_provider_provenance_scheduler_health_record,
+    )
+
+    normalized_format = export_format.strip().lower() if isinstance(export_format, str) else "json"
+    if normalized_format not in {"json", "csv"}:
+      raise ValueError("Unsupported provider provenance scheduler stitched narrative export format.")
+    normalized_category = self._normalize_provider_provenance_scheduler_alert_history_category(category)
+    normalized_status = self._normalize_provider_provenance_scheduler_alert_history_status(status)
+    normalized_narrative_facet = self._normalize_provider_provenance_scheduler_alert_history_narrative_facet(
+      narrative_facet
+    )
+    normalized_occurrence_limit = max(1, min(occurrence_limit, 50))
+    normalized_offset = max(offset, 0)
+    normalized_history_limit = max(1, min(history_limit, 200))
+    normalized_drilldown_history_limit = max(1, min(drilldown_history_limit, 100))
+    alert_history_payload = self.get_provider_provenance_scheduler_alert_history_page(
+      category=normalized_category,
+      status=normalized_status,
+      narrative_facet=normalized_narrative_facet,
+      search=search,
+      limit=normalized_occurrence_limit,
+      offset=normalized_offset,
+    )
+    selected_occurrences = tuple(alert_history_payload["items"])
+    if not selected_occurrences:
+      raise LookupError("No scheduler alert occurrences match the selected stitched narrative report filters.")
+    self._prune_provider_provenance_scheduler_health_records()
+    all_records = tuple(
+      sorted(
+        self._list_provider_provenance_scheduler_health_records(),
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+    )
+    occurrence_payloads: list[dict[str, Any]] = []
+    stitched_segments: list[dict[str, Any]] = []
+    stitched_records_by_id: dict[str, ProviderProvenanceSchedulerHealthRecord] = {}
+    flattened_rows: list[dict[str, Any]] = []
+    for occurrence_index, occurrence in enumerate(selected_occurrences, start=1):
+      alert = occurrence["alert"]
+      narrative = occurrence["narrative"]
+      occurrence_context = self._build_provider_provenance_scheduler_occurrence_reconstruction_context(
+        alert_category=alert.category,
+        detected_at=alert.detected_at,
+        resolved_at=alert.resolved_at,
+        narrative_mode=(
+          narrative.get("narrative_mode")
+          if isinstance(narrative.get("narrative_mode"), str)
+          else ("mixed_status_post_resolution" if alert.status == "resolved" else "matched_status")
+        ),
+        history_limit=normalized_history_limit,
+        drilldown_history_limit=normalized_drilldown_history_limit,
+        all_records=all_records,
+      )
+      occurrence_records = occurrence_context["export_records"]
+      for record in occurrence_records:
+        stitched_records_by_id.setdefault(record.record_id, record)
+        flattened_rows.append(
+          {
+            "occurrence": occurrence,
+            "context": occurrence_context,
+            "record": record,
+          }
+        )
+      occurrence_segments = self._build_provider_provenance_scheduler_status_narrative_segments(
+        records=occurrence_records,
+        resolution_at=occurrence_context["resolved_at"],
+      )
+      for segment_index, segment in enumerate(occurrence_segments, start=1):
+        stitched_segments.append(
+          {
+            "stitch_index": len(stitched_segments) + 1,
+            "occurrence_index": occurrence_index,
+            "segment_index": segment_index,
+            "occurrence_id": alert.occurrence_id,
+            "category": alert.category,
+            "occurrence_status": alert.status,
+            "summary": alert.summary,
+            "detected_at": alert.detected_at.isoformat(),
+            "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at is not None else None,
+            "narrative_mode": occurrence_context["normalized_narrative_mode"],
+            **segment,
+          }
+        )
+      occurrence_payloads.append(
+        {
+          "occurrence_id": alert.occurrence_id,
+          "category": alert.category,
+          "status": alert.status,
+          "severity": alert.severity,
+          "summary": alert.summary,
+          "detail": alert.detail,
+          "detected_at": alert.detected_at.isoformat(),
+          "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at is not None else None,
+          "timeline_key": alert.timeline_key,
+          "timeline_position": alert.timeline_position,
+          "timeline_total": alert.timeline_total,
+          "delivery_targets": list(alert.delivery_targets),
+          "narrative": {
+            "facet": narrative.get("facet"),
+            "facet_flags": list(narrative.get("facet_flags", ())),
+            "narrative_mode": occurrence_context["normalized_narrative_mode"],
+            "can_reconstruct_narrative": bool(narrative.get("can_reconstruct_narrative")),
+            "has_post_resolution_history": bool(narrative.get("has_post_resolution_history")),
+            "occurrence_record_count": int(narrative.get("occurrence_record_count", 0)),
+            "post_resolution_record_count": int(narrative.get("post_resolution_record_count", 0)),
+            "status_sequence": list(narrative.get("status_sequence", ())),
+            "post_resolution_status_sequence": list(
+              narrative.get("post_resolution_status_sequence", ())
+            ),
+            "narrative_window_ended_at": (
+              narrative.get("narrative_window_ended_at").isoformat()
+              if isinstance(narrative.get("narrative_window_ended_at"), datetime)
+              else narrative.get("narrative_window_ended_at")
+            ),
+            "next_occurrence_detected_at": (
+              narrative.get("next_occurrence_detected_at").isoformat()
+              if isinstance(narrative.get("next_occurrence_detected_at"), datetime)
+              else narrative.get("next_occurrence_detected_at")
+            ),
+          },
+          "search_match": deepcopy(occurrence.get("search_match")),
+          "retrieval_cluster": deepcopy(occurrence.get("retrieval_cluster")),
+          "window_started_at": occurrence_context["detected_at"].isoformat(),
+          "window_ended_at": occurrence_context["export_window_end"].isoformat(),
+          "record_count": len(occurrence_records),
+          "current": occurrence_context["analytics_payload"]["current"],
+          "selected_occurrence": occurrence_context["selected_occurrence_payload"],
+          "status_sequence": list(occurrence_segments),
+          "next_occurrence_detected_at": (
+            occurrence_context["next_occurrence_detected_at"].isoformat()
+            if occurrence_context["next_occurrence_detected_at"] is not None
+            else None
+          ),
+          "peak_lag_seconds": max(
+            (record.max_due_lag_seconds for record in occurrence_records),
+            default=0,
+          ),
+          "peak_due_report_count": max(
+            (record.due_report_count for record in occurrence_records),
+            default=0,
+          ),
+        }
+      )
+    stitched_records = tuple(
+      sorted(
+        stitched_records_by_id.values(),
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+    )
+    latest_stitched_record = max(
+      stitched_records,
+      key=lambda record: (record.recorded_at, record.record_id),
+    )
+    stitched_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(
+      latest_stitched_record,
+    )
+    stitched_window_started_at = min(
+      context["detected_at"] for context in (row["context"] for row in flattened_rows)
+    )
+    stitched_window_ended_at = latest_stitched_record.recorded_at
+    stitched_window_days = max(
+      3,
+      min(
+        int((stitched_window_ended_at.date() - stitched_window_started_at.date()).days) + 1,
+        90,
+      ),
+    )
+    stitched_history_payload = {
+      "query": {
+        "status": None,
+        "limit": normalized_history_limit,
+        "offset": 0,
+      },
+      "items": tuple(
+        sorted(
+          stitched_records,
+          key=lambda record: (record.recorded_at, record.record_id),
+          reverse=True,
+        )
+      )[:normalized_history_limit],
+      "total": len(stitched_records),
+      "returned": min(len(stitched_records), normalized_history_limit),
+      "has_more": len(stitched_records) > normalized_history_limit,
+      "next_offset": (
+        normalized_history_limit if len(stitched_records) > normalized_history_limit else None
+      ),
+      "previous_offset": None,
+    }
+    stitched_time_series = self._build_provider_provenance_scheduler_health_time_series(
+      records=stitched_records,
+      window_days=stitched_window_days,
+      now=stitched_window_ended_at,
+    )
+    stitched_drilldown = self._build_provider_provenance_scheduler_health_hourly_drill_down(
+      records=stitched_records,
+      bucket_key=latest_stitched_record.recorded_at.date().isoformat(),
+      history_limit=normalized_drilldown_history_limit,
+    )
+    by_category: dict[str, dict[str, Any]] = {}
+    for occurrence in occurrence_payloads:
+      category_key = occurrence["category"]
+      category_entry = by_category.setdefault(
+        category_key,
+        {
+          "category": category_key,
+          "occurrence_count": 0,
+          "active_count": 0,
+          "resolved_count": 0,
+          "record_count": 0,
+          "peak_lag_seconds": 0,
+          "peak_due_report_count": 0,
+        },
+      )
+      category_entry["occurrence_count"] += 1
+      category_entry["active_count"] += 1 if occurrence["status"] == "active" else 0
+      category_entry["resolved_count"] += 1 if occurrence["status"] == "resolved" else 0
+      category_entry["record_count"] += int(occurrence["record_count"])
+      category_entry["peak_lag_seconds"] = max(
+        category_entry["peak_lag_seconds"],
+        int(occurrence["peak_lag_seconds"]),
+      )
+      category_entry["peak_due_report_count"] = max(
+        category_entry["peak_due_report_count"],
+        int(occurrence["peak_due_report_count"]),
+      )
+    exported_at = self._clock().isoformat()
+    analytics_payload = {
+      "generated_at": exported_at,
+      "query": {
+        "status": normalized_status,
+        "window_days": stitched_time_series["window_days"],
+        "history_limit": min(normalized_history_limit, 50),
+        "drilldown_bucket_key": (
+          stitched_drilldown["bucket_key"]
+          if isinstance(stitched_drilldown, dict)
+          else None
+        ),
+        "drilldown_history_limit": normalized_drilldown_history_limit,
+        "reconstruction_mode": "stitched_occurrence_report",
+        "narrative_mode": "stitched_multi_occurrence",
+        "alert_category": normalized_category,
+        "narrative_facet": normalized_narrative_facet or "all_occurrences",
+        "search": search.strip() if isinstance(search, str) and search.strip() else None,
+        "occurrence_limit": normalized_occurrence_limit,
+        "occurrence_offset": normalized_offset,
+        "selected_occurrence_count": len(occurrence_payloads),
+        "stitched_window_started_at": stitched_window_started_at.isoformat(),
+        "stitched_window_ended_at": stitched_window_ended_at.isoformat(),
+      },
+      "current": serialize_provider_provenance_scheduler_health(stitched_snapshot),
+      "totals": {
+        "record_count": len(stitched_records),
+        "healthy_count": sum(1 for record in stitched_records if record.status == "healthy"),
+        "lagging_count": sum(1 for record in stitched_records if record.status == "lagging"),
+        "failed_count": sum(1 for record in stitched_records if record.status == "failed"),
+        "disabled_count": sum(1 for record in stitched_records if record.status == "disabled"),
+        "starting_count": sum(1 for record in stitched_records if record.status == "starting"),
+        "executed_report_count": sum(record.last_executed_count for record in stitched_records),
+        "peak_lag_seconds": max((record.max_due_lag_seconds for record in stitched_records), default=0),
+        "peak_due_report_count": max((record.due_report_count for record in stitched_records), default=0),
+      },
+      "available_filters": {
+        "statuses": sorted({record.status for record in stitched_records if record.status}),
+        "categories": sorted({occurrence["category"] for occurrence in occurrence_payloads}),
+      },
+      "time_series": stitched_time_series,
+      "drill_down": stitched_drilldown,
+      "recent_history": [
+        serialize_provider_provenance_scheduler_health_record(record)
+        for record in stitched_history_payload["items"][:min(normalized_history_limit, 50)]
+      ],
+    }
+    stitched_report_payload = {
+      "mode": "stitched_multi_occurrence",
+      "summary": {
+        "occurrence_count": len(occurrence_payloads),
+        "active_count": sum(1 for occurrence in occurrence_payloads if occurrence["status"] == "active"),
+        "resolved_count": sum(1 for occurrence in occurrence_payloads if occurrence["status"] == "resolved"),
+        "segment_count": len(stitched_segments),
+        "record_count": len(stitched_records),
+        "categories": sorted({occurrence["category"] for occurrence in occurrence_payloads}),
+        "statuses": sorted({occurrence["status"] for occurrence in occurrence_payloads}),
+        "narrative_facets": sorted(
+          {
+            occurrence["narrative"]["facet"]
+            for occurrence in occurrence_payloads
+            if isinstance(occurrence["narrative"]["facet"], str)
+            and occurrence["narrative"]["facet"]
+          }
+        ),
+        "stitched_window_started_at": stitched_window_started_at.isoformat(),
+        "stitched_window_ended_at": stitched_window_ended_at.isoformat(),
+        "peak_lag_seconds": analytics_payload["totals"]["peak_lag_seconds"],
+        "peak_due_report_count": analytics_payload["totals"]["peak_due_report_count"],
+        "executed_report_count": analytics_payload["totals"]["executed_report_count"],
+      },
+      "selected_occurrence_page": {
+        "query": alert_history_payload["query"],
+        "total": alert_history_payload["total"],
+        "returned": alert_history_payload["returned"],
+        "has_more": alert_history_payload["has_more"],
+        "next_offset": alert_history_payload["next_offset"],
+        "previous_offset": alert_history_payload["previous_offset"],
+      },
+      "search_summary": alert_history_payload.get("search_summary"),
+      "search_analytics": alert_history_payload.get("search_analytics"),
+      "retrieval_clusters": alert_history_payload.get("retrieval_clusters"),
+      "occurrences": occurrence_payloads,
+      "stitched_status_sequence": stitched_segments,
+      "by_category": tuple(by_category[key] for key in sorted(by_category)),
+    }
+    if normalized_format == "json":
+      payload = {
+        "export_scope": "provider_provenance_scheduler_health",
+        "exported_at": exported_at,
+        "query": analytics_payload["query"],
+        "current": analytics_payload["current"],
+        "history_page": serialize_provider_provenance_scheduler_health_history(
+          stitched_snapshot,
+          stitched_history_payload,
+        ),
+        "analytics": analytics_payload,
+        "stitched_occurrence_report": stitched_report_payload,
+      }
+      content = json.dumps(payload, indent=2, sort_keys=True)
+      category_label = normalized_category or "all"
+      return {
+        "content": content,
+        "content_type": "application/json; charset=utf-8",
+        "exported_at": exported_at,
+        "filename": f"provider-provenance-scheduler-narrative-report-{category_label}.json",
+        "format": "json",
+        "record_count": stitched_history_payload["returned"],
+        "total_count": stitched_history_payload["total"],
+      }
+    buffer = io.StringIO()
+    fieldnames = (
+      "occurrence_id",
+      "occurrence_category",
+      "occurrence_status",
+      "occurrence_detected_at",
+      "occurrence_resolved_at",
+      "narrative_mode",
+      "retrieval_cluster_id",
+      "retrieval_cluster_label",
+      "record_id",
+      "recorded_at",
+      "status",
+      "summary",
+      "cycle_count",
+      "last_executed_count",
+      "total_executed_count",
+      "due_report_count",
+      "max_due_lag_seconds",
+      "last_error",
+      "source_tab_id",
+      "source_tab_label",
+      "narrative_phase",
+      "issues",
+    )
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in flattened_rows:
+      alert = row["occurrence"]["alert"]
+      occurrence_context = row["context"]
+      record = row["record"]
+      retrieval_cluster = row["occurrence"].get("retrieval_cluster", {})
+      serialized = serialize_provider_provenance_scheduler_health_record(record)
+      writer.writerow(
+        {
+          "occurrence_id": alert.occurrence_id,
+          "occurrence_category": alert.category,
+          "occurrence_status": alert.status,
+          "occurrence_detected_at": alert.detected_at.isoformat(),
+          "occurrence_resolved_at": alert.resolved_at.isoformat() if alert.resolved_at is not None else "",
+          "narrative_mode": occurrence_context["normalized_narrative_mode"],
+          "retrieval_cluster_id": retrieval_cluster.get("cluster_id", ""),
+          "retrieval_cluster_label": retrieval_cluster.get("label", ""),
+          "record_id": serialized["record_id"],
+          "recorded_at": serialized["recorded_at"],
+          "status": serialized["status"],
+          "summary": serialized["summary"],
+          "cycle_count": serialized["cycle_count"],
+          "last_executed_count": serialized["last_executed_count"],
+          "total_executed_count": serialized["total_executed_count"],
+          "due_report_count": serialized["due_report_count"],
+          "max_due_lag_seconds": serialized["max_due_lag_seconds"],
+          "last_error": serialized["last_error"],
+          "source_tab_id": serialized["source_tab_id"],
+          "source_tab_label": serialized["source_tab_label"],
+          "narrative_phase": self._build_provider_provenance_scheduler_narrative_phase(
+            record=record,
+            resolution_at=occurrence_context["resolved_at"],
+          ),
+          "issues": " | ".join(serialized["issues"]),
+        }
+      )
+    category_label = normalized_category or "all"
+    return {
+      "content": buffer.getvalue(),
+      "content_type": "text/csv; charset=utf-8",
+      "exported_at": exported_at,
+      "filename": f"provider-provenance-scheduler-narrative-report-{category_label}.csv",
+      "format": "csv",
+      "record_count": len(flattened_rows),
+      "total_count": len(flattened_rows),
+    }
+
+  def export_provider_provenance_scheduler_health(
+    self,
+    *,
+    export_format: str = "json",
+    status: str | None = None,
+    window_days: int = 14,
+    history_limit: int = 12,
+    drilldown_bucket_key: str | None = None,
+    drilldown_history_limit: int = 24,
+    offset: int = 0,
+    limit: int = 25,
+  ) -> dict[str, Any]:
+    from akra_trader.application_flows.provider_provenance.serialization import (
+      serialize_provider_provenance_scheduler_health,
+      serialize_provider_provenance_scheduler_health_history,
+      serialize_provider_provenance_scheduler_health_record,
+    )
+
+    normalized_format = export_format.strip().lower() if isinstance(export_format, str) else "json"
+    if normalized_format not in {"json", "csv"}:
+      raise ValueError("Unsupported provider provenance scheduler health export format.")
+    analytics_payload = self.get_provider_provenance_scheduler_health_analytics(
+      status=status,
+      window_days=window_days,
+      history_limit=history_limit,
+      drilldown_bucket_key=drilldown_bucket_key,
+      drilldown_history_limit=drilldown_history_limit,
+    )
+    history_payload = self.get_provider_provenance_scheduler_health_history_page(
+      status=status,
+      limit=limit,
+      offset=offset,
+    )
+    current_snapshot = self.get_provider_provenance_scheduler_health()
+    exported_at = self._clock().isoformat()
+    if normalized_format == "json":
+      content = json.dumps(
+        {
+          "export_scope": "provider_provenance_scheduler_health",
+          "exported_at": exported_at,
+          "query": {
+            "status": self._normalize_provider_provenance_scheduler_health_status(status),
+            "window_days": analytics_payload["query"]["window_days"],
+            "history_limit": analytics_payload["query"]["history_limit"],
+            "drilldown_bucket_key": analytics_payload["query"]["drilldown_bucket_key"],
+            "drilldown_history_limit": analytics_payload["query"]["drilldown_history_limit"],
+            "offset": history_payload["query"]["offset"],
+            "limit": history_payload["query"]["limit"],
+          },
+          "current": serialize_provider_provenance_scheduler_health(current_snapshot),
+          "history_page": serialize_provider_provenance_scheduler_health_history(
+            current_snapshot,
+            history_payload,
+          ),
+          "analytics": analytics_payload,
+        },
+        indent=2,
+        sort_keys=True,
+      )
+      return {
+        "content": content,
+        "content_type": "application/json; charset=utf-8",
+        "exported_at": exported_at,
+        "filename": "provider-provenance-scheduler-health.json",
+        "format": "json",
+        "record_count": history_payload["returned"],
+        "total_count": history_payload["total"],
+      }
+    buffer = io.StringIO()
+    fieldnames = (
+      "record_id",
+      "recorded_at",
+      "status",
+      "summary",
+      "cycle_count",
+      "last_executed_count",
+      "total_executed_count",
+      "due_report_count",
+      "max_due_lag_seconds",
+      "last_error",
+      "source_tab_id",
+      "source_tab_label",
+      "issues",
+    )
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for item in history_payload["items"]:
+      serialized = serialize_provider_provenance_scheduler_health_record(item)
+      writer.writerow(
+        {
+          "record_id": serialized["record_id"],
+          "recorded_at": serialized["recorded_at"],
+          "status": serialized["status"],
+          "summary": serialized["summary"],
+          "cycle_count": serialized["cycle_count"],
+          "last_executed_count": serialized["last_executed_count"],
+          "total_executed_count": serialized["total_executed_count"],
+          "due_report_count": serialized["due_report_count"],
+          "max_due_lag_seconds": serialized["max_due_lag_seconds"],
+          "last_error": serialized["last_error"],
+          "source_tab_id": serialized["source_tab_id"],
+          "source_tab_label": serialized["source_tab_label"],
+          "issues": " | ".join(serialized["issues"]),
+        }
+      )
+    return {
+      "content": buffer.getvalue(),
+      "content_type": "text/csv; charset=utf-8",
+      "exported_at": exported_at,
+      "filename": "provider-provenance-scheduler-health.csv",
+      "format": "csv",
+      "record_count": history_payload["returned"],
+      "total_count": history_payload["total"],
+    }
