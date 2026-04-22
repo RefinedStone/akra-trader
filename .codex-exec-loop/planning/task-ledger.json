@@ -802,18 +802,54 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add approval queue and reusable governance policy layer for hierarchy-step templates",
       "description": "Extend the newly audited hierarchy-step template lifecycle layer with template-specific approval-queue workflows and reusable governance policy records so reusable rollout steps can be reviewed, prioritized, and applied under durable governance rules instead of direct lifecycle or bulk-governance actions alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 33,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:45:00+09:00",
+      "updated_at": "2026-04-22T20:12:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-policy-catalog-hierarchy-step-template-team-audit"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 19216d7 says hierarchy-step templates now have lifecycle, bulk governance, and team audit coverage, but template-specific approval queues and a reusable governance policy layer are still missing.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task and this is the direct executable remainder named first in the latest main-session reply before returning to the larger stitched scheduler narrative backlog."
+      "direction_relation_note": "Completed on main in commit 23cd28b with hierarchy-step templates promoted into approval-queue sources, saved governance policy fields persisted on templates, direct /hierarchy-step-templates/{id}/stage support, and control-room visibility for template policy plus source provenance across queue, audit, and history views.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web typecheck and build, docs updates, commit, and push all landed; the latest main-session reply now leaves source-template queue filtering or batch stage workflow plus the broader stitched scheduler narrative and deeper search gaps."
+    },
+    {
+      "id": "task-b1-provider-market-context-hierarchy-step-template-queue-filters-batch-stage",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add source-template queue filters and batch stage workflow for hierarchy-step approvals",
+      "description": "Extend the new hierarchy-step template approval-queue source layer with queue filtering by source hierarchy-step template and operator-facing batch stage actions so staged plans can be isolated and promoted in groups from the saved template provenance now recorded on each queue item.",
+      "status": "done",
+      "base_priority": 78,
+      "dynamic_priority_delta": 32,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T10:30:28+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-policy-catalog-hierarchy-step-template-approval-policy"
+      ],
+      "direction_relation_note": "Completed on main in commit c3105bf with source_hierarchy_step_template_id queue-plan filtering, hierarchy-step template batch stage support, queue filter-bar source template selection, and post-stage review handoff wired through the control room and backend surfaces.",
+      "priority_reason": "Closed after backend and control-room queue provenance changes, targeted pytest coverage, web typecheck or build, compileall, docs updates, commit, and push all landed; the latest main-session reply now leaves server-side source-template queue search or sort and persisted saved queue views as the direct queue follow-up ahead of larger narrative gaps."
+    },
+    {
+      "id": "task-b1-provider-market-context-hierarchy-step-template-queue-search-saved-views",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add server-side source-template queue search, sort, and saved views for hierarchy-step approvals",
+      "description": "Extend the newly shipped source-template queue filter and batch stage workflow with server-side source-template-aware search or sort plus persisted saved queue views so operators can reopen common hierarchy-step approval slices without rebuilding client-side state each time.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 35,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T10:30:28+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-hierarchy-step-template-queue-filters-batch-stage"
+      ],
+      "direction_relation_note": "The latest main-session reply after commit c3105bf says the queue now supports source-template filtering and batch stage, but source-template server-side search or sort and persisted saved queue views are still missing from that approval workflow.",
+      "priority_reason": "Promoted to ready because the latest main-session reply names this as the immediate executable continuation of the just-shipped hierarchy-step queue slice, while stitched scheduler narratives and deeper narrative search remain larger adjacent gaps."
     },
     {
       "id": "task-b1-provider-market-context-cross-incident-narrative-reporting",
@@ -825,7 +861,7 @@
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:45:00+09:00",
+      "updated_at": "2026-04-22T10:30:28+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-mixed-status-narrative-artifact",
@@ -834,8 +870,8 @@
         "task-b1-provider-market-context-scheduler-narrative-governance-bulk-ops",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 19216d7 says scheduler narrative review is still occurrence or facet centered even after hierarchy-step template team audit shipped, so stitched multi-occurrence artifacts and cross-incident reporting remain missing from the operator narrative lane.",
-      "priority_reason": "This remains an explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted hierarchy-step template approval-queue or policy-layer slice so builtin next-task clears the direct template-governance remainder before broader narrative stitching."
+      "direction_relation_note": "The latest main-session reply after commit c3105bf says scheduler narrative review is still occurrence or facet centered even after hierarchy-step template queue filtering and batch stage shipped, so stitched multi-occurrence artifacts and cross-incident reporting remain missing from the operator narrative lane.",
+      "priority_reason": "This remains an explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted queue search or saved-view slice so builtin next-task clears the remaining direct hierarchy-step approval queue hardening before broader narrative stitching."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
@@ -973,7 +1009,7 @@
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:45:00+09:00",
+      "updated_at": "2026-04-22T10:30:28+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
@@ -981,8 +1017,8 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-templates",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 19216d7 still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after hierarchy-step template team audit shipped.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the promoted hierarchy-step template approval-queue or policy-layer slice and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
+      "direction_relation_note": "The latest main-session reply after commit c3105bf still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after hierarchy-step template queue filtering and source-template batch stage shipped.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the promoted queue search or saved-view slice and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
