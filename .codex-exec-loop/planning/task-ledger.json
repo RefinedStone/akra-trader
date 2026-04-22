@@ -1280,36 +1280,90 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Persist scheduler search indexes and tune ranked full-text relevance",
       "description": "Build the next scheduler narrative search layer by moving the new full-text index beyond request-local or rebuild-only behavior into a persistent search index with explicit ranked relevance tuning so larger occurrence corpora can be queried consistently across restarts and ranking quality can improve before broader retrieval expansion.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 40,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:35:00+09:00",
+      "updated_at": "2026-04-22T20:06:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-fulltext-boolean-search-layer"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says the remaining heavier search layer starts with persistent search index work and ranked full-text relevance tuning now that the dedicated full-text index plus boolean evaluator has shipped.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task, the previous full-text or boolean slice is complete, and persistence plus relevance tuning is the clearest executable infrastructure step before cross-occurrence vector retrieval."
+      "direction_relation_note": "Completed on main in commit e1bbbd6 with persisted scheduler search_projection data recorded per health record, occurrence full-text indexing rebuilt from that durable projection state, tfidf_field_weight_v1 relevance tuning, and control-room visibility for persistent-index plus relevance-model metadata.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web typecheck/build, docs updates, commit, and push all landed; the latest main-session reply now leaves the larger retrieval infrastructure around cross-occurrence semantic or vector retrieval, a standalone search store, and query analytics or feedback loops."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-cross-occurrence-semantic-retrieval",
       "direction_id": "operator-trust-and-discipline",
       "title": "Extend scheduler search into cross-occurrence semantic or vector retrieval clusters",
       "description": "Build the next layer above the persistent full-text search engine by retrieving and ranking semantically related scheduler occurrences and stitched reports across separate incident windows with cross-occurrence semantic or vector retrieval so operators can follow recurring recovery patterns instead of only matching one occurrence at a time.",
-      "status": "proposed",
+      "status": "done",
       "base_priority": 77,
-      "dynamic_priority_delta": 33,
+      "dynamic_priority_delta": 35,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:35:00+09:00",
+      "updated_at": "2026-04-22T20:20:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-persistent-index-relevance-tuning"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly keeps cross-occurrence semantic or vector retrieval as a remaining gap after the full-text or boolean layer shipped, but it is cleaner to stage it after persistent indexing and relevance tuning exist.",
-      "priority_reason": "This is executable follow-up work, but it stays proposed behind the new persistent-index queue head so builtin next-task advances through one ranking and storage foundation before adding broader occurrence clustering."
+      "direction_relation_note": "Completed on main in commit 4742b17 with in-process cross-occurrence retrieval clustering wired into scheduler narrative search, search summaries, stitched exports, and control-room cluster visibility, while the latest main-session reply explicitly leaves the heavier standalone store and true vector-backend layers as follow-up infrastructure.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall, web typecheck/build, docs updates, commit, and push all landed; queue selection should now move to the remaining standalone-store, true vector backend, and analytics follow-up work."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-standalone-search-store",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Extract scheduler narrative indexing into a standalone persistent search store",
+      "description": "Move scheduler narrative indexing beyond health-record-attached projections into a dedicated persistent search-store contract so larger corpora, independent rebuilds, and future retrieval layers do not depend on application-state records as the only index backing store.",
+      "status": "ready",
+      "base_priority": 76,
+      "dynamic_priority_delta": 36,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T20:20:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-cross-occurrence-semantic-retrieval"
+      ],
+      "direction_relation_note": "The latest main-session reply says the shipped clustered retrieval still runs on persisted scheduler search projections and explicitly calls out the absence of a persistent standalone search store as the clearest remaining substrate gap.",
+      "priority_reason": "Promoted to ready because the prior queue head is now complete and extracting a standalone store is the most defensible next step before deeper vector retrieval backends and analytics feedback loops are layered on top."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-vector-backend",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Back scheduler retrieval clusters with a true vector or semantic search backend",
+      "description": "Replace the current in-process clustered retrieval over persisted scheduler search projections with a true vector or semantic retrieval backend so cross-occurrence similarity search scales beyond application-memory clustering and can support higher-quality semantic recall.",
+      "status": "proposed",
+      "base_priority": 75,
+      "dynamic_priority_delta": 32,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T20:20:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-standalone-search-store"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says there is still no true cross-occurrence vector or semantic retrieval backend beyond the in-process clustered retrieval that just shipped, leaving a distinct infrastructure task after the search-store substrate is extracted.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind the standalone-store extraction so builtin next-task advances through the storage substrate before switching the retrieval engine underneath the new cluster UI."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-query-analytics-feedback-loop",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add query analytics and feedback loops for scheduler narrative retrieval quality",
+      "description": "Instrument scheduler narrative search with durable query analytics, result or click feedback, and tuning signals so relevance models and future retrieval layers can be evaluated from operator behavior instead of only static scoring heuristics.",
+      "status": "proposed",
+      "base_priority": 74,
+      "dynamic_priority_delta": 28,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T20:20:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-vector-backend"
+      ],
+      "direction_relation_note": "The latest main-session reply still names query analytics and feedback loops as missing search infrastructure after the clustered retrieval rollout, but they become more useful once the standalone store and true vector backend shape are in place.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the storage and retrieval-engine layers so instrumentation follows the more structural search changes."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
