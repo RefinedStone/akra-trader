@@ -396,6 +396,18 @@ from akra_trader.application_support.provider_governance_persistence import (
 from akra_trader.application_support.provider_governance_persistence import (
   save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record as save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record_support,
 )
+from akra_trader.application_support.provider_governance_policy_history import (
+  build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_detail as build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_detail_support,
+)
+from akra_trader.application_support.provider_governance_policy_history import (
+  build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision as build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_support,
+)
+from akra_trader.application_support.provider_governance_policy_history import (
+  normalize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_status as normalize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_status_support,
+)
+from akra_trader.application_support.provider_governance_policy_history import (
+  record_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision as record_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_support,
+)
 from akra_trader.application_support.provider_governance_records import (
   get_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record as get_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record_support,
 )
@@ -37849,10 +37861,9 @@ class TradingApplication:
   def _normalize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_status(
     status: str | None,
   ) -> str:
-    if not isinstance(status, str):
-      return "active"
-    normalized = status.strip().lower().replace("-", "_")
-    return "deleted" if normalized == "deleted" else "active"
+    return normalize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_status_support(
+      status
+    )
 
   def _build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision(
     self,
@@ -37865,46 +37876,15 @@ class TradingApplication:
     actor_tab_id: str | None = None,
     actor_tab_label: str | None = None,
   ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord:
-    revision_count = sum(
-      1
-      for revision in self._list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records()
-      if revision.governance_policy_id == record.governance_policy_id
-    )
-    return ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord(
-      revision_id=f"{record.governance_policy_id}:r{revision_count + 1:04d}",
-      governance_policy_id=record.governance_policy_id,
+    return build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_support(
+      self,
+      record=record,
       action=action,
-      reason=reason.strip() if isinstance(reason, str) and reason.strip() else action,
-      name=record.name,
-      description=record.description,
-      scheduler_key=record.scheduler_key,
-      status=self._normalize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_status(
-        record.status
-      ),
-      action_scope=record.action_scope,
-      require_approval_note=bool(record.require_approval_note),
-      guidance=record.guidance,
-      name_prefix=record.name_prefix,
-      name_suffix=record.name_suffix,
-      description_append=record.description_append,
-      default_moderation_status=record.default_moderation_status,
-      governance_view=record.governance_view,
-      window_days=record.window_days,
-      stale_pending_hours=record.stale_pending_hours,
-      minimum_score=record.minimum_score,
-      require_note=record.require_note,
+      reason=reason,
       recorded_at=recorded_at,
       source_revision_id=source_revision_id,
-      recorded_by_tab_id=(
-        actor_tab_id.strip()
-        if isinstance(actor_tab_id, str) and actor_tab_id.strip()
-        else None
-      ),
-      recorded_by_tab_label=(
-        actor_tab_label.strip()
-        if isinstance(actor_tab_label, str) and actor_tab_label.strip()
-        else None
-      ),
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
     )
 
   @staticmethod
@@ -37913,36 +37893,10 @@ class TradingApplication:
     record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord,
     action: str,
   ) -> str:
-    moderation_summary = (
-      f"{record.default_moderation_status} @ {record.minimum_score}+"
-      if record.minimum_score > 0
-      else record.default_moderation_status
+    return build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_detail_support(
+      record=record,
+      action=action,
     )
-    governance_summary = (
-      f"{record.governance_view} / {record.window_days}d / stale {record.stale_pending_hours}h"
-    )
-    scope_summary = f"{record.action_scope} actions"
-    if action == "created":
-      return (
-        f"Created moderation governance policy {record.name} for {scope_summary}; "
-        f"{moderation_summary}; view {governance_summary}."
-      )
-    if action == "updated":
-      return (
-        f"Updated moderation governance policy {record.name}; "
-        f"{scope_summary}; {moderation_summary}; view {governance_summary}."
-      )
-    if action == "deleted":
-      return f"Deleted moderation governance policy {record.name}."
-    if action == "restored":
-      return f"Restored moderation governance policy {record.name}."
-    if action == "bulk_updated":
-      return f"Bulk-updated moderation governance policy {record.name}."
-    if action == "bulk_deleted":
-      return f"Bulk-deleted moderation governance policy {record.name}."
-    if action == "bulk_restored":
-      return f"Bulk-restored moderation governance policy {record.name}."
-    return f"Recorded moderation governance policy action {action} for {record.name}."
 
   def _record_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision(
     self,
@@ -37955,64 +37909,16 @@ class TradingApplication:
     actor_tab_id: str | None = None,
     actor_tab_label: str | None = None,
   ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord:
-    revision = self._save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
-      self._build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision(
-        record=record,
-        action=action,
-        reason=reason,
-        recorded_at=recorded_at,
-        source_revision_id=source_revision_id,
-        actor_tab_id=actor_tab_id,
-        actor_tab_label=actor_tab_label,
-      )
+    return record_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_support(
+      self,
+      record=record,
+      action=action,
+      reason=reason,
+      recorded_at=recorded_at,
+      source_revision_id=source_revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
     )
-    saved = self._save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record(
-      replace(
-        record,
-        status=self._normalize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_status(
-          record.status
-        ),
-        current_revision_id=revision.revision_id,
-        revision_count=int(record.revision_count or 0) + 1,
-      )
-    )
-    self._save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
-      ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord(
-        audit_id=uuid4().hex[:12],
-        governance_policy_id=saved.governance_policy_id,
-        action=action,
-        recorded_at=recorded_at,
-        reason=reason.strip() if isinstance(reason, str) and reason.strip() else action,
-        detail=self._build_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_detail(
-          record=saved,
-          action=action,
-        ),
-        scheduler_key=saved.scheduler_key,
-        revision_id=revision.revision_id,
-        source_revision_id=source_revision_id,
-        name=saved.name,
-        status=saved.status,
-        action_scope=saved.action_scope,
-        require_approval_note=saved.require_approval_note,
-        default_moderation_status=saved.default_moderation_status,
-        governance_view=saved.governance_view,
-        window_days=saved.window_days,
-        stale_pending_hours=saved.stale_pending_hours,
-        minimum_score=saved.minimum_score,
-        require_note=saved.require_note,
-        actor_tab_id=(
-          actor_tab_id.strip()
-          if isinstance(actor_tab_id, str) and actor_tab_id.strip()
-          else None
-        ),
-        actor_tab_label=(
-          actor_tab_label.strip()
-          if isinstance(actor_tab_label, str) and actor_tab_label.strip()
-          else None
-        ),
-      )
-    )
-    return saved
 
   @staticmethod
   def _normalize_provider_provenance_scheduler_search_moderation_policy_catalog_status(
