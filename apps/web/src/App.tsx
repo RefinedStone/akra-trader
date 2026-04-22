@@ -52,8 +52,9 @@ import {
 } from "./runSurfaceCapabilities";
 import { RunSurfaceCollectionQueryBuilder } from "./features/query-builder";
 import {
-  formatComparisonTooltipConflictSessionRelativeTime,
+  formatComparisonTooltipTuningDelta,
   formatComparisonTooltipTuningValue,
+  formatRelativeTimestampLabel,
 } from "./features/comparisonTooltipFormatters";
 import { RunSection } from "./features/run-history/RunSection";
 import type {
@@ -2086,17 +2087,7 @@ function buildPresetStructuredDiffDelta(
     typeof incomingRaw === "number" &&
     Number.isFinite(incomingRaw)
   ) {
-    const delta = incomingRaw - existingRaw;
-    if (delta === 0) {
-      return {
-        direction: "same" as const,
-        label: "match",
-      };
-    }
-    return {
-      direction: delta > 0 ? ("higher" as const) : ("lower" as const),
-      label: `${delta > 0 ? "higher " : "lower "}${delta > 0 ? "+" : ""}${formatComparisonTooltipTuningValue(delta)}`,
-    };
+    return formatComparisonTooltipTuningDelta(existingRaw, incomingRaw);
   }
   if (typeof existingRaw === "boolean" && typeof incomingRaw === "boolean") {
     return {
@@ -2586,18 +2577,6 @@ function matchesPresetRevisionFilter(
     .join(" ")
     .toLowerCase();
   return searchable.includes(query);
-}
-
-function formatRelativeTimestampLabel(value?: string | null) {
-  if (!value) {
-    return "n/a";
-  }
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) {
-    return formatTimestamp(value);
-  }
-  const relative = formatComparisonTooltipConflictSessionRelativeTime(timestamp, new Date());
-  return relative ? `${relative} · ${formatTimestamp(value)}` : formatTimestamp(value);
 }
 
 const defaultRunHistoryFilter: RunHistoryFilter = {

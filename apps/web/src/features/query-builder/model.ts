@@ -21,8 +21,14 @@ import {
   AkraTouchFeedbackEnvelope,
   triggerAkraTouchFeedbackBridge,
 } from "../../touchFeedback";
-import { formatComparisonTooltipConflictSessionRelativeTime } from "../comparisonTooltipFormatters";
-export { formatComparisonTooltipConflictSessionRelativeTime };
+import {
+  formatComparisonTooltipConflictSessionRelativeTime,
+  formatRelativeTimestampLabel,
+} from "../comparisonTooltipFormatters";
+export {
+  formatComparisonTooltipConflictSessionRelativeTime,
+  formatRelativeTimestampLabel,
+};
 import {
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
@@ -131,18 +137,6 @@ export function formatTimestamp(value?: string | null) {
     return "n/a";
   }
   return value;
-}
-
-export function formatRelativeTimestampLabel(value?: string | null) {
-  if (!value) {
-    return "n/a";
-  }
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) {
-    return formatTimestamp(value);
-  }
-  const relative = formatComparisonTooltipConflictSessionRelativeTime(timestamp, new Date());
-  return relative ? `${relative} · ${formatTimestamp(value)}` : formatTimestamp(value);
 }
 
 export function encodeComparisonScoreLinkToken(value: string) {
