@@ -2378,6 +2378,93 @@ def test_provider_provenance_scheduler_search_moderation_catalog_governance_flow
   ][0]
   assert restored_policy["status"] == "active"
 
+  meta_policy = (
+    app.create_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy(
+      name="Escalate governance policy review",
+      description="Reusable queue defaults for moderation governance policy changes.",
+      action_scope="update",
+      require_approval_note=True,
+      guidance="Meta-policy review note is required.",
+      name_prefix="[Meta] ",
+      description_append=" Escalated through policy review.",
+      policy_action_scope="update",
+      policy_require_approval_note=True,
+      policy_guidance="Require policy-level note for apply.",
+      default_moderation_status="approved",
+      governance_view="high_score_pending",
+      window_days=45,
+      stale_pending_hours=12,
+      minimum_score=260,
+      require_note=True,
+      created_by_tab_id="control-room",
+      created_by_tab_label="Control room",
+    )
+  )
+  assert meta_policy["action_scope"] == "update"
+  assert meta_policy["policy_action_scope"] == "update"
+
+  meta_policies = (
+    app.list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policies(
+      action_scope="update",
+    )
+  )
+  assert meta_policies["total"] == 1
+  assert meta_policies["items"][0]["meta_policy_id"] == meta_policy["meta_policy_id"]
+
+  staged_meta_plan = app.stage_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+    governance_policy_ids=(governance_policy["governance_policy_id"],),
+    action="update",
+    meta_policy_id=meta_policy["meta_policy_id"],
+    actor="operator",
+    source_tab_id="control-room",
+    source_tab_label="Control room",
+  )
+  assert staged_meta_plan["queue_state"] == "pending_approval"
+  assert staged_meta_plan["preview_count"] == 1
+  assert staged_meta_plan["preview_items"][0]["governance_policy_id"] == governance_policy["governance_policy_id"]
+  assert staged_meta_plan["preview_items"][0]["proposed_snapshot"]["minimum_score"] == 260
+
+  queued_meta_plans = (
+    app.list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plans(
+      queue_state="pending_approval",
+      meta_policy_id=meta_policy["meta_policy_id"],
+    )
+  )
+  assert queued_meta_plans["summary"]["pending_approval_count"] == 1
+  assert queued_meta_plans["items"][0]["plan_id"] == staged_meta_plan["plan_id"]
+
+  approved_meta_plan = (
+    app.approve_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+      plan_id=staged_meta_plan["plan_id"],
+      actor="operator",
+      note="Reviewed moderation governance policy changes.",
+      source_tab_id="control-room",
+      source_tab_label="Control room",
+    )
+  )
+  assert approved_meta_plan["queue_state"] == "ready_to_apply"
+  assert approved_meta_plan["approval_note"] == "Reviewed moderation governance policy changes."
+
+  applied_meta_plan = (
+    app.apply_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+      plan_id=staged_meta_plan["plan_id"],
+      actor="operator",
+      note="Apply reviewed moderation governance policy changes.",
+      source_tab_id="control-room",
+      source_tab_label="Control room",
+    )
+  )
+  assert applied_meta_plan["queue_state"] == "completed"
+  assert applied_meta_plan["applied_result"]["applied_count"] == 1
+
+  meta_updated_policy = app.list_provider_provenance_scheduler_search_moderation_catalog_governance_policies()[
+    "items"
+  ][0]
+  assert meta_updated_policy["minimum_score"] == 260
+  assert meta_updated_policy["require_approval_note"] is True
+  assert meta_updated_policy["guidance"] == "Require policy-level note for apply."
+  assert meta_updated_policy["description"].endswith("Escalated through policy review.")
+
 
 def test_provider_provenance_scheduler_history_and_analytics_persist(
   monkeypatch,

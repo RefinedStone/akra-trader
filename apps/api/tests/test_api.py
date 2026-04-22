@@ -5522,6 +5522,110 @@ def test_scheduler_search_moderation_catalog_governance_routes(
     assert updated_catalog_payload["require_note"] is True
     assert updated_catalog_payload["description"].endswith("Reviewed by governance queue.")
 
+    meta_policy_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-policies",
+      json={
+        "name": "Escalate governance policy review",
+        "description": "Reusable queue defaults for moderation governance policy changes.",
+        "action_scope": "update",
+        "require_approval_note": True,
+        "guidance": "Meta-policy review note is mandatory.",
+        "name_prefix": "[Meta] ",
+        "description_append": " Escalated through policy review.",
+        "policy_action_scope": "update",
+        "policy_require_approval_note": True,
+        "policy_guidance": "Require policy-level note for apply.",
+        "default_moderation_status": "approved",
+        "governance_view": "high_score_pending",
+        "window_days": 45,
+        "stale_pending_hours": 12,
+        "minimum_score": 260,
+        "require_note": True,
+        "created_by_tab_id": "control-room",
+        "created_by_tab_label": "Control room",
+      },
+    )
+    assert meta_policy_response.status_code == 200
+    meta_policy_payload = meta_policy_response.json()
+    assert meta_policy_payload["policy_action_scope"] == "update"
+    assert meta_policy_payload["minimum_score"] == 260
+
+    meta_policy_list_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-policies",
+      params={"action_scope": "update"},
+    )
+    assert meta_policy_list_response.status_code == 200
+    meta_policy_list_payload = meta_policy_list_response.json()
+    assert meta_policy_list_payload["total"] == 1
+    assert meta_policy_list_payload["items"][0]["meta_policy_id"] == meta_policy_payload["meta_policy_id"]
+
+    meta_stage_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans",
+      json={
+        "governance_policy_ids": [governance_policy_payload["governance_policy_id"]],
+        "action": "update",
+        "meta_policy_id": meta_policy_payload["meta_policy_id"],
+        "actor": "operator",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert meta_stage_response.status_code == 200
+    meta_stage_payload = meta_stage_response.json()
+    assert meta_stage_payload["queue_state"] == "pending_approval"
+    assert meta_stage_payload["preview_count"] == 1
+    assert meta_stage_payload["preview_items"][0]["governance_policy_id"] == governance_policy_payload["governance_policy_id"]
+    assert meta_stage_payload["preview_items"][0]["proposed_snapshot"]["minimum_score"] == 260
+
+    meta_queue_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans",
+      params={
+        "queue_state": "pending_approval",
+        "meta_policy_id": meta_policy_payload["meta_policy_id"],
+      },
+    )
+    assert meta_queue_response.status_code == 200
+    meta_queue_payload = meta_queue_response.json()
+    assert meta_queue_payload["summary"]["pending_approval_count"] == 1
+    assert meta_queue_payload["items"][0]["plan_id"] == meta_stage_payload["plan_id"]
+
+    meta_approve_response = client.post(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans/{meta_stage_payload['plan_id']}/approve",
+      json={
+        "actor": "operator",
+        "note": "Reviewed moderation governance policy changes.",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert meta_approve_response.status_code == 200
+    meta_approve_payload = meta_approve_response.json()
+    assert meta_approve_payload["queue_state"] == "ready_to_apply"
+
+    meta_apply_response = client.post(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans/{meta_stage_payload['plan_id']}/apply",
+      json={
+        "actor": "operator",
+        "note": "Apply reviewed moderation governance policy changes.",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert meta_apply_response.status_code == 200
+    meta_apply_payload = meta_apply_response.json()
+    assert meta_apply_payload["queue_state"] == "completed"
+    assert meta_apply_payload["applied_result"]["applied_count"] == 1
+
+    refreshed_governance_policy_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies",
+      params={"action_scope": "update"},
+    )
+    assert refreshed_governance_policy_response.status_code == 200
+    refreshed_governance_policy_payload = refreshed_governance_policy_response.json()["items"][0]
+    assert refreshed_governance_policy_payload["minimum_score"] == 260
+    assert refreshed_governance_policy_payload["guidance"] == "Require policy-level note for apply."
+    assert refreshed_governance_policy_payload["description"].endswith("Escalated through policy review.")
+
 
 def test_operator_visibility_endpoint_can_reconstruct_mixed_status_scheduler_narrative(
   tmp_path: Path,

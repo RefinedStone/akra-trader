@@ -462,6 +462,63 @@ class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanAp
   source_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyCreateRequest(BaseModel):
+  name: str
+  description: str = ""
+  action_scope: str = "any"
+  require_approval_note: bool = False
+  guidance: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  policy_action_scope: str | None = None
+  policy_require_approval_note: bool | None = None
+  policy_guidance: str | None = None
+  default_moderation_status: str | None = None
+  governance_view: str | None = None
+  window_days: int | None = None
+  stale_pending_hours: int | None = None
+  minimum_score: int | None = None
+  require_note: bool | None = None
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanStageRequest(BaseModel):
+  governance_policy_ids: list[str] = Field(default_factory=list)
+  action: str
+  meta_policy_id: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  action_scope: str | None = None
+  require_approval_note: bool | None = None
+  guidance: str | None = None
+  default_moderation_status: str | None = None
+  governance_view: str | None = None
+  window_days: int | None = None
+  stale_pending_hours: int | None = None
+  minimum_score: int | None = None
+  require_note: bool | None = None
+  actor: str = "operator"
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanApprovalRequest(BaseModel):
+  actor: str = "operator"
+  note: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanApplyRequest(BaseModel):
+  actor: str = "operator"
+  note: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -3101,6 +3158,171 @@ def create_router(container: Container) -> APIRouter:
     methods=["POST"],
     name="apply_operator_provider_provenance_scheduler_search_moderation_catalog_governance_plan",
     summary="Apply an approved moderation policy catalog governance plan",
+  )
+
+  def create_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy(
+    request: OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyCreateRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.create_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy(
+        name=request.name,
+        description=request.description,
+        action_scope=request.action_scope,
+        require_approval_note=request.require_approval_note,
+        guidance=request.guidance,
+        name_prefix=request.name_prefix,
+        name_suffix=request.name_suffix,
+        description_append=request.description_append,
+        policy_action_scope=request.policy_action_scope,
+        policy_require_approval_note=request.policy_require_approval_note,
+        policy_guidance=request.policy_guidance,
+        default_moderation_status=request.default_moderation_status,
+        governance_view=request.governance_view,
+        window_days=request.window_days,
+        stale_pending_hours=request.stale_pending_hours,
+        minimum_score=request.minimum_score,
+        require_note=request.require_note,
+        created_by_tab_id=request.created_by_tab_id,
+        created_by_tab_label=request.created_by_tab_label,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-policies",
+    create_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy,
+    methods=["POST"],
+    name="create_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy",
+    summary="Create a reusable meta policy for moderation governance policies",
+  )
+
+  def list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policies(
+    action_scope: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return app.list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policies(
+      action_scope=action_scope,
+      search=search,
+      limit=limit,
+    )
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-policies",
+    list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policies,
+    methods=["GET"],
+    name="list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policies",
+    summary="List reusable meta policies for moderation governance policies",
+  )
+
+  def stage_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+    request: OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanStageRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.stage_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+        governance_policy_ids=request.governance_policy_ids,
+        action=request.action,
+        meta_policy_id=request.meta_policy_id,
+        name_prefix=request.name_prefix,
+        name_suffix=request.name_suffix,
+        description_append=request.description_append,
+        action_scope=request.action_scope,
+        require_approval_note=request.require_approval_note,
+        guidance=request.guidance,
+        default_moderation_status=request.default_moderation_status,
+        governance_view=request.governance_view,
+        window_days=request.window_days,
+        stale_pending_hours=request.stale_pending_hours,
+        minimum_score=request.minimum_score,
+        require_note=request.require_note,
+        actor=request.actor,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans",
+    stage_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan,
+    methods=["POST"],
+    name="stage_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan",
+    summary="Stage moderation governance policy changes into an approval queue plan",
+  )
+
+  def list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plans(
+    queue_state: str | None = None,
+    meta_policy_id: str | None = None,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return app.list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plans(
+      queue_state=queue_state,
+      meta_policy_id=meta_policy_id,
+    )
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans",
+    list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plans,
+    methods=["GET"],
+    name="list_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plans",
+    summary="List staged moderation governance policy plans",
+  )
+
+  def approve_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+    plan_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanApprovalRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.approve_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+        plan_id=plan_id,
+        actor=request.actor,
+        note=request.note,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans/{plan_id}/approve",
+    approve_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan,
+    methods=["POST"],
+    name="approve_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan",
+    summary="Approve a staged moderation governance policy plan",
+  )
+
+  def apply_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+    plan_id: str,
+    request: OperatorProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanApplyRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.apply_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan(
+        plan_id=plan_id,
+        actor=request.actor,
+        note=request.note,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans/{plan_id}/apply",
+    apply_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan,
+    methods=["POST"],
+    name="apply_operator_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan",
+    summary="Apply an approved moderation governance policy plan",
   )
 
   return router

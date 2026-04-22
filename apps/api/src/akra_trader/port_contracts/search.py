@@ -6,6 +6,8 @@ from typing import Protocol
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord
@@ -133,3 +135,21 @@ class ProviderProvenanceSchedulerSearchBackendPort(Protocol):
   def list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord, ...]: ...
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord: ...
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord, ...]: ...
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord: ...
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord, ...]: ...

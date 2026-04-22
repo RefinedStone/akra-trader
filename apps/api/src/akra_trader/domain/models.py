@@ -1936,6 +1936,96 @@ class ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord:
   applied_result: dict[str, Any] | None = None
 
 
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord:
+  meta_policy_id: str
+  created_at: datetime
+  updated_at: datetime
+  name: str
+  description: str = ""
+  scheduler_key: str = "provider_provenance_reports"
+  status: str = "active"
+  action_scope: str = "any"
+  require_approval_note: bool = False
+  guidance: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  policy_action_scope: str | None = None
+  policy_require_approval_note: bool | None = None
+  policy_guidance: str | None = None
+  default_moderation_status: str | None = None
+  governance_view: str | None = None
+  window_days: int | None = None
+  stale_pending_hours: int | None = None
+  minimum_score: int | None = None
+  require_note: bool | None = None
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanPreviewItem:
+  governance_policy_id: str
+  governance_policy_name: str
+  action: str
+  current_status: str
+  current_revision_id: str | None = None
+  rollback_revision_id: str | None = None
+  outcome: str = "changed"
+  message: str | None = None
+  changed_fields: tuple[str, ...] = ()
+  field_diffs: dict[str, dict[str, Any]] = field(default_factory=dict)
+  current_snapshot: dict[str, Any] = field(default_factory=dict)
+  proposed_snapshot: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord:
+  plan_id: str
+  created_at: datetime
+  updated_at: datetime
+  scheduler_key: str = "provider_provenance_reports"
+  action: str = "update"
+  status: str = "previewed"
+  queue_state: str = "pending_approval"
+  meta_policy_id: str | None = None
+  meta_policy_name: str | None = None
+  require_approval_note: bool = False
+  guidance: str | None = None
+  requested_governance_policy_ids: tuple[str, ...] = ()
+  preview_items: tuple[
+    ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanPreviewItem,
+    ...,
+  ] = ()
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  policy_action_scope: str | None = None
+  policy_require_approval_note: bool | None = None
+  policy_guidance: str | None = None
+  default_moderation_status: str | None = None
+  governance_view: str | None = None
+  window_days: int | None = None
+  stale_pending_hours: int | None = None
+  minimum_score: int | None = None
+  require_note: bool | None = None
+  created_by: str = "operator"
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+  approved_at: datetime | None = None
+  approved_by: str | None = None
+  approved_by_tab_id: str | None = None
+  approved_by_tab_label: str | None = None
+  approval_note: str | None = None
+  applied_at: datetime | None = None
+  applied_by: str | None = None
+  applied_by_tab_id: str | None = None
+  applied_by_tab_label: str | None = None
+  apply_note: str | None = None
+  applied_result: dict[str, Any] | None = None
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "

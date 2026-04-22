@@ -96,6 +96,8 @@ creation.
   registries, revision restore, bulk governance, and staged approval queues for handoff workflows
 - scheduler governance now includes reusable policy templates, policy catalogs, captured plan
   hierarchies, and dedicated approval-queue/workbench surfaces instead of one-off record mutation
+- scheduler search moderation governance now also includes reusable meta-policies and a staged
+  approval queue for moderation governance policy updates instead of direct policy mutation
 - scheduler narrative retrieval now runs through dedicated server-side lexical/semantic search,
   ranking, clustering, external index storage, query analytics, relevance feedback, and moderation
   governance surfaces

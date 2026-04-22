@@ -27,7 +27,16 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModeratio
 from akra_trader.domain.models import (
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPreviewItem,
 )
+from akra_trader.domain.models import (
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanPreviewItem,
+)
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
+from akra_trader.domain.models import (
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord,
+)
+from akra_trader.domain.models import (
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord,
+)
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord
@@ -454,6 +463,82 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalog_gov
     approved_by="operator",
     approval_note="Stage catalog patch behind review.",
   )
+  meta_policy_record = ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyRecord(
+    meta_policy_id="gov-meta-policy-1",
+    created_at=now + timedelta(minutes=7),
+    updated_at=now + timedelta(minutes=7),
+    name="Escalate governance policy updates",
+    description="Reusable review defaults for moderation governance policies.",
+    status="active",
+    action_scope="update",
+    require_approval_note=True,
+    guidance="Meta-policy review note is mandatory.",
+    name_prefix="[Meta] ",
+    description_append=" Escalated through policy review.",
+    policy_action_scope="update",
+    policy_require_approval_note=True,
+    policy_guidance="Require policy-level note for apply.",
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=45,
+    stale_pending_hours=12,
+    minimum_score=250,
+    require_note=True,
+    created_by_tab_id="control-room",
+    created_by_tab_label="Control room",
+  )
+  meta_plan_record = ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanRecord(
+    plan_id="gov-meta-plan-1",
+    created_at=now + timedelta(minutes=8),
+    updated_at=now + timedelta(minutes=8),
+    action="update",
+    status="approved",
+    queue_state="ready_to_apply",
+    meta_policy_id="gov-meta-policy-1",
+    meta_policy_name="Escalate governance policy updates",
+    require_approval_note=True,
+    guidance="Meta-policy review note is mandatory.",
+    requested_governance_policy_ids=("gov-policy-1",),
+    preview_items=(
+      ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanPreviewItem(
+        governance_policy_id="gov-policy-1",
+        governance_policy_name="Stage catalog changes with note",
+        action="update",
+        current_status="active",
+        current_revision_id="gov-policy-1:r0001",
+        rollback_revision_id="gov-policy-1:r0001",
+        outcome="changed",
+        message="Meta-policy raises the governance minimum score.",
+        changed_fields=("minimum_score", "guidance"),
+        field_diffs={
+          "minimum_score": {"before": 200, "after": 250},
+          "guidance": {
+            "before": "Require a note before applying moderation catalog changes.",
+            "after": "Require policy-level note for apply.",
+          },
+        },
+        current_snapshot={"minimum_score": 200, "guidance": "Require a note before applying moderation catalog changes."},
+        proposed_snapshot={"minimum_score": 250, "guidance": "Require policy-level note for apply."},
+      ),
+    ),
+    name_prefix="[Meta] ",
+    description_append=" Escalated through policy review.",
+    policy_action_scope="update",
+    policy_require_approval_note=True,
+    policy_guidance="Require policy-level note for apply.",
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=45,
+    stale_pending_hours=12,
+    minimum_score=250,
+    require_note=True,
+    created_by="operator",
+    created_by_tab_id="control-room",
+    created_by_tab_label="Control room",
+    approved_at=now + timedelta(minutes=9),
+    approved_by="operator",
+    approval_note="Meta-governance review completed.",
+  )
 
   with TestClient(service_app) as service_client:
     def fake_urlopen(request, timeout: float):
@@ -492,6 +577,12 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalog_gov
     saved_plan = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
       plan_record
     )
+    saved_meta_policy = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_record(
+      meta_policy_record
+    )
+    saved_meta_plan = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record(
+      meta_plan_record
+    )
     listed_policies = (
       backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records()
     )
@@ -504,11 +595,19 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalog_gov
     listed_plans = (
       backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records()
     )
+    listed_meta_policies = (
+      backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_policy_records()
+    )
+    listed_meta_plans = (
+      backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_records()
+    )
 
   assert saved_policy.governance_policy_id == "gov-policy-1"
   assert saved_revision.revision_id == "gov-policy-1:r0001"
   assert saved_audit.audit_id == "gov-audit-1"
   assert saved_plan.plan_id == "gov-plan-1"
+  assert saved_meta_policy.meta_policy_id == "gov-meta-policy-1"
+  assert saved_meta_plan.plan_id == "gov-meta-plan-1"
   assert len(listed_policies) == 1
   assert listed_policies[0].require_approval_note is True
   assert listed_policies[0].description_append == " Reviewed by governance queue."
@@ -519,3 +618,9 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalog_gov
   assert len(listed_plans) == 1
   assert listed_plans[0].queue_state == "ready_to_apply"
   assert listed_plans[0].preview_items[0].changed_fields == ("minimum_score", "require_note")
+  assert len(listed_meta_policies) == 1
+  assert listed_meta_policies[0].policy_action_scope == "update"
+  assert listed_meta_policies[0].minimum_score == 250
+  assert len(listed_meta_plans) == 1
+  assert listed_meta_plans[0].meta_policy_id == "gov-meta-policy-1"
+  assert listed_meta_plans[0].preview_items[0].changed_fields == ("minimum_score", "guidance")

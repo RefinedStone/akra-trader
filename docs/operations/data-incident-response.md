@@ -148,6 +148,9 @@ unclear dataset lineage.
 - those moderation-catalog governance policies now also expose revision history, team audit, and
   bulk governance, so reusable catalog-lifecycle rules can be patched, retired, or restored with
   the same operational traceability as the moderation catalog assets they govern
+- those same moderation-catalog governance policies now also support reusable meta-policies and a
+  staged approval queue, so policy-level governance defaults can be previewed, approved, and
+  applied before they rewrite the active moderation-governance rule set
 - that same retrieval path now also emits cross-occurrence semantic/vector clusters, so a handoff
   can start from grouped recovery or failure narratives instead of only a flat ranked result set
   from scratch before ranking results

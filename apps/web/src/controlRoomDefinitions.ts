@@ -1849,6 +1849,134 @@ export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanList
   items: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanEntry[];
 };
 
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyEntry = {
+  meta_policy_id: string;
+  created_at: string;
+  updated_at: string;
+  scheduler_key: string;
+  status: string;
+  name: string;
+  description: string;
+  action_scope: string;
+  require_approval_note: boolean;
+  guidance?: string | null;
+  name_prefix?: string | null;
+  name_suffix?: string | null;
+  description_append?: string | null;
+  policy_action_scope?: string | null;
+  policy_require_approval_note?: boolean | null;
+  policy_guidance?: string | null;
+  default_moderation_status?: string | null;
+  governance_view?: string | null;
+  window_days?: number | null;
+  stale_pending_hours?: number | null;
+  minimum_score?: number | null;
+  require_note?: boolean | null;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyListPayload = {
+  generated_at: string;
+  query: {
+    action_scope?: string | null;
+    search?: string | null;
+    limit: number;
+  };
+  available_filters: {
+    action_scopes: string[];
+  };
+  total: number;
+  items: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyEntry[];
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanPreviewItem = {
+  governance_policy_id: string;
+  governance_policy_name: string;
+  action: string;
+  current_status: string;
+  current_revision_id?: string | null;
+  rollback_revision_id?: string | null;
+  outcome: string;
+  message?: string | null;
+  changed_fields: string[];
+  field_diffs: Record<string, { before: unknown; after: unknown }>;
+  current_snapshot: Record<string, unknown>;
+  proposed_snapshot: Record<string, unknown>;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanEntry = {
+  plan_id: string;
+  created_at: string;
+  updated_at: string;
+  scheduler_key: string;
+  action: string;
+  status: string;
+  queue_state: string;
+  meta_policy_id?: string | null;
+  meta_policy_name?: string | null;
+  require_approval_note: boolean;
+  guidance?: string | null;
+  requested_governance_policy_ids: string[];
+  preview_count: number;
+  preview_items: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanPreviewItem[];
+  name_prefix?: string | null;
+  name_suffix?: string | null;
+  description_append?: string | null;
+  policy_action_scope?: string | null;
+  policy_require_approval_note?: boolean | null;
+  policy_guidance?: string | null;
+  default_moderation_status?: string | null;
+  governance_view?: string | null;
+  window_days?: number | null;
+  stale_pending_hours?: number | null;
+  minimum_score?: number | null;
+  require_note?: boolean | null;
+  created_by: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  approved_by_tab_id?: string | null;
+  approved_by_tab_label?: string | null;
+  approval_note?: string | null;
+  applied_at?: string | null;
+  applied_by?: string | null;
+  applied_by_tab_id?: string | null;
+  applied_by_tab_label?: string | null;
+  apply_note?: string | null;
+  applied_result?: {
+    requested_count: number;
+    applied_count: number;
+    skipped_count: number;
+    failed_count: number;
+    results: Array<Record<string, unknown>>;
+  } | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanListPayload = {
+  generated_at: string;
+  query: {
+    queue_state?: string | null;
+    meta_policy_id?: string | null;
+  };
+  available_filters: {
+    queue_states: string[];
+    meta_policies: {
+      meta_policy_id: string;
+      name: string;
+      action_scope: string;
+    }[];
+  };
+  summary: {
+    total: number;
+    pending_approval_count: number;
+    ready_to_apply_count: number;
+    completed_count: number;
+  };
+  items: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanEntry[];
+};
+
 export type ProviderProvenanceSchedulerSearchDashboardPayload = {
   generated_at: string;
   query: {

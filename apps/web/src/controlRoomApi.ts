@@ -18,6 +18,10 @@ import type {
   ProviderProvenanceSchedulerSearchDashboardPayload,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanEntry,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanListPayload,
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanEntry,
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanListPayload,
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyEntry,
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyListPayload,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditListPayload,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry,
   ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyListPayload,
@@ -1325,6 +1329,190 @@ export async function applyProviderProvenanceSchedulerSearchModerationCatalogGov
 }) {
   return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanEntry>(
     `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-plans/${encodeURIComponent(params.planId)}/apply`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        actor: params.actor?.trim() || "operator",
+        note: params.note ?? null,
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function createProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicy(params: {
+  name: string;
+  description?: string;
+  actionScope?: "any" | "update" | "delete" | "restore";
+  requireApprovalNote?: boolean;
+  guidance?: string | null;
+  namePrefix?: string | null;
+  nameSuffix?: string | null;
+  descriptionAppend?: string | null;
+  policyActionScope?: "any" | "update" | "delete" | "restore" | null;
+  policyRequireApprovalNote?: boolean | null;
+  policyGuidance?: string | null;
+  defaultModerationStatus?: "pending" | "approved" | "rejected" | null;
+  governanceView?: string | null;
+  windowDays?: number | null;
+  stalePendingHours?: number | null;
+  minimumScore?: number | null;
+  requireNote?: boolean | null;
+  createdByTabId?: string;
+  createdByTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyEntry>(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-policies",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: params.name,
+        description: params.description ?? "",
+        action_scope: params.actionScope ?? "any",
+        require_approval_note: params.requireApprovalNote ?? false,
+        guidance: params.guidance ?? null,
+        name_prefix: params.namePrefix ?? null,
+        name_suffix: params.nameSuffix ?? null,
+        description_append: params.descriptionAppend ?? null,
+        policy_action_scope: params.policyActionScope ?? null,
+        policy_require_approval_note: params.policyRequireApprovalNote ?? null,
+        policy_guidance: params.policyGuidance ?? null,
+        default_moderation_status: params.defaultModerationStatus ?? null,
+        governance_view: params.governanceView ?? null,
+        window_days: params.windowDays ?? null,
+        stale_pending_hours: params.stalePendingHours ?? null,
+        minimum_score: params.minimumScore ?? null,
+        require_note: params.requireNote ?? null,
+        created_by_tab_id: params.createdByTabId?.trim() || null,
+        created_by_tab_label: params.createdByTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicies(params: {
+  actionScope?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.actionScope?.trim()) {
+    searchParams.set("action_scope", params.actionScope.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-policies${suffix}`,
+  );
+}
+
+export async function stageProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlan(params: {
+  governancePolicyIds: string[];
+  action: "update" | "delete" | "restore";
+  metaPolicyId?: string;
+  namePrefix?: string | null;
+  nameSuffix?: string | null;
+  descriptionAppend?: string | null;
+  actionScope?: "any" | "update" | "delete" | "restore";
+  requireApprovalNote?: boolean;
+  guidance?: string | null;
+  defaultModerationStatus?: "pending" | "approved" | "rejected";
+  governanceView?: string;
+  windowDays?: number;
+  stalePendingHours?: number;
+  minimumScore?: number;
+  requireNote?: boolean;
+  actor?: string;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanEntry>(
+    "/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        governance_policy_ids: params.governancePolicyIds,
+        action: params.action,
+        meta_policy_id: params.metaPolicyId?.trim() || null,
+        ...(params.namePrefix !== undefined ? { name_prefix: params.namePrefix } : {}),
+        ...(params.nameSuffix !== undefined ? { name_suffix: params.nameSuffix } : {}),
+        ...(params.descriptionAppend !== undefined ? { description_append: params.descriptionAppend } : {}),
+        ...(params.actionScope ? { action_scope: params.actionScope } : {}),
+        ...(params.requireApprovalNote !== undefined ? { require_approval_note: params.requireApprovalNote } : {}),
+        ...(params.guidance !== undefined ? { guidance: params.guidance } : {}),
+        ...(params.defaultModerationStatus ? { default_moderation_status: params.defaultModerationStatus } : {}),
+        ...(params.governanceView ? { governance_view: params.governanceView } : {}),
+        ...(typeof params.windowDays === "number" && Number.isFinite(params.windowDays)
+          ? { window_days: Math.max(7, Math.min(Math.round(params.windowDays), 180)) }
+          : {}),
+        ...(typeof params.stalePendingHours === "number" && Number.isFinite(params.stalePendingHours)
+          ? { stale_pending_hours: Math.max(1, Math.min(Math.round(params.stalePendingHours), 24 * 30)) }
+          : {}),
+        ...(typeof params.minimumScore === "number" && Number.isFinite(params.minimumScore)
+          ? { minimum_score: Math.max(Math.round(params.minimumScore), 0) }
+          : {}),
+        ...(typeof params.requireNote === "boolean" ? { require_note: params.requireNote } : {}),
+        actor: params.actor?.trim() || "operator",
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlans(params: {
+  queueState?: string;
+  metaPolicyId?: string;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.queueState?.trim()) {
+    searchParams.set("queue_state", params.queueState.trim());
+  }
+  if (params.metaPolicyId?.trim()) {
+    searchParams.set("meta_policy_id", params.metaPolicyId.trim());
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans${suffix}`,
+  );
+}
+
+export async function approveProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlan(params: {
+  planId: string;
+  actor?: string;
+  note?: string | null;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans/${encodeURIComponent(params.planId)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        actor: params.actor?.trim() || "operator",
+        note: params.note ?? null,
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function applyProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlan(params: {
+  planId: string;
+  actor?: string;
+  note?: string | null;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanEntry>(
+    `/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-meta-plans/${encodeURIComponent(params.planId)}/apply`,
     {
       method: "POST",
       body: JSON.stringify({
