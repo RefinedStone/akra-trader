@@ -704,6 +704,9 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest(Ba
   description_append: str | None = None
   query_patch: dict[str, Any] | None = None
   layout_patch: dict[str, Any] | None = None
+  queue_view_patch: dict[str, Any] | None = None
+  default_policy_template_id: str | None = None
+  default_policy_catalog_id: str | None = None
   occurrence_limit: int | None = None
   history_limit: int | None = None
   drilldown_history_limit: int | None = None

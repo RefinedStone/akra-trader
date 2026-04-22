@@ -17924,6 +17924,224 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     for item in reverted_stitched_report_view_list_payload["items"]
   )
 
+  stitched_report_governance_registry_policy_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_create"],
+    app=app,
+    request_payload={
+      "name": "Stitched governance registry staged updates",
+      "description": "Reusable staged review lane for stitched governance registry updates.",
+      "item_type_scope": "stitched_report_governance_registry",
+      "action_scope": "update",
+      "approval_lane": "stitched_registry",
+      "approval_priority": "critical",
+      "guidance": "Review stitched queue bundles before apply.",
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert stitched_report_governance_registry_policy_template_payload["item_type_scope"] == (
+    "stitched_report_governance_registry"
+  )
+
+  stitched_report_view_default_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create"],
+    app=app,
+    request_payload={
+      "name": "Stitched report default review catalog",
+      "description": "Reusable default-policy bundle for stitched governance registries.",
+      "policy_template_ids": [
+        stitched_report_view_governance_policy_template_payload["policy_template_id"],
+      ],
+      "default_policy_template_id": stitched_report_view_governance_policy_template_payload[
+        "policy_template_id"
+      ],
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert stitched_report_view_default_policy_catalog_payload["item_type_scope"] == (
+    "stitched_report_view"
+  )
+
+  stitched_report_governance_registry_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create"],
+    app=app,
+    request_payload={
+      "name": "Stitched governance registry staged catalog",
+      "description": "Reusable approval defaults for stitched governance registry plans.",
+      "policy_template_ids": [
+        stitched_report_governance_registry_policy_template_payload["policy_template_id"],
+      ],
+      "default_policy_template_id": stitched_report_governance_registry_policy_template_payload[
+        "policy_template_id"
+      ],
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert stitched_report_governance_registry_policy_catalog_payload["item_type_scope"] == (
+    "stitched_report_governance_registry"
+  )
+
+  stitched_governance_registry_governance_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
+    app=app,
+    request_payload={
+      "item_type": "stitched_report_governance_registry",
+      "item_ids": [
+        stitched_governance_registry_payload["registry_id"],
+        secondary_stitched_governance_registry_payload["registry_id"],
+      ],
+      "action": "update",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_stitched_report_governance_registry_governance_plan",
+      "name_suffix": " / staged",
+      "queue_view_patch": {
+        "queue_state": "pending_approval",
+        "approval_lane": "scheduler_reports",
+        "approval_priority": "high",
+        "search": "staged stitched handoff",
+        "sort": "queue_priority",
+      },
+      "default_policy_template_id": stitched_report_view_governance_policy_template_payload[
+        "policy_template_id"
+      ],
+      "default_policy_catalog_id": stitched_report_view_default_policy_catalog_payload["catalog_id"],
+      "policy_catalog_id": stitched_report_governance_registry_policy_catalog_payload["catalog_id"],
+    },
+  )
+  assert stitched_governance_registry_governance_plan_payload["status"] == "previewed"
+  assert stitched_governance_registry_governance_plan_payload["item_type"] == (
+    "stitched_report_governance_registry"
+  )
+  assert stitched_governance_registry_governance_plan_payload["preview_changed_count"] == 2
+  assert stitched_governance_registry_governance_plan_payload["policy_catalog_id"] == (
+    stitched_report_governance_registry_policy_catalog_payload["catalog_id"]
+  )
+  assert stitched_governance_registry_governance_plan_payload["policy_template_id"] == (
+    stitched_report_governance_registry_policy_template_payload["policy_template_id"]
+  )
+  assert stitched_governance_registry_governance_plan_payload["approval_lane"] == "stitched_registry"
+  assert stitched_governance_registry_governance_plan_payload["approval_priority"] == "critical"
+  assert stitched_governance_registry_governance_plan_payload["request_payload"]["queue_view_patch"] == {
+    "queue_state": "pending_approval",
+    "approval_lane": "scheduler_reports",
+    "approval_priority": "high",
+    "search": "staged stitched handoff",
+    "sort": "queue_priority",
+  }
+  assert stitched_governance_registry_governance_plan_payload["request_payload"][
+    "default_policy_template_id"
+  ] == stitched_report_view_governance_policy_template_payload["policy_template_id"]
+  assert stitched_governance_registry_governance_plan_payload["request_payload"][
+    "default_policy_catalog_id"
+  ] == stitched_report_view_default_policy_catalog_payload["catalog_id"]
+  assert any("queue_view" in item["changed_fields"] for item in stitched_governance_registry_governance_plan_payload["preview_items"])
+  assert any(
+    "default_policy_template_id" in item["changed_fields"]
+    or "default_policy_catalog_id" in item["changed_fields"]
+    for item in stitched_governance_registry_governance_plan_payload["preview_items"]
+  )
+
+  stitched_governance_registry_governance_plan_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"],
+    app=app,
+    filters={
+      "item_type": "stitched_report_governance_registry",
+      "status": "previewed",
+      "limit": 10,
+    },
+  )
+  assert stitched_governance_registry_governance_plan_list_payload["total"] >= 1
+  assert stitched_governance_registry_governance_plan_payload["plan_id"] in {
+    item["plan_id"] for item in stitched_governance_registry_governance_plan_list_payload["items"]
+  }
+
+  approved_stitched_governance_registry_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_approve"],
+    app=app,
+    path_params={"plan_id": stitched_governance_registry_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "approved stitched governance registry rollout",
+    },
+  )
+  assert approved_stitched_governance_registry_plan_payload["status"] == "approved"
+
+  applied_stitched_governance_registry_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_apply"],
+    app=app,
+    path_params={"plan_id": stitched_governance_registry_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+    },
+  )
+  assert applied_stitched_governance_registry_plan_payload["status"] == "applied"
+  assert applied_stitched_governance_registry_plan_payload["applied_result"]["applied_count"] == 2
+
+  staged_stitched_governance_registry_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_list"],
+    app=app,
+    filters={"search": "Shift /", "limit": 10},
+  )
+  staged_stitched_governance_registry_items = {
+    item["registry_id"]: item for item in staged_stitched_governance_registry_list_payload["items"]
+  }
+  assert {
+    stitched_governance_registry_payload["registry_id"],
+    secondary_stitched_governance_registry_payload["registry_id"],
+  }.issubset(staged_stitched_governance_registry_items)
+  assert all(
+    item["name"].endswith(" / staged")
+    and item["queue_view"]["queue_state"] == "pending_approval"
+    and item["queue_view"]["approval_lane"] == "scheduler_reports"
+    and item["queue_view"]["approval_priority"] == "high"
+    and item["queue_view"]["search"] == "staged stitched handoff"
+    and item["queue_view"]["sort"] == "queue_priority"
+    and item["default_policy_template_id"]
+    == stitched_report_view_governance_policy_template_payload["policy_template_id"]
+    and item["default_policy_catalog_id"] == stitched_report_view_default_policy_catalog_payload["catalog_id"]
+    for item in staged_stitched_governance_registry_items.values()
+  )
+
+  rolled_back_stitched_governance_registry_plan_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_rollback"],
+    app=app,
+    path_params={"plan_id": stitched_governance_registry_governance_plan_payload["plan_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "note": "rollback stitched governance registry rollout",
+    },
+  )
+  assert rolled_back_stitched_governance_registry_plan_payload["status"] == "rolled_back"
+  assert rolled_back_stitched_governance_registry_plan_payload["rollback_result"]["applied_count"] == 2
+
+  reverted_stitched_governance_registry_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_stitched_report_governance_registry_list"],
+    app=app,
+    filters={"search": "Shift /", "limit": 10},
+  )
+  reverted_stitched_governance_registry_items = {
+    item["registry_id"]: item
+    for item in reverted_stitched_governance_registry_list_payload["items"]
+    if item["registry_id"] in staged_stitched_governance_registry_items
+  }
+  assert len(reverted_stitched_governance_registry_items) == 2
+  assert all(
+    not item["name"].endswith(" / staged")
+    and item["queue_view"]["queue_state"] == "ready_to_apply"
+    and item["queue_view"]["approval_priority"] == "critical"
+    and item["queue_view"]["search"] == "reviewed handoff"
+    and item["queue_view"]["sort"] == "updated_desc"
+    and item["default_policy_template_id"] is None
+    and item["default_policy_catalog_id"] is None
+    for item in reverted_stitched_governance_registry_items.values()
+  )
+
   batch_template_governance_plan_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
     app=app,

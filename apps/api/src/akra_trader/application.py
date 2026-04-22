@@ -7577,6 +7577,24 @@ class TradingApplication:
       "drilldown_history_limit": int(record.drilldown_history_limit),
     }
 
+  def _build_provider_provenance_scheduler_stitched_report_governance_registry_snapshot(
+    self,
+    record: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+  ) -> dict[str, Any]:
+    normalized_queue_view = self._normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+      record.queue_view
+    )
+    return {
+      "name": record.name,
+      "description": record.description,
+      "status": self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+      "queue_view": deepcopy(normalized_queue_view),
+      "default_policy_template_id": record.default_policy_template_id,
+      "default_policy_template_name": record.default_policy_template_name,
+      "default_policy_catalog_id": record.default_policy_catalog_id,
+      "default_policy_catalog_name": record.default_policy_catalog_name,
+    }
+
   @staticmethod
   def _build_provider_provenance_scheduler_narrative_field_diffs(
     current_snapshot: dict[str, Any],
@@ -8161,6 +8179,235 @@ class TradingApplication:
       rollback_revision_id=current.current_revision_id,
       outcome="changed",
       message="Stitched report view will be updated with the requested governance patch.",
+      changed_fields=changed_fields,
+      field_diffs=field_diffs,
+      current_snapshot=current_snapshot,
+      proposed_snapshot=proposed_snapshot,
+    )
+
+  def _preview_provider_provenance_scheduler_stitched_report_governance_registry_governance_item(
+    self,
+    current: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRecord,
+    *,
+    action: str,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    description_append: str | None = None,
+    queue_view_patch: dict[str, Any] | None = None,
+    default_policy_template_id: str | None = None,
+    default_policy_catalog_id: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePreviewItem:
+    current_snapshot = self._build_provider_provenance_scheduler_stitched_report_governance_registry_snapshot(
+      current
+    )
+    if action == "delete":
+      if current.status == "deleted":
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.registry_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="skipped",
+          message="Stitched governance registry is already deleted.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      proposed = replace(current, status="deleted")
+      proposed_snapshot = self._build_provider_provenance_scheduler_stitched_report_governance_registry_snapshot(
+        proposed
+      )
+      changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+        current_snapshot,
+        proposed_snapshot,
+        ("status",),
+      )
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.registry_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="changed",
+        message="Stitched governance registry will be deleted.",
+        changed_fields=changed_fields,
+        field_diffs=field_diffs,
+        current_snapshot=current_snapshot,
+        proposed_snapshot=proposed_snapshot,
+      )
+    if action == "restore":
+      if current.status != "deleted":
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.registry_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="skipped",
+          message="Stitched governance registry is already active.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      revision = self._find_latest_active_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+        current.registry_id
+      )
+      if revision is None:
+        return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+          item_id=current.registry_id,
+          item_name=current.name,
+          status=current.status,
+          current_revision_id=current.current_revision_id,
+          rollback_revision_id=current.current_revision_id,
+          outcome="failed",
+          message="No active revision is available for restore.",
+          current_snapshot=current_snapshot,
+          proposed_snapshot=deepcopy(current_snapshot),
+        )
+      proposed = replace(
+        current,
+        name=revision.name,
+        description=revision.description,
+        queue_view=self._normalize_provider_provenance_scheduler_stitched_report_governance_registry_queue_view(
+          revision.queue_view
+        ),
+        default_policy_template_id=revision.default_policy_template_id,
+        default_policy_template_name=revision.default_policy_template_name,
+        default_policy_catalog_id=revision.default_policy_catalog_id,
+        default_policy_catalog_name=revision.default_policy_catalog_name,
+        status="active",
+      )
+      proposed_snapshot = self._build_provider_provenance_scheduler_stitched_report_governance_registry_snapshot(
+        proposed
+      )
+      changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+        current_snapshot,
+        proposed_snapshot,
+        (
+          "name",
+          "description",
+          "status",
+          "queue_view",
+          "default_policy_template_id",
+          "default_policy_template_name",
+          "default_policy_catalog_id",
+          "default_policy_catalog_name",
+        ),
+      )
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.registry_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        apply_revision_id=revision.revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="changed",
+        message="Stitched governance registry will be restored from the latest active revision.",
+        changed_fields=changed_fields,
+        field_diffs=field_diffs,
+        current_snapshot=current_snapshot,
+        proposed_snapshot=proposed_snapshot,
+      )
+    if current.status == "deleted":
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.registry_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="skipped",
+        message="Stitched governance registry is deleted; restore it before previewing edits.",
+        current_snapshot=current_snapshot,
+        proposed_snapshot=deepcopy(current_snapshot),
+      )
+    (
+      resolved_default_policy_catalog,
+      resolved_default_policy_template,
+      _resolved_lane,
+      _resolved_priority,
+      _resolved_guidance,
+    ) = self._resolve_provider_provenance_scheduler_narrative_governance_policy_layer(
+      item_type="stitched_report_view",
+      action="update",
+      policy_catalog_id=(
+        default_policy_catalog_id
+        if isinstance(default_policy_catalog_id, str)
+        else current.default_policy_catalog_id
+      ),
+      policy_template_id=(
+        default_policy_template_id
+        if isinstance(default_policy_template_id, str)
+        else current.default_policy_template_id
+      ),
+    )
+    proposed = replace(
+      current,
+      name=f"{name_prefix or ''}{current.name}{name_suffix or ''}",
+      description=(
+        f"{current.description} {description_append}".strip()
+        if description_append is not None
+        else current.description
+      ),
+      queue_view=self._build_provider_provenance_scheduler_stitched_report_governance_registry_bulk_queue_view(
+        current.queue_view,
+        queue_view_patch,
+      ),
+      default_policy_template_id=(
+        resolved_default_policy_template.policy_template_id
+        if resolved_default_policy_template is not None
+        else None
+      ),
+      default_policy_template_name=(
+        resolved_default_policy_template.name
+        if resolved_default_policy_template is not None
+        else None
+      ),
+      default_policy_catalog_id=(
+        resolved_default_policy_catalog.catalog_id
+        if resolved_default_policy_catalog is not None
+        else None
+      ),
+      default_policy_catalog_name=(
+        resolved_default_policy_catalog.name
+        if resolved_default_policy_catalog is not None
+        else None
+      ),
+    )
+    proposed_snapshot = self._build_provider_provenance_scheduler_stitched_report_governance_registry_snapshot(
+      proposed
+    )
+    changed_fields, field_diffs = self._build_provider_provenance_scheduler_narrative_field_diffs(
+      current_snapshot,
+      proposed_snapshot,
+      (
+        "name",
+        "description",
+        "queue_view",
+        "default_policy_template_id",
+        "default_policy_template_name",
+        "default_policy_catalog_id",
+        "default_policy_catalog_name",
+      ),
+    )
+    if not changed_fields:
+      return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+        item_id=current.registry_id,
+        item_name=current.name,
+        status=current.status,
+        current_revision_id=current.current_revision_id,
+        rollback_revision_id=current.current_revision_id,
+        outcome="skipped",
+        message="Stitched governance registry already matches the requested governance patch.",
+        current_snapshot=current_snapshot,
+        proposed_snapshot=deepcopy(current_snapshot),
+      )
+    return ProviderProvenanceSchedulerNarrativeGovernancePreviewItem(
+      item_id=current.registry_id,
+      item_name=current.name,
+      status=current.status,
+      current_revision_id=current.current_revision_id,
+      rollback_revision_id=current.current_revision_id,
+      outcome="changed",
+      message="Stitched governance registry will be updated with the requested governance patch.",
       changed_fields=changed_fields,
       field_diffs=field_diffs,
       current_snapshot=current_snapshot,
@@ -8969,7 +9216,12 @@ class TradingApplication:
     item_type: str,
   ) -> str:
     normalized = item_type.strip().lower()
-    if normalized not in {"template", "registry", "stitched_report_view"}:
+    if normalized not in {
+      "template",
+      "registry",
+      "stitched_report_view",
+      "stitched_report_governance_registry",
+    }:
       raise ValueError("Unsupported scheduler narrative governance item type.")
     return normalized
 
@@ -8982,7 +9234,13 @@ class TradingApplication:
       if isinstance(item_type_scope, str) and item_type_scope.strip()
       else "any"
     )
-    if normalized not in {"any", "template", "registry", "stitched_report_view"}:
+    if normalized not in {
+      "any",
+      "template",
+      "registry",
+      "stitched_report_view",
+      "stitched_report_governance_registry",
+    }:
       raise ValueError("Unsupported scheduler narrative governance policy item-type scope.")
     return normalized
 
@@ -12145,6 +12403,9 @@ class TradingApplication:
     description_append: str | None = None,
     query_patch: dict[str, Any] | None = None,
     layout_patch: dict[str, Any] | None = None,
+    queue_view_patch: dict[str, Any] | None = None,
+    default_policy_template_id: str | None = None,
+    default_policy_catalog_id: str | None = None,
     occurrence_limit: int | None = None,
     history_limit: int | None = None,
     drilldown_history_limit: int | None = None,
@@ -12212,6 +12473,17 @@ class TradingApplication:
       and drilldown_history_limit is None
     ):
       raise ValueError("No scheduler stitched report view governance fields were provided.")
+    if (
+      normalized_action == "update"
+      and normalized_item_type == "stitched_report_governance_registry"
+      and normalized_name_prefix is None
+      and normalized_name_suffix is None
+      and normalized_description_append is None
+      and not isinstance(queue_view_patch, dict)
+      and default_policy_template_id is None
+      and default_policy_catalog_id is None
+    ):
+      raise ValueError("No stitched governance registry governance fields were provided.")
     resolved_reason = (
       reason.strip()
       if isinstance(reason, str) and reason.strip()
@@ -12253,6 +12525,22 @@ class TradingApplication:
               layout_patch=layout_patch,
               template_id=template_id,
               clear_template_link=clear_template_link,
+            )
+          )
+        elif normalized_item_type == "stitched_report_governance_registry":
+          current_registry = self.get_provider_provenance_scheduler_stitched_report_governance_registry(
+            item_id
+          )
+          preview_items.append(
+            self._preview_provider_provenance_scheduler_stitched_report_governance_registry_governance_item(
+              current_registry,
+              action=normalized_action,
+              name_prefix=normalized_name_prefix,
+              name_suffix=normalized_name_suffix,
+              description_append=normalized_description_append,
+              queue_view_patch=queue_view_patch,
+              default_policy_template_id=default_policy_template_id,
+              default_policy_catalog_id=default_policy_catalog_id,
             )
           )
         else:
@@ -12301,6 +12589,12 @@ class TradingApplication:
       request_payload["query_patch"] = deepcopy(query_patch)
     if isinstance(layout_patch, dict) and layout_patch:
       request_payload["layout_patch"] = deepcopy(layout_patch)
+    if isinstance(queue_view_patch, dict) and queue_view_patch:
+      request_payload["queue_view_patch"] = deepcopy(queue_view_patch)
+    if isinstance(default_policy_template_id, str):
+      request_payload["default_policy_template_id"] = default_policy_template_id
+    if isinstance(default_policy_catalog_id, str):
+      request_payload["default_policy_catalog_id"] = default_policy_catalog_id
     if occurrence_limit is not None:
       request_payload["occurrence_limit"] = self._normalize_provider_provenance_scheduler_stitched_report_view_limit(
         occurrence_limit,
@@ -12827,6 +13121,71 @@ class TradingApplication:
               message=preview.message,
             )
           )
+        elif current.item_type == "stitched_report_governance_registry":
+          existing = self.get_provider_provenance_scheduler_stitched_report_governance_registry(
+            preview.item_id
+          )
+          if existing.current_revision_id != preview.current_revision_id:
+            raise RuntimeError("Stitched governance registry drifted since the governance preview was created.")
+          if current.action == "delete":
+            updated = self.delete_provider_provenance_scheduler_stitched_report_governance_registry(
+              preview.item_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          elif current.action == "restore":
+            if not preview.apply_revision_id:
+              raise RuntimeError("No restore revision was captured in the governance preview.")
+            updated = self.restore_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+              preview.item_id,
+              preview.apply_revision_id,
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          else:
+            updated_name = (
+              f"{request_payload.get('name_prefix', '')}{existing.name}{request_payload.get('name_suffix', '')}"
+            )
+            updated_description = (
+              f"{existing.description} {request_payload['description_append']}".strip()
+              if isinstance(request_payload.get("description_append"), str)
+              else existing.description
+            )
+            updated = self.update_provider_provenance_scheduler_stitched_report_governance_registry(
+              preview.item_id,
+              name=updated_name,
+              description=updated_description,
+              queue_view=(
+                request_payload.get("queue_view_patch")
+                if isinstance(request_payload.get("queue_view_patch"), dict)
+                else existing.queue_view
+              ),
+              default_policy_template_id=(
+                request_payload.get("default_policy_template_id")
+                if isinstance(request_payload.get("default_policy_template_id"), str)
+                else existing.default_policy_template_id
+              ),
+              default_policy_catalog_id=(
+                request_payload.get("default_policy_catalog_id")
+                if isinstance(request_payload.get("default_policy_catalog_id"), str)
+                else existing.default_policy_catalog_id
+              ),
+              actor_tab_id=actor_tab_id,
+              actor_tab_label=actor_tab_label,
+              reason=current.reason,
+            )
+          results.append(
+            ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+              item_id=updated.registry_id,
+              item_name=updated.name,
+              outcome="applied",
+              status=updated.status,
+              current_revision_id=updated.current_revision_id,
+              message=preview.message,
+            )
+          )
         else:
           existing = self.get_provider_provenance_scheduler_stitched_report_view(preview.item_id)
           if existing.current_revision_id != preview.current_revision_id:
@@ -13104,6 +13463,24 @@ class TradingApplication:
               status=updated.status,
               current_revision_id=updated.current_revision_id,
               message="Registry restored to the pre-apply revision snapshot.",
+            )
+          )
+        elif current.item_type == "stitched_report_governance_registry":
+          updated = self.restore_provider_provenance_scheduler_stitched_report_governance_registry_revision(
+            preview.item_id,
+            preview.rollback_revision_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason="scheduler_stitched_report_governance_registry_governance_rollback",
+          )
+          results.append(
+            ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+              item_id=updated.registry_id,
+              item_name=updated.name,
+              outcome="applied",
+              status=updated.status,
+              current_revision_id=updated.current_revision_id,
+              message="Stitched governance registry restored to the pre-apply revision snapshot.",
             )
           )
         else:

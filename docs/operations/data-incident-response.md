@@ -96,6 +96,10 @@ unclear dataset lineage.
 - those stitched-report governance registries now also have bulk governance controls and a
   dedicated team audit trail, so shift leads can patch or retire multiple queue/default bundles
   together and still review who changed which stitched handoff lane later
+- those same stitched-report governance registries now also use staged governance plans with
+  reusable policy templates and catalogs, so queue-slice/default-policy bundle changes can enter
+  preview, approval, apply, and rollback workflow before they touch the active stitched handoff
+  configuration
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

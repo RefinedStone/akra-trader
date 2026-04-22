@@ -198,6 +198,9 @@ It is not yet a finished live trading product:
 - those stitched-report governance registries now also support bulk lifecycle edits and a shared
   team audit surface, so queue-slice bundles can be patched, retired, restored, and reviewed
   across shifts without dropping back to one-registry-at-a-time maintenance
+- those same stitched-report governance registries now also stage through the shared governance
+  approval queue with reusable policy templates and catalogs, so queue-slice/default-policy bundle
+  changes can be previewed, approved, applied, and rolled back instead of mutating directly
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

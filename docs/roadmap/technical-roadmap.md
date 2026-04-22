@@ -144,6 +144,10 @@ creation.
 - those stitched-report governance registries now also have bulk-governance and shared audit
   surfaces, so the saved stitched-only queue/default bundles can be batch-patched and reviewed as
   team-owned lifecycle objects instead of one-off manual edits
+- those same stitched-report governance registries now also run through staged governance plans
+  with reusable policy templates and catalogs, so stitched queue/default bundles can follow the
+  same preview, approval, apply, and rollback discipline as the rest of the scheduler governance
+  layer
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand

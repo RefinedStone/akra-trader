@@ -1402,7 +1402,7 @@ export async function restoreProviderProvenanceSchedulerNarrativeRegistryRevisio
 }
 
 export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(params: {
-  itemType: "template" | "registry" | "stitched_report_view";
+  itemType: "template" | "registry" | "stitched_report_view" | "stitched_report_governance_registry";
   itemIds: string[];
   action: "delete" | "restore" | "update";
   actorTabId?: string;
@@ -1413,6 +1413,9 @@ export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(p
   descriptionAppend?: string;
   queryPatch?: Record<string, unknown>;
   layoutPatch?: Record<string, unknown>;
+  queueViewPatch?: Record<string, unknown>;
+  defaultPolicyTemplateId?: string;
+  defaultPolicyCatalogId?: string;
   occurrenceLimit?: number;
   historyLimit?: number;
   drilldownHistoryLimit?: number;
@@ -1443,6 +1446,13 @@ export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(p
         ...(params.descriptionAppend?.trim() ? { description_append: params.descriptionAppend.trim() } : {}),
         ...(params.queryPatch ? { query_patch: params.queryPatch } : {}),
         ...(params.layoutPatch ? { layout_patch: params.layoutPatch } : {}),
+        ...(params.queueViewPatch ? { queue_view_patch: params.queueViewPatch } : {}),
+        ...(params.defaultPolicyTemplateId !== undefined
+          ? { default_policy_template_id: params.defaultPolicyTemplateId }
+          : {}),
+        ...(params.defaultPolicyCatalogId !== undefined
+          ? { default_policy_catalog_id: params.defaultPolicyCatalogId }
+          : {}),
         ...(typeof params.occurrenceLimit === "number"
           ? { occurrence_limit: Math.max(1, Math.min(Math.round(params.occurrenceLimit), 50)) }
           : {}),

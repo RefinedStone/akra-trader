@@ -57,7 +57,6 @@ import {
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
   createProviderProvenanceSchedulerStitchedReportGovernanceRegistry,
-  bulkGovernProviderProvenanceSchedulerStitchedReportGovernanceRegistries,
   createProviderProvenanceSchedulerStitchedReportView,
   createProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy,
@@ -824,7 +823,12 @@ const defaultProviderProvenanceSchedulerNarrativeRegistryBulkDraft: ProviderProv
 type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraftState = {
   name: string;
   description: string;
-  item_type_scope: "any" | "template" | "registry" | "stitched_report_view";
+  item_type_scope:
+    | "any"
+    | "template"
+    | "registry"
+    | "stitched_report_view"
+    | "stitched_report_governance_registry";
   action_scope: "any" | "delete" | "restore" | "update";
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical";
@@ -987,7 +991,12 @@ type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVer
 
 type ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
   queue_state: typeof ALL_FILTER_VALUE | "pending_approval" | "ready_to_apply" | "completed";
-  item_type: typeof ALL_FILTER_VALUE | "template" | "registry" | "stitched_report_view";
+  item_type:
+    | typeof ALL_FILTER_VALUE
+    | "template"
+    | "registry"
+    | "stitched_report_view"
+    | "stitched_report_governance_registry";
   approval_lane: string;
   approval_priority: string;
   policy_template_id: string;
@@ -2909,6 +2918,7 @@ function normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueView(
     queueView?.item_type === "template"
     || queueView?.item_type === "registry"
     || queueView?.item_type === "stitched_report_view"
+    || queueView?.item_type === "stitched_report_governance_registry"
   ) {
     normalized.item_type = queueView.item_type;
   }
@@ -2960,6 +2970,7 @@ function buildProviderProvenanceSchedulerNarrativeGovernanceQueueFilterStateFrom
       normalized?.item_type === "template"
       || normalized?.item_type === "registry"
       || normalized?.item_type === "stitched_report_view"
+      || normalized?.item_type === "stitched_report_governance_registry"
         ? normalized.item_type
         : ALL_FILTER_VALUE,
     approval_lane: normalized?.approval_lane ?? ALL_FILTER_VALUE,
@@ -3121,7 +3132,7 @@ function formatProviderProvenanceSchedulerNarrativeGovernanceQueueSortLabel(sort
 
 function providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
   itemTypeScope: string | null | undefined,
-  itemType: "template" | "registry" | "stitched_report_view",
+  itemType: "template" | "registry" | "stitched_report_view" | "stitched_report_governance_registry",
 ) {
   return itemTypeScope === "any" || itemTypeScope === itemType;
 }
@@ -4098,6 +4109,8 @@ export default function App() {
   const [providerProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId, setProviderProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId] =
     useState("");
   const [providerProvenanceSchedulerStitchedReportViewGovernancePolicyTemplateId, setProviderProvenanceSchedulerStitchedReportViewGovernancePolicyTemplateId] =
+    useState("");
+  const [providerProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId, setProviderProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId] =
     useState("");
   const [providerProvenanceSchedulerNarrativeGovernanceQueueFilter, setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter] =
     useState<ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState>(
@@ -7575,12 +7588,13 @@ export default function App() {
             providerProvenanceSchedulerStitchedReportGovernanceRegistryBulkDraft,
           )
         : undefined;
-      const result = await bulkGovernProviderProvenanceSchedulerStitchedReportGovernanceRegistries({
+      const plan = await createProviderProvenanceSchedulerNarrativeGovernancePlan({
+        itemType: "stitched_report_governance_registry",
+        itemIds: [...selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryIds],
         action,
-        registryIds: [...selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryIds],
         actorTabId: comparisonHistoryTabIdentity.tabId,
         actorTabLabel: comparisonHistoryTabIdentity.label,
-        reason: `scheduler_stitched_report_governance_registry_bulk_${action}_from_control_room`,
+        reason: `scheduler_stitched_report_governance_registry_bulk_${action}_preview_from_control_room`,
         ...(action === "update"
           ? {
               namePrefix: providerProvenanceSchedulerStitchedReportGovernanceRegistryBulkDraft.name_prefix,
@@ -7600,19 +7614,23 @@ export default function App() {
                   : undefined,
             }
           : {}),
+        policyTemplateId:
+          providerProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId
+          || undefined,
       });
       await loadProviderProvenanceWorkspaceRegistry();
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(plan.plan_id);
       if (action === "update") {
         setProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkDraft(
           defaultProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkDraft,
         );
       }
       setProviderProvenanceWorkspaceFeedback(
-        `Applied stitched governance registry bulk ${action}. ${result.applied_count} applied, ${result.skipped_count} skipped, ${result.failed_count} failed.`,
+        `Previewed stitched governance registry plan ${shortenIdentifier(plan.plan_id, 10)}. ${formatProviderProvenanceSchedulerNarrativeGovernancePlanSummary(plan)}`,
       );
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
-        `Stitched governance registry bulk ${action} failed: ${(error as Error).message}`,
+        `Stitched governance registry governance preview failed: ${(error as Error).message}`,
       );
     } finally {
       setProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkAction(null);
@@ -8944,9 +8962,11 @@ export default function App() {
     const label =
       result.item_type === "registry"
         ? "registry entries"
+        : result.item_type === "stitched_report_governance_registry"
+          ? "stitched governance registries"
         : result.item_type === "stitched_report_view"
           ? "stitched report views"
-        : result.item_type === "policy_catalog"
+          : result.item_type === "policy_catalog"
           ? "policy catalogs"
           : "templates";
     const parts = [
@@ -9446,6 +9466,16 @@ export default function App() {
       if (providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(savedTemplate.item_type_scope, "stitched_report_view")) {
         setProviderProvenanceSchedulerStitchedReportViewGovernancePolicyTemplateId(savedTemplate.policy_template_id);
       }
+      if (
+        providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+          savedTemplate.item_type_scope,
+          "stitched_report_governance_registry",
+        )
+      ) {
+        setProviderProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId(
+          savedTemplate.policy_template_id,
+        );
+      }
       setProviderProvenanceWorkspaceFeedback(
         `${editingProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateId ? "Updated" : "Saved"} governance policy template ${savedTemplate.name} for ${formatWorkflowToken(savedTemplate.approval_lane)} / ${formatWorkflowToken(savedTemplate.approval_priority)} review.`,
       );
@@ -9523,6 +9553,7 @@ export default function App() {
         catalog.item_type_scope === "template"
         || catalog.item_type_scope === "registry"
         || catalog.item_type_scope === "stitched_report_view"
+        || catalog.item_type_scope === "stitched_report_governance_registry"
           ? catalog.item_type_scope
           : ALL_FILTER_VALUE,
       approval_lane: catalog.approval_lane || ALL_FILTER_VALUE,
@@ -9554,6 +9585,17 @@ export default function App() {
       && providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(catalog.item_type_scope, "stitched_report_view")
     ) {
       setProviderProvenanceSchedulerStitchedReportViewGovernancePolicyTemplateId(
+        catalog.default_policy_template_id,
+      );
+    }
+    if (
+      catalog.default_policy_template_id
+      && providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+        catalog.item_type_scope,
+        "stitched_report_governance_registry",
+      )
+    ) {
+      setProviderProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId(
         catalog.default_policy_template_id,
       );
     }
@@ -10700,6 +10742,7 @@ export default function App() {
         entry.item_type_scope === "template"
         || entry.item_type_scope === "registry"
         || entry.item_type_scope === "stitched_report_view"
+        || entry.item_type_scope === "stitched_report_governance_registry"
           ? entry.item_type_scope
           : "any",
       action_scope:
@@ -10950,6 +10993,15 @@ export default function App() {
       }
       return;
     }
+    if (plan.item_type === "stitched_report_governance_registry") {
+      if (
+        editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId
+        && affectedIds.has(editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId)
+      ) {
+        resetProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft();
+      }
+      return;
+    }
     if (
       plan.item_type === "stitched_report_view"
       && editingProviderProvenanceSchedulerStitchedReportViewId
@@ -11106,6 +11158,7 @@ export default function App() {
       if (action === "apply") {
         const affectedTemplateIds = new Set<string>();
         const affectedRegistryIds = new Set<string>();
+        const affectedStitchedGovernanceRegistryIds = new Set<string>();
         const affectedStitchedReportViewIds = new Set<string>();
         result.results.forEach((entry) => {
           if (entry.outcome !== "succeeded" || !entry.plan) {
@@ -11118,6 +11171,10 @@ export default function App() {
           } else if (entry.plan.item_type === "registry") {
             entry.plan.target_ids.forEach((targetId) => {
               affectedRegistryIds.add(targetId);
+            });
+          } else if (entry.plan.item_type === "stitched_report_governance_registry") {
+            entry.plan.target_ids.forEach((targetId) => {
+              affectedStitchedGovernanceRegistryIds.add(targetId);
             });
           } else if (entry.plan.item_type === "stitched_report_view") {
             entry.plan.target_ids.forEach((targetId) => {
@@ -11138,6 +11195,12 @@ export default function App() {
           resetProviderProvenanceSchedulerNarrativeRegistryDraft();
         }
         if (
+          editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId
+          && affectedStitchedGovernanceRegistryIds.has(editingProviderProvenanceSchedulerStitchedReportGovernanceRegistryId)
+        ) {
+          resetProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft();
+        }
+        if (
           editingProviderProvenanceSchedulerStitchedReportViewId
           && affectedStitchedReportViewIds.has(editingProviderProvenanceSchedulerStitchedReportViewId)
         ) {
@@ -11153,6 +11216,7 @@ export default function App() {
       if (action === "apply") {
         setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
         setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
+        setSelectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryIds([]);
         setSelectedProviderProvenanceSchedulerStitchedReportViewIds([]);
       }
       setProviderProvenanceWorkspaceFeedback(
@@ -13420,6 +13484,7 @@ export default function App() {
                                               event.target.value === "template"
                                               || event.target.value === "registry"
                                               || event.target.value === "stitched_report_view"
+                                              || event.target.value === "stitched_report_governance_registry"
                                                 ? event.target.value
                                                 : "any",
                                           }))
@@ -13430,6 +13495,7 @@ export default function App() {
                                         <option value="template">Templates</option>
                                         <option value="registry">Registry</option>
                                         <option value="stitched_report_view">Stitched report views</option>
+                                        <option value="stitched_report_governance_registry">Stitched governance registries</option>
                                       </select>
                                     </label>
                                     <label>
@@ -13712,11 +13778,39 @@ export default function App() {
                                                     if (entry.status !== "active") {
                                                       return;
                                                     }
-                                                    if (entry.item_type_scope !== "registry") {
+                                                    if (
+                                                      providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+                                                        entry.item_type_scope,
+                                                        "template",
+                                                      )
+                                                    ) {
                                                       setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId(entry.policy_template_id);
                                                     }
-                                                    if (entry.item_type_scope !== "template") {
+                                                    if (
+                                                      providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+                                                        entry.item_type_scope,
+                                                        "registry",
+                                                      )
+                                                    ) {
                                                       setProviderProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId(entry.policy_template_id);
+                                                    }
+                                                    if (
+                                                      providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+                                                        entry.item_type_scope,
+                                                        "stitched_report_view",
+                                                      )
+                                                    ) {
+                                                      setProviderProvenanceSchedulerStitchedReportViewGovernancePolicyTemplateId(entry.policy_template_id);
+                                                    }
+                                                    if (
+                                                      providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+                                                        entry.item_type_scope,
+                                                        "stitched_report_governance_registry",
+                                                      )
+                                                    ) {
+                                                      setProviderProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId(
+                                                        entry.policy_template_id,
+                                                      );
                                                     }
                                                   }}
                                                   disabled={entry.status !== "active"}
@@ -13825,6 +13919,7 @@ export default function App() {
                                                           entry.item_type_scope === "template"
                                                           || entry.item_type_scope === "registry"
                                                           || entry.item_type_scope === "stitched_report_view"
+                                                          || entry.item_type_scope === "stitched_report_governance_registry"
                                                             ? entry.item_type_scope
                                                             : "any",
                                                         action_scope:
@@ -17344,6 +17439,7 @@ export default function App() {
                                               event.target.value === "template"
                                               || event.target.value === "registry"
                                               || event.target.value === "stitched_report_view"
+                                              || event.target.value === "stitched_report_governance_registry"
                                                 ? event.target.value
                                                 : ALL_FILTER_VALUE,
                                           }))
@@ -17354,6 +17450,7 @@ export default function App() {
                                         <option value="template">Templates</option>
                                         <option value="registry">Registry</option>
                                         <option value="stitched_report_view">Stitched report views</option>
+                                        <option value="stitched_report_governance_registry">Stitched governance registries</option>
                                       </select>
                                     </label>
                                     <label>
@@ -20020,6 +20117,31 @@ export default function App() {
                                           </span>
                                         </div>
                                         <div className="market-data-provenance-history-actions">
+                                          <label>
+                                            <span>Policy</span>
+                                            <select
+                                              onChange={(event) => {
+                                                setProviderProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId(
+                                                  event.target.value,
+                                                );
+                                              }}
+                                              value={providerProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId}
+                                            >
+                                              <option value="">No policy template</option>
+                                              {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
+                                                .filter((entry) =>
+                                                  providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+                                                    entry.item_type_scope,
+                                                    "stitched_report_governance_registry",
+                                                  ),
+                                                )
+                                                .map((entry) => (
+                                                  <option key={entry.policy_template_id} value={entry.policy_template_id}>
+                                                    {entry.name} · {formatWorkflowToken(entry.approval_lane)} · {formatWorkflowToken(entry.approval_priority)}
+                                                  </option>
+                                                ))}
+                                            </select>
+                                          </label>
                                           <button
                                             className="ghost-button"
                                             onClick={toggleAllProviderProvenanceSchedulerStitchedReportGovernanceRegistrySelections}
@@ -20044,8 +20166,8 @@ export default function App() {
                                             type="button"
                                           >
                                             {providerProvenanceSchedulerStitchedReportGovernanceRegistryBulkAction === "delete"
-                                              ? "Deleting…"
-                                              : "Delete selected"}
+                                              ? "Previewing…"
+                                              : "Preview delete"}
                                           </button>
                                           <button
                                             className="ghost-button"
@@ -20061,8 +20183,8 @@ export default function App() {
                                             type="button"
                                           >
                                             {providerProvenanceSchedulerStitchedReportGovernanceRegistryBulkAction === "restore"
-                                              ? "Restoring…"
-                                              : "Restore selected"}
+                                              ? "Previewing…"
+                                              : "Preview restore"}
                                           </button>
                                         </div>
                                       </div>
@@ -20072,8 +20194,8 @@ export default function App() {
                                         <div className="market-data-provenance-history-head">
                                           <strong>Bulk stitched governance registry edits</strong>
                                           <p>
-                                            Patch queue slices, default policy links, and metadata across multiple
-                                            stitched governance registries without reopening each lifecycle object.
+                                            Preview queue-slice, default-policy, and metadata changes as staged
+                                            governance plans before approval and apply.
                                           </p>
                                         </div>
                                         <div className="filter-bar">
@@ -20264,6 +20386,31 @@ export default function App() {
                                             </select>
                                           </label>
                                           <label>
+                                            <span>Governance policy</span>
+                                            <select
+                                              onChange={(event) => {
+                                                setProviderProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId(
+                                                  event.target.value,
+                                                );
+                                              }}
+                                              value={providerProvenanceSchedulerStitchedReportGovernanceRegistryGovernancePolicyTemplateId}
+                                            >
+                                              <option value="">No policy template</option>
+                                              {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
+                                                .filter((entry) =>
+                                                  providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+                                                    entry.item_type_scope,
+                                                    "stitched_report_governance_registry",
+                                                  ),
+                                                )
+                                                .map((entry) => (
+                                                  <option key={entry.policy_template_id} value={entry.policy_template_id}>
+                                                    {entry.name} · {formatWorkflowToken(entry.approval_lane)} · {formatWorkflowToken(entry.approval_priority)}
+                                                  </option>
+                                                ))}
+                                            </select>
+                                          </label>
+                                          <label>
                                             <span>Action</span>
                                             <div className="market-data-provenance-history-actions">
                                               <button
@@ -20281,8 +20428,8 @@ export default function App() {
                                                 type="button"
                                               >
                                                 {providerProvenanceSchedulerStitchedReportGovernanceRegistryBulkAction === "update"
-                                                  ? "Applying…"
-                                                  : "Apply bulk edit"}
+                                                  ? "Previewing…"
+                                                  : "Preview bulk edit"}
                                               </button>
                                             </div>
                                           </label>
