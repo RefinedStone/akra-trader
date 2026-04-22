@@ -1484,18 +1484,38 @@ export type ProviderProvenanceSchedulerSearchFeedbackModerationResult = {
   learned_relevance_hint?: string | null;
 };
 
+export type ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult = {
+  moderation_status: string;
+  requested_count: number;
+  updated_count: number;
+  missing_count: number;
+  results: {
+    feedback_id: string;
+    outcome: string;
+    moderation_status?: string | null;
+    moderated_at?: string | null;
+    moderated_by?: string | null;
+    message?: string | null;
+  }[];
+  learned_relevance_hint?: string | null;
+};
+
 export type ProviderProvenanceSchedulerSearchDashboardPayload = {
   generated_at: string;
   query: {
     search?: string | null;
     moderation_status?: string | null;
     signal?: string | null;
+    governance_view?: string | null;
+    window_days: number;
+    stale_pending_hours: number;
     query_limit: number;
     feedback_limit: number;
   };
   available_filters: {
     moderation_statuses: string[];
     signals: string[];
+    governance_views: string[];
   };
   summary: {
     query_count: number;
@@ -1506,6 +1526,55 @@ export type ProviderProvenanceSchedulerSearchDashboardPayload = {
     rejected_feedback_count: number;
     relevant_feedback_count: number;
     not_relevant_feedback_count: number;
+  };
+  quality_dashboard: {
+    window_days: number;
+    window_started_at: string;
+    window_ended_at: string;
+    time_series: {
+      bucket_key: string;
+      bucket_label: string;
+      started_at: string;
+      ended_at: string;
+      query_count: number;
+      feedback_count: number;
+      pending_feedback_count: number;
+      approved_feedback_count: number;
+      rejected_feedback_count: number;
+      moderated_feedback_count: number;
+      relevant_feedback_count: number;
+      not_relevant_feedback_count: number;
+      top_score: number;
+      stale_pending_count: number;
+    }[];
+    actor_rollups: {
+      actor: string;
+      feedback_count: number;
+      pending_feedback_count: number;
+      approved_feedback_count: number;
+      rejected_feedback_count: number;
+      relevant_feedback_count: number;
+      not_relevant_feedback_count: number;
+    }[];
+    moderator_rollups: {
+      moderated_by: string;
+      feedback_count: number;
+      approved_feedback_count: number;
+      rejected_feedback_count: number;
+      pending_feedback_count: number;
+      last_moderated_at?: string | null;
+    }[];
+  };
+  moderation_governance: {
+    governance_view: string;
+    stale_pending_hours: number;
+    high_score_pending_threshold: number;
+    pending_feedback_count: number;
+    stale_pending_count: number;
+    high_score_pending_count: number;
+    moderated_feedback_count: number;
+    conflicting_query_count: number;
+    approval_rate_pct: number;
   };
   top_queries: {
     query: string;
@@ -1539,6 +1608,10 @@ export type ProviderProvenanceSchedulerSearchDashboardPayload = {
     semantic_concepts: string[];
     operator_hits: string[];
     score: number;
+    age_hours: number;
+    stale_pending: boolean;
+    high_score_pending: boolean;
+    query_run_count: number;
   }[];
 };
 

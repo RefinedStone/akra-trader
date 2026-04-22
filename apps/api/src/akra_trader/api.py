@@ -271,6 +271,15 @@ class OperatorProviderProvenanceSchedulerSearchFeedbackModerationRequest(BaseMod
   source_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerSearchFeedbackBatchModerationRequest(BaseModel):
+  feedback_ids: list[str] = Field(default_factory=list)
+  moderation_status: str
+  actor: str = "operator"
+  note: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -2143,6 +2152,9 @@ def create_router(container: Container) -> APIRouter:
     search: str | None = None,
     moderation_status: str | None = None,
     signal: str | None = None,
+    governance_view: str | None = None,
+    window_days: int = 30,
+    stale_pending_hours: int = 24,
     query_limit: int = 12,
     feedback_limit: int = 20,
     app: TradingApplication = Depends(get_app),
@@ -2152,6 +2164,9 @@ def create_router(container: Container) -> APIRouter:
         search=search,
         moderation_status=moderation_status,
         signal=signal,
+        governance_view=governance_view,
+        window_days=window_days,
+        stale_pending_hours=stale_pending_hours,
         query_limit=query_limit,
         feedback_limit=feedback_limit,
       )
@@ -2191,6 +2206,30 @@ def create_router(container: Container) -> APIRouter:
     methods=["POST"],
     name="moderate_operator_provider_provenance_scheduler_search_feedback",
     summary="Moderate scheduler search feedback before it influences ranking",
+  )
+
+  def moderate_operator_provider_provenance_scheduler_search_feedback_batch(
+    request: OperatorProviderProvenanceSchedulerSearchFeedbackBatchModerationRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.moderate_provider_provenance_scheduler_search_feedback_batch(
+        feedback_ids=tuple(request.feedback_ids),
+        moderation_status=request.moderation_status,
+        actor=request.actor,
+        note=request.note,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-search/feedback/batch-moderate",
+    moderate_operator_provider_provenance_scheduler_search_feedback_batch,
+    methods=["POST"],
+    name="moderate_operator_provider_provenance_scheduler_search_feedback_batch",
+    summary="Moderate scheduler search feedback in batch",
   )
 
   return router

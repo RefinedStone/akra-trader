@@ -17,6 +17,7 @@ import type {
   ProviderProvenanceSchedulerAlertHistoryPayload,
   ProviderProvenanceSchedulerSearchDashboardPayload,
   ProviderProvenanceSchedulerSearchFeedbackResult,
+  ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult,
   ProviderProvenanceSchedulerSearchFeedbackModerationResult,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
@@ -600,6 +601,9 @@ export async function getProviderProvenanceSchedulerSearchDashboard(params: {
   search?: string;
   moderationStatus?: string;
   signal?: "relevant" | "not_relevant";
+  governanceView?: string;
+  windowDays?: number;
+  stalePendingHours?: number;
   queryLimit?: number;
   feedbackLimit?: number;
 } = {}) {
@@ -612,6 +616,18 @@ export async function getProviderProvenanceSchedulerSearchDashboard(params: {
   }
   if (params.signal?.trim()) {
     searchParams.set("signal", params.signal.trim());
+  }
+  if (params.governanceView?.trim()) {
+    searchParams.set("governance_view", params.governanceView.trim());
+  }
+  if (typeof params.windowDays === "number" && Number.isFinite(params.windowDays)) {
+    searchParams.set("window_days", String(Math.max(7, Math.min(Math.round(params.windowDays), 180))));
+  }
+  if (typeof params.stalePendingHours === "number" && Number.isFinite(params.stalePendingHours)) {
+    searchParams.set(
+      "stale_pending_hours",
+      String(Math.max(1, Math.min(Math.round(params.stalePendingHours), 24 * 30))),
+    );
   }
   if (typeof params.queryLimit === "number" && Number.isFinite(params.queryLimit)) {
     searchParams.set("query_limit", String(Math.max(1, Math.min(Math.round(params.queryLimit), 50))));
@@ -638,6 +654,30 @@ export async function moderateProviderProvenanceSchedulerSearchFeedback(params: 
     {
       method: "POST",
       body: JSON.stringify({
+        moderation_status: params.moderationStatus,
+        actor: params.actor?.trim() || "operator",
+        note: params.note ?? null,
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
+      }),
+    },
+  );
+}
+
+export async function moderateProviderProvenanceSchedulerSearchFeedbackBatch(params: {
+  feedbackIds: string[];
+  moderationStatus: "pending" | "approved" | "rejected";
+  actor?: string;
+  note?: string | null;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult>(
+    "/operator/provider-provenance-analytics/scheduler-search/feedback/batch-moderate",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        feedback_ids: params.feedbackIds,
         moderation_status: params.moderationStatus,
         actor: params.actor?.trim() || "operator",
         note: params.note ?? null,

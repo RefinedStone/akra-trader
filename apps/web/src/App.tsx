@@ -128,6 +128,7 @@ import {
   listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
+  moderateProviderProvenanceSchedulerSearchFeedbackBatch,
   moderateProviderProvenanceSchedulerSearchFeedback,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
@@ -362,6 +363,7 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult,
   ProviderProvenanceSchedulerSearchDashboardPayload,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
@@ -499,6 +501,9 @@ type ProviderProvenanceSchedulerSearchDashboardFilterState = {
   search: string;
   moderation_status: string;
   signal: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
 };
 
 type ProviderProvenanceSchedulerExportPolicyDraft = {
@@ -530,6 +535,9 @@ const defaultProviderProvenanceSchedulerSearchDashboardFilterState: ProviderProv
   search: "",
   moderation_status: ALL_FILTER_VALUE,
   signal: ALL_FILTER_VALUE,
+  governance_view: "all_feedback",
+  window_days: 30,
+  stale_pending_hours: 24,
 };
 
 function normalizeProviderProvenanceSchedulerRoutingPolicyDraftValue(policyId?: string | null) {
@@ -4326,6 +4334,8 @@ export default function App() {
     useState<string | null>(null);
   const [providerProvenanceSchedulerSearchFeedbackModerationPendingId, setProviderProvenanceSchedulerSearchFeedbackModerationPendingId] =
     useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerSearchFeedbackIds, setSelectedProviderProvenanceSchedulerSearchFeedbackIds] =
+    useState<string[]>([]);
   const [providerProvenanceSchedulerDrilldownBucketKey, setProviderProvenanceSchedulerDrilldownBucketKey] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerExports, setProviderProvenanceSchedulerExports] =
@@ -6141,6 +6151,9 @@ export default function App() {
     providerProvenanceSchedulerSearchDashboardFilter.search,
     providerProvenanceSchedulerSearchDashboardFilter.moderation_status,
     providerProvenanceSchedulerSearchDashboardFilter.signal,
+    providerProvenanceSchedulerSearchDashboardFilter.governance_view,
+    providerProvenanceSchedulerSearchDashboardFilter.window_days,
+    providerProvenanceSchedulerSearchDashboardFilter.stale_pending_hours,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.view_id,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.action,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.actor_tab_id,
@@ -6968,6 +6981,9 @@ export default function App() {
                   providerProvenanceSchedulerSearchDashboardFilter.signal as "relevant" | "not_relevant"
                 )
               : undefined,
+          governanceView: providerProvenanceSchedulerSearchDashboardFilter.governance_view,
+          windowDays: providerProvenanceSchedulerSearchDashboardFilter.window_days,
+          stalePendingHours: providerProvenanceSchedulerSearchDashboardFilter.stale_pending_hours,
           queryLimit: 8,
           feedbackLimit: 12,
         }),
@@ -7008,6 +7024,11 @@ export default function App() {
       }
       if (providerProvenanceSchedulerSearchDashboardRequestIdRef.current === searchDashboardRequestId) {
         setProviderProvenanceSchedulerSearchDashboard(searchDashboardPayload);
+        setSelectedProviderProvenanceSchedulerSearchFeedbackIds((current) =>
+          current.filter((feedbackId) =>
+            searchDashboardPayload.feedback_items.some((entry) => entry.feedback_id === feedbackId),
+          ),
+        );
       }
       if (providerProvenanceSchedulerExportRequestIdRef.current === exportRequestId) {
         setProviderProvenanceSchedulerExports(exportListPayload.items);
@@ -7151,6 +7172,38 @@ export default function App() {
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
         `Scheduler feedback moderation failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchFeedbackModerationPendingId(null);
+    }
+  }
+
+  async function moderateProviderProvenanceSchedulerSearchFeedbackSelection(
+    moderationStatus: "pending" | "approved" | "rejected",
+  ) {
+    if (!selectedProviderProvenanceSchedulerSearchFeedbackIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select scheduler feedback rows before running bulk moderation.");
+      return;
+    }
+    const pendingKey = `batch:${moderationStatus}`;
+    setProviderProvenanceSchedulerSearchFeedbackModerationPendingId(pendingKey);
+    try {
+      const result: ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult =
+        await moderateProviderProvenanceSchedulerSearchFeedbackBatch({
+          feedbackIds: selectedProviderProvenanceSchedulerSearchFeedbackIds,
+          moderationStatus,
+          actor: "operator",
+          sourceTabId: activeWorkspace,
+          sourceTabLabel: "control-room",
+        });
+      setProviderProvenanceWorkspaceFeedback(
+        `${formatWorkflowToken(result.moderation_status)} ${result.updated_count} scheduler feedback item(s). ${result.learned_relevance_hint ?? ""}`.trim(),
+      );
+      setSelectedProviderProvenanceSchedulerSearchFeedbackIds([]);
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler feedback batch moderation failed: ${(error as Error).message}`,
       );
     } finally {
       setProviderProvenanceSchedulerSearchFeedbackModerationPendingId(null);
@@ -19418,6 +19471,62 @@ export default function App() {
                                         <option value="not_relevant">Not relevant</option>
                                       </select>
                                     </label>
+                                    <label className="run-form-field">
+                                      <span>Governance view</span>
+                                      <select
+                                        value={providerProvenanceSchedulerSearchDashboardFilter.governance_view}
+                                        onChange={(event) => {
+                                          setProviderProvenanceSchedulerSearchDashboardFilter((current) => ({
+                                            ...current,
+                                            governance_view: event.target.value,
+                                          }));
+                                          setSelectedProviderProvenanceSchedulerSearchFeedbackIds([]);
+                                        }}
+                                      >
+                                        <option value="all_feedback">All feedback</option>
+                                        <option value="pending_queue">Pending queue</option>
+                                        <option value="stale_pending">Stale pending</option>
+                                        <option value="high_score_pending">High-score pending</option>
+                                        <option value="moderated">Moderated</option>
+                                        <option value="conflicting_queries">Conflicting queries</option>
+                                      </select>
+                                    </label>
+                                    <label className="run-form-field">
+                                      <span>Window</span>
+                                      <select
+                                        value={providerProvenanceSchedulerSearchDashboardFilter.window_days}
+                                        onChange={(event) => {
+                                          setProviderProvenanceSchedulerSearchDashboardFilter((current) => ({
+                                            ...current,
+                                            window_days: Number.parseInt(event.target.value, 10) || 30,
+                                          }));
+                                        }}
+                                      >
+                                        {[14, 30, 60, 90].map((value) => (
+                                          <option key={`provider-scheduler-search-window-${value}`} value={value}>
+                                            {value}d
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label className="run-form-field">
+                                      <span>Stale pending</span>
+                                      <select
+                                        value={providerProvenanceSchedulerSearchDashboardFilter.stale_pending_hours}
+                                        onChange={(event) => {
+                                          setProviderProvenanceSchedulerSearchDashboardFilter((current) => ({
+                                            ...current,
+                                            stale_pending_hours: Number.parseInt(event.target.value, 10) || 24,
+                                          }));
+                                        }}
+                                      >
+                                        {[12, 24, 48, 72].map((value) => (
+                                          <option key={`provider-scheduler-search-stale-${value}`} value={value}>
+                                            {value}h
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
                                     {providerProvenanceSchedulerSearchDashboard?.query.search ? (
                                       <span className="run-lineage-symbol-copy">
                                         Dashboard search {providerProvenanceSchedulerSearchDashboard.query.search}
@@ -19439,7 +19548,69 @@ export default function App() {
                                         <span className="run-filter-summary-chip">
                                           Signals {providerProvenanceSchedulerSearchDashboard.summary.relevant_feedback_count} relevant · {providerProvenanceSchedulerSearchDashboard.summary.not_relevant_feedback_count} not relevant
                                         </span>
+                                        <span className="run-filter-summary-chip">
+                                          Governance stale {providerProvenanceSchedulerSearchDashboard.moderation_governance.stale_pending_count} · high-score {providerProvenanceSchedulerSearchDashboard.moderation_governance.high_score_pending_count}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Approval rate {providerProvenanceSchedulerSearchDashboard.moderation_governance.approval_rate_pct}% · conflicting queries {providerProvenanceSchedulerSearchDashboard.moderation_governance.conflicting_query_count}
+                                        </span>
                                       </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Long-horizon quality</th>
+                                            <th>Actor rollup</th>
+                                            <th>Moderator rollup</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          <tr>
+                                            <td>
+                                              <strong>
+                                                {providerProvenanceSchedulerSearchDashboard.quality_dashboard.window_days} day trend
+                                              </strong>
+                                              {providerProvenanceSchedulerSearchDashboard.quality_dashboard.time_series.length ? (
+                                                providerProvenanceSchedulerSearchDashboard.quality_dashboard.time_series
+                                                  .slice(-6)
+                                                  .map((entry) => (
+                                                    <p
+                                                      className="run-lineage-symbol-copy"
+                                                      key={`provider-scheduler-search-quality-${entry.bucket_key}`}
+                                                    >
+                                                      {entry.bucket_label} · q {entry.query_count} · fb {entry.feedback_count} · pending {entry.pending_feedback_count} · approved {entry.approved_feedback_count}
+                                                    </p>
+                                                  ))
+                                              ) : (
+                                                <p className="run-lineage-symbol-copy">No long-horizon scheduler search activity in the selected window.</p>
+                                              )}
+                                            </td>
+                                            <td>
+                                              <strong>Actors</strong>
+                                              {providerProvenanceSchedulerSearchDashboard.quality_dashboard.actor_rollups.length ? (
+                                                providerProvenanceSchedulerSearchDashboard.quality_dashboard.actor_rollups.map((entry) => (
+                                                  <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-actor-${entry.actor}`}>
+                                                    {entry.actor} · {entry.feedback_count} feedback · pending {entry.pending_feedback_count} · relevant {entry.relevant_feedback_count}
+                                                  </p>
+                                                ))
+                                              ) : (
+                                                <p className="run-lineage-symbol-copy">No actor rollups for the current filter.</p>
+                                              )}
+                                            </td>
+                                            <td>
+                                              <strong>Moderators</strong>
+                                              {providerProvenanceSchedulerSearchDashboard.quality_dashboard.moderator_rollups.length ? (
+                                                providerProvenanceSchedulerSearchDashboard.quality_dashboard.moderator_rollups.map((entry) => (
+                                                  <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-moderator-${entry.moderated_by}`}>
+                                                    {entry.moderated_by} · {entry.feedback_count} decisions · approved {entry.approved_feedback_count} · rejected {entry.rejected_feedback_count}
+                                                  </p>
+                                                ))
+                                              ) : (
+                                                <p className="run-lineage-symbol-copy">No moderator decisions recorded in the selected window.</p>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
                                       <table className="data-table">
                                         <thead>
                                           <tr>
@@ -19509,6 +19680,24 @@ export default function App() {
                                       <table className="data-table">
                                         <thead>
                                           <tr>
+                                            <th>
+                                              <input
+                                                checked={
+                                                  providerProvenanceSchedulerSearchDashboard.feedback_items.length > 0
+                                                  && providerProvenanceSchedulerSearchDashboard.feedback_items.every((entry) =>
+                                                    selectedProviderProvenanceSchedulerSearchFeedbackIds.includes(entry.feedback_id),
+                                                  )
+                                                }
+                                                onChange={(event) => {
+                                                  setSelectedProviderProvenanceSchedulerSearchFeedbackIds(
+                                                    event.target.checked
+                                                      ? providerProvenanceSchedulerSearchDashboard.feedback_items.map((entry) => entry.feedback_id)
+                                                      : [],
+                                                  );
+                                                }}
+                                                type="checkbox"
+                                              />
+                                            </th>
                                             <th>Feedback item</th>
                                             <th>Signals</th>
                                             <th>Moderation</th>
@@ -19519,12 +19708,28 @@ export default function App() {
                                             providerProvenanceSchedulerSearchDashboard.feedback_items.map((entry) => (
                                               <tr key={`provider-scheduler-search-dashboard-feedback-item-${entry.feedback_id}`}>
                                                 <td>
+                                                  <input
+                                                    checked={selectedProviderProvenanceSchedulerSearchFeedbackIds.includes(entry.feedback_id)}
+                                                    onChange={(event) => {
+                                                      setSelectedProviderProvenanceSchedulerSearchFeedbackIds((current) =>
+                                                        event.target.checked
+                                                          ? [...current, entry.feedback_id]
+                                                          : current.filter((feedbackId) => feedbackId !== entry.feedback_id),
+                                                      );
+                                                    }}
+                                                    type="checkbox"
+                                                  />
+                                                </td>
+                                                <td>
                                                   <strong>{entry.query}</strong>
                                                   <p className="run-lineage-symbol-copy">
                                                     {entry.occurrence_id} · {formatWorkflowToken(entry.signal)} · score {entry.score}
                                                   </p>
                                                   <p className="run-lineage-symbol-copy">
                                                     {entry.matched_fields.join(" · ") || "ranked fields"} · {entry.semantic_concepts.join(" · ") || "no semantic concepts"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Age {entry.age_hours}h · query runs {entry.query_run_count}
                                                   </p>
                                                   {entry.note ? (
                                                     <p className="run-lineage-symbol-copy">{entry.note}</p>
@@ -19537,6 +19742,9 @@ export default function App() {
                                                   </p>
                                                   <p className="run-lineage-symbol-copy">
                                                     Moderated {formatTimestamp(entry.moderated_at ?? null)} · by {entry.moderated_by ?? "n/a"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.stale_pending ? "Stale pending" : "Fresh queue"} · {entry.high_score_pending ? "high-score" : "normal-score"}
                                                   </p>
                                                   {entry.moderation_note ? (
                                                     <p className="run-lineage-symbol-copy">{entry.moderation_note}</p>
@@ -19580,7 +19788,7 @@ export default function App() {
                                             ))
                                           ) : (
                                             <tr>
-                                              <td colSpan={3}>
+                                              <td colSpan={4}>
                                                 <p className="empty-state">
                                                   No scheduler search feedback matches the current moderation filter.
                                                 </p>
@@ -19589,6 +19797,50 @@ export default function App() {
                                           )}
                                         </tbody>
                                       </table>
+                                      <div className="market-data-provenance-history-actions">
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            !selectedProviderProvenanceSchedulerSearchFeedbackIds.length
+                                            || providerProvenanceSchedulerSearchFeedbackModerationPendingId !== null
+                                          }
+                                          onClick={() => {
+                                            void moderateProviderProvenanceSchedulerSearchFeedbackSelection("approved");
+                                          }}
+                                          type="button"
+                                        >
+                                          Approve selected
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            !selectedProviderProvenanceSchedulerSearchFeedbackIds.length
+                                            || providerProvenanceSchedulerSearchFeedbackModerationPendingId !== null
+                                          }
+                                          onClick={() => {
+                                            void moderateProviderProvenanceSchedulerSearchFeedbackSelection("rejected");
+                                          }}
+                                          type="button"
+                                        >
+                                          Reject selected
+                                        </button>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            !selectedProviderProvenanceSchedulerSearchFeedbackIds.length
+                                            || providerProvenanceSchedulerSearchFeedbackModerationPendingId !== null
+                                          }
+                                          onClick={() => {
+                                            void moderateProviderProvenanceSchedulerSearchFeedbackSelection("pending");
+                                          }}
+                                          type="button"
+                                        >
+                                          Queue selected
+                                        </button>
+                                        <span className="run-lineage-symbol-copy">
+                                          {selectedProviderProvenanceSchedulerSearchFeedbackIds.length} selected
+                                        </span>
+                                      </div>
                                     </>
                                   ) : null}
                                   {providerProvenanceSchedulerSearchDashboardLoading ? (

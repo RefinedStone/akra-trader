@@ -131,6 +131,10 @@ unclear dataset lineage.
 - that same scheduler retrieval now also has a query analytics dashboard and feedback moderation
   queue, so operators can review which searches are being used and approve relevance signals
   before they influence learned ranking
+- that same scheduler search quality workflow now also exposes long-horizon trend buckets,
+  moderator and actor rollups, stale/high-score moderation backlog signals, and batch moderation
+  actions, so governance can clear or review search feedback as an operational queue instead of
+  one row at a time
 - that same retrieval path now also emits cross-occurrence semantic/vector clusters, so a handoff
   can start from grouped recovery or failure narratives instead of only a flat ranked result set
   from scratch before ranking results

@@ -240,6 +240,9 @@ It is not yet a finished live trading product:
 - that same scheduler retrieval now also exposes a query analytics dashboard and feedback
   moderation queue, so teams can review search usage and only approved relevance signals feed the
   learned ranking path
+- that same scheduler search quality layer now also tracks long-horizon daily trends, actor and
+  moderator rollups, governance backlog signals, and batch moderation actions, so ranking quality
+  review is no longer limited to one query's recent feedback queue
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

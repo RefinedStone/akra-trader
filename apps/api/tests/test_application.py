@@ -2007,20 +2007,28 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   assert pending_payload["items"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_v1"
 
   dashboard_payload = app.get_provider_provenance_scheduler_search_dashboard(
+    governance_view="pending_queue",
+    window_days=30,
+    stale_pending_hours=1,
     moderation_status="pending",
     feedback_limit=10,
   )
   assert dashboard_payload["summary"]["feedback_count"] >= 1
   assert dashboard_payload["summary"]["pending_feedback_count"] >= 1
+  assert dashboard_payload["query"]["governance_view"] == "pending_queue"
+  assert dashboard_payload["quality_dashboard"]["window_days"] == 30
+  assert dashboard_payload["quality_dashboard"]["time_series"]
+  assert dashboard_payload["moderation_governance"]["pending_feedback_count"] >= 1
   assert dashboard_payload["feedback_items"][0]["feedback_id"] == feedback_result["feedback_id"]
+  assert dashboard_payload["feedback_items"][0]["age_hours"] >= 0
 
-  moderation_result = app.moderate_provider_provenance_scheduler_search_feedback(
-    feedback_id=feedback_result["feedback_id"],
+  moderation_result = app.moderate_provider_provenance_scheduler_search_feedback_batch(
+    feedback_ids=(feedback_result["feedback_id"],),
     moderation_status="approved",
     actor="operator",
   )
   assert moderation_result["moderation_status"] == "approved"
-  assert moderation_result["approved_feedback_count"] == 1
+  assert moderation_result["updated_count"] == 1
 
   tuned_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],

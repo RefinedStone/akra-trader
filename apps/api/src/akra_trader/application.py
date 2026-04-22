@@ -36915,6 +36915,24 @@ class TradingApplication:
     return None
 
   @staticmethod
+  def _normalize_provider_provenance_scheduler_search_governance_view(
+    view: str | None,
+  ) -> str | None:
+    if not isinstance(view, str):
+      return None
+    normalized = view.strip().lower().replace("-", "_")
+    if normalized in {
+      "all_feedback",
+      "pending_queue",
+      "stale_pending",
+      "high_score_pending",
+      "moderated",
+      "conflicting_queries",
+    }:
+      return normalized
+    return None
+
+  @staticmethod
   def _build_provider_provenance_scheduler_search_query_feature_set(
     parsed_query: Mapping[str, Any],
   ) -> tuple[str, ...]:
@@ -37487,27 +37505,115 @@ class TradingApplication:
       ),
     }
 
+  def moderate_provider_provenance_scheduler_search_feedback_batch(
+    self,
+    *,
+    feedback_ids: tuple[str, ...] | list[str],
+    moderation_status: str,
+    actor: str = "operator",
+    note: str | None = None,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> dict[str, Any]:
+    normalized_status = self._normalize_provider_provenance_scheduler_search_feedback_moderation_status(
+      moderation_status
+    )
+    if normalized_status is None:
+      raise ValueError("Scheduler search feedback batch moderation requires a valid status.")
+    normalized_feedback_ids = tuple(
+      dict.fromkeys(
+        feedback_id.strip()
+        for feedback_id in feedback_ids
+        if isinstance(feedback_id, str) and feedback_id.strip()
+      )
+    )
+    if not normalized_feedback_ids:
+      raise ValueError("Scheduler search feedback batch moderation requires at least one feedback id.")
+    results: list[dict[str, Any]] = []
+    for feedback_id in normalized_feedback_ids:
+      try:
+        moderation_result = self.moderate_provider_provenance_scheduler_search_feedback(
+          feedback_id=feedback_id,
+          moderation_status=normalized_status,
+          actor=actor,
+          note=note,
+          source_tab_id=source_tab_id,
+          source_tab_label=source_tab_label,
+        )
+      except LookupError as exc:
+        results.append(
+          {
+            "feedback_id": feedback_id,
+            "outcome": "missing",
+            "message": str(exc),
+          }
+        )
+        continue
+      results.append(
+        {
+          "feedback_id": feedback_id,
+          "outcome": "updated",
+          "moderation_status": moderation_result.get("moderation_status"),
+          "moderated_at": moderation_result.get("moderated_at"),
+          "moderated_by": moderation_result.get("moderated_by"),
+        }
+      )
+    succeeded_count = sum(1 for item in results if item.get("outcome") == "updated")
+    missing_count = sum(1 for item in results if item.get("outcome") == "missing")
+    return {
+      "moderation_status": normalized_status,
+      "requested_count": len(normalized_feedback_ids),
+      "updated_count": succeeded_count,
+      "missing_count": missing_count,
+      "results": tuple(results),
+      "learned_relevance_hint": (
+        "Approved feedback will now contribute to learned scheduler ranking."
+        if normalized_status == "approved"
+        else "Rejected feedback is excluded from learned scheduler ranking."
+      ),
+    }
+
   def get_provider_provenance_scheduler_search_dashboard(
     self,
     *,
     search: str | None = None,
     moderation_status: str | None = None,
     signal: str | None = None,
+    governance_view: str | None = None,
+    window_days: int = 30,
+    stale_pending_hours: int = 24,
     query_limit: int = 12,
     feedback_limit: int = 20,
   ) -> dict[str, Any]:
     self._prune_provider_provenance_scheduler_search_query_analytics_records()
     self._prune_provider_provenance_scheduler_search_feedback_records()
+    current_time = self._clock()
     normalized_search = search.strip().lower() if isinstance(search, str) and search.strip() else None
     normalized_moderation_status = self._normalize_provider_provenance_scheduler_search_feedback_moderation_status(
       moderation_status
     )
     normalized_signal = self._normalize_provider_provenance_scheduler_search_feedback_signal(signal)
+    normalized_governance_view = self._normalize_provider_provenance_scheduler_search_governance_view(
+      governance_view
+    ) or "all_feedback"
+    normalized_window_days = max(7, min(window_days, 180))
+    normalized_stale_pending_hours = max(1, min(stale_pending_hours, 24 * 30))
     normalized_query_limit = max(1, min(query_limit, 50))
     normalized_feedback_limit = max(1, min(feedback_limit, 100))
+    stale_pending_cutoff_seconds = normalized_stale_pending_hours * 3600
+    high_score_pending_threshold = 150
+    window_started_at = current_time - timedelta(days=normalized_window_days)
 
-    analytics_records = self._list_provider_provenance_scheduler_search_query_analytics_records()
-    feedback_records = self._list_provider_provenance_scheduler_search_feedback_records()
+    analytics_records = tuple(
+      record
+      for record in self._list_provider_provenance_scheduler_search_query_analytics_records()
+      if record.recorded_at >= window_started_at
+    )
+    feedback_records = tuple(
+      record
+      for record in self._list_provider_provenance_scheduler_search_feedback_records()
+      if record.recorded_at >= window_started_at
+    )
 
     def _matches_search(record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord | ProviderProvenanceSchedulerSearchFeedbackRecord) -> bool:
       if normalized_search is None:
@@ -37544,18 +37650,67 @@ class TradingApplication:
       return any(normalized_search in value for value in haystacks)
 
     filtered_analytics = tuple(record for record in analytics_records if _matches_search(record))
-    filtered_feedback = tuple(
+    feedback_by_query_key: dict[str, list[ProviderProvenanceSchedulerSearchFeedbackRecord]] = {}
+    for feedback_record in feedback_records:
+      feedback_by_query_key.setdefault(feedback_record.query.strip().lower(), []).append(feedback_record)
+
+    conflicting_query_keys = {
+      query_key
+      for query_key, grouped_records in feedback_by_query_key.items()
+      if {
+        self._normalize_provider_provenance_scheduler_search_feedback_signal(record.signal)
+        for record in grouped_records
+      } >= {"relevant", "not_relevant"}
+    }
+
+    def _is_stale_pending(record: ProviderProvenanceSchedulerSearchFeedbackRecord) -> bool:
+      if record.moderation_status != "pending":
+        return False
+      age_seconds = max((current_time - record.recorded_at).total_seconds(), 0.0)
+      return age_seconds >= stale_pending_cutoff_seconds
+
+    def _is_high_score_pending(record: ProviderProvenanceSchedulerSearchFeedbackRecord) -> bool:
+      return record.moderation_status == "pending" and int(record.score) >= high_score_pending_threshold
+
+    prefiltered_feedback = tuple(
       record
       for record in feedback_records
       if _matches_search(record)
       and (normalized_moderation_status is None or record.moderation_status == normalized_moderation_status)
       and (normalized_signal is None or record.signal == normalized_signal)
     )
+    filtered_feedback = tuple(
+      record
+      for record in prefiltered_feedback
+      if (
+        normalized_governance_view == "all_feedback"
+        or (
+          normalized_governance_view == "pending_queue"
+          and record.moderation_status == "pending"
+        )
+        or (
+          normalized_governance_view == "stale_pending"
+          and _is_stale_pending(record)
+        )
+        or (
+          normalized_governance_view == "high_score_pending"
+          and _is_high_score_pending(record)
+        )
+        or (
+          normalized_governance_view == "moderated"
+          and record.moderation_status in {"approved", "rejected"}
+        )
+        or (
+          normalized_governance_view == "conflicting_queries"
+          and record.query.strip().lower() in conflicting_query_keys
+        )
+      )
+    )
 
     query_rollups: dict[str, dict[str, Any]] = {}
-    feedback_by_query: dict[str, list[ProviderProvenanceSchedulerSearchFeedbackRecord]] = {}
-    for feedback_record in feedback_records:
-      feedback_by_query.setdefault(feedback_record.query.strip().lower(), []).append(feedback_record)
+    filtered_feedback_by_query: dict[str, list[ProviderProvenanceSchedulerSearchFeedbackRecord]] = {}
+    for feedback_record in filtered_feedback:
+      filtered_feedback_by_query.setdefault(feedback_record.query.strip().lower(), []).append(feedback_record)
     for analytics_record in filtered_analytics:
       query_key = analytics_record.query.strip().lower()
       rollup = query_rollups.setdefault(
@@ -37589,10 +37744,10 @@ class TradingApplication:
         item[1]["search_count"],
         item[1]["top_score"],
         item[1]["last_recorded_at"],
-      ),
+        ),
       reverse=True,
     )[:normalized_query_limit]:
-      related_feedback = feedback_by_query.get(query_key, [])
+      related_feedback = filtered_feedback_by_query.get(query_key, [])
       top_queries.append(
         {
           "query": rollup["query"],
@@ -37608,6 +37763,92 @@ class TradingApplication:
           "semantic_concepts": tuple(sorted(rollup["semantic_concepts"])),
           "parsed_operators": tuple(sorted(rollup["parsed_operators"])),
           "relevance_models": tuple(sorted(rollup["relevance_models"])),
+        }
+      )
+
+    actor_rollups: dict[str, dict[str, Any]] = {}
+    moderator_rollups: dict[str, dict[str, Any]] = {}
+    for record in filtered_feedback:
+      actor_key = record.actor.strip() if isinstance(record.actor, str) and record.actor.strip() else "operator"
+      actor_rollup = actor_rollups.setdefault(
+        actor_key,
+        {
+          "actor": actor_key,
+          "feedback_count": 0,
+          "pending_feedback_count": 0,
+          "approved_feedback_count": 0,
+          "rejected_feedback_count": 0,
+          "relevant_feedback_count": 0,
+          "not_relevant_feedback_count": 0,
+        },
+      )
+      actor_rollup["feedback_count"] += 1
+      actor_rollup[f"{record.moderation_status}_feedback_count"] += 1
+      actor_rollup[f"{record.signal}_feedback_count"] += 1
+      if isinstance(record.moderated_by, str) and record.moderated_by.strip():
+        moderator_key = record.moderated_by.strip()
+        moderator_rollup = moderator_rollups.setdefault(
+          moderator_key,
+          {
+            "moderated_by": moderator_key,
+            "feedback_count": 0,
+            "approved_feedback_count": 0,
+            "rejected_feedback_count": 0,
+            "pending_feedback_count": 0,
+            "last_moderated_at": record.moderated_at,
+          },
+        )
+        moderator_rollup["feedback_count"] += 1
+        moderator_rollup[f"{record.moderation_status}_feedback_count"] += 1
+        if isinstance(record.moderated_at, datetime):
+          current_latest = moderator_rollup.get("last_moderated_at")
+          moderator_rollup["last_moderated_at"] = (
+            max(current_latest, record.moderated_at)
+            if isinstance(current_latest, datetime)
+            else record.moderated_at
+          )
+
+    bucket_anchor_candidates = [current_time]
+    bucket_anchor_candidates.extend(record.recorded_at for record in filtered_feedback)
+    bucket_anchor_candidates.extend(record.recorded_at for record in filtered_analytics)
+    window_anchor = self._normalize_provider_provenance_export_bucket_start(max(bucket_anchor_candidates))
+    time_series_started_at = window_anchor - timedelta(days=normalized_window_days - 1)
+    time_series: list[dict[str, Any]] = []
+    for offset in range(normalized_window_days):
+      bucket_start = time_series_started_at + timedelta(days=offset)
+      bucket_end = bucket_start + timedelta(days=1)
+      bucket_queries = tuple(
+        record
+        for record in filtered_analytics
+        if bucket_start <= self._normalize_provider_provenance_export_bucket_start(record.recorded_at) < bucket_end
+      )
+      bucket_feedback = tuple(
+        record
+        for record in filtered_feedback
+        if bucket_start <= self._normalize_provider_provenance_export_bucket_start(record.recorded_at) < bucket_end
+      )
+      bucket_moderated = tuple(
+        record
+        for record in filtered_feedback
+        if isinstance(record.moderated_at, datetime)
+        and bucket_start <= self._normalize_provider_provenance_export_bucket_start(record.moderated_at) < bucket_end
+      )
+      time_series.append(
+        {
+          "bucket_key": bucket_start.date().isoformat(),
+          "bucket_label": bucket_start.strftime("%b %d"),
+          "started_at": bucket_start.isoformat(),
+          "ended_at": bucket_end.isoformat(),
+          "query_count": len(bucket_queries),
+          "feedback_count": len(bucket_feedback),
+          "pending_feedback_count": sum(1 for record in bucket_feedback if record.moderation_status == "pending"),
+          "approved_feedback_count": sum(1 for record in bucket_feedback if record.moderation_status == "approved"),
+          "rejected_feedback_count": sum(1 for record in bucket_feedback if record.moderation_status == "rejected"),
+          "moderated_feedback_count": len(bucket_moderated),
+          "relevant_feedback_count": sum(1 for record in bucket_feedback if record.signal == "relevant"),
+          "not_relevant_feedback_count": sum(1 for record in bucket_feedback if record.signal == "not_relevant"),
+          "top_score": max((record.top_score for record in bucket_queries), default=0),
+          "stale_pending_count": sum(1 for record in bucket_feedback if _is_stale_pending(record)),
         }
       )
 
@@ -37629,22 +37870,51 @@ class TradingApplication:
         "semantic_concepts": tuple(record.semantic_concepts),
         "operator_hits": tuple(record.operator_hits),
         "score": record.score,
+        "age_hours": int(max((current_time - record.recorded_at).total_seconds(), 0.0) // 3600),
+        "stale_pending": _is_stale_pending(record),
+        "high_score_pending": _is_high_score_pending(record),
+        "query_run_count": len(
+          tuple(
+            analytics_record
+            for analytics_record in filtered_analytics
+            if analytics_record.query.strip().lower() == record.query.strip().lower()
+          )
+        ),
       }
-      for record in filtered_feedback[:normalized_feedback_limit]
+      for record in sorted(
+        filtered_feedback,
+        key=lambda record: (
+          0 if record.moderation_status == "pending" else 1,
+          0 if _is_stale_pending(record) else 1,
+          -int(record.score),
+          record.recorded_at,
+        ),
+      )[:normalized_feedback_limit]
     )
 
     return {
-      "generated_at": self._clock(),
+      "generated_at": current_time,
       "query": {
         "search": normalized_search,
         "moderation_status": normalized_moderation_status,
         "signal": normalized_signal,
+        "governance_view": normalized_governance_view,
+        "window_days": normalized_window_days,
+        "stale_pending_hours": normalized_stale_pending_hours,
         "query_limit": normalized_query_limit,
         "feedback_limit": normalized_feedback_limit,
       },
       "available_filters": {
         "moderation_statuses": ("pending", "approved", "rejected"),
         "signals": ("relevant", "not_relevant"),
+        "governance_views": (
+          "all_feedback",
+          "pending_queue",
+          "stale_pending",
+          "high_score_pending",
+          "moderated",
+          "conflicting_queries",
+        ),
       },
       "summary": {
         "query_count": len(filtered_analytics),
@@ -37655,6 +37925,81 @@ class TradingApplication:
         "rejected_feedback_count": sum(1 for record in filtered_feedback if record.moderation_status == "rejected"),
         "relevant_feedback_count": sum(1 for record in filtered_feedback if record.signal == "relevant"),
         "not_relevant_feedback_count": sum(1 for record in filtered_feedback if record.signal == "not_relevant"),
+      },
+      "quality_dashboard": {
+        "window_days": normalized_window_days,
+        "window_started_at": window_started_at,
+        "window_ended_at": current_time,
+        "time_series": tuple(time_series),
+        "actor_rollups": tuple(
+          {
+            "actor": actor_key,
+            "feedback_count": int(entry["feedback_count"]),
+            "pending_feedback_count": int(entry["pending_feedback_count"]),
+            "approved_feedback_count": int(entry["approved_feedback_count"]),
+            "rejected_feedback_count": int(entry["rejected_feedback_count"]),
+            "relevant_feedback_count": int(entry["relevant_feedback_count"]),
+            "not_relevant_feedback_count": int(entry["not_relevant_feedback_count"]),
+          }
+          for actor_key, entry in sorted(
+            actor_rollups.items(),
+            key=lambda item: (item[1]["feedback_count"], item[0]),
+            reverse=True,
+          )
+        ),
+        "moderator_rollups": tuple(
+          {
+            "moderated_by": moderator_key,
+            "feedback_count": int(entry["feedback_count"]),
+            "approved_feedback_count": int(entry["approved_feedback_count"]),
+            "rejected_feedback_count": int(entry["rejected_feedback_count"]),
+            "pending_feedback_count": int(entry["pending_feedback_count"]),
+            "last_moderated_at": (
+              entry["last_moderated_at"]
+              if isinstance(entry.get("last_moderated_at"), datetime)
+              else None
+            ),
+          }
+          for moderator_key, entry in sorted(
+            moderator_rollups.items(),
+            key=lambda item: (item[1]["feedback_count"], item[0]),
+            reverse=True,
+          )
+        ),
+      },
+      "moderation_governance": {
+        "governance_view": normalized_governance_view,
+        "stale_pending_hours": normalized_stale_pending_hours,
+        "high_score_pending_threshold": high_score_pending_threshold,
+        "pending_feedback_count": sum(1 for record in filtered_feedback if record.moderation_status == "pending"),
+        "stale_pending_count": sum(1 for record in filtered_feedback if _is_stale_pending(record)),
+        "high_score_pending_count": sum(1 for record in filtered_feedback if _is_high_score_pending(record)),
+        "moderated_feedback_count": sum(
+          1 for record in filtered_feedback if record.moderation_status in {"approved", "rejected"}
+        ),
+        "conflicting_query_count": sum(
+          1 for query_key in query_rollups if query_key in conflicting_query_keys
+        ),
+        "approval_rate_pct": (
+          int(
+            round(
+              (
+                sum(1 for record in filtered_feedback if record.moderation_status == "approved")
+                / max(
+                    sum(
+                      1
+                      for record in filtered_feedback
+                      if record.moderation_status in {"approved", "rejected"}
+                    ),
+                    1,
+                  )
+              )
+              * 100
+            )
+          )
+          if any(record.moderation_status in {"approved", "rejected"} for record in filtered_feedback)
+          else 0
+        ),
       },
       "top_queries": tuple(top_queries),
       "feedback_items": recent_feedback,

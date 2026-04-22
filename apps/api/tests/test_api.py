@@ -5091,12 +5091,22 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
 
   dashboard_response = client.get(
     "/api/operator/provider-provenance-analytics/scheduler-search/dashboard",
-    params={"moderation_status": "pending", "feedback_limit": 10},
+    params={
+      "moderation_status": "pending",
+      "governance_view": "pending_queue",
+      "window_days": 30,
+      "stale_pending_hours": 1,
+      "feedback_limit": 10,
+    },
   )
   assert dashboard_response.status_code == 200
   dashboard_payload = dashboard_response.json()
   assert dashboard_payload["summary"]["feedback_count"] >= 1
   assert dashboard_payload["summary"]["pending_feedback_count"] >= 1
+  assert dashboard_payload["query"]["governance_view"] == "pending_queue"
+  assert dashboard_payload["quality_dashboard"]["window_days"] == 30
+  assert dashboard_payload["quality_dashboard"]["time_series"]
+  assert dashboard_payload["moderation_governance"]["pending_feedback_count"] >= 1
   assert dashboard_payload["feedback_items"][0]["feedback_id"] == feedback_payload["feedback_id"]
 
   moderation_response = client.post(

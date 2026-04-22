@@ -183,6 +183,9 @@ creation.
 - that same retrieval layer now also exposes a scheduler query analytics dashboard and feedback
   moderation workflow, so learned relevance tuning can stay operator-reviewed instead of
   promoting every captured signal directly into ranking
+- that same quality layer now also ships a long-horizon scheduler search dashboard plus
+  moderation governance controls, so future relevance work can inspect trend lines, backlog age,
+  moderator behavior, and batch decisions before moving to heavier learned ranking infrastructure
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries
