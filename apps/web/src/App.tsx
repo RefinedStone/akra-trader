@@ -126,14 +126,19 @@ import {
   listProviderProvenanceSchedulerStitchedReportViewRevisions,
   getProviderProvenanceSchedulerSearchDashboard,
   bulkGovernProviderProvenanceSchedulerSearchModerationPolicyCatalogs,
+  createProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicy,
   listProviderProvenanceSchedulerSearchModerationPolicyCatalogs,
+  listProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicies,
+  listProviderProvenanceSchedulerSearchModerationCatalogGovernancePlans,
   listProviderProvenanceSchedulerSearchModerationPolicyCatalogAudits,
   listProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisions,
   listProviderProvenanceSchedulerSearchModerationPlans,
   listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
+  approveProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan,
   approveProviderProvenanceSchedulerSearchModerationPlan,
+  applyProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan,
   applyProviderProvenanceSchedulerSearchModerationPlan,
   createProviderProvenanceSchedulerSearchModerationPolicyCatalog,
   deleteProviderProvenanceSchedulerSearchModerationPolicyCatalog,
@@ -157,6 +162,7 @@ import {
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance,
   runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernance,
+  stageProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan,
   stageProviderProvenanceSchedulerSearchModerationPlan,
   updateProviderProvenanceSchedulerSearchModerationPolicyCatalog,
   stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates,
@@ -375,6 +381,8 @@ import type {
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanListPayload,
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyListPayload,
   ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord,
   ProviderProvenanceSchedulerSearchModerationPlanListPayload,
   ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionListPayload,
@@ -552,6 +560,34 @@ type ProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft = {
   require_note: boolean;
 };
 
+type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft = {
+  name: string;
+  description: string;
+  action_scope: string;
+  require_approval_note: boolean;
+  guidance: string;
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+};
+
+type ProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilterState = {
+  queue_state: string;
+  governance_policy_id: string;
+};
+
+type ProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft = {
+  action: string;
+  governance_policy_id: string;
+  note: string;
+};
+
 type ProviderProvenanceSchedulerSearchModerationQueueFilterState = {
   queue_state: string;
   policy_catalog_id: string;
@@ -625,6 +661,34 @@ const defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft: 
   stale_pending_hours: 24,
   minimum_score: 0,
   require_note: false,
+};
+
+const defaultProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft = {
+  name: "",
+  description: "",
+  action_scope: "any",
+  require_approval_note: false,
+  guidance: "",
+  name_prefix: "",
+  name_suffix: "",
+  description_append: "",
+  default_moderation_status: "approved",
+  governance_view: "pending_queue",
+  window_days: 30,
+  stale_pending_hours: 24,
+  minimum_score: 0,
+  require_note: false,
+};
+
+const defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilterState: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilterState = {
+  queue_state: "pending_approval",
+  governance_policy_id: ALL_FILTER_VALUE,
+};
+
+const defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft: ProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft = {
+  action: "update",
+  governance_policy_id: ALL_FILTER_VALUE,
+  note: "",
 };
 
 const defaultProviderProvenanceSchedulerSearchModerationQueueFilterState: ProviderProvenanceSchedulerSearchModerationQueueFilterState = {
@@ -4462,6 +4526,30 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerSearchModerationPolicyCatalogAuditsError, setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsError] =
     useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernancePolicies, setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicies] =
+    useState<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyListPayload | null>(null);
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernancePoliciesLoading, setProviderProvenanceSchedulerSearchModerationCatalogGovernancePoliciesLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernancePoliciesError, setProviderProvenanceSchedulerSearchModerationCatalogGovernancePoliciesError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft, setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft] =
+    useState<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft>(
+      defaultProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft,
+    );
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernancePlans, setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlans] =
+    useState<ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanListPayload | null>(null);
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernancePlansLoading, setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlansLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernancePlansError, setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlansError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter, setProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter] =
+    useState<ProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilterState>(
+      defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilterState,
+    );
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft, setProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft] =
+    useState<ProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft>(
+      defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft,
+    );
   const [providerProvenanceSchedulerSearchModerationPlans, setProviderProvenanceSchedulerSearchModerationPlans] =
     useState<ProviderProvenanceSchedulerSearchModerationPlanListPayload | null>(null);
   const [providerProvenanceSchedulerSearchModerationPlansLoading, setProviderProvenanceSchedulerSearchModerationPlansLoading] =
@@ -4485,6 +4573,8 @@ export default function App() {
   const [providerProvenanceSchedulerSearchFeedbackModerationPendingId, setProviderProvenanceSchedulerSearchFeedbackModerationPendingId] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerSearchModerationPlanPendingId, setProviderProvenanceSchedulerSearchModerationPlanPendingId] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId, setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerSearchFeedbackIds, setSelectedProviderProvenanceSchedulerSearchFeedbackIds] =
     useState<string[]>([]);
@@ -4668,6 +4758,8 @@ export default function App() {
   const providerProvenanceSchedulerSearchModerationPolicyCatalogRequestIdRef = useRef(0);
   const providerProvenanceSchedulerSearchModerationPolicyCatalogHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerSearchModerationCatalogGovernancePlanRequestIdRef = useRef(0);
   const providerProvenanceSchedulerSearchModerationPlanRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
   const providerProvenanceSchedulerStitchedReportViewRequestIdRef = useRef(0);
@@ -6314,6 +6406,8 @@ export default function App() {
     providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.action,
     providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.actor_tab_id,
     providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.search,
+    providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter.queue_state,
+    providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter.governance_policy_id,
     providerProvenanceSchedulerSearchModerationQueueFilter.queue_state,
     providerProvenanceSchedulerSearchModerationQueueFilter.policy_catalog_id,
     providerProvenanceSchedulerStitchedReportViewAuditFilter.view_id,
@@ -7079,6 +7173,14 @@ export default function App() {
       providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef.current + 1;
     providerProvenanceSchedulerSearchModerationPolicyCatalogAuditRequestIdRef.current =
       searchModerationPolicyCatalogAuditRequestId;
+    const searchModerationCatalogGovernancePolicyRequestId =
+      providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyRequestIdRef.current + 1;
+    providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyRequestIdRef.current =
+      searchModerationCatalogGovernancePolicyRequestId;
+    const searchModerationCatalogGovernancePlanRequestId =
+      providerProvenanceSchedulerSearchModerationCatalogGovernancePlanRequestIdRef.current + 1;
+    providerProvenanceSchedulerSearchModerationCatalogGovernancePlanRequestIdRef.current =
+      searchModerationCatalogGovernancePlanRequestId;
     const searchModerationPlanRequestId =
       providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current + 1;
     providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current =
@@ -7095,6 +7197,8 @@ export default function App() {
     setProviderProvenanceSchedulerSearchDashboardLoading(true);
     setProviderProvenanceSchedulerSearchModerationPolicyCatalogsLoading(true);
     setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsLoading(true);
+    setProviderProvenanceSchedulerSearchModerationCatalogGovernancePoliciesLoading(true);
+    setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlansLoading(true);
     setProviderProvenanceSchedulerSearchModerationPlansLoading(true);
     setProviderProvenanceSchedulerExportsLoading(true);
     setProviderProvenanceSchedulerStitchedReportViewsLoading(true);
@@ -7105,6 +7209,8 @@ export default function App() {
     setProviderProvenanceSchedulerSearchDashboardError(null);
     setProviderProvenanceSchedulerSearchModerationPolicyCatalogsError(null);
     setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsError(null);
+    setProviderProvenanceSchedulerSearchModerationCatalogGovernancePoliciesError(null);
+    setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlansError(null);
     setProviderProvenanceSchedulerSearchModerationPlansError(null);
     setProviderProvenanceSchedulerExportsError(null);
     setProviderProvenanceSchedulerStitchedReportViewsError(null);
@@ -7117,6 +7223,8 @@ export default function App() {
         searchDashboardPayload,
         searchModerationPolicyCatalogPayload,
         searchModerationPolicyCatalogAuditPayload,
+        searchModerationCatalogGovernancePolicyPayload,
+        searchModerationCatalogGovernancePlanPayload,
         searchModerationPlanPayload,
         exportListPayload,
         stitchedViewPayload,
@@ -7183,6 +7291,19 @@ export default function App() {
           search:
             providerProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter.search.trim() || undefined,
           limit: 12,
+        }),
+        listProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicies({
+          limit: 20,
+        }),
+        listProviderProvenanceSchedulerSearchModerationCatalogGovernancePlans({
+          queueState:
+            providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter.queue_state !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter.queue_state
+              : undefined,
+          governancePolicyId:
+            providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter.governance_policy_id !== ALL_FILTER_VALUE
+              ? providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter.governance_policy_id
+              : undefined,
         }),
         listProviderProvenanceSchedulerSearchModerationPlans({
           queueState:
@@ -7269,6 +7390,22 @@ export default function App() {
         );
       }
       if (
+        providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyRequestIdRef.current
+        === searchModerationCatalogGovernancePolicyRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicies(
+          searchModerationCatalogGovernancePolicyPayload,
+        );
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationCatalogGovernancePlanRequestIdRef.current
+        === searchModerationCatalogGovernancePlanRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlans(
+          searchModerationCatalogGovernancePlanPayload,
+        );
+      }
+      if (
         providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
         === searchModerationPlanRequestId
       ) {
@@ -7324,6 +7461,20 @@ export default function App() {
         setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsError(message);
       }
       if (
+        providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyRequestIdRef.current
+        === searchModerationCatalogGovernancePolicyRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicies(null);
+        setProviderProvenanceSchedulerSearchModerationCatalogGovernancePoliciesError(message);
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationCatalogGovernancePlanRequestIdRef.current
+        === searchModerationCatalogGovernancePlanRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlans(null);
+        setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlansError(message);
+      }
+      if (
         providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
         === searchModerationPlanRequestId
       ) {
@@ -7366,6 +7517,18 @@ export default function App() {
         === searchModerationPolicyCatalogAuditRequestId
       ) {
         setProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditsLoading(false);
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyRequestIdRef.current
+        === searchModerationCatalogGovernancePolicyRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationCatalogGovernancePoliciesLoading(false);
+      }
+      if (
+        providerProvenanceSchedulerSearchModerationCatalogGovernancePlanRequestIdRef.current
+        === searchModerationCatalogGovernancePlanRequestId
+      ) {
+        setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlansLoading(false);
       }
       if (
         providerProvenanceSchedulerSearchModerationPlanRequestIdRef.current
@@ -7741,6 +7904,186 @@ export default function App() {
       );
     } finally {
       setProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkAction(null);
+    }
+  }
+
+  async function createProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry() {
+    const normalizedName = providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.name.trim();
+    if (!normalizedName) {
+      setProviderProvenanceWorkspaceFeedback("Name the moderation catalog governance policy before saving it.");
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationCatalogGovernancePoliciesLoading(true);
+    try {
+      const result = await createProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicy({
+        name: normalizedName,
+        description: providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.description,
+        actionScope:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.action_scope === "update"
+          || providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.action_scope === "delete"
+          || providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.action_scope === "restore"
+            ? providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.action_scope
+            : "any",
+        requireApprovalNote:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.require_approval_note,
+        guidance:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.guidance.trim() || null,
+        namePrefix:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.name_prefix || null,
+        nameSuffix:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.name_suffix || null,
+        descriptionAppend:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.description_append || null,
+        defaultModerationStatus:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.default_moderation_status
+            === "pending"
+          || providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.default_moderation_status
+              === "rejected"
+            ? providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.default_moderation_status
+            : "approved",
+        governanceView:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.governance_view,
+        windowDays:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.window_days,
+        stalePendingHours:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.stale_pending_hours,
+        minimumScore:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.minimum_score,
+        requireNote:
+          providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.require_note,
+        createdByTabId: activeWorkspace,
+        createdByTabLabel: "control-room",
+      });
+      setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft(
+        defaultProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft,
+      );
+      setProviderProvenanceWorkspaceFeedback(
+        `Saved moderation catalog governance policy ${result.name} for ${formatWorkflowToken(result.action_scope)} actions.`,
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Moderation catalog governance policy save failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationCatalogGovernancePoliciesLoading(false);
+    }
+  }
+
+  async function stageProviderProvenanceSchedulerSearchModerationCatalogGovernanceSelection() {
+    if (!selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.length) {
+      setProviderProvenanceWorkspaceFeedback("Select one or more moderation policy catalogs before staging governance.");
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId("stage");
+    try {
+      const useGovernancePolicy =
+        providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.governance_policy_id !== ALL_FILTER_VALUE;
+      const result = await stageProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan({
+        catalogIds: selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds,
+        action:
+          providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.action === "delete"
+          || providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.action === "restore"
+            ? providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.action
+            : "update",
+        governancePolicyId:
+          useGovernancePolicy
+            ? providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.governance_policy_id
+            : undefined,
+        ...(useGovernancePolicy
+          ? {}
+          : {
+              namePrefix:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.name_prefix || undefined,
+              nameSuffix:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.name_suffix || undefined,
+              descriptionAppend:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.description_append || undefined,
+              defaultModerationStatus:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.default_moderation_status === "pending"
+                || providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.default_moderation_status === "rejected"
+                  ? providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.default_moderation_status
+                  : "approved",
+              governanceView:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.governance_view,
+              windowDays:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.window_days,
+              stalePendingHours:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.stale_pending_hours,
+              minimumScore:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.minimum_score,
+              requireNote:
+                providerProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft.require_note,
+            }),
+        actor: "operator",
+        sourceTabId: activeWorkspace,
+        sourceTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Staged moderation catalog governance plan ${shortenIdentifier(result.plan_id, 10)} with ${result.preview_count} preview item(s).`,
+      );
+      setSelectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds([]);
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Moderation catalog governance plan staging failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId(null);
+    }
+  }
+
+  async function approveProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueuePlan(planId: string) {
+    const normalizedPlanId = planId.trim();
+    if (!normalizedPlanId) {
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId(normalizedPlanId);
+    try {
+      const result = await approveProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan({
+        planId: normalizedPlanId,
+        actor: "operator",
+        note: providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.note.trim() || null,
+        sourceTabId: activeWorkspace,
+        sourceTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Approved moderation catalog governance plan ${shortenIdentifier(result.plan_id, 10)}.`,
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Moderation catalog governance plan approval failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId(null);
+    }
+  }
+
+  async function applyProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueuePlan(planId: string) {
+    const normalizedPlanId = planId.trim();
+    if (!normalizedPlanId) {
+      return;
+    }
+    setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId(normalizedPlanId);
+    try {
+      const result = await applyProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan({
+        planId: normalizedPlanId,
+        actor: "operator",
+        note: providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.note.trim() || null,
+        sourceTabId: activeWorkspace,
+        sourceTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Applied moderation catalog governance plan ${shortenIdentifier(result.plan_id, 10)} with ${result.applied_result?.applied_count ?? 0} catalog change(s).`,
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Moderation catalog governance plan apply failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId(null);
     }
   }
 
@@ -21020,6 +21363,495 @@ export default function App() {
                                         )}
                                       </div>
                                       <div className="market-data-provenance-history-head">
+                                        <strong>Moderation catalog governance policies</strong>
+                                        <p>
+                                          Save reusable approval requirements and update defaults, then stage
+                                          selected moderation policy catalogs through a dedicated governance queue.
+                                        </p>
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <label className="run-form-field">
+                                          <span>Name</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                name: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="Catalog cleanup with approval"
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.name}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Action scope</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.action_scope}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                action_scope: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value="any">Any action</option>
+                                            <option value="update">Update only</option>
+                                            <option value="delete">Delete only</option>
+                                            <option value="restore">Restore only</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field checkbox-field">
+                                          <span>Require approval note</span>
+                                          <input
+                                            checked={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.require_approval_note}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                require_approval_note: event.target.checked,
+                                              }));
+                                            }}
+                                            type="checkbox"
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Description</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                description: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="Stage policy-catalog changes behind explicit approval."
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.description}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Guidance</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                guidance: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="Require note before catalog lifecycle changes."
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.guidance}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Name prefix</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                name_prefix: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="[Ops] "
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.name_prefix}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Name suffix</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                name_suffix: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder=" / reviewed"
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.name_suffix}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Description append</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                description_append: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder=" Escalate stale pending rows before applying."
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.description_append}
+                                          />
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Default outcome</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.default_moderation_status}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                default_moderation_status: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value="approved">Approved</option>
+                                            <option value="rejected">Rejected</option>
+                                            <option value="pending">Pending</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Governance view</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.governance_view}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                governance_view: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value="pending_queue">Pending queue</option>
+                                            <option value="stale_pending">Stale pending</option>
+                                            <option value="high_score_pending">High-score pending</option>
+                                            <option value="conflicting_queries">Conflicting queries</option>
+                                            <option value="all_feedback">All feedback</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Window</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.window_days}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                window_days: Number.parseInt(event.target.value, 10) || 30,
+                                              }));
+                                            }}
+                                          >
+                                            {[14, 30, 60, 90].map((value) => (
+                                              <option key={`provider-scheduler-search-governance-policy-window-${value}`} value={value}>
+                                                {value}d
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Stale pending</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.stale_pending_hours}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                stale_pending_hours: Number.parseInt(event.target.value, 10) || 24,
+                                              }));
+                                            }}
+                                          >
+                                            {[12, 24, 48, 72].map((value) => (
+                                              <option key={`provider-scheduler-search-governance-policy-stale-${value}`} value={value}>
+                                                {value}h
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Minimum score</span>
+                                          <input
+                                            min={0}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                minimum_score: Math.max(Number.parseInt(event.target.value, 10) || 0, 0),
+                                              }));
+                                            }}
+                                            type="number"
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.minimum_score}
+                                          />
+                                        </label>
+                                        <label className="run-form-field checkbox-field">
+                                          <span>Require moderation note</span>
+                                          <input
+                                            checked={providerProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft.require_note}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft((current) => ({
+                                                ...current,
+                                                require_note: event.target.checked,
+                                              }));
+                                            }}
+                                            type="checkbox"
+                                          />
+                                        </label>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={providerProvenanceSchedulerSearchModerationCatalogGovernancePoliciesLoading}
+                                          onClick={() => {
+                                            void createProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry();
+                                          }}
+                                          type="button"
+                                        >
+                                          Save governance policy
+                                        </button>
+                                      </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Policy</th>
+                                            <th>Defaults</th>
+                                            <th>Use</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerSearchModerationCatalogGovernancePolicies?.items.length ? (
+                                            providerProvenanceSchedulerSearchModerationCatalogGovernancePolicies.items.map((entry) => (
+                                              <tr key={`provider-scheduler-search-moderation-governance-policy-${entry.governance_policy_id}`}>
+                                                <td>
+                                                  <strong>{entry.name}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatWorkflowToken(entry.action_scope)} · approval note {entry.require_approval_note ? "required" : "optional"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.guidance || entry.description || "No governance guidance"}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.name_prefix || entry.name_suffix
+                                                      ? `name ${entry.name_prefix ?? ""}…${entry.name_suffix ?? ""}`
+                                                      : "No name affixes"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Outcome {formatWorkflowToken(entry.default_moderation_status)} · view {formatWorkflowToken(entry.governance_view)}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Window {entry.window_days}d · stale {entry.stale_pending_hours}h · minimum {entry.minimum_score}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      setProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft((current) => ({
+                                                        ...current,
+                                                        governance_policy_id: entry.governance_policy_id,
+                                                        action:
+                                                          entry.action_scope === "update"
+                                                          || entry.action_scope === "delete"
+                                                          || entry.action_scope === "restore"
+                                                            ? entry.action_scope
+                                                            : current.action,
+                                                      }));
+                                                      setProviderProvenanceWorkspaceFeedback(
+                                                        `Selected moderation catalog governance policy ${entry.name}.`,
+                                                      );
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Use policy
+                                                  </button>
+                                                </td>
+                                              </tr>
+                                            ))
+                                          ) : (
+                                            <tr>
+                                              <td colSpan={3}>
+                                                <p className="empty-state">No moderation catalog governance policies saved yet.</p>
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Moderation catalog governance queue</strong>
+                                        <p>
+                                          Stage selected moderation policy catalogs, preview the exact catalog diffs,
+                                          then approve and apply the change set.
+                                        </p>
+                                      </div>
+                                      <div className="market-data-provenance-history-actions">
+                                        <label className="run-form-field">
+                                          <span>Action</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.action}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft((current) => ({
+                                                ...current,
+                                                action: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value="update">Update</option>
+                                            <option value="delete">Delete</option>
+                                            <option value="restore">Restore</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Governance policy</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.governance_policy_id}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft((current) => ({
+                                                ...current,
+                                                governance_policy_id: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value={ALL_FILTER_VALUE}>No reusable policy</option>
+                                            {(providerProvenanceSchedulerSearchModerationCatalogGovernancePolicies?.items ?? []).map((entry) => (
+                                              <option key={`provider-scheduler-search-moderation-governance-policy-option-${entry.governance_policy_id}`} value={entry.governance_policy_id}>
+                                                {entry.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Approval/apply note</span>
+                                          <input
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft((current) => ({
+                                                ...current,
+                                                note: event.target.value,
+                                              }));
+                                            }}
+                                            placeholder="required when the governance policy gates approval on notes"
+                                            type="text"
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft.note}
+                                          />
+                                        </label>
+                                        <button
+                                          className="ghost-button"
+                                          disabled={
+                                            !selectedProviderProvenanceSchedulerSearchModerationPolicyCatalogIds.length
+                                            || providerProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId !== null
+                                          }
+                                          onClick={() => {
+                                            void stageProviderProvenanceSchedulerSearchModerationCatalogGovernanceSelection();
+                                          }}
+                                          type="button"
+                                        >
+                                          Stage selected catalogs
+                                        </button>
+                                        <label className="run-form-field">
+                                          <span>Queue state</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter.queue_state}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter((current) => ({
+                                                ...current,
+                                                queue_state: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value={ALL_FILTER_VALUE}>All states</option>
+                                            <option value="pending_approval">Pending approval</option>
+                                            <option value="ready_to_apply">Ready to apply</option>
+                                            <option value="completed">Completed</option>
+                                          </select>
+                                        </label>
+                                        <label className="run-form-field">
+                                          <span>Governance policy</span>
+                                          <select
+                                            value={providerProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter.governance_policy_id}
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilter((current) => ({
+                                                ...current,
+                                                governance_policy_id: event.target.value,
+                                              }));
+                                            }}
+                                          >
+                                            <option value={ALL_FILTER_VALUE}>All policies</option>
+                                            {(providerProvenanceSchedulerSearchModerationCatalogGovernancePlans?.available_filters.governance_policies ?? []).map((entry) => (
+                                              <option key={`provider-scheduler-search-moderation-governance-queue-policy-${entry.governance_policy_id}`} value={entry.governance_policy_id}>
+                                                {entry.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <span className="run-lineage-symbol-copy">
+                                          {providerProvenanceSchedulerSearchModerationCatalogGovernancePlans?.summary.pending_approval_count ?? 0} pending · {providerProvenanceSchedulerSearchModerationCatalogGovernancePlans?.summary.ready_to_apply_count ?? 0} ready · {providerProvenanceSchedulerSearchModerationCatalogGovernancePlans?.summary.completed_count ?? 0} completed
+                                        </span>
+                                      </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Plan</th>
+                                            <th>Preview</th>
+                                            <th>Queue</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerSearchModerationCatalogGovernancePlans?.items.length ? (
+                                            providerProvenanceSchedulerSearchModerationCatalogGovernancePlans.items.map((entry) => (
+                                              <tr key={`provider-scheduler-search-moderation-catalog-governance-plan-${entry.plan_id}`}>
+                                                <td>
+                                                  <strong>{shortenIdentifier(entry.plan_id, 10)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatWorkflowToken(entry.action)} · {entry.governance_policy_name ?? "No policy"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Created {formatTimestamp(entry.created_at)} · by {entry.created_by}
+                                                  </p>
+                                                  {entry.guidance ? (
+                                                    <p className="run-lineage-symbol-copy">{entry.guidance}</p>
+                                                  ) : null}
+                                                </td>
+                                                <td>
+                                                  <strong>{entry.preview_count} preview item(s)</strong>
+                                                  {entry.preview_items.slice(0, 4).map((preview) => (
+                                                    <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-moderation-catalog-governance-preview-${entry.plan_id}-${preview.catalog_id}`}>
+                                                      {preview.catalog_name} · {formatWorkflowToken(preview.outcome)}{preview.changed_fields.length ? ` · ${preview.changed_fields.join(" · ")}` : ""}
+                                                      {preview.message ? ` · ${preview.message}` : ""}
+                                                    </p>
+                                                  ))}
+                                                </td>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(entry.queue_state)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Approved {formatTimestamp(entry.approved_at ?? null)} · by {entry.approved_by ?? "n/a"}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Applied {formatTimestamp(entry.applied_at ?? null)} · by {entry.applied_by ?? "n/a"}
+                                                  </p>
+                                                  <div className="market-data-provenance-history-actions">
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={
+                                                        entry.queue_state !== "pending_approval"
+                                                        || providerProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId === entry.plan_id
+                                                      }
+                                                      onClick={() => {
+                                                        void approveProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueuePlan(entry.plan_id);
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Approve
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      disabled={
+                                                        entry.queue_state !== "ready_to_apply"
+                                                        || providerProvenanceSchedulerSearchModerationCatalogGovernancePlanPendingId === entry.plan_id
+                                                      }
+                                                      onClick={() => {
+                                                        void applyProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueuePlan(entry.plan_id);
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Apply
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            ))
+                                          ) : (
+                                            <tr>
+                                              <td colSpan={3}>
+                                                <p className="empty-state">No moderation catalog governance plans match the current filter.</p>
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
+                                      <div className="market-data-provenance-history-head">
                                         <strong>Scheduler moderation approval queue</strong>
                                         <p>
                                           Stage selected feedback, review the plan preview, then approve and apply it
@@ -21234,12 +22066,24 @@ export default function App() {
                                     </p>
                                   ) : null}
                                   {providerProvenanceSchedulerSearchModerationPolicyCatalogsLoading
-                                  || providerProvenanceSchedulerSearchModerationPlansLoading ? (
+                                  || providerProvenanceSchedulerSearchModerationPlansLoading
+                                  || providerProvenanceSchedulerSearchModerationCatalogGovernancePoliciesLoading
+                                  || providerProvenanceSchedulerSearchModerationCatalogGovernancePlansLoading ? (
                                     <p className="empty-state">Loading scheduler moderation governance…</p>
                                   ) : null}
                                   {providerProvenanceSchedulerSearchModerationPolicyCatalogsError ? (
                                     <p className="market-data-workflow-feedback">
                                       Scheduler moderation policy catalogs failed: {providerProvenanceSchedulerSearchModerationPolicyCatalogsError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerSearchModerationCatalogGovernancePoliciesError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduler moderation catalog governance policies failed: {providerProvenanceSchedulerSearchModerationCatalogGovernancePoliciesError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerSearchModerationCatalogGovernancePlansError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Scheduler moderation catalog governance queue failed: {providerProvenanceSchedulerSearchModerationCatalogGovernancePlansError}
                                     </p>
                                   ) : null}
                                   {providerProvenanceSchedulerSearchModerationPlansError ? (

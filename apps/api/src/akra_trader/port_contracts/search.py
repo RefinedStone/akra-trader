@@ -5,6 +5,8 @@ from typing import Protocol
 
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
@@ -93,3 +95,21 @@ class ProviderProvenanceSchedulerSearchBackendPort(Protocol):
   def list_provider_provenance_scheduler_search_moderation_plan_records(
     self,
   ) -> tuple[ProviderProvenanceSchedulerSearchModerationPlanRecord, ...]: ...
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord: ...
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord, ...]: ...
+
+  def save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord,
+  ) -> ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord: ...
+
+  def list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord, ...]: ...

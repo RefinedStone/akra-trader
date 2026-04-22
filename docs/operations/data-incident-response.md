@@ -141,6 +141,10 @@ unclear dataset lineage.
 - those same moderation policy catalogs now also expose revision history, audit trails, and bulk
   governance, so teams can review lifecycle changes and roll out governance-default updates
   across multiple moderation catalogs in one pass
+- that same moderation-catalog layer now also has reusable governance policies and a staged
+  approval queue for catalog lifecycle changes, so teams can preview, approve, and apply search
+  moderation catalog updates behind saved governance defaults before those defaults start driving
+  future moderation plans
 - that same retrieval path now also emits cross-occurrence semantic/vector clusters, so a handoff
   can start from grouped recovery or failure narratives instead of only a flat ranked result set
   from scratch before ranking results

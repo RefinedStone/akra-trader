@@ -2219,6 +2219,110 @@ def test_provider_provenance_scheduler_search_moderation_policy_catalog_and_plan
   assert tuned_payload["search_analytics"]["learned_relevance_active"] is True
 
 
+def test_provider_provenance_scheduler_search_moderation_catalog_governance_flow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 16, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+
+  catalog = app.create_provider_provenance_scheduler_search_moderation_policy_catalog(
+    name="Scheduler governance candidate",
+    description="Catalog changes should flow through governance review.",
+    default_moderation_status="approved",
+    governance_view="pending_queue",
+    minimum_score=100,
+    created_by_tab_id="control-room",
+    created_by_tab_label="Control room",
+  )
+  governance_policy = (
+    app.create_provider_provenance_scheduler_search_moderation_catalog_governance_policy(
+      name="Require reviewed catalog updates",
+      description="Reusable governance defaults for moderation policy catalogs.",
+      action_scope="update",
+      require_approval_note=True,
+      guidance="Approval note is mandatory before moderation catalog changes apply.",
+      description_append=" Reviewed by governance queue.",
+      default_moderation_status="approved",
+      governance_view="high_score_pending",
+      window_days=30,
+      stale_pending_hours=24,
+      minimum_score=180,
+      require_note=True,
+      created_by_tab_id="control-room",
+      created_by_tab_label="Control room",
+    )
+  )
+  assert governance_policy["action_scope"] == "update"
+  assert governance_policy["require_approval_note"] is True
+
+  governance_policies = (
+    app.list_provider_provenance_scheduler_search_moderation_catalog_governance_policies(
+      action_scope="update",
+    )
+  )
+  assert governance_policies["total"] == 1
+  assert (
+    governance_policies["items"][0]["governance_policy_id"]
+    == governance_policy["governance_policy_id"]
+  )
+
+  staged_plan = app.stage_provider_provenance_scheduler_search_moderation_catalog_governance_plan(
+    catalog_ids=(catalog["catalog_id"],),
+    action="update",
+    governance_policy_id=governance_policy["governance_policy_id"],
+    actor="operator",
+    source_tab_id="control-room",
+    source_tab_label="Control room",
+  )
+  assert staged_plan["queue_state"] == "pending_approval"
+  assert staged_plan["preview_count"] == 1
+  assert staged_plan["preview_items"][0]["outcome"] == "changed"
+  assert "description" in staged_plan["preview_items"][0]["changed_fields"]
+  assert staged_plan["preview_items"][0]["proposed_snapshot"]["minimum_score"] == 180
+
+  queued_plans = app.list_provider_provenance_scheduler_search_moderation_catalog_governance_plans(
+    queue_state="pending_approval",
+  )
+  assert queued_plans["summary"]["pending_approval_count"] == 1
+  assert queued_plans["items"][0]["plan_id"] == staged_plan["plan_id"]
+
+  approved_plan = app.approve_provider_provenance_scheduler_search_moderation_catalog_governance_plan(
+    plan_id=staged_plan["plan_id"],
+    actor="operator",
+    note="Catalog changes reviewed for scheduler governance.",
+    source_tab_id="control-room",
+    source_tab_label="Control room",
+  )
+  assert approved_plan["queue_state"] == "ready_to_apply"
+  assert approved_plan["approval_note"] == "Catalog changes reviewed for scheduler governance."
+
+  applied_plan = app.apply_provider_provenance_scheduler_search_moderation_catalog_governance_plan(
+    plan_id=staged_plan["plan_id"],
+    actor="operator",
+    note="Apply reviewed moderation catalog changes.",
+    source_tab_id="control-room",
+    source_tab_label="Control room",
+  )
+  assert applied_plan["queue_state"] == "completed"
+  assert applied_plan["applied_result"]["applied_count"] == 1
+
+  updated_catalog = app.list_provider_provenance_scheduler_search_moderation_policy_catalogs()["items"][0]
+  assert updated_catalog["minimum_score"] == 180
+  assert updated_catalog["require_note"] is True
+  assert updated_catalog["description"].endswith("Reviewed by governance queue.")
+
+
 def test_provider_provenance_scheduler_history_and_analytics_persist(
   monkeypatch,
   tmp_path: Path,

@@ -1661,6 +1661,127 @@ export type ProviderProvenanceSchedulerSearchModerationPlanListPayload = {
   items: ProviderProvenanceSchedulerSearchModerationPlanEntry[];
 };
 
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry = {
+  governance_policy_id: string;
+  created_at: string;
+  updated_at: string;
+  scheduler_key: string;
+  name: string;
+  description: string;
+  action_scope: string;
+  require_approval_note: boolean;
+  guidance?: string | null;
+  name_prefix?: string | null;
+  name_suffix?: string | null;
+  description_append?: string | null;
+  default_moderation_status: string;
+  governance_view: string;
+  window_days: number;
+  stale_pending_hours: number;
+  minimum_score: number;
+  require_note: boolean;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyListPayload = {
+  generated_at: string;
+  query: {
+    action_scope?: string | null;
+    search?: string | null;
+    limit: number;
+  };
+  available_filters: {
+    action_scopes: string[];
+  };
+  total: number;
+  items: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyEntry[];
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPreviewItem = {
+  catalog_id: string;
+  catalog_name: string;
+  action: string;
+  current_status: string;
+  current_revision_id?: string | null;
+  rollback_revision_id?: string | null;
+  outcome: string;
+  message?: string | null;
+  changed_fields: string[];
+  field_diffs: Record<string, { before: unknown; after: unknown }>;
+  current_snapshot: Record<string, unknown>;
+  proposed_snapshot: Record<string, unknown>;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanEntry = {
+  plan_id: string;
+  created_at: string;
+  updated_at: string;
+  scheduler_key: string;
+  action: string;
+  status: string;
+  queue_state: string;
+  governance_policy_id?: string | null;
+  governance_policy_name?: string | null;
+  require_approval_note: boolean;
+  guidance?: string | null;
+  requested_catalog_ids: string[];
+  preview_count: number;
+  preview_items: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPreviewItem[];
+  name_prefix?: string | null;
+  name_suffix?: string | null;
+  description_append?: string | null;
+  default_moderation_status?: string | null;
+  governance_view?: string | null;
+  window_days?: number | null;
+  stale_pending_hours?: number | null;
+  minimum_score?: number | null;
+  require_note?: boolean | null;
+  created_by: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  approved_by_tab_id?: string | null;
+  approved_by_tab_label?: string | null;
+  approval_note?: string | null;
+  applied_at?: string | null;
+  applied_by?: string | null;
+  applied_by_tab_id?: string | null;
+  applied_by_tab_label?: string | null;
+  apply_note?: string | null;
+  applied_result?: {
+    requested_count: number;
+    applied_count: number;
+    skipped_count: number;
+    failed_count: number;
+    results: Array<Record<string, unknown>>;
+  } | null;
+};
+
+export type ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanListPayload = {
+  generated_at: string;
+  query: {
+    queue_state?: string | null;
+    governance_policy_id?: string | null;
+  };
+  available_filters: {
+    queue_states: string[];
+    governance_policies: {
+      governance_policy_id: string;
+      name: string;
+      action_scope: string;
+    }[];
+  };
+  summary: {
+    total: number;
+    pending_approval_count: number;
+    ready_to_apply_count: number;
+    completed_count: number;
+  };
+  items: ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanEntry[];
+};
+
 export type ProviderProvenanceSchedulerSearchDashboardPayload = {
   generated_at: string;
   query: {

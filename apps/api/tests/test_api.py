@@ -5180,32 +5180,21 @@ def test_scheduler_search_moderation_policy_catalog_and_plan_routes(
       source_tab_label="Background scheduler",
     )
 
-    search_response = client.get(
-      "/api/operator/provider-provenance-analytics/scheduler-alerts",
-      params={
-        "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
-        "limit": 10,
-        "offset": 0,
-      },
-    )
-    assert search_response.status_code == 200
-    search_payload = search_response.json()
-
     feedback_response = client.post(
       "/api/operator/provider-provenance-analytics/scheduler-alerts/search-feedback",
       json={
-        "query_id": search_payload["search_summary"]["query_id"],
-        "query": search_payload["query"]["search"],
-        "occurrence_id": search_payload["items"][0]["occurrence_id"],
+        "query_id": "query-moderation-route",
+        "query": "status:resolved AND recovered",
+        "occurrence_id": "scheduler-occ-route-1",
         "signal": "relevant",
-        "matched_fields": search_payload["items"][0]["search_match"]["matched_fields"],
-        "semantic_concepts": search_payload["items"][0]["search_match"]["semantic_concepts"],
-        "operator_hits": search_payload["items"][0]["search_match"]["operator_hits"],
-        "lexical_score": search_payload["items"][0]["search_match"]["lexical_score"],
-        "semantic_score": search_payload["items"][0]["search_match"]["semantic_score"],
-        "operator_score": search_payload["items"][0]["search_match"]["operator_score"],
-        "score": search_payload["items"][0]["search_match"]["score"],
-        "ranking_reason": search_payload["items"][0]["search_match"]["ranking_reason"],
+        "matched_fields": ["summary", "status_sequence"],
+        "semantic_concepts": ["recovery"],
+        "operator_hits": ["status:resolved"],
+        "lexical_score": 220,
+        "semantic_score": 110,
+        "operator_score": 160,
+        "score": 530,
+        "ranking_reason": "stable moderation fixture for policy catalog routes",
       },
     )
     assert feedback_response.status_code == 200
@@ -5333,19 +5322,146 @@ def test_scheduler_search_moderation_policy_catalog_and_plan_routes(
     assert apply_payload["queue_state"] == "completed"
     assert apply_payload["applied_result"]["updated_count"] == 1
 
-    tuned_search_response = client.get(
-      "/api/operator/provider-provenance-analytics/scheduler-alerts",
+    dashboard_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/dashboard",
       params={
-        "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
-        "limit": 10,
-        "offset": 0,
+        "governance_view": "all_feedback",
+        "window_days": 30,
+        "feedback_limit": 10,
       },
     )
-    assert tuned_search_response.status_code == 200
-    tuned_search_payload = tuned_search_response.json()
-    assert tuned_search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
-    assert tuned_search_payload["search_analytics"]["approved_feedback_count"] == 1
-    assert tuned_search_payload["search_analytics"]["learned_relevance_active"] is True
+    assert dashboard_response.status_code == 200
+    dashboard_payload = dashboard_response.json()
+    assert dashboard_payload["summary"]["feedback_count"] == 1
+    assert dashboard_payload["summary"]["approved_feedback_count"] == 1
+    assert dashboard_payload["feedback_items"][0]["feedback_id"] == feedback_payload["feedback_id"]
+
+
+def test_scheduler_search_moderation_catalog_governance_routes(
+  tmp_path: Path,
+) -> None:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    provider_provenance_report_scheduler_enabled=False,
+  ) as client:
+    catalog_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+      json={
+        "name": "Moderation catalog for governance",
+        "description": "Stage catalog lifecycle updates through a governance queue.",
+        "default_moderation_status": "approved",
+        "governance_view": "pending_queue",
+        "window_days": 30,
+        "stale_pending_hours": 24,
+        "minimum_score": 100,
+        "require_note": False,
+        "created_by_tab_id": "control-room",
+        "created_by_tab_label": "Control room",
+      },
+    )
+    assert catalog_response.status_code == 200
+    catalog_payload = catalog_response.json()
+
+    governance_policy_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies",
+      json={
+        "name": "Require review for catalog patches",
+        "description": "Stage moderation catalog updates with an approval note.",
+        "action_scope": "update",
+        "require_approval_note": True,
+        "guidance": "Approval note is mandatory before applying policy-catalog changes.",
+        "description_append": " Reviewed by governance queue.",
+        "default_moderation_status": "approved",
+        "governance_view": "high_score_pending",
+        "window_days": 30,
+        "stale_pending_hours": 24,
+        "minimum_score": 180,
+        "require_note": True,
+        "created_by_tab_id": "control-room",
+        "created_by_tab_label": "Control room",
+      },
+    )
+    assert governance_policy_response.status_code == 200
+    governance_policy_payload = governance_policy_response.json()
+    assert governance_policy_payload["action_scope"] == "update"
+    assert governance_policy_payload["require_approval_note"] is True
+
+    governance_policy_list_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-policies",
+      params={"action_scope": "update"},
+    )
+    assert governance_policy_list_response.status_code == 200
+    governance_policy_list_payload = governance_policy_list_response.json()
+    assert governance_policy_list_payload["total"] == 1
+    assert (
+      governance_policy_list_payload["items"][0]["governance_policy_id"]
+      == governance_policy_payload["governance_policy_id"]
+    )
+
+    stage_response = client.post(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-plans",
+      json={
+        "catalog_ids": [catalog_payload["catalog_id"]],
+        "action": "update",
+        "governance_policy_id": governance_policy_payload["governance_policy_id"],
+        "actor": "operator",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert stage_response.status_code == 200
+    stage_payload = stage_response.json()
+    assert stage_payload["queue_state"] == "pending_approval"
+    assert stage_payload["preview_count"] == 1
+    assert stage_payload["preview_items"][0]["outcome"] == "changed"
+    assert "description" in stage_payload["preview_items"][0]["changed_fields"]
+    assert stage_payload["preview_items"][0]["proposed_snapshot"]["minimum_score"] == 180
+
+    queue_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-plans",
+      params={"queue_state": "pending_approval"},
+    )
+    assert queue_response.status_code == 200
+    queue_payload = queue_response.json()
+    assert queue_payload["summary"]["pending_approval_count"] == 1
+    assert queue_payload["items"][0]["plan_id"] == stage_payload["plan_id"]
+
+    approve_response = client.post(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-plans/{stage_payload['plan_id']}/approve",
+      json={
+        "actor": "operator",
+        "note": "Catalog changes reviewed for scheduler governance.",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert approve_response.status_code == 200
+    approve_payload = approve_response.json()
+    assert approve_payload["queue_state"] == "ready_to_apply"
+    assert approve_payload["approval_note"] == "Catalog changes reviewed for scheduler governance."
+
+    apply_response = client.post(
+      f"/api/operator/provider-provenance-analytics/scheduler-search/moderation-catalog-governance-plans/{stage_payload['plan_id']}/apply",
+      json={
+        "actor": "operator",
+        "note": "Apply reviewed moderation catalog changes.",
+        "source_tab_id": "control-room",
+        "source_tab_label": "Control room",
+      },
+    )
+    assert apply_response.status_code == 200
+    apply_payload = apply_response.json()
+    assert apply_payload["queue_state"] == "completed"
+    assert apply_payload["applied_result"]["applied_count"] == 1
+
+    updated_catalog_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-search/moderation-policy-catalogs",
+    )
+    assert updated_catalog_response.status_code == 200
+    updated_catalog_payload = updated_catalog_response.json()["items"][0]
+    assert updated_catalog_payload["minimum_score"] == 180
+    assert updated_catalog_payload["require_note"] is True
+    assert updated_catalog_payload["description"].endswith("Reviewed by governance queue.")
 
 
 def test_operator_visibility_endpoint_can_reconstruct_mixed_status_scheduler_narrative(

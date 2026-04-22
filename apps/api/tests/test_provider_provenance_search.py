@@ -24,6 +24,11 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentR
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanPreviewItem
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPlanRecord
+from akra_trader.domain.models import (
+  ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPreviewItem,
+)
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionRecord
@@ -330,3 +335,121 @@ def test_http_scheduler_search_service_client_round_trips_moderation_catalogs_an
   assert listed_audits[0].actor_tab_id == "control-room"
   assert len(listed_plans) == 1
   assert listed_plans[0].preview_items[0].feedback_id == "feedback-1"
+
+
+def test_http_scheduler_search_service_client_round_trips_moderation_catalog_governance_records() -> None:
+  service = ProviderProvenanceSchedulerSearchService(
+    store=InMemoryProviderProvenanceSchedulerSearchStore()
+  )
+  service_app = create_provider_provenance_scheduler_search_service_app(
+    service=service,
+    auth_token="search-token",
+  )
+  now = datetime(2026, 4, 22, 14, 0, tzinfo=UTC)
+  policy_record = ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRecord(
+    governance_policy_id="gov-policy-1",
+    created_at=now,
+    updated_at=now,
+    name="Stage catalog changes with note",
+    action_scope="update",
+    require_approval_note=True,
+    guidance="Require a note before applying moderation catalog changes.",
+    description_append=" Reviewed by governance queue.",
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=30,
+    stale_pending_hours=24,
+    minimum_score=200,
+    require_note=True,
+    created_by_tab_id="control-room",
+    created_by_tab_label="Control room",
+  )
+  plan_record = ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanRecord(
+    plan_id="gov-plan-1",
+    created_at=now + timedelta(minutes=5),
+    updated_at=now + timedelta(minutes=5),
+    action="update",
+    status="approved",
+    queue_state="ready_to_apply",
+    governance_policy_id="gov-policy-1",
+    governance_policy_name="Stage catalog changes with note",
+    require_approval_note=True,
+    guidance="Require a note before applying moderation catalog changes.",
+    requested_catalog_ids=("catalog-1",),
+    preview_items=(
+      ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanPreviewItem(
+        catalog_id="catalog-1",
+        catalog_name="Scheduler moderation queue",
+        action="update",
+        current_status="active",
+        current_revision_id="catalog-1:r0002",
+        rollback_revision_id="catalog-1:r0002",
+        changed_fields=("minimum_score", "require_note"),
+        field_diffs={
+          "minimum_score": {"before": 150, "after": 200},
+          "require_note": {"before": False, "after": True},
+        },
+        current_snapshot={"minimum_score": 150, "require_note": False},
+        proposed_snapshot={"minimum_score": 200, "require_note": True},
+      ),
+    ),
+    default_moderation_status="approved",
+    governance_view="high_score_pending",
+    window_days=30,
+    stale_pending_hours=24,
+    minimum_score=200,
+    require_note=True,
+    created_by="operator",
+    created_by_tab_id="control-room",
+    created_by_tab_label="Control room",
+    approved_at=now + timedelta(minutes=6),
+    approved_by="operator",
+    approval_note="Stage catalog patch behind review.",
+  )
+
+  with TestClient(service_app) as service_client:
+    def fake_urlopen(request, timeout: float):
+      response = service_client.request(
+        request.get_method(),
+        request.full_url,
+        content=request.data,
+        headers=dict(request.headers),
+      )
+      body = response.content
+      if response.status_code >= 400:
+        raise urllib_error.HTTPError(
+          request.full_url,
+          response.status_code,
+          getattr(response, "reason_phrase", "search service error"),
+          hdrs=response.headers,
+          fp=BytesIO(body),
+        )
+      return FakeResponse(response.status_code, body)
+
+    backend = HttpProviderProvenanceSchedulerSearchServiceClient(
+      service_url="https://search-service.example",
+      auth_token="search-token",
+      urlopen=fake_urlopen,
+    )
+
+    saved_policy = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record(
+      policy_record
+    )
+    saved_plan = backend.save_provider_provenance_scheduler_search_moderation_catalog_governance_plan_record(
+      plan_record
+    )
+    listed_policies = (
+      backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records()
+    )
+    listed_plans = (
+      backend.list_provider_provenance_scheduler_search_moderation_catalog_governance_plan_records()
+    )
+
+  assert saved_policy.governance_policy_id == "gov-policy-1"
+  assert saved_plan.plan_id == "gov-plan-1"
+  assert len(listed_policies) == 1
+  assert listed_policies[0].require_approval_note is True
+  assert listed_policies[0].description_append == " Reviewed by governance queue."
+  assert len(listed_plans) == 1
+  assert listed_plans[0].queue_state == "ready_to_apply"
+  assert listed_plans[0].preview_items[0].changed_fields == ("minimum_score", "require_note")
