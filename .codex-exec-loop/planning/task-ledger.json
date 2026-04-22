@@ -1352,36 +1352,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Replace the app-managed scheduler search backend with a true external search service",
       "description": "Move the new dedicated scheduler retrieval backend beyond app-managed SQLAlchemy storage into a separate external search service so indexing, semantic recall, and cross-occurrence retrieval can scale independently of the API process and local relational storage lifecycle.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 76,
       "dynamic_priority_delta": 33,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T20:45:00+09:00",
+      "updated_at": "2026-04-22T20:55:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-vector-backend"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says scheduler retrieval now uses a dedicated persistent backend but still stops at app-managed SQLAlchemy storage rather than a separate external search service, making this the clearest immediate follow-up after commit 3a3f2d7.",
-      "priority_reason": "Promoted to ready because builtin next-task still needs one concrete executable continuation, and the latest main-session reply names the true external search-service step as the remaining structural retrieval gap ahead of query analytics, feedback loops, and learned relevance tuning."
+      "direction_relation_note": "Completed on main in commit 16d35bc with the API now defaulting to an HTTP-backed external_scheduler_search_service client, an embedded bridge reserved for tests or development, a separate deployable provider_provenance_search_service app, and config/bootstrap or docs updates that split scheduler retrieval behind a true external service boundary.",
+      "priority_reason": "Closed after service-client and service-app wiring, targeted pytest and compileall coverage, web typecheck/build validation, docs updates, commit, and push all landed; the latest main-session reply now leaves query analytics, feedback capture, and learned relevance tuning as the direct next continuation."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-query-analytics-feedback-loop",
       "direction_id": "operator-trust-and-discipline",
       "title": "Add query analytics, feedback capture, and learned relevance tuning for scheduler retrieval",
       "description": "Instrument scheduler narrative search with durable query analytics, result or click feedback, and learned relevance-tuning signals so boolean, full-text, and semantic ranking quality can be evaluated and improved from operator behavior instead of only static heuristics.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 74,
-      "dynamic_priority_delta": 30,
+      "dynamic_priority_delta": 34,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T20:45:00+09:00",
+      "updated_at": "2026-04-22T20:55:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-external-search-service"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says there is still no query analytics, feedback loop, or learned relevance tuning layer above the current boolean, full-text, and semantic ranking stack, but it also says the storage layer still stops short of a true external search service.",
-      "priority_reason": "This remains a clear executable follow-up, but it stays proposed behind the newly promoted external search-service queue head so builtin next-task advances through the remaining retrieval substrate change before instrumentation and learning loops settle on top of it."
+      "direction_relation_note": "The latest main-session reply says the external search-service split is now complete, but explicitly calls out missing query analytics, feedback loops, and learned relevance tuning above the existing boolean, full-text, and semantic retrieval stack.",
+      "priority_reason": "Promoted to ready because builtin next-task should continue with the only explicit remaining executable follow-up from the latest main-session reply now that the external search-service infrastructure landed in commit 16d35bc."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
