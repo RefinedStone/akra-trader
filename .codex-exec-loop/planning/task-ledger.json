@@ -49,32 +49,32 @@
     {
       "id": "task-llm-sensitivity-comparison-tooltip-helper-shared-layer-consolidation",
       "direction_id": "llm-sensitivity-decomposition",
-      "title": "Consolidate remaining comparison tooltip helpers into the shared formatter layer",
-      "description": "Pull the remaining comparison tooltip helper logic, including derived formatter paths such as `formatRelativeTimestampLabel`, behind the new shared formatter module so `RunSection.tsx` keeps shedding presentation utility ownership and the comparison tooltip boundary is fully neutral.",
-      "status": "ready",
+      "title": "Finish consolidating comparison tooltip helpers into the shared formatter layer",
+      "description": "Completed the remaining comparison tooltip helper consolidation by moving the session summary/metadata, timestamp parsing, refresh interval, hash, tuning delta, preset conflict summary, import feedback, and relative timestamp label helpers into `features/comparisonTooltipFormatters.ts`, leaving `RunSection.tsx` with only UI and DOM interaction concerns.",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 21,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T21:11:22+09:00",
+      "updated_at": "2026-04-22T21:21:56+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says there is no remaining work inside the completed extraction itself and explicitly names the next cleanup candidate: move derived formatter helpers like `formatRelativeTimestampLabel` and the rest of the comparison tooltip helper set into the same shared layer.",
-      "priority_reason": "Promoted to the sole ready queue head because the operator asked to continue with exactly one queued task, the previous head is now complete, and this is the only concrete follow-up the main session directly proposed as executable next work."
+      "direction_relation_note": "The latest main-session reply confirms this final formatter/helper pass landed in commit `7d7f409`, and explicitly states there is no remaining formatter-layer consolidation work left in `RunSection.tsx` beyond UI/DOM helpers.",
+      "priority_reason": "Marked done because the main session completed the remaining helper consolidation, validated it with `npm run typecheck` plus focused formatter/run-history tests, and pushed the result to `origin/main`."
     },
     {
       "id": "task-llm-sensitivity-application-guarded-live-provider-governance-support-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Move guarded-live and provider-governance orchestration out of application.py",
       "description": "Keep `application.py` import-compatible but peel guarded-live and provider-governance orchestration into bounded `application_support/*` or nearby use-case modules so the compatibility facade stops accumulating policy and serializer logic outside the already-split comparison path.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 88,
-      "dynamic_priority_delta": 14,
+      "dynamic_priority_delta": 17,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T19:10:00+09:00",
+      "updated_at": "2026-04-22T21:21:56+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The backend target and current-state docs both say comparison extraction is real now, but guarded-live and provider-governance orchestration still need the same treatment in application.py to satisfy the compatibility-facade goal.",
-      "priority_reason": "This remains a direct follow-up in the same lane, but it should stay proposed behind the App.tsx route-owned split so the queue keeps one deterministic next task while frontend ownership extraction continues to unblock further bounded-flow moves."
+      "direction_relation_note": "With the App.tsx and tooltip-helper decomposition stages now complete, the next still-open compatibility-facade target in this direction is the guarded-live and provider-governance orchestration that remains in `application.py`.",
+      "priority_reason": "Promoted to the sole ready queue head because the operator asked to continue with one queued task, the previous frontend consolidation head is now done, and this is the clearest executable follow-up in the same decomposition lane."
     },
     {
       "id": "task-llm-sensitivity-domain-models-operator-guarded-live-family-split",
