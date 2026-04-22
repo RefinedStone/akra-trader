@@ -1307,6 +1307,24 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
       resolved_count: number;
     }[];
   };
+  retrieval_clusters: {
+    cluster_id?: string | null;
+    rank: number;
+    label?: string | null;
+    summary?: string | null;
+    occurrence_count: number;
+    top_score: number;
+    average_score: number;
+    average_similarity_pct: number;
+    semantic_concepts: string[];
+    vector_terms: string[];
+    categories: string[];
+    statuses: string[];
+    narrative_facets: string[];
+    top_occurrence_id?: string | null;
+    top_occurrence_summary?: string | null;
+    occurrence_ids: string[];
+  }[];
   search_summary?: {
     query?: string | null;
     mode?: string | null;
@@ -1323,6 +1341,9 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     indexed_term_count: number;
     persistence_mode?: string | null;
     relevance_model?: string | null;
+    retrieval_cluster_mode?: string | null;
+    retrieval_cluster_count: number;
+    top_cluster_label?: string | null;
     parsed_terms: string[];
     parsed_phrases: string[];
     parsed_operators: string[];
@@ -1359,6 +1380,14 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
       operator_score: number;
       relevance_model?: string | null;
       ranking_reason?: string | null;
+    } | null;
+    retrieval_cluster?: {
+      cluster_id?: string | null;
+      rank: number;
+      label?: string | null;
+      similarity_pct: number;
+      semantic_concepts: string[];
+      vector_terms: string[];
     } | null;
   })[];
   total: number;

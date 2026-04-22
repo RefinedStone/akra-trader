@@ -169,6 +169,9 @@ creation.
   than a single free-text substring layer
 - that same scheduler search surface now also materializes a dedicated full-text index and boolean
   query evaluator, so future narrative tooling can build on indexed `AND` / `OR` / `NOT`
+- that same retrieval surface now also groups ranked matches into cross-occurrence
+  semantic/vector clusters, so future stitched-report tooling can pivot from narrative clusters
+  instead of only paginated occurrence rows
   retrieval instead of re-implementing linear scan matching in each workflow
 - that same scheduler search layer now also persists record-backed search projections and tuned
   relevance weighting, so future narrative retrieval can build on durable lexical projections

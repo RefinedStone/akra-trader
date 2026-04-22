@@ -11,6 +11,7 @@ from datetime import timedelta
 import hashlib
 import io
 import json
+import math
 from numbers import Number
 import re
 from threading import Lock
@@ -37835,6 +37836,357 @@ class TradingApplication:
       "ranking_reason": " · ".join(ranking_reason_parts),
     }
 
+  @staticmethod
+  def _humanize_provider_provenance_scheduler_retrieval_feature(
+    feature: str,
+  ) -> str:
+    if not isinstance(feature, str) or not feature.strip():
+      return ""
+    _, _, raw_value = feature.partition(":")
+    normalized_value = raw_value or feature
+    return normalized_value.replace("_", " ").replace("->", " -> ").strip()
+
+  @classmethod
+  def _build_provider_provenance_scheduler_alert_occurrence_retrieval_vector(
+    cls,
+    *,
+    row: Mapping[str, Any],
+    search_match: Mapping[str, Any],
+    document: Mapping[str, Any],
+  ) -> dict[str, float]:
+    alert = row.get("alert")
+    narrative = row.get("narrative")
+    if not isinstance(alert, OperatorAlert):
+      return {}
+    vector: dict[str, float] = {}
+
+    def add_feature(feature: str | None, weight: float) -> None:
+      if not isinstance(feature, str) or not feature.strip():
+        return
+      vector[feature] = vector.get(feature, 0.0) + weight
+
+    for concept in document.get("semantic_concepts", ()) or ():
+      if isinstance(concept, str):
+        add_feature(f"concept:{concept}", 3.0)
+    for concept in search_match.get("semantic_concepts", ()) or ():
+      if isinstance(concept, str):
+        add_feature(f"concept:{concept}", 4.5)
+    for term in search_match.get("matched_terms", ()) or ():
+      if isinstance(term, str):
+        add_feature(f"term:{term}", 3.0)
+    for phrase in search_match.get("matched_phrases", ()) or ():
+      if isinstance(phrase, str):
+        add_feature(f"phrase:{phrase}", 4.0)
+        for token in cls._tokenize_provider_provenance_scheduler_alert_search_query(phrase):
+          add_feature(f"term:{token}", 1.5)
+
+    add_feature(f"category:{alert.category}", 2.6)
+    add_feature(f"status:{alert.status}", 2.2)
+    add_feature(f"severity:{alert.severity}", 1.2)
+    add_feature(f"source:{alert.source}", 1.0)
+
+    if isinstance(narrative, Mapping):
+      facet = narrative.get("facet")
+      if isinstance(facet, str) and facet.strip():
+        add_feature(f"facet:{facet}", 2.1)
+      for flag in narrative.get("facet_flags", ()) or ():
+        if isinstance(flag, str) and flag.strip():
+          add_feature(f"flag:{flag}", 1.6)
+      status_sequence = tuple(
+        status
+        for status in narrative.get("status_sequence", ()) or ()
+        if isinstance(status, str) and status.strip()
+      )
+      if status_sequence:
+        add_feature(f"sequence:{'->'.join(status_sequence)}", 2.8)
+        for status in status_sequence:
+          add_feature(f"sequence_state:{status}", 1.0)
+
+    primary_focus = alert.primary_focus
+    if primary_focus is not None:
+      if isinstance(primary_focus.symbol, str) and primary_focus.symbol.strip():
+        add_feature(f"focus:{primary_focus.symbol.strip().lower()}", 1.8)
+      if isinstance(primary_focus.timeframe, str) and primary_focus.timeframe.strip():
+        add_feature(f"focus:{primary_focus.timeframe.strip().lower()}", 1.4)
+      if isinstance(primary_focus.policy, str) and primary_focus.policy.strip():
+        add_feature(f"focus_policy:{primary_focus.policy.strip().lower()}", 1.2)
+      if isinstance(primary_focus.reason, str) and primary_focus.reason.strip():
+        for token in cls._tokenize_provider_provenance_scheduler_alert_search_query(
+          primary_focus.reason
+        ):
+          add_feature(f"term:{token}", 0.8)
+
+    for value in document.get("normalized_fields", {}).get("market_context", ()) or ():
+      if not isinstance(value, str):
+        continue
+      for token in cls._tokenize_provider_provenance_scheduler_alert_search_query(value):
+        add_feature(f"term:{token}", 0.8)
+    for value in document.get("normalized_fields", {}).get("summary", ()) or ():
+      if not isinstance(value, str):
+        continue
+      for token in cls._tokenize_provider_provenance_scheduler_alert_search_query(value):
+        if token in search_match.get("matched_terms", ()):
+          add_feature(f"term:{token}", 0.6)
+    return vector
+
+  @staticmethod
+  def _calculate_provider_provenance_scheduler_retrieval_similarity(
+    left: Mapping[str, float],
+    right: Mapping[str, float],
+  ) -> float:
+    if not left or not right:
+      return 0.0
+    if len(left) <= len(right):
+      dot_product = sum(weight * right.get(key, 0.0) for key, weight in left.items())
+    else:
+      dot_product = sum(weight * left.get(key, 0.0) for key, weight in right.items())
+    if dot_product <= 0:
+      return 0.0
+    left_norm = math.sqrt(sum(weight * weight for weight in left.values()))
+    right_norm = math.sqrt(sum(weight * weight for weight in right.values()))
+    if left_norm <= 0 or right_norm <= 0:
+      return 0.0
+    return dot_product / (left_norm * right_norm)
+
+  @staticmethod
+  def _merge_provider_provenance_scheduler_retrieval_vectors(
+    vectors: Iterable[Mapping[str, float]],
+  ) -> dict[str, float]:
+    merged: dict[str, float] = {}
+    for vector in vectors:
+      for key, weight in vector.items():
+        merged[key] = merged.get(key, 0.0) + float(weight)
+    return merged
+
+  @classmethod
+  def _build_provider_provenance_scheduler_retrieval_cluster_label(
+    cls,
+    *,
+    semantic_concepts: tuple[str, ...],
+    categories: tuple[str, ...],
+    statuses: tuple[str, ...],
+  ) -> str:
+    label_parts: list[str] = []
+    if semantic_concepts:
+      label_parts.append(" / ".join(cls._humanize_provider_provenance_scheduler_retrieval_feature(f"concept:{concept}") for concept in semantic_concepts[:2]))
+    if categories:
+      label_parts.append(
+        cls._humanize_provider_provenance_scheduler_retrieval_feature(f"category:{categories[0]}")
+      )
+    if statuses:
+      label_parts.append(
+        cls._humanize_provider_provenance_scheduler_retrieval_feature(f"status:{statuses[0]}")
+      )
+    label = " · ".join(part for part in label_parts if part)
+    return label or "Cross-occurrence retrieval cluster"
+
+  @classmethod
+  def _cluster_provider_provenance_scheduler_alert_occurrence_search_results(
+    cls,
+    *,
+    rows: tuple[Mapping[str, Any], ...],
+    index: Mapping[str, Any],
+  ) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
+    if not rows:
+      return (), ()
+    documents_by_id = {
+      int(document.get("document_id", -1)): document
+      for document in index.get("documents", ()) or ()
+      if isinstance(document, Mapping)
+    }
+    raw_clusters: list[dict[str, Any]] = []
+    similarity_threshold = 0.46
+    for result_index, row in enumerate(rows):
+      search_match = row.get("search_match")
+      document_id = row.get("_search_document_id")
+      document = documents_by_id.get(int(document_id)) if isinstance(document_id, int) else None
+      if not isinstance(search_match, Mapping) or not isinstance(document, Mapping):
+        continue
+      vector = cls._build_provider_provenance_scheduler_alert_occurrence_retrieval_vector(
+        row=row,
+        search_match=search_match,
+        document=document,
+      )
+      best_cluster_index: int | None = None
+      best_similarity = 0.0
+      for cluster_index, cluster in enumerate(raw_clusters):
+        similarity = cls._calculate_provider_provenance_scheduler_retrieval_similarity(
+          vector,
+          cluster["centroid"],
+        )
+        if similarity > best_similarity:
+          best_similarity = similarity
+          best_cluster_index = cluster_index
+      if best_cluster_index is None or best_similarity < similarity_threshold:
+        raw_clusters.append(
+          {
+            "items": [
+              {
+                "result_index": result_index,
+                "row": row,
+                "vector": vector,
+                "similarity": 1.0,
+              }
+            ],
+            "centroid": dict(vector),
+          }
+        )
+        continue
+      cluster = raw_clusters[best_cluster_index]
+      cluster["items"].append(
+        {
+          "result_index": result_index,
+          "row": row,
+          "vector": vector,
+          "similarity": best_similarity,
+        }
+      )
+      cluster["centroid"] = cls._merge_provider_provenance_scheduler_retrieval_vectors(
+        item["vector"] for item in cluster["items"]
+      )
+
+    ordered_clusters = sorted(
+      raw_clusters,
+      key=lambda cluster: (
+        max(
+          (
+            int(item["row"].get("search_match", {}).get("score", 0))
+            for item in cluster["items"]
+          ),
+          default=0,
+        ),
+        len(cluster["items"]),
+      ),
+      reverse=True,
+    )
+    cluster_payloads: list[dict[str, Any]] = []
+    retrieval_cluster_by_result_index: dict[int, dict[str, Any]] = {}
+    for cluster_rank, cluster in enumerate(ordered_clusters, start=1):
+      sorted_items = sorted(
+        cluster["items"],
+        key=lambda item: (
+          int(item["row"].get("search_match", {}).get("score", 0)),
+          item["row"]["alert"].resolved_at or item["row"]["alert"].detected_at,
+        ),
+        reverse=True,
+      )
+      top_occurrence = sorted_items[0]["row"]["alert"]
+      semantic_counts: dict[str, int] = {}
+      category_counts: dict[str, int] = {}
+      status_counts: dict[str, int] = {}
+      facet_counts: dict[str, int] = {}
+      for item in sorted_items:
+        row = item["row"]
+        alert = row.get("alert")
+        narrative = row.get("narrative")
+        search_match = row.get("search_match", {})
+        if isinstance(search_match, Mapping):
+          for concept in search_match.get("semantic_concepts", ()) or ():
+            if isinstance(concept, str):
+              semantic_counts[concept] = semantic_counts.get(concept, 0) + 1
+        if isinstance(alert, OperatorAlert):
+          category_counts[alert.category] = category_counts.get(alert.category, 0) + 1
+          status_counts[alert.status] = status_counts.get(alert.status, 0) + 1
+        if isinstance(narrative, Mapping):
+          facet = narrative.get("facet")
+          if isinstance(facet, str) and facet.strip():
+            facet_counts[facet] = facet_counts.get(facet, 0) + 1
+      sorted_semantic_concepts = tuple(
+        concept
+        for concept, _ in sorted(
+          semantic_counts.items(),
+          key=lambda item: (-item[1], item[0]),
+        )
+      )
+      sorted_categories = tuple(
+        category_key
+        for category_key, _ in sorted(
+          category_counts.items(),
+          key=lambda item: (-item[1], item[0]),
+        )
+      )
+      sorted_statuses = tuple(
+        status_key
+        for status_key, _ in sorted(
+          status_counts.items(),
+          key=lambda item: (-item[1], item[0]),
+        )
+      )
+      sorted_facets = tuple(
+        facet_key
+        for facet_key, _ in sorted(
+          facet_counts.items(),
+          key=lambda item: (-item[1], item[0]),
+        )
+      )
+      top_vector_terms = tuple(
+        dict.fromkeys(
+          cls._humanize_provider_provenance_scheduler_retrieval_feature(feature)
+          for feature, _ in sorted(
+            cluster["centroid"].items(),
+            key=lambda item: (-item[1], item[0]),
+          )
+          if feature.startswith(("concept:", "term:", "phrase:", "sequence:", "focus:"))
+        )
+      )[:5]
+      label = cls._build_provider_provenance_scheduler_retrieval_cluster_label(
+        semantic_concepts=sorted_semantic_concepts,
+        categories=sorted_categories,
+        statuses=sorted_statuses,
+      )
+      cluster_id = f"cluster-{cluster_rank}"
+      score_values = [
+        int(item["row"].get("search_match", {}).get("score", 0))
+        for item in sorted_items
+      ]
+      similarity_values = [float(item.get("similarity", 0.0)) for item in sorted_items]
+      summary = (
+        f"{len(sorted_items)} occurrence(s) grouped around {label.lower()}"
+      )
+      cluster_payload = {
+        "cluster_id": cluster_id,
+        "rank": cluster_rank,
+        "label": label,
+        "summary": summary,
+        "occurrence_count": len(sorted_items),
+        "top_score": max(score_values, default=0),
+        "average_score": int(round(sum(score_values) / len(score_values))) if score_values else 0,
+        "average_similarity_pct": int(round((sum(similarity_values) / len(similarity_values)) * 100))
+        if similarity_values
+        else 0,
+        "semantic_concepts": sorted_semantic_concepts[:5],
+        "vector_terms": top_vector_terms,
+        "categories": sorted_categories,
+        "statuses": sorted_statuses,
+        "narrative_facets": sorted_facets,
+        "top_occurrence_id": top_occurrence.occurrence_id,
+        "top_occurrence_summary": top_occurrence.summary,
+        "occurrence_ids": tuple(
+          item["row"]["alert"].occurrence_id
+          for item in sorted_items
+          if isinstance(item["row"]["alert"].occurrence_id, str)
+        ),
+      }
+      cluster_payloads.append(cluster_payload)
+      for item in sorted_items:
+        retrieval_cluster_by_result_index[item["result_index"]] = {
+          "cluster_id": cluster_id,
+          "rank": cluster_rank,
+          "label": label,
+          "similarity_pct": int(round(float(item.get("similarity", 0.0)) * 100)),
+          "semantic_concepts": list(cluster_payload["semantic_concepts"]),
+          "vector_terms": list(cluster_payload["vector_terms"]),
+        }
+
+    enriched_rows = tuple(
+      {
+        **row,
+        "retrieval_cluster": retrieval_cluster_by_result_index.get(result_index),
+      }
+      for result_index, row in enumerate(rows)
+    )
+    return enriched_rows, tuple(cluster_payloads)
+
   @classmethod
   def _build_provider_provenance_scheduler_alert_occurrence_search_match(
     cls,
@@ -38157,6 +38509,7 @@ class TradingApplication:
         continue
       eligible_history.append(row)
     filtered_history: list[dict[str, Any]] = []
+    retrieval_clusters: tuple[dict[str, Any], ...] = ()
     parsed_search = (
       self._parse_provider_provenance_scheduler_alert_search_query(normalized_search)
       if normalized_search is not None
@@ -38183,7 +38536,13 @@ class TradingApplication:
         )
         if search_match is None:
           continue
-        filtered_history.append({**row, "search_match": search_match})
+        filtered_history.append(
+          {
+            **row,
+            "search_match": search_match,
+            "_search_document_id": matched_document_id,
+          }
+        )
     else:
       filtered_history = [{**row, "search_match": None} for row in eligible_history]
     if normalized_search is not None:
@@ -38199,6 +38558,11 @@ class TradingApplication:
         ),
         reverse=True,
       )
+      clustered_history, retrieval_clusters = self._cluster_provider_provenance_scheduler_alert_occurrence_search_results(
+        rows=tuple(filtered_history),
+        index=search_index,
+      )
+      filtered_history = list(clustered_history)
     total = len(filtered_history)
     items = filtered_history[normalized_offset:normalized_offset + normalized_limit]
     next_offset = (
@@ -38285,6 +38649,13 @@ class TradingApplication:
         ),
         "semantic_concepts": tuple(parsed_search.get("semantic_concepts", ())),
         "query_plan": tuple(parsed_search.get("query_plan", ())),
+        "retrieval_cluster_mode": "cross_occurrence_semantic_vector_cluster_v1",
+        "retrieval_cluster_count": len(retrieval_clusters),
+        "top_cluster_label": (
+          retrieval_clusters[0].get("label")
+          if retrieval_clusters
+          else None
+        ),
       }
     return {
       "generated_at": current_time,
@@ -38313,6 +38684,7 @@ class TradingApplication:
         "by_category": summary_by_category,
       },
       "search_summary": search_summary,
+      "retrieval_clusters": retrieval_clusters,
       "items": tuple(items),
       "total": total,
       "returned": len(items),
@@ -39444,6 +39816,7 @@ class TradingApplication:
             ),
           },
           "search_match": deepcopy(occurrence.get("search_match")),
+          "retrieval_cluster": deepcopy(occurrence.get("retrieval_cluster")),
           "window_started_at": occurrence_context["detected_at"].isoformat(),
           "window_ended_at": occurrence_context["export_window_end"].isoformat(),
           "record_count": len(occurrence_records),
@@ -39627,6 +40000,7 @@ class TradingApplication:
         "previous_offset": alert_history_payload["previous_offset"],
       },
       "search_summary": alert_history_payload.get("search_summary"),
+      "retrieval_clusters": alert_history_payload.get("retrieval_clusters"),
       "occurrences": occurrence_payloads,
       "stitched_status_sequence": stitched_segments,
       "by_category": tuple(by_category[key] for key in sorted(by_category)),
@@ -39663,6 +40037,8 @@ class TradingApplication:
       "occurrence_detected_at",
       "occurrence_resolved_at",
       "narrative_mode",
+      "retrieval_cluster_id",
+      "retrieval_cluster_label",
       "record_id",
       "recorded_at",
       "status",
@@ -39684,6 +40060,7 @@ class TradingApplication:
       alert = row["occurrence"]["alert"]
       occurrence_context = row["context"]
       record = row["record"]
+      retrieval_cluster = row["occurrence"].get("retrieval_cluster", {})
       serialized = serialize_provider_provenance_scheduler_health_record(record)
       writer.writerow(
         {
@@ -39693,6 +40070,8 @@ class TradingApplication:
           "occurrence_detected_at": alert.detected_at.isoformat(),
           "occurrence_resolved_at": alert.resolved_at.isoformat() if alert.resolved_at is not None else "",
           "narrative_mode": occurrence_context["normalized_narrative_mode"],
+          "retrieval_cluster_id": retrieval_cluster.get("cluster_id", ""),
+          "retrieval_cluster_label": retrieval_cluster.get("label", ""),
           "record_id": serialized["record_id"],
           "recorded_at": serialized["recorded_at"],
           "status": serialized["status"],
@@ -42455,6 +42834,11 @@ def serialize_provider_provenance_scheduler_alert_history(
         "indexed_term_count": int(payload.get("search_summary", {}).get("indexed_term_count", 0)),
         "persistence_mode": payload.get("search_summary", {}).get("persistence_mode"),
         "relevance_model": payload.get("search_summary", {}).get("relevance_model"),
+        "retrieval_cluster_mode": payload.get("search_summary", {}).get("retrieval_cluster_mode"),
+        "retrieval_cluster_count": int(
+          payload.get("search_summary", {}).get("retrieval_cluster_count", 0)
+        ),
+        "top_cluster_label": payload.get("search_summary", {}).get("top_cluster_label"),
         "parsed_terms": list(payload.get("search_summary", {}).get("parsed_terms", ())),
         "parsed_phrases": list(payload.get("search_summary", {}).get("parsed_phrases", ())),
         "parsed_operators": list(payload.get("search_summary", {}).get("parsed_operators", ())),
@@ -42464,6 +42848,28 @@ def serialize_provider_provenance_scheduler_alert_history(
       if isinstance(payload.get("search_summary"), dict)
       else None
     ),
+    "retrieval_clusters": [
+      {
+        "cluster_id": entry.get("cluster_id"),
+        "rank": int(entry.get("rank", 0)),
+        "label": entry.get("label"),
+        "summary": entry.get("summary"),
+        "occurrence_count": int(entry.get("occurrence_count", 0)),
+        "top_score": int(entry.get("top_score", 0)),
+        "average_score": int(entry.get("average_score", 0)),
+        "average_similarity_pct": int(entry.get("average_similarity_pct", 0)),
+        "semantic_concepts": list(entry.get("semantic_concepts", ())),
+        "vector_terms": list(entry.get("vector_terms", ())),
+        "categories": list(entry.get("categories", ())),
+        "statuses": list(entry.get("statuses", ())),
+        "narrative_facets": list(entry.get("narrative_facets", ())),
+        "top_occurrence_id": entry.get("top_occurrence_id"),
+        "top_occurrence_summary": entry.get("top_occurrence_summary"),
+        "occurrence_ids": list(entry.get("occurrence_ids", ())),
+      }
+      for entry in payload.get("retrieval_clusters", ())
+      if isinstance(entry, dict)
+    ],
     "items": [
       {
         **serialize_operator_alert(
@@ -42547,6 +42953,22 @@ def serialize_provider_provenance_scheduler_alert_history(
             "ranking_reason": item.get("search_match", {}).get("ranking_reason"),
           }
           if isinstance(item, dict) and isinstance(item.get("search_match"), dict)
+          else None
+        ),
+        "retrieval_cluster": (
+          {
+            "cluster_id": item.get("retrieval_cluster", {}).get("cluster_id"),
+            "rank": int(item.get("retrieval_cluster", {}).get("rank", 0)),
+            "label": item.get("retrieval_cluster", {}).get("label"),
+            "similarity_pct": int(item.get("retrieval_cluster", {}).get("similarity_pct", 0)),
+            "semantic_concepts": list(
+              item.get("retrieval_cluster", {}).get("semantic_concepts", ())
+            ),
+            "vector_terms": list(
+              item.get("retrieval_cluster", {}).get("vector_terms", ())
+            ),
+          }
+          if isinstance(item, dict) and isinstance(item.get("retrieval_cluster"), dict)
           else None
         ),
       }

@@ -124,6 +124,8 @@ unclear dataset lineage.
   context operators before exporting a stitched handoff narrative
 - that full-text path now also reuses persisted scheduler search projections and tuned relevance
   scoring, so repeated incident review searches do not depend on rebuilding every lexical hint
+- that same retrieval path now also emits cross-occurrence semantic/vector clusters, so a handoff
+  can start from grouped recovery or failure narratives instead of only a flat ranked result set
   from scratch before ranking results
 - those saved scheduler narrative templates and boards now also support edit, delete, and
   revision-restore workflow, so teams can correct or retire shared review lenses without losing

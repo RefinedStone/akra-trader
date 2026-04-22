@@ -670,6 +670,22 @@ function formatProviderProvenanceSchedulerSearchMatchSummary(
   return `Search score ${searchMatch.score} · ${searchMatch.term_coverage_pct}% coverage · ${searchMatch.matched_fields.join(", ") || "ranked fields"}${operatorSummary}${semanticSummary}`;
 }
 
+function formatProviderProvenanceSchedulerRetrievalClusterSummary(
+  cluster:
+    | ProviderProvenanceSchedulerAlertHistoryPayload["retrieval_clusters"][number]
+    | ProviderProvenanceSchedulerAlertHistoryPayload["items"][number]["retrieval_cluster"]
+    | null
+    | undefined,
+) {
+  if (!cluster) {
+    return null;
+  }
+  const label = cluster.label ?? "Cross-occurrence cluster";
+  const rank = typeof cluster.rank === "number" && cluster.rank > 0 ? `Cluster ${cluster.rank}` : "Cluster";
+  const similarity = "similarity_pct" in cluster ? ` · similarity ${cluster.similarity_pct}%` : "";
+  return `${rank} · ${label}${similarity}`;
+}
+
 function buildProviderProvenanceSchedulerAlertWorkflowReason(
   alert: OperatorVisibilityAlertEntry,
   mode: "workflow" | "escalation",
@@ -6158,6 +6174,11 @@ export default function App() {
 
   const providerProvenanceSchedulerAlertTimelineItems = useMemo(
     () => providerProvenanceSchedulerAlertHistory?.items ?? [],
+    [providerProvenanceSchedulerAlertHistory],
+  );
+
+  const providerProvenanceSchedulerAlertRetrievalClusters = useMemo(
+    () => providerProvenanceSchedulerAlertHistory?.retrieval_clusters ?? [],
     [providerProvenanceSchedulerAlertHistory],
   );
 
@@ -18931,6 +18952,14 @@ export default function App() {
                                           : "Ephemeral index"} · {providerProvenanceSchedulerAlertHistory.search_summary.relevance_model}
                                       </span>
                                     ) : null}
+                                    {providerProvenanceSchedulerAlertHistory?.search_summary?.retrieval_cluster_count ? (
+                                      <span className="run-filter-summary-chip">
+                                        Clustered {providerProvenanceSchedulerAlertHistory.search_summary.retrieval_cluster_count} group(s)
+                                        {providerProvenanceSchedulerAlertHistory.search_summary.top_cluster_label
+                                          ? ` · top ${providerProvenanceSchedulerAlertHistory.search_summary.top_cluster_label}`
+                                          : ""}
+                                      </span>
+                                    ) : null}
                                   </div>
                                   <div className="market-data-provenance-history-actions">
                                     <label className="run-form-field">
@@ -19090,6 +19119,66 @@ export default function App() {
                                         : "Page 1"}
                                     </span>
                                   </div>
+                                  {providerProvenanceSchedulerAlertRetrievalClusters.length ? (
+                                    <>
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Cross-occurrence retrieval clusters</strong>
+                                        <p>
+                                          Semantic/vector clustering groups related scheduler occurrences across the
+                                          current search slice so review can start from recovery or failure narratives
+                                          instead of single rows.
+                                        </p>
+                                      </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Cluster</th>
+                                            <th>Coverage</th>
+                                            <th>Signals</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerAlertRetrievalClusters.map((cluster) => (
+                                            <tr key={`provider-scheduler-retrieval-cluster-${cluster.cluster_id ?? cluster.rank}`}>
+                                              <td>
+                                                <strong>{cluster.label ?? `Cluster ${cluster.rank}`}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  Rank {cluster.rank} · {cluster.occurrence_count} occurrence(s)
+                                                </p>
+                                                {cluster.top_occurrence_summary ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Top occurrence {cluster.top_occurrence_summary}
+                                                  </p>
+                                                ) : null}
+                                              </td>
+                                              <td>
+                                                <strong>Top {cluster.top_score}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  Avg {cluster.average_score} · similarity {cluster.average_similarity_pct}%
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {cluster.summary ?? "Cross-occurrence retrieval cluster"}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <strong>
+                                                  {cluster.semantic_concepts.length
+                                                    ? cluster.semantic_concepts.join(" · ")
+                                                    : "No dominant semantic concept"}
+                                                </strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  Vector {cluster.vector_terms.join(" · ") || "n/a"}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {cluster.categories.join(" · ") || "n/a"} · {cluster.statuses.join(" · ") || "n/a"}
+                                                </p>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </>
+                                  ) : null}
                                   {providerProvenanceSchedulerAlertHistoryLoading && !providerProvenanceSchedulerAlertTimelineItems.length ? (
                                     <p className="empty-state">Loading scheduler alert timeline…</p>
                                   ) : null}
@@ -19140,6 +19229,11 @@ export default function App() {
                                                     {formatProviderProvenanceSchedulerSearchMatchSummary(alert.search_match)}
                                                   </p>
                                                 ) : null}
+                                                {alert.retrieval_cluster ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatProviderProvenanceSchedulerRetrievalClusterSummary(alert.retrieval_cluster)}
+                                                  </p>
+                                                ) : null}
                                                 {alert.narrative.can_reconstruct_narrative ? (
                                                   <p className="run-lineage-symbol-copy">
                                                     Sequence {alert.narrative.status_sequence.join(" → ") || "n/a"}
@@ -19188,6 +19282,11 @@ export default function App() {
                                                 {alert.search_match?.relevance_model ? (
                                                   <p className="run-lineage-symbol-copy">
                                                     Relevance {alert.search_match.relevance_model} · lexical {alert.search_match.lexical_score} · semantic {alert.search_match.semantic_score} · operator {alert.search_match.operator_score}
+                                                  </p>
+                                                ) : null}
+                                                {alert.retrieval_cluster?.vector_terms.length ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Cluster vector {alert.retrieval_cluster.vector_terms.join(" · ")}
                                                   </p>
                                                 ) : null}
                                                 <div className="market-data-provenance-history-actions">

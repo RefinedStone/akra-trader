@@ -226,6 +226,9 @@ It is not yet a finished live trading product:
   boolean query engine, so operators can issue structured searches like
   `status:resolved AND (recovered OR healthy) AND NOT category:failure` and get ranked results
   from indexed scheduler narrative documents instead of only linear scan filtering
+- that same scheduler search now also clusters matched occurrences into cross-occurrence
+  semantic/vector retrieval groups, so operators can review stitched recovery or failure
+  narratives as ranked clusters instead of scanning one occurrence row at a time
 - that same scheduler search layer now also persists record-backed search projections and uses
   tuned ranked relevance, so the boolean/full-text path can reuse saved scheduler index material
   and score matches with stronger lexical weighting than the earlier flat scan

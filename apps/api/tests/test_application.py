@@ -1947,11 +1947,17 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   assert search_payload["search_summary"]["indexed_term_count"] > 0
   assert search_payload["search_summary"]["persistence_mode"] == "record_backed_scheduler_search_projection"
   assert search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_v1"
+  assert (
+    search_payload["search_summary"]["retrieval_cluster_mode"]
+    == "cross_occurrence_semantic_vector_cluster_v1"
+  )
+  assert search_payload["search_summary"]["retrieval_cluster_count"] >= 1
   assert "recovery" in search_payload["search_summary"]["semantic_concepts"]
   assert "AND" in search_payload["search_summary"]["query_plan"]
   assert "OR" in search_payload["search_summary"]["query_plan"]
   assert "NOT" in search_payload["search_summary"]["query_plan"]
   assert search_payload["returned"] >= 1
+  assert search_payload["retrieval_clusters"]
   assert any(
     item["narrative"]["has_post_resolution_history"]
     for item in search_payload["items"]
@@ -1960,6 +1966,8 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   assert "status:resolved" in search_payload["items"][0]["search_match"]["operator_hits"]
   assert "recovery" in search_payload["items"][0]["search_match"]["semantic_concepts"]
   assert search_payload["items"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_v1"
+  assert search_payload["items"][0]["retrieval_cluster"]["cluster_id"]
+  assert search_payload["items"][0]["retrieval_cluster"]["label"]
 
 
 def test_provider_provenance_scheduler_history_and_analytics_persist(
