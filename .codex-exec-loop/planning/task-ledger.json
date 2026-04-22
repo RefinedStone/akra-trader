@@ -320,31 +320,31 @@
       "id": "task-llm-sensitivity-guarded-live-alert-workflows-escalation-sync-orchestration-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split guarded-live incident escalation and workflow sync orchestration out of guarded_live_alert_workflows.py",
-      "description": "Continue the guarded-live decomposition by extracting the remaining incident workflow escalation/sync block from `application_support/guarded_live_alert_workflows.py` into a bounded orchestration module while preserving the existing compatibility import surface.",
-      "status": "ready",
+      "description": "Completed the guarded-live escalation/workflow-sync split by moving `_refresh_guarded_live_incident_workflow`, `_sync_incident_provider_workflow`, and `_escalate_incident_event` ownership into `application_support/guarded_live_incident_workflow_orchestration.py`, leaving `guarded_live_alert_workflows.py` as a thin compatibility shim for that surface.",
+      "status": "done",
       "base_priority": 95,
       "dynamic_priority_delta": 39,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T23:23:02+09:00",
+      "updated_at": "2026-04-22T23:31:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the just-finished incident-event/refresh split leaves the incident workflow escalation/sync block around `guarded_live_alert_workflows.py:306` as the next decomposition candidate in the same area.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task, the prior queue head is now complete, and the latest main-session reply explicitly names the escalation/sync block as the next executable follow-up in this bounded guarded-live workflow slice."
+      "direction_relation_note": "The latest main-session reply confirms escalation/workflow-sync ownership now lives in `guarded_live_incident_workflow_orchestration.py`, with `guarded_live_alert_workflows.py` reduced to an import-stable shim for the extracted surface.",
+      "priority_reason": "Marked done because the main session completed the split, validated it with `python -m py_compile` plus targeted guarded-live application/API pytest coverage, and pushed commit `14bfce6` to `origin/main`."
     },
     {
       "id": "task-llm-sensitivity-guarded-live-alert-workflows-live-operator-alert-builder-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split live operator alert builder ownership out of guarded_live_alert_workflows.py",
       "description": "Extract the remaining live operator alert builder from `application_support/guarded_live_alert_workflows.py` into a bounded support module so the workflow file can stay focused on orchestration and compatibility imports.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 93,
-      "dynamic_priority_delta": 35,
+      "dynamic_priority_delta": 41,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T23:23:02+09:00",
+      "updated_at": "2026-04-22T23:31:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply identifies the live operator alert builder as another remaining decomposition candidate in `guarded_live_alert_workflows.py`, but frames it after the escalation/sync block rather than as the immediate next step.",
-      "priority_reason": "Kept proposed because it is clearly executable but the latest main-session reply gives the incident escalation/sync block stronger immediate-next-task evidence for builtin queue continuation."
+      "direction_relation_note": "The latest main-session reply says there is no remaining work in the completed escalation/sync split and explicitly identifies the live operator alert builder block after `guarded_live_alert_workflows.py:314` as the next decomposition candidate in the same file.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task, the previous queue head just completed, and the latest main-session reply directly names the live operator alert builder block as the next executable follow-up for builtin queue continuation."
     },
     {
       "id": "task-llm-sensitivity-domain-models-operator-guarded-live-family-split",
@@ -356,10 +356,10 @@
       "dynamic_priority_delta": 10,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T21:30:00+09:00",
+      "updated_at": "2026-04-22T23:31:00+09:00",
       "source_turn_id": null,
       "direction_relation_note": "The direction detail and current-state docs explicitly note that provider-provenance records already moved behind domain/models.py compatibility imports, while the remaining operator and guarded-live families still need the same bounded-family treatment.",
-      "priority_reason": "This remains executable but stays proposed because the latest main-session reply points to finishing the remaining `application.py` support/helper decomposition first, so opening a second backend compatibility split now would dilute the immediate continuation."
+      "priority_reason": "This remains executable but stays proposed because the latest main-session reply gives a narrower immediate-next-task signal for the remaining `guarded_live_alert_workflows.py` live operator alert builder block, so switching to `domain/models.py` now would interrupt the active guarded-live decomposition chain."
     }
   ]
 }
