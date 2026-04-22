@@ -1024,18 +1024,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add stitched-governance-registry-specific approval queue and policy catalog surfaces",
       "description": "Extend stitched-report governance registries beyond the shared scheduler governance queue and generic policy-catalog surface by adding a stitched-governance-registry-specific approval queue view and dedicated policy-catalog workspace so operators can review pending stitched_report_governance_registry plans and reusable governance defaults from a purpose-built product surface.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 84,
       "dynamic_priority_delta": 33,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T14:07:27+09:00",
+      "updated_at": "2026-04-22T14:19:37+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-stitched-report-registry-approval-policy-layer"
       ],
-      "direction_relation_note": "The latest main-session reply says stitched-report governance registries now use the shared staged approval and reusable policy layer, but they still do not expose a stitched-governance-registry-specific approval queue or policy-catalog product surface separate from the shared scheduler governance queue.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task, the latest main-session reply names this as the remaining direct stitched-registry follow-up, and builtin next-task should advance through this explicit surface split before returning to the larger deeper scheduler narrative search gap."
+      "direction_relation_note": "Completed on main in commit 8ee8705 with stitched-governance-registry-specific approval queue and policy catalog panels added to the control room, including dedicated filter/search/sort surfaces and direct review or approve or apply or rollback or use-defaults actions for stitched_report_governance_registry entries.",
+      "priority_reason": "Closed after App.tsx operator surfaces and current-state or incident-response or roadmap doc updates landed with web typecheck and build verification; the latest main-session reply now leaves registry-dedicated backend governance records as the direct continuation ahead of the larger deeper scheduler narrative search gap."
+    },
+    {
+      "id": "task-b1-provider-market-context-stitched-report-registry-dedicated-record-layer",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Split stitched-governance-registry plan and policy records out of the shared scheduler governance layer",
+      "description": "Replace reuse of the shared scheduler governance plan and policy records behind stitched-governance-registry approval queues and policy catalogs with stitched-report-governance-registry-dedicated record types or storage semantics so the new registry-specific workspace is backed by a durable domain model instead of shared scheduler internals.",
+      "status": "done",
+      "base_priority": 85,
+      "dynamic_priority_delta": 34,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T14:47:26+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-stitched-report-registry-dedicated-governance-workspace"
+      ],
+      "direction_relation_note": "Completed on main in commit 8dc1f82 with stitched-governance-registry-dedicated policy template, policy catalog, and governance plan repositories wired through application.py, in-memory and SQLAlchemy adapters, standalone stitched registry routes, and control-room consumers that now use stitched-registry-specific APIs instead of shared scheduler governance records.",
+      "priority_reason": "Closed after targeted application and API pytest coverage, compileall verification, web typecheck and build, docs current-state or incident-response or roadmap updates, commit, and push all landed; the latest main-session reply says the remaining larger gap is deeper server-side scheduler narrative search rather than further stitched-registry record splitting."
     },
     {
       "id": "task-b1-provider-market-context-hierarchy-step-template-queue-view-workspace",
@@ -1186,12 +1204,12 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add deeper server-side search for scheduler occurrence timelines",
       "description": "Extend the new scheduler-only occurrence history surface with deeper server-side search and narrative-oriented query controls beyond category or status filters so operators can isolate specific occurrence windows, recovery stories, and related scheduler records without relying on oversized client-side scans.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 75,
-      "dynamic_priority_delta": 22,
+      "dynamic_priority_delta": 36,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T21:05:00+09:00",
+      "updated_at": "2026-04-22T14:47:26+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
@@ -1199,8 +1217,8 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-templates",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit df328ba still calls out deeper server-side scheduler narrative search as the larger unchanged open area, but it is now secondary to the newly explicit stitched-report registry approval or policy layer gap.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the stitched-report registry staged-approval and policy queue head so builtin next-task advances through the direct continuation order from the latest main-session reply before taking on the broader search expansion."
+      "direction_relation_note": "The latest main-session reply after commit 8dc1f82 says the stitched-governance-registry record split is complete and directly identifies deeper server-side scheduler narrative search as the next larger unfinished area.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task, the prior queue head is now done, and the latest main-session reply explicitly names deeper server-side scheduler narrative search as the immediate executable continuation."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
