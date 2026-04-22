@@ -970,18 +970,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Promote stitched report governance into a stitched-report-only registry and lifecycle layer",
       "description": "Separate stitched report governance from the shared scheduler plan and policy records by adding stitched-report-only registry objects and a dedicated lifecycle layer so saved stitched report views can be governed through durable stitched-specific records instead of reusing generic shared governance entities.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 30,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T20:55:00+09:00",
+      "updated_at": "2026-04-22T21:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-stitched-report-dedicated-governance-workspace"
       ],
-      "direction_relation_note": "The latest main-session reply says the stitched report queue and catalog surfaces now exist, but they still reuse shared governance plan and policy records and do not yet have a stitched-report-only registry or separate lifecycle tier.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and the latest main-session reply names this stitched-report-only registry or lifecycle gap as the first remaining item before the broader deeper scheduler narrative search work."
+      "direction_relation_note": "Completed on main in commit bc49ddf with stitched-report-only governance registries, revision records, create or list or update or delete or revision-list or revision-restore surfaces, and dedicated control-room registry consumers replacing reuse of the shared scheduler governance records.",
+      "priority_reason": "Closed after backend registry or lifecycle persistence, control-room registry management, targeted pytest and compileall coverage, web typecheck or build verification, docs current-state updates, commit, and push all landed; the latest main-session reply now leaves registry-specific bulk governance or team audit as the direct stitched-report continuation before the broader deeper scheduler narrative search work."
+    },
+    {
+      "id": "task-b1-provider-market-context-stitched-report-registry-governance-audit",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add bulk governance and team audit workflows for stitched-report governance registries",
+      "description": "Deepen the new stitched-report-only governance registry or lifecycle layer by adding registry-specific bulk governance actions, team-shared audit visibility, and operator review workflows so stitched report registries can be governed safely as a dedicated surface instead of only record-by-record lifecycle edits.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 31,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T21:05:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-stitched-report-registry-lifecycle-layer"
+      ],
+      "direction_relation_note": "The latest main-session reply says the stitched-report-only registry now has its own lifecycle, but registry-specific bulk governance and team audit layers are still missing.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and the latest main-session reply names this as the immediate remaining stitched-report follow-up ahead of the broader deeper server-side scheduler narrative search work."
     },
     {
       "id": "task-b1-provider-market-context-hierarchy-step-template-queue-view-workspace",
@@ -1137,7 +1155,7 @@
       "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T20:55:00+09:00",
+      "updated_at": "2026-04-22T21:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
@@ -1145,8 +1163,8 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-templates",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply after commit 77f82a1 still calls out deeper server-side scheduler narrative search as the broader unchanged open area even after the stitched report dedicated governance workspace shipped.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the newly explicit stitched-report-only registry or lifecycle gap so builtin next-task advances through the main-session continuation order before taking on the broader search expansion."
+      "direction_relation_note": "The latest main-session reply after commit bc49ddf still calls out deeper server-side scheduler narrative search as the larger unchanged open area, but it is now secondary to the newly explicit stitched-report registry bulk-governance or audit gap.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the new stitched-report registry bulk-governance or team-audit queue head so builtin next-task advances through the direct continuation order from the latest main-session reply before taking on the broader search expansion."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
