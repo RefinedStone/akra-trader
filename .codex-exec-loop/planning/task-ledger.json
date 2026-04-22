@@ -1006,18 +1006,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add staged approval and reusable policy layer for stitched-report governance registries",
       "description": "Extend the new stitched-report governance registry bulk-governance and audit flow with registry-specific staged approval, approval queue semantics, and reusable policy layers so stitched report registry changes can be reviewed, gated, and rolled out through dedicated stitched-report governance rules instead of immediate bulk mutation only.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 83,
       "dynamic_priority_delta": 32,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T21:20:00+09:00",
+      "updated_at": "2026-04-22T14:07:27+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-stitched-report-registry-governance-audit"
       ],
-      "direction_relation_note": "The latest main-session reply says stitched-report governance registries now have bulk governance and team audit, but this registry-specific surface still lacks its own staged approval and reusable policy layer.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and the latest main-session reply explicitly names the stitched-report registry approval or policy layer as the next direct follow-up before returning to the broader deeper server-side scheduler narrative search gap."
+      "direction_relation_note": "Completed on main in commit 69ff0a5 with stitched_report_governance_registry promoted into the staged governance-plan flow, registry revisions wired through preview or apply or rollback, queue_view_patch plus default_policy_template_id or default_policy_catalog_id accepted on plan create, and shared control-room filters plus reusable policy selection exposed for the new registry item type.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web typecheck and build, docs updates, commit, and push all landed; the latest main-session reply now leaves a stitched-governance-registry-specific approval queue or policy-catalog product surface as the immediate executable follow-up ahead of the broader deeper server-side scheduler narrative search work."
+    },
+    {
+      "id": "task-b1-provider-market-context-stitched-report-registry-dedicated-governance-workspace",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add stitched-governance-registry-specific approval queue and policy catalog surfaces",
+      "description": "Extend stitched-report governance registries beyond the shared scheduler governance queue and generic policy-catalog surface by adding a stitched-governance-registry-specific approval queue view and dedicated policy-catalog workspace so operators can review pending stitched_report_governance_registry plans and reusable governance defaults from a purpose-built product surface.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 33,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T14:07:27+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-stitched-report-registry-approval-policy-layer"
+      ],
+      "direction_relation_note": "The latest main-session reply says stitched-report governance registries now use the shared staged approval and reusable policy layer, but they still do not expose a stitched-governance-registry-specific approval queue or policy-catalog product surface separate from the shared scheduler governance queue.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task, the latest main-session reply names this as the remaining direct stitched-registry follow-up, and builtin next-task should advance through this explicit surface split before returning to the larger deeper scheduler narrative search gap."
     },
     {
       "id": "task-b1-provider-market-context-hierarchy-step-template-queue-view-workspace",
