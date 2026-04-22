@@ -134,6 +134,9 @@ creation.
 - those same saved stitched report views now also run through staged governance plans with
   reusable policy templates, so saved scheduler report lenses can follow the same queue,
   approval, and rollback discipline as the rest of the scheduler governance layer
+- those saved stitched report views now also have stitched-report-specific approval-queue and
+  policy-catalog surfaces, so their saved-view governance can be reviewed and defaulted in place
+  rather than only through the broader shared scheduler governance workspace
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand

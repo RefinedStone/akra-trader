@@ -188,6 +188,9 @@ It is not yet a finished live trading product:
 - those same saved stitched report views now also stage governance plans through the approval
   queue and can reuse named policy templates, so bulk edits move through diff preview, approval,
   apply, and rollback instead of bypassing the shared governance lane
+- those saved stitched report views now also expose their own approval-queue slice and stitched
+  report policy-catalog surface, so operators can review saved-view governance plans and apply
+  stitched-specific queue defaults without jumping back to the generic scheduler governance panel
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

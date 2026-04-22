@@ -85,6 +85,10 @@ unclear dataset lineage.
 - those same saved stitched report views now also use staged governance plans with reusable
   policy templates, so bulk stitched-report edits enter the shared approval queue with previewed
   diffs and rollback targets before they touch the active handoff lens
+- those same saved stitched report views now also have a dedicated approval-queue slice and
+  stitched-report policy catalog surface, so shift leads can review and stage saved-view
+  governance directly from the stitched report workspace instead of pivoting through the generic
+  scheduler governance controls first
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

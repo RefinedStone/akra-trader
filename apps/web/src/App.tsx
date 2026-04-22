@@ -956,6 +956,27 @@ const defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter:
   sort: DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
 };
 
+type ProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterState = {
+  queue_state: typeof ALL_FILTER_VALUE | "pending_approval" | "ready_to_apply" | "completed";
+  approval_lane: string;
+  approval_priority: string;
+  policy_template_id: string;
+  policy_catalog_id: string;
+  search: string;
+  sort: string;
+};
+
+const defaultProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter:
+  ProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterState = {
+    queue_state: ALL_FILTER_VALUE,
+    approval_lane: ALL_FILTER_VALUE,
+    approval_priority: ALL_FILTER_VALUE,
+    policy_template_id: ALL_FILTER_VALUE,
+    policy_catalog_id: ALL_FILTER_VALUE,
+    search: "",
+    sort: DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
+  };
+
 type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState = {
   policy_template_id: string;
   action: string;
@@ -3962,6 +3983,25 @@ export default function App() {
     useState<"approve" | "apply" | "rollback" | null>(null);
   const [providerProvenanceSchedulerNarrativeGovernanceBatchAction, setProviderProvenanceSchedulerNarrativeGovernanceBatchAction] =
     useState<"approve" | "apply" | null>(null);
+  const [providerProvenanceSchedulerStitchedReportGovernanceQueueFilter, setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter] =
+    useState<ProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterState>(
+      defaultProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter,
+    );
+  const [providerProvenanceSchedulerStitchedReportGovernancePlans, setProviderProvenanceSchedulerStitchedReportGovernancePlans] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePlan[]>([]);
+  const [providerProvenanceSchedulerStitchedReportGovernancePlanListSummary, setProviderProvenanceSchedulerStitchedReportGovernancePlanListSummary] =
+    useState({
+      total: 0,
+      pending_approval_count: 0,
+      ready_to_apply_count: 0,
+      completed_count: 0,
+    });
+  const [providerProvenanceSchedulerStitchedReportGovernancePlansLoading, setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerStitchedReportGovernancePlansError, setProviderProvenanceSchedulerStitchedReportGovernancePlansError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerStitchedReportGovernanceCatalogSearch, setProviderProvenanceSchedulerStitchedReportGovernanceCatalogSearch] =
+    useState("");
   const [providerProvenanceScheduledReports, setProviderProvenanceScheduledReports] =
     useState<ProviderProvenanceScheduledReportEntry[]>([]);
   const [providerProvenanceScheduledReportsLoading, setProviderProvenanceScheduledReportsLoading] =
@@ -4178,6 +4218,7 @@ export default function App() {
   const providerProvenanceSchedulerStitchedReportViewRequestIdRef = useRef(0);
   const providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef = useRef(0);
   const providerProvenanceSchedulerNarrativeGovernancePlanRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerStitchedReportGovernancePlanRequestIdRef = useRef(0);
   const providerProvenanceWorkspaceRegistryLoadedRef = useRef(false);
   const providerProvenanceSchedulerAutomationRef = useRef<HTMLDivElement | null>(null);
   const providerProvenanceSchedulerNarrativeTemplateNameMap = useMemo(
@@ -4385,6 +4426,47 @@ export default function App() {
     [
       filteredProviderProvenanceSchedulerNarrativeGovernancePlans,
       selectedProviderProvenanceSchedulerNarrativeGovernancePlanIdSet,
+    ],
+  );
+  const providerProvenanceSchedulerStitchedReportGovernanceQueueSummary = useMemo(
+    () => providerProvenanceSchedulerStitchedReportGovernancePlanListSummary,
+    [providerProvenanceSchedulerStitchedReportGovernancePlanListSummary],
+  );
+  const stitchedReportGovernanceCatalogSearchNormalized = useMemo(
+    () => providerProvenanceSchedulerStitchedReportGovernanceCatalogSearch.trim().toLowerCase(),
+    [providerProvenanceSchedulerStitchedReportGovernanceCatalogSearch],
+  );
+  const providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs = useMemo(
+    () =>
+      providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.filter((entry) => {
+        if (
+          !providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+            entry.item_type_scope,
+            "stitched_report_view",
+          )
+        ) {
+          return false;
+        }
+        if (!stitchedReportGovernanceCatalogSearchNormalized) {
+          return true;
+        }
+        const searchValues = [
+          entry.catalog_id,
+          entry.name,
+          entry.description,
+          entry.default_policy_template_name ?? "",
+          entry.approval_lane,
+          entry.approval_priority,
+          entry.guidance ?? "",
+          ...entry.policy_template_names,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return searchValues.includes(stitchedReportGovernanceCatalogSearchNormalized);
+      }),
+    [
+      providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs,
+      stitchedReportGovernanceCatalogSearchNormalized,
     ],
   );
   const selectedProviderProvenanceSchedulerExportEntry = useMemo(
@@ -7436,6 +7518,71 @@ export default function App() {
     providerProvenanceSchedulerNarrativeGovernanceQueueFilter,
   ]);
 
+  const loadProviderProvenanceSchedulerStitchedReportGovernancePlans = useCallback(async () => {
+    const requestId = ++providerProvenanceSchedulerStitchedReportGovernancePlanRequestIdRef.current;
+    setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading(true);
+    setProviderProvenanceSchedulerStitchedReportGovernancePlansError(null);
+    try {
+      const payload = await listProviderProvenanceSchedulerNarrativeGovernancePlans({
+        itemType: "stitched_report_view",
+        queueState:
+          providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.queue_state !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.queue_state
+            : undefined,
+        approvalLane:
+          providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_lane !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_lane
+            : undefined,
+        approvalPriority:
+          providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_priority !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_priority
+            : undefined,
+        policyTemplateId:
+          providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_template_id !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_template_id
+            : undefined,
+        policyCatalogId:
+          providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_catalog_id !== ALL_FILTER_VALUE
+            ? providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_catalog_id
+            : undefined,
+        search:
+          providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.search.trim() || undefined,
+        sort: normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueSort(
+          providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.sort,
+        ),
+        limit: 24,
+      });
+      if (requestId !== providerProvenanceSchedulerStitchedReportGovernancePlanRequestIdRef.current) {
+        return;
+      }
+      setProviderProvenanceSchedulerStitchedReportGovernancePlans(payload.items);
+      setProviderProvenanceSchedulerStitchedReportGovernancePlanListSummary({
+        total: payload.total,
+        pending_approval_count: payload.pending_approval_count,
+        ready_to_apply_count: payload.ready_to_apply_count,
+        completed_count: payload.completed_count,
+      });
+    } catch (error) {
+      if (requestId !== providerProvenanceSchedulerStitchedReportGovernancePlanRequestIdRef.current) {
+        return;
+      }
+      setProviderProvenanceSchedulerStitchedReportGovernancePlans([]);
+      setProviderProvenanceSchedulerStitchedReportGovernancePlanListSummary({
+        total: 0,
+        pending_approval_count: 0,
+        ready_to_apply_count: 0,
+        completed_count: 0,
+      });
+      setProviderProvenanceSchedulerStitchedReportGovernancePlansError((error as Error).message);
+    } finally {
+      if (requestId === providerProvenanceSchedulerStitchedReportGovernancePlanRequestIdRef.current) {
+        setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading(false);
+      }
+    }
+  }, [
+    providerProvenanceSchedulerStitchedReportGovernanceQueueFilter,
+  ]);
+
   async function loadProviderProvenanceWorkspaceRegistry() {
     setProviderProvenanceAnalyticsPresetsLoading(true);
     setProviderProvenanceDashboardViewsLoading(true);
@@ -7448,6 +7595,7 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsLoading(true);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading(true);
     setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(true);
+    setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading(true);
     setProviderProvenanceScheduledReportsLoading(true);
     setProviderProvenanceAnalyticsPresetsError(null);
     setProviderProvenanceDashboardViewsError(null);
@@ -7460,6 +7608,7 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsError(null);
     setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError(null);
     setProviderProvenanceSchedulerNarrativeGovernancePlansError(null);
+    setProviderProvenanceSchedulerStitchedReportGovernancePlansError(null);
     setProviderProvenanceScheduledReportsError(null);
     try {
       const [
@@ -7704,7 +7853,10 @@ export default function App() {
         setProviderProvenanceScheduledReportHistoryError(null);
       }
       providerProvenanceWorkspaceRegistryLoadedRef.current = true;
-      await loadProviderProvenanceSchedulerNarrativeGovernancePlans();
+      await Promise.all([
+        loadProviderProvenanceSchedulerNarrativeGovernancePlans(),
+        loadProviderProvenanceSchedulerStitchedReportGovernancePlans(),
+      ]);
     } catch (error) {
       const message = (error as Error).message;
       providerProvenanceWorkspaceRegistryLoadedRef.current = false;
@@ -7727,6 +7879,13 @@ export default function App() {
       setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateIds([]);
       setSelectedProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateId(null);
       setProviderProvenanceSchedulerNarrativeGovernancePlanListSummary({
+        total: 0,
+        pending_approval_count: 0,
+        ready_to_apply_count: 0,
+        completed_count: 0,
+      });
+      setProviderProvenanceSchedulerStitchedReportGovernancePlans([]);
+      setProviderProvenanceSchedulerStitchedReportGovernancePlanListSummary({
         total: 0,
         pending_approval_count: 0,
         ready_to_apply_count: 0,
@@ -7755,7 +7914,9 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePlansError(message);
+      setProviderProvenanceSchedulerStitchedReportGovernancePlansError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(false);
+      setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading(false);
       setProviderProvenanceScheduledReportsError(message);
     } finally {
       setProviderProvenanceAnalyticsPresetsLoading(false);
@@ -7768,6 +7929,7 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditsLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditsLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditsLoading(false);
+      setProviderProvenanceSchedulerStitchedReportGovernancePlansLoading(false);
       setProviderProvenanceScheduledReportsLoading(false);
     }
   }
@@ -7778,6 +7940,13 @@ export default function App() {
     }
     void loadProviderProvenanceSchedulerNarrativeGovernancePlans();
   }, [loadProviderProvenanceSchedulerNarrativeGovernancePlans]);
+
+  useEffect(() => {
+    if (!providerProvenanceWorkspaceRegistryLoadedRef.current) {
+      return;
+    }
+    void loadProviderProvenanceSchedulerStitchedReportGovernancePlans();
+  }, [loadProviderProvenanceSchedulerStitchedReportGovernancePlans]);
 
   async function loadMarketDataWorkflow(
     instrument: MarketDataStatus["instruments"][number] | null,
@@ -8836,6 +9005,68 @@ export default function App() {
     );
     setProviderProvenanceWorkspaceFeedback(
       `Applied governance policy catalog ${catalog.name} to the approval queue and governance defaults.`,
+    );
+  }
+
+  function applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(
+    catalog: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  ) {
+    if (
+      catalog.default_policy_template_id
+      && providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+        catalog.item_type_scope,
+        "stitched_report_view",
+      )
+    ) {
+      setProviderProvenanceSchedulerStitchedReportViewGovernancePolicyTemplateId(
+        catalog.default_policy_template_id,
+      );
+    }
+    setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter({
+      queue_state: ALL_FILTER_VALUE,
+      approval_lane: catalog.approval_lane || ALL_FILTER_VALUE,
+      approval_priority: catalog.approval_priority || ALL_FILTER_VALUE,
+      policy_template_id: catalog.default_policy_template_id ?? ALL_FILTER_VALUE,
+      policy_catalog_id: catalog.catalog_id,
+      search: "",
+      sort: DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
+    });
+    setProviderProvenanceWorkspaceFeedback(
+      `Applied stitched report governance catalog ${catalog.name} to saved-view defaults and the stitched approval queue slice.`,
+    );
+  }
+
+  function reviewProviderProvenanceSchedulerStitchedReportGovernancePlanInSharedQueue(
+    plan: ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ) {
+    setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter({
+      queue_state:
+        providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.queue_state,
+      item_type: "stitched_report_view",
+      approval_lane:
+        providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_lane,
+      approval_priority:
+        providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_priority,
+      policy_template_id:
+        providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_template_id,
+      policy_catalog_id:
+        providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_catalog_id,
+      source_hierarchy_step_template_id: ALL_FILTER_VALUE,
+      search: providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.search,
+      sort: providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.sort,
+    });
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(plan.plan_id);
+    setProviderProvenanceWorkspaceFeedback(
+      `Opened stitched report governance plan ${shortenIdentifier(plan.plan_id, 10)} in the shared approval queue.`,
+    );
+  }
+
+  function openProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogInSharedSurface(
+    catalog: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  ) {
+    setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId(catalog.catalog_id);
+    setProviderProvenanceWorkspaceFeedback(
+      `Opened governance policy catalog ${catalog.name} in the shared catalog workspace.`,
     );
   }
 
@@ -10140,15 +10371,44 @@ export default function App() {
     }
   }
 
-  async function approveProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan() {
-    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlan) {
-      setProviderProvenanceWorkspaceFeedback("Select a scheduler governance plan first.");
+  function resetProviderProvenanceSchedulerNarrativeGovernanceDraftForPlan(
+    plan: ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ) {
+    const affectedIds = new Set(plan.target_ids);
+    if (plan.item_type === "template") {
+      if (
+        editingProviderProvenanceSchedulerNarrativeTemplateId
+        && affectedIds.has(editingProviderProvenanceSchedulerNarrativeTemplateId)
+      ) {
+        resetProviderProvenanceSchedulerNarrativeTemplateDraft();
+      }
       return;
     }
+    if (plan.item_type === "registry") {
+      if (
+        editingProviderProvenanceSchedulerNarrativeRegistryId
+        && affectedIds.has(editingProviderProvenanceSchedulerNarrativeRegistryId)
+      ) {
+        resetProviderProvenanceSchedulerNarrativeRegistryDraft();
+      }
+      return;
+    }
+    if (
+      plan.item_type === "stitched_report_view"
+      && editingProviderProvenanceSchedulerStitchedReportViewId
+      && affectedIds.has(editingProviderProvenanceSchedulerStitchedReportViewId)
+    ) {
+      resetProviderProvenanceSchedulerStitchedReportViewDraft();
+    }
+  }
+
+  async function approveProviderProvenanceSchedulerNarrativeGovernancePlanEntry(
+    plan: ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ) {
     setProviderProvenanceSchedulerNarrativeGovernancePlanAction("approve");
     try {
       const updated = await approveProviderProvenanceSchedulerNarrativeGovernancePlan({
-        planId: selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id,
+        planId: plan.plan_id,
         actorTabId: comparisonHistoryTabIdentity.tabId,
         actorTabLabel: comparisonHistoryTabIdentity.label,
       });
@@ -10166,15 +10426,13 @@ export default function App() {
     }
   }
 
-  async function applyProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan() {
-    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlan) {
-      setProviderProvenanceWorkspaceFeedback("Select a scheduler governance plan first.");
-      return;
-    }
+  async function applyProviderProvenanceSchedulerNarrativeGovernancePlanEntry(
+    plan: ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ) {
     if (
       typeof window !== "undefined"
       && !window.confirm(
-        `Apply approved scheduler governance plan ${shortenIdentifier(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id, 10)}?`,
+        `Apply approved scheduler governance plan ${shortenIdentifier(plan.plan_id, 10)}?`,
       )
     ) {
       return;
@@ -10182,35 +10440,11 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeGovernancePlanAction("apply");
     try {
       const updated = await applyProviderProvenanceSchedulerNarrativeGovernancePlan({
-        planId: selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id,
+        planId: plan.plan_id,
         actorTabId: comparisonHistoryTabIdentity.tabId,
         actorTabLabel: comparisonHistoryTabIdentity.label,
       });
-      if (updated.item_type === "template") {
-        const affectedIds = new Set(updated.target_ids);
-        if (
-          editingProviderProvenanceSchedulerNarrativeTemplateId
-          && affectedIds.has(editingProviderProvenanceSchedulerNarrativeTemplateId)
-        ) {
-          resetProviderProvenanceSchedulerNarrativeTemplateDraft();
-        }
-      } else if (updated.item_type === "registry") {
-        const affectedIds = new Set(updated.target_ids);
-        if (
-          editingProviderProvenanceSchedulerNarrativeRegistryId
-          && affectedIds.has(editingProviderProvenanceSchedulerNarrativeRegistryId)
-        ) {
-          resetProviderProvenanceSchedulerNarrativeRegistryDraft();
-        }
-      } else if (updated.item_type === "stitched_report_view") {
-        const affectedIds = new Set(updated.target_ids);
-        if (
-          editingProviderProvenanceSchedulerStitchedReportViewId
-          && affectedIds.has(editingProviderProvenanceSchedulerStitchedReportViewId)
-        ) {
-          resetProviderProvenanceSchedulerStitchedReportViewDraft();
-        }
-      }
+      resetProviderProvenanceSchedulerNarrativeGovernanceDraftForPlan(updated);
       await loadProviderProvenanceWorkspaceRegistry();
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
@@ -10228,6 +10462,61 @@ export default function App() {
     } finally {
       setProviderProvenanceSchedulerNarrativeGovernancePlanAction(null);
     }
+  }
+
+  async function rollbackProviderProvenanceSchedulerNarrativeGovernancePlanEntry(
+    plan: ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ) {
+    if (
+      typeof window !== "undefined"
+      && !window.confirm(
+        `Rollback scheduler governance plan ${shortenIdentifier(plan.plan_id, 10)} to its pre-apply revisions?`,
+      )
+    ) {
+      return;
+    }
+    setProviderProvenanceSchedulerNarrativeGovernancePlanAction("rollback");
+    try {
+      const updated = await rollbackProviderProvenanceSchedulerNarrativeGovernancePlan({
+        planId: plan.plan_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      resetProviderProvenanceSchedulerNarrativeGovernanceDraftForPlan(updated);
+      await loadProviderProvenanceWorkspaceRegistry();
+      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
+      setProviderProvenanceWorkspaceFeedback(
+        updated.rollback_result
+          ? formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(updated.rollback_result)
+          : `Rolled back scheduler governance plan ${shortenIdentifier(updated.plan_id, 10)}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler governance rollback failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerNarrativeGovernancePlanAction(null);
+    }
+  }
+
+  async function approveProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan() {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlan) {
+      setProviderProvenanceWorkspaceFeedback("Select a scheduler governance plan first.");
+      return;
+    }
+    await approveProviderProvenanceSchedulerNarrativeGovernancePlanEntry(
+      selectedProviderProvenanceSchedulerNarrativeGovernancePlan,
+    );
+  }
+
+  async function applyProviderProvenanceSchedulerNarrativeGovernanceSelectedPlan() {
+    if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlan) {
+      setProviderProvenanceWorkspaceFeedback("Select a scheduler governance plan first.");
+      return;
+    }
+    await applyProviderProvenanceSchedulerNarrativeGovernancePlanEntry(
+      selectedProviderProvenanceSchedulerNarrativeGovernancePlan,
+    );
   }
 
   async function runProviderProvenanceSchedulerNarrativeGovernancePlanBatch(
@@ -10326,60 +10615,9 @@ export default function App() {
       setProviderProvenanceWorkspaceFeedback("Select a scheduler governance plan first.");
       return;
     }
-    if (
-      typeof window !== "undefined"
-      && !window.confirm(
-        `Rollback scheduler governance plan ${shortenIdentifier(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id, 10)} to its pre-apply revisions?`,
-      )
-    ) {
-      return;
-    }
-    setProviderProvenanceSchedulerNarrativeGovernancePlanAction("rollback");
-    try {
-      const updated = await rollbackProviderProvenanceSchedulerNarrativeGovernancePlan({
-        planId: selectedProviderProvenanceSchedulerNarrativeGovernancePlan.plan_id,
-        actorTabId: comparisonHistoryTabIdentity.tabId,
-        actorTabLabel: comparisonHistoryTabIdentity.label,
-      });
-      if (updated.item_type === "template") {
-        const affectedIds = new Set(updated.target_ids);
-        if (
-          editingProviderProvenanceSchedulerNarrativeTemplateId
-          && affectedIds.has(editingProviderProvenanceSchedulerNarrativeTemplateId)
-        ) {
-          resetProviderProvenanceSchedulerNarrativeTemplateDraft();
-        }
-      } else if (updated.item_type === "registry") {
-        const affectedIds = new Set(updated.target_ids);
-        if (
-          editingProviderProvenanceSchedulerNarrativeRegistryId
-          && affectedIds.has(editingProviderProvenanceSchedulerNarrativeRegistryId)
-        ) {
-          resetProviderProvenanceSchedulerNarrativeRegistryDraft();
-        }
-      } else if (updated.item_type === "stitched_report_view") {
-        const affectedIds = new Set(updated.target_ids);
-        if (
-          editingProviderProvenanceSchedulerStitchedReportViewId
-          && affectedIds.has(editingProviderProvenanceSchedulerStitchedReportViewId)
-        ) {
-          resetProviderProvenanceSchedulerStitchedReportViewDraft();
-        }
-      }
-      await loadProviderProvenanceWorkspaceRegistry();
-      setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(updated.plan_id);
-      setProviderProvenanceWorkspaceFeedback(
-        updated.rollback_result
-          ? formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(updated.rollback_result)
-          : `Rolled back scheduler governance plan ${shortenIdentifier(updated.plan_id, 10)}.`,
-      );
-    } catch (error) {
-      setProviderProvenanceWorkspaceFeedback(
-        `Scheduler governance rollback failed: ${(error as Error).message}`,
-      );
-    } finally {
-      setProviderProvenanceSchedulerNarrativeGovernancePlanAction(null);
-    }
+    await rollbackProviderProvenanceSchedulerNarrativeGovernancePlanEntry(
+      selectedProviderProvenanceSchedulerNarrativeGovernancePlan,
+    );
   }
 
   async function saveCurrentProviderProvenancePreset() {
@@ -18680,10 +18918,414 @@ export default function App() {
                                           ))}
                                         </tbody>
                                       </table>
-                                    ) : (
+                                  ) : (
                                       !providerProvenanceSchedulerStitchedReportViewAuditsLoading
                                         ? <p className="empty-state">No stitched report view audit events match the selected filters.</p>
                                         : null
+                                    )}
+                                  </div>
+                                  <div className="market-data-provenance-shared-history">
+                                    <div className="market-data-provenance-history-head">
+                                      <strong>Stitched report approval queue</strong>
+                                      <p>
+                                        Review saved stitched report view governance plans without leaving the stitched
+                                        report surface. This keeps stitched-report approvals and policy defaults visible
+                                        next to the saved lens they change.
+                                      </p>
+                                    </div>
+                                    <div className="provider-provenance-governance-summary">
+                                      <strong>
+                                        {providerProvenanceSchedulerStitchedReportGovernanceQueueSummary.total} stitched plan(s)
+                                      </strong>
+                                      <span>
+                                        {providerProvenanceSchedulerStitchedReportGovernanceQueueSummary.pending_approval_count} pending approval · {" "}
+                                        {providerProvenanceSchedulerStitchedReportGovernanceQueueSummary.ready_to_apply_count} ready to apply · {" "}
+                                        {providerProvenanceSchedulerStitchedReportGovernanceQueueSummary.completed_count} completed
+                                      </span>
+                                    </div>
+                                    <div className="filter-bar">
+                                      <label>
+                                        <span>Queue state</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter((current) => ({
+                                              ...current,
+                                              queue_state:
+                                                event.target.value === "pending_approval"
+                                                || event.target.value === "ready_to_apply"
+                                                || event.target.value === "completed"
+                                                  ? event.target.value
+                                                  : ALL_FILTER_VALUE,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.queue_state}
+                                        >
+                                          <option value={ALL_FILTER_VALUE}>All states</option>
+                                          <option value="pending_approval">Pending approval</option>
+                                          <option value="ready_to_apply">Ready to apply</option>
+                                          <option value="completed">Completed</option>
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Lane</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter((current) => ({
+                                              ...current,
+                                              approval_lane: event.target.value || ALL_FILTER_VALUE,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_lane}
+                                        >
+                                          <option value={ALL_FILTER_VALUE}>All lanes</option>
+                                          {Array.from(
+                                            new Set(
+                                              providerProvenanceSchedulerStitchedReportGovernancePlans.map(
+                                                (entry) => entry.approval_lane,
+                                              ),
+                                            ),
+                                          ).sort().map((lane) => (
+                                            <option key={lane} value={lane}>
+                                              {formatWorkflowToken(lane)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Priority</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter((current) => ({
+                                              ...current,
+                                              approval_priority: event.target.value || ALL_FILTER_VALUE,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_priority}
+                                        >
+                                          <option value={ALL_FILTER_VALUE}>All priorities</option>
+                                          <option value="low">Low</option>
+                                          <option value="normal">Normal</option>
+                                          <option value="high">High</option>
+                                          <option value="critical">Critical</option>
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Policy template</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter((current) => ({
+                                              ...current,
+                                              policy_template_id:
+                                                event.target.value === ""
+                                                  ? ""
+                                                  : event.target.value || ALL_FILTER_VALUE,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_template_id}
+                                        >
+                                          <option value={ALL_FILTER_VALUE}>All policy templates</option>
+                                          <option value="">No policy template</option>
+                                          {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
+                                            .filter(
+                                              (entry) =>
+                                                providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType(
+                                                  entry.item_type_scope,
+                                                  "stitched_report_view",
+                                                ),
+                                            )
+                                            .map((entry) => (
+                                              <option key={entry.policy_template_id} value={entry.policy_template_id}>
+                                                {entry.name}
+                                              </option>
+                                            ))}
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Policy catalog</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter((current) => ({
+                                              ...current,
+                                              policy_catalog_id:
+                                                event.target.value === ""
+                                                  ? ""
+                                                  : event.target.value || ALL_FILTER_VALUE,
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.policy_catalog_id}
+                                        >
+                                          <option value={ALL_FILTER_VALUE}>All policy catalogs</option>
+                                          <option value="">No policy catalog</option>
+                                          {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.map((entry) => (
+                                            <option key={entry.catalog_id} value={entry.catalog_id}>
+                                              {entry.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Search</span>
+                                        <input
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter((current) => ({
+                                              ...current,
+                                              search: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="plan, view, policy"
+                                          type="text"
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.search}
+                                        />
+                                      </label>
+                                      <label>
+                                        <span>Sort</span>
+                                        <select
+                                          onChange={(event) =>
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter((current) => ({
+                                              ...current,
+                                              sort: normalizeProviderProvenanceSchedulerNarrativeGovernanceQueueSort(
+                                                event.target.value,
+                                              ),
+                                            }))
+                                          }
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.sort}
+                                        >
+                                          <option value={DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT}>
+                                            Queue priority
+                                          </option>
+                                          <option value="updated_desc">Updated newest</option>
+                                          <option value="updated_asc">Updated oldest</option>
+                                          <option value="created_desc">Created newest</option>
+                                          <option value="created_asc">Created oldest</option>
+                                        </select>
+                                      </label>
+                                    </div>
+                                    {providerProvenanceSchedulerStitchedReportGovernancePlansLoading ? (
+                                      <p className="empty-state">Loading stitched report approval queue…</p>
+                                    ) : null}
+                                    {providerProvenanceSchedulerStitchedReportGovernancePlansError ? (
+                                      <p className="market-data-workflow-feedback">
+                                        Stitched report approval queue failed: {providerProvenanceSchedulerStitchedReportGovernancePlansError}
+                                      </p>
+                                    ) : null}
+                                    {providerProvenanceSchedulerStitchedReportGovernancePlans.length ? (
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Plan</th>
+                                            <th>Preview</th>
+                                            <th>Action</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerStitchedReportGovernancePlans.map((plan) => (
+                                            <tr key={`provider-scheduler-stitched-governance-plan-${plan.plan_id}`}>
+                                              <td>
+                                                <strong>
+                                                  {formatWorkflowToken(plan.action)} stitched_report_view
+                                                </strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {shortenIdentifier(plan.plan_id, 10)} · {formatWorkflowToken(getProviderProvenanceSchedulerNarrativeGovernanceQueueState(plan))}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {plan.created_by_tab_label ?? plan.created_by_tab_id ?? "unknown tab"} · {formatTimestamp(plan.updated_at)}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(plan.approval_lane)} · {formatWorkflowToken(plan.approval_priority)}
+                                                  {plan.policy_template_name ? ` · ${plan.policy_template_name}` : ""}
+                                                  {plan.policy_catalog_name ? ` · ${plan.policy_catalog_name}` : ""}
+                                                </p>
+                                                {plan.policy_guidance ? (
+                                                  <p className="run-lineage-symbol-copy">{plan.policy_guidance}</p>
+                                                ) : null}
+                                              </td>
+                                              <td>
+                                                <strong>{formatProviderProvenanceSchedulerNarrativeGovernancePlanSummary(plan)}</strong>
+                                                <p className="run-lineage-symbol-copy">{plan.rollback_summary}</p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {plan.preview_items.length} preview row(s) · rollback ready {plan.rollback_ready_count}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <div className="market-data-provenance-history-actions">
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      reviewProviderProvenanceSchedulerStitchedReportGovernancePlanInSharedQueue(plan);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {selectedProviderProvenanceSchedulerNarrativeGovernancePlanId === plan.plan_id
+                                                      ? "Shared queue selected"
+                                                      : "Review in shared queue"}
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    disabled={
+                                                      plan.status !== "previewed"
+                                                      || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
+                                                    }
+                                                    onClick={() => {
+                                                      void approveProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {providerProvenanceSchedulerNarrativeGovernancePlanAction === "approve"
+                                                      ? "Approving…"
+                                                      : "Approve"}
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    disabled={
+                                                      plan.status !== "approved"
+                                                      || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
+                                                    }
+                                                    onClick={() => {
+                                                      void applyProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {providerProvenanceSchedulerNarrativeGovernancePlanAction === "apply"
+                                                      ? "Applying…"
+                                                      : "Apply"}
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    disabled={
+                                                      plan.status !== "applied"
+                                                      || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
+                                                    }
+                                                    onClick={() => {
+                                                      void rollbackProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    {providerProvenanceSchedulerNarrativeGovernancePlanAction === "rollback"
+                                                      ? "Rolling back…"
+                                                      : "Rollback"}
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : (
+                                      !providerProvenanceSchedulerStitchedReportGovernancePlansLoading
+                                        ? <p className="empty-state">No stitched report governance plans match the dedicated queue filters.</p>
+                                        : null
+                                    )}
+                                  </div>
+                                  <div className="market-data-provenance-shared-history">
+                                    <div className="market-data-provenance-history-head">
+                                      <strong>Stitched report policy catalogs</strong>
+                                      <p>
+                                        Review only governance catalogs that can drive stitched report view approval
+                                        defaults, then apply those defaults or jump into the shared catalog workspace.
+                                      </p>
+                                    </div>
+                                    <div className="provider-provenance-governance-summary">
+                                      <strong>
+                                        {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.length} stitched catalog(s)
+                                      </strong>
+                                      <span>
+                                        {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.filter((entry) => entry.status === "active").length} active · {" "}
+                                        {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.filter((entry) => entry.status === "deleted").length} deleted
+                                      </span>
+                                    </div>
+                                    <div className="filter-bar">
+                                      <label>
+                                        <span>Search</span>
+                                        <input
+                                          onChange={(event) => {
+                                            setProviderProvenanceSchedulerStitchedReportGovernanceCatalogSearch(
+                                              event.target.value,
+                                            );
+                                          }}
+                                          placeholder="catalog, guidance, policy"
+                                          type="text"
+                                          value={providerProvenanceSchedulerStitchedReportGovernanceCatalogSearch}
+                                        />
+                                      </label>
+                                    </div>
+                                    {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.length ? (
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Catalog</th>
+                                            <th>Defaults</th>
+                                            <th>Action</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.map((catalog) => (
+                                            <tr key={`provider-scheduler-stitched-governance-catalog-${catalog.catalog_id}`}>
+                                              <td>
+                                                <strong>{catalog.name}</strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(catalog.status)} · {catalog.policy_template_ids.length} linked template(s)
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  Scope {formatWorkflowToken(catalog.item_type_scope)} · {formatWorkflowToken(catalog.action_scope)}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {catalog.description || "No stitched report catalog description recorded."}
+                                                </p>
+                                              </td>
+                                              <td>
+                                                <strong>
+                                                  {catalog.default_policy_template_name ?? "No default policy template"}
+                                                </strong>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatWorkflowToken(catalog.approval_lane)} · {formatWorkflowToken(catalog.approval_priority)}
+                                                </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {catalog.hierarchy_steps.length} hierarchy step(s)
+                                                </p>
+                                                {catalog.guidance ? (
+                                                  <p className="run-lineage-symbol-copy">{catalog.guidance}</p>
+                                                ) : null}
+                                              </td>
+                                              <td>
+                                                <div className="market-data-provenance-history-actions">
+                                                  <button
+                                                    className="ghost-button"
+                                                    disabled={catalog.status !== "active"}
+                                                    onClick={() => {
+                                                      applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Use defaults
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    disabled={catalog.status !== "active" || !catalog.hierarchy_steps.length}
+                                                    onClick={() => {
+                                                      applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
+                                                      void stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy(catalog);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Stage queue
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() => {
+                                                      openProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogInSharedSurface(catalog);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Open shared catalog
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : (
+                                      <p className="empty-state">No stitched report policy catalogs match the current search.</p>
                                     )}
                                   </div>
                                   <div className="market-data-provenance-history-head">
