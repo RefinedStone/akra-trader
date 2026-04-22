@@ -483,6 +483,27 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarc
   clear_template_link: bool | None = None
 
 
+class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateCreateRequest(
+  BaseModel
+):
+  name: str
+  description: str = ""
+  step: OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRequest | None = None
+  origin_catalog_id: str | None = None
+  origin_step_id: str | None = None
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateApplyRequest(
+  BaseModel
+):
+  catalog_ids: list[str] = Field(default_factory=list)
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str | None = None
+
+
 class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest(BaseModel):
   item_type: str
   item_ids: list[str] = Field(default_factory=list)
@@ -661,6 +682,14 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance": (
     OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernanceRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateCreateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateApplyRequest,
     {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage": (

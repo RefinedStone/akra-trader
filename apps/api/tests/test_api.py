@@ -2266,6 +2266,91 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   restore_catalog_hierarchy_step_payload = restore_catalog_hierarchy_step_response.json()
   assert restore_catalog_hierarchy_step_payload["hierarchy_steps"][0]["name_prefix"] is None
 
+  secondary_governance_policy_catalog_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs",
+    json={
+      "name": "Shift lead secondary catalog",
+      "description": "Secondary reusable queue defaults for cross-catalog governance.",
+      "policy_template_ids": [governance_policy_template_payload["policy_template_id"]],
+      "default_policy_template_id": governance_policy_template_payload["policy_template_id"],
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert secondary_governance_policy_catalog_response.status_code == 200
+  secondary_governance_policy_catalog_payload = secondary_governance_policy_catalog_response.json()
+
+  hierarchy_step_template_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates",
+    json={
+      "name": "Cross-catalog template sync",
+      "description": "Reusable hierarchy step for template governance sync.",
+      "origin_catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "origin_step_id": template_hierarchy_step_id,
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert hierarchy_step_template_response.status_code == 200
+  hierarchy_step_template_payload = hierarchy_step_template_response.json()
+  assert hierarchy_step_template_payload["origin_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+  assert hierarchy_step_template_payload["origin_step_id"] == template_hierarchy_step_id
+  assert hierarchy_step_template_payload["step"]["source_template_id"] is None
+
+  hierarchy_step_template_list_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates",
+    params={"search": "cross-catalog", "limit": 10},
+  )
+  assert hierarchy_step_template_list_response.status_code == 200
+  hierarchy_step_template_list_payload = hierarchy_step_template_list_response.json()
+  assert hierarchy_step_template_list_payload["total"] == 1
+  assert (
+    hierarchy_step_template_list_payload["items"][0]["hierarchy_step_template_id"]
+    == hierarchy_step_template_payload["hierarchy_step_template_id"]
+  )
+
+  apply_hierarchy_step_template_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_payload['hierarchy_step_template_id']}/apply",
+    json={
+      "catalog_ids": [
+        governance_policy_catalog_payload["catalog_id"],
+        secondary_governance_policy_catalog_payload["catalog_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "apply_hierarchy_step_template",
+    },
+  )
+  assert apply_hierarchy_step_template_response.status_code == 200
+  apply_hierarchy_step_template_payload = apply_hierarchy_step_template_response.json()
+  assert apply_hierarchy_step_template_payload["applied_count"] == 2
+
+  refreshed_primary_catalog_response = client.get(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/revisions",
+  )
+  assert refreshed_primary_catalog_response.status_code == 200
+  refreshed_primary_catalog_payload = refreshed_primary_catalog_response.json()
+  primary_template_backed_step = next(
+    step
+    for step in refreshed_primary_catalog_payload["current"]["hierarchy_steps"]
+    if step["step_id"] == template_hierarchy_step_id
+  )
+  assert (
+    primary_template_backed_step["source_template_id"]
+    == hierarchy_step_template_payload["hierarchy_step_template_id"]
+  )
+
+  refreshed_secondary_catalog_response = client.get(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{secondary_governance_policy_catalog_payload['catalog_id']}/revisions",
+  )
+  assert refreshed_secondary_catalog_response.status_code == 200
+  refreshed_secondary_catalog_payload = refreshed_secondary_catalog_response.json()
+  assert len(refreshed_secondary_catalog_payload["current"]["hierarchy_steps"]) == 1
+  assert (
+    refreshed_secondary_catalog_payload["current"]["hierarchy_steps"][0]["source_template_id"]
+    == hierarchy_step_template_payload["hierarchy_step_template_id"]
+  )
+
   stage_catalog_hierarchy_response = client.post(
     f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/stage",
     json={
@@ -2343,7 +2428,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
     json={
       "source_tab_id": "tab_scheduler",
       "source_tab_label": "Scheduler",
-      "due_before": "2026-04-29T00:00:00Z",
+      "due_before": "2026-05-29T00:00:00Z",
       "limit": 10,
     },
   )

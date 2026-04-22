@@ -15175,6 +15175,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance",
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create",
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_list",
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
@@ -15395,6 +15398,15 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance"
   ].methods == ("POST",)
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create"
+  ].methods == ("POST",)
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_list"
+  ].filter_param_specs[0].key == "item_type"
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply"
+  ].path_param_keys == ("hierarchy_step_template_id",)
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage"
   ].methods == ("POST",)
@@ -17374,6 +17386,96 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     },
   )
   assert restored_catalog_hierarchy_step_payload["hierarchy_steps"][0]["name_prefix"] is None
+
+  secondary_governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_create"],
+    app=app,
+    request_payload={
+      "name": "Shift lead secondary catalog",
+      "description": "Secondary reusable queue defaults for cross-catalog governance.",
+      "policy_template_ids": [governance_policy_template_payload["policy_template_id"]],
+      "default_policy_template_id": governance_policy_template_payload["policy_template_id"],
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+
+  hierarchy_step_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create"
+    ],
+    app=app,
+    request_payload={
+      "name": "Cross-catalog template sync",
+      "description": "Reusable hierarchy step for template governance sync.",
+      "origin_catalog_id": governance_policy_catalog_payload["catalog_id"],
+      "origin_step_id": template_hierarchy_step_id,
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert hierarchy_step_template_payload["origin_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+  assert hierarchy_step_template_payload["origin_step_id"] == template_hierarchy_step_id
+  assert hierarchy_step_template_payload["step"]["source_template_id"] is None
+
+  hierarchy_step_template_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_list"
+    ],
+    app=app,
+    filters={"search": "cross-catalog", "limit": 10},
+  )
+  assert hierarchy_step_template_list_payload["total"] == 1
+  assert (
+    hierarchy_step_template_list_payload["items"][0]["hierarchy_step_template_id"]
+    == hierarchy_step_template_payload["hierarchy_step_template_id"]
+  )
+
+  applied_hierarchy_step_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key[
+      "operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply"
+    ],
+    app=app,
+    path_params={
+      "hierarchy_step_template_id": hierarchy_step_template_payload["hierarchy_step_template_id"],
+    },
+    request_payload={
+      "catalog_ids": [
+        governance_policy_catalog_payload["catalog_id"],
+        secondary_governance_policy_catalog_payload["catalog_id"],
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "apply_hierarchy_step_template",
+    },
+  )
+  assert applied_hierarchy_step_template_payload["applied_count"] == 2
+
+  refreshed_primary_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_list"],
+    app=app,
+    path_params={"catalog_id": governance_policy_catalog_payload["catalog_id"]},
+  )
+  primary_template_backed_step = next(
+    step
+    for step in refreshed_primary_catalog_payload["current"]["hierarchy_steps"]
+    if step["step_id"] == template_hierarchy_step_id
+  )
+  assert (
+    primary_template_backed_step["source_template_id"]
+    == hierarchy_step_template_payload["hierarchy_step_template_id"]
+  )
+
+  refreshed_secondary_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_list"],
+    app=app,
+    path_params={"catalog_id": secondary_governance_policy_catalog_payload["catalog_id"]},
+  )
+  assert len(refreshed_secondary_catalog_payload["current"]["hierarchy_steps"]) == 1
+  assert (
+    refreshed_secondary_catalog_payload["current"]["hierarchy_steps"][0]["source_template_id"]
+    == hierarchy_step_template_payload["hierarchy_step_template_id"]
+  )
 
   staged_governance_policy_catalog_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage"],

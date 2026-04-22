@@ -32,6 +32,7 @@ from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord
@@ -331,6 +332,10 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_scheduler_narrative_governance_policy_catalog_audit_records: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_narrative_governance_hierarchy_step_templates: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord,
     ] = OrderedDict()
     self._provider_provenance_scheduler_narrative_governance_plans: OrderedDict[
       str,
@@ -994,6 +999,34 @@ class InMemoryRunRepository(RunRepositoryPort):
         key=lambda record: (record.recorded_at, record.audit_id),
         reverse=True,
       )
+    )
+
+  def save_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord:
+    self._provider_provenance_scheduler_narrative_governance_hierarchy_step_templates[
+      record.hierarchy_step_template_id
+    ] = record
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_hierarchy_step_templates(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_governance_hierarchy_step_templates.values(),
+        key=lambda record: (record.updated_at, record.hierarchy_step_template_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_narrative_governance_hierarchy_step_template(
+    self,
+    hierarchy_step_template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord | None:
+    return self._provider_provenance_scheduler_narrative_governance_hierarchy_step_templates.get(
+      hierarchy_step_template_id
     )
 
   def save_provider_provenance_scheduler_narrative_governance_plan(

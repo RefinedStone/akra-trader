@@ -2162,6 +2162,71 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("catalog_id",),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance",
   )
+  operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates",
+    route_name="create_operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template",
+    response_title="Create provider provenance scheduler narrative governance hierarchy step template",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates",
+    route_name="list_operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_templates",
+    response_title="List provider provenance scheduler narrative governance hierarchy step templates",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_list",
+    filter_keys=("item_type", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "item_type",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Item type",
+          description="Filter hierarchy step templates by supported scheduler narrative item type.",
+          examples=("registry",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search hierarchy step templates by name, origin catalog, template provenance, or item targets.",
+          examples=("cross-catalog",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=20,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=100),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of hierarchy step templates to return.",
+          examples=(20,),
+        ),
+      ),
+    ),
+  )
+  operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/{hierarchy_step_template_id}/apply",
+    route_name="apply_operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template",
+    response_title="Apply provider provenance scheduler narrative governance hierarchy step template to policy catalogs",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
+    methods=("POST",),
+    path_param_keys=("hierarchy_step_template_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply",
+  )
   operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{catalog_id}/stage",
@@ -3985,6 +4050,9 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_update_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_restore_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_step_bulk_governance_binding,
+    operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_create_binding,
+    operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_list_binding,
+    operator_provider_provenance_scheduler_narrative_governance_hierarchy_step_template_apply_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_create_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_list_binding,

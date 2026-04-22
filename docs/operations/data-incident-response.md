@@ -104,6 +104,9 @@ unclear dataset lineage.
 - those captured hierarchies now also expose step-level edit, revision-restore, and bulk
   governance workflow, so operators can correct or selectively recover one reusable hierarchy step
   without replacing the rest of the catalog
+- those same hierarchy steps can now be saved as named step templates and reapplied across several
+  policy catalogs, so cross-catalog handoffs can sync one reviewed governance step into multiple
+  queue catalogs without rebuilding it one catalog at a time
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

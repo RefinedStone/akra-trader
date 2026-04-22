@@ -20,6 +20,8 @@ import type {
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate,
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogListPayload,
@@ -1476,6 +1478,105 @@ export async function runProviderProvenanceSchedulerNarrativeGovernancePolicyCat
         ...(params.layoutPatch !== undefined ? { layout_patch: params.layoutPatch } : {}),
         ...(params.templateId !== undefined ? { template_id: params.templateId } : {}),
         ...(params.clearTemplateLink !== undefined ? { clear_template_link: params.clearTemplateLink } : {}),
+      }),
+    },
+  );
+}
+
+export async function createProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(params: {
+  name: string;
+  description?: string;
+  step?: {
+    stepId?: string;
+    itemType: "template" | "registry";
+    itemIds: string[];
+    namePrefix?: string;
+    nameSuffix?: string;
+    descriptionAppend?: string;
+    queryPatch?: Record<string, unknown>;
+    layoutPatch?: Record<string, unknown>;
+    templateId?: string;
+    clearTemplateLink?: boolean;
+  };
+  originCatalogId?: string;
+  originStepId?: string;
+  createdByTabId?: string;
+  createdByTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: params.name,
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...(params.step
+          ? {
+              step: {
+                ...(params.step.stepId?.trim() ? { step_id: params.step.stepId.trim() } : {}),
+                item_type: params.step.itemType,
+                item_ids: params.step.itemIds,
+                action: "update",
+                ...(params.step.namePrefix !== undefined ? { name_prefix: params.step.namePrefix } : {}),
+                ...(params.step.nameSuffix !== undefined ? { name_suffix: params.step.nameSuffix } : {}),
+                ...(params.step.descriptionAppend !== undefined
+                  ? { description_append: params.step.descriptionAppend }
+                  : {}),
+                ...(params.step.queryPatch ? { query_patch: params.step.queryPatch } : {}),
+                ...(params.step.layoutPatch ? { layout_patch: params.step.layoutPatch } : {}),
+                ...(params.step.templateId?.trim() ? { template_id: params.step.templateId.trim() } : {}),
+                ...(params.step.clearTemplateLink ? { clear_template_link: true } : {}),
+              },
+            }
+          : {}),
+        ...(params.originCatalogId?.trim() ? { origin_catalog_id: params.originCatalogId.trim() } : {}),
+        ...(params.originStepId?.trim() ? { origin_step_id: params.originStepId.trim() } : {}),
+        ...(params.createdByTabId?.trim() ? { created_by_tab_id: params.createdByTabId.trim() } : {}),
+        ...(params.createdByTabLabel?.trim()
+          ? { created_by_tab_label: params.createdByTabLabel.trim() }
+          : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates(params: {
+  itemType?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.itemType?.trim()) {
+    searchParams.set("item_type", params.itemType.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 100))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates${suffix}`,
+  );
+}
+
+export async function applyProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate(params: {
+  hierarchyStepTemplateId: string;
+  catalogIds: string[];
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/hierarchy-step-templates/${encodeURIComponent(params.hierarchyStepTemplateId)}/apply`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        catalog_ids: params.catalogIds,
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
       }),
     },
   );

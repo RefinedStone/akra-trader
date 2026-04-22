@@ -148,8 +148,9 @@ creation.
   governance now also includes reusable staged-plan hierarchies that can be captured from the
   current template/registry workbench and replayed back into the approval queue as catalog-linked
   plans, and those captured hierarchies now also support step edit, step revision restore, and
-  step bulk-governance workflow; stitched multi-occurrence narrative artifacts and deeper
-  server-side narrative search are still not built
+  step bulk-governance workflow; hierarchy steps can now also be promoted into named templates and
+  synced across multiple policy catalogs, but stitched multi-occurrence narrative artifacts and
+  deeper server-side narrative search are still not built
 
 ### Remaining work
 

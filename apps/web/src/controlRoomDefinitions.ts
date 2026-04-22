@@ -1814,8 +1814,30 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditList
   total: number;
 };
 
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate = {
+  hierarchy_step_template_id: string;
+  name: string;
+  description: string;
+  item_type: "template" | "registry" | string;
+  step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep;
+  origin_catalog_id?: string | null;
+  origin_catalog_name?: string | null;
+  origin_step_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateListPayload = {
+  items: ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate[];
+  total: number;
+};
+
 export type ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep = {
   step_id?: string | null;
+  source_template_id?: string | null;
+  source_template_name?: string | null;
   item_type: "template" | "registry" | string;
   action: "update" | string;
   item_ids: string[];

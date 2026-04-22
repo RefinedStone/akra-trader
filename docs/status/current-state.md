@@ -209,6 +209,9 @@ It is not yet a finished live trading product:
 - policy-catalog hierarchy steps now also have their own edit, revision-restore, and bulk
   governance workflow in the control room, so reusable staged hierarchies can be corrected or
   selectively restored without recapturing or restoring the whole catalog
+- those hierarchy steps can now also be promoted into named reusable step templates and pushed back
+  across multiple policy catalogs, so cross-catalog governance no longer depends on recapturing the
+  same hierarchy step in every catalog by hand
 
 ### Operator discipline baseline
 

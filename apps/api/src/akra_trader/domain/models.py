@@ -1184,9 +1184,31 @@ class ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRecord:
+  hierarchy_step_template_id: str
+  name: str
+  description: str = ""
+  item_type: str = "template"
+  step: "ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep" = field(
+    default_factory=lambda: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep(
+      item_type="template"
+    )
+  )
+  origin_catalog_id: str | None = None
+  origin_catalog_name: str | None = None
+  origin_step_id: str | None = None
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep:
   item_type: str
   step_id: str | None = None
+  source_template_id: str | None = None
+  source_template_name: str | None = None
   action: str = "update"
   item_ids: tuple[str, ...] = ()
   item_names: tuple[str, ...] = ()
