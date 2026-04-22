@@ -1287,6 +1287,7 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     category?: string | null;
     status?: string | null;
     narrative_facet?: string | null;
+    search?: string | null;
     limit: number;
     offset: number;
   };

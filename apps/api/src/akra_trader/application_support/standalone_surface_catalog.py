@@ -3381,7 +3381,7 @@ def build_standalone_surface_runtime_bindings(
     response_title="Provider provenance scheduler alert history",
     scope="app",
     binding_kind="operator_provider_provenance_scheduler_alert_history",
-    filter_keys=("category", "status", "narrative_facet", "limit", "offset"),
+    filter_keys=("category", "status", "narrative_facet", "search", "limit", "offset"),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
         "category",
@@ -3414,6 +3414,17 @@ def build_standalone_surface_runtime_bindings(
           title="Narrative facet",
           description="Filter scheduler alert history by occurrence narrative facet.",
           examples=("post_resolution_recovery",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search scheduler alert occurrences by occurrence ID, summary, symbol, timeline, or narrative status sequence.",
+          examples=("healthy",),
         ),
       ),
       StandaloneSurfaceFilterParamSpec(

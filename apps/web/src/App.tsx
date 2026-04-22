@@ -6870,6 +6870,10 @@ export default function App() {
             providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet !== "all_occurrences"
               ? providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet
               : undefined,
+          search:
+            providerProvenanceAnalyticsQuery.search_query.trim()
+              ? providerProvenanceAnalyticsQuery.search_query.trim()
+              : undefined,
           limit: schedulerHistoryLimit,
           offset: providerProvenanceSchedulerAlertHistoryOffset,
         }),
@@ -7054,6 +7058,10 @@ export default function App() {
       alertCategory: category,
       status,
       narrativeFacet,
+      search:
+        query?.search?.trim()
+        || providerProvenanceAnalyticsQuery.search_query.trim()
+        || undefined,
       offset: options?.offset ?? providerProvenanceSchedulerAlertHistoryOffset,
       occurrenceLimit: options?.occurrenceLimit ?? providerProvenanceSchedulerAlertHistory?.query.limit ?? 8,
       format,
@@ -18950,6 +18958,21 @@ export default function App() {
                                           </option>
                                         ))}
                                       </select>
+                                    </label>
+                                    <label className="run-form-field">
+                                      <span>Search</span>
+                                      <input
+                                        onChange={(event) => {
+                                          setProviderProvenanceAnalyticsQuery((current) => ({
+                                            ...current,
+                                            search_query: event.target.value,
+                                          }));
+                                          setProviderProvenanceSchedulerAlertHistoryOffset(0);
+                                        }}
+                                        placeholder="occurrence, symbol, status sequence"
+                                        type="search"
+                                        value={providerProvenanceAnalyticsQuery.search_query}
+                                      />
                                     </label>
                                     <button
                                       className="ghost-button"

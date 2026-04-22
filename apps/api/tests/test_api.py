@@ -864,6 +864,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "category",
     "status",
     "narrative_facet",
+    "search",
     "limit",
     "offset",
     "app",
@@ -4981,6 +4982,10 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
       "/api/operator/provider-provenance-analytics/scheduler-alerts",
       params={"category": "scheduler_lag", "narrative_facet": "post_resolution_recovery", "limit": 10, "offset": 0},
     )
+    search_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-alerts",
+      params={"search": "healthy", "limit": 10, "offset": 0},
+    )
 
   assert first_page_response.status_code == 200
   first_page_payload = first_page_response.json()
@@ -5005,6 +5010,15 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert all(
     item["narrative"]["has_post_resolution_history"]
     for item in narrative_page_payload["items"]
+  )
+
+  assert search_response.status_code == 200
+  search_payload = search_response.json()
+  assert search_payload["query"]["search"] == "healthy"
+  assert search_payload["returned"] >= 1
+  assert any(
+    item["narrative"]["has_post_resolution_history"]
+    for item in search_payload["items"]
   )
 
 
@@ -5172,6 +5186,7 @@ def test_operator_visibility_endpoint_can_export_stitched_scheduler_narrative_re
         "alert_category": "scheduler_lag",
         "status": "resolved",
         "narrative_facet": "resolved_narratives",
+        "search": "healthy",
         "offset": 0,
         "occurrence_limit": 4,
         "format": "json",
@@ -5186,6 +5201,7 @@ def test_operator_visibility_endpoint_can_export_stitched_scheduler_narrative_re
   assert stitched_report["query"]["reconstruction_mode"] == "stitched_occurrence_report"
   assert stitched_report["query"]["narrative_mode"] == "stitched_multi_occurrence"
   assert stitched_report["query"]["narrative_facet"] == "resolved_narratives"
+  assert stitched_report["query"]["search"] == "healthy"
   assert stitched_report["stitched_occurrence_report"]["summary"]["occurrence_count"] == 2
   assert len(stitched_report["stitched_occurrence_report"]["occurrences"]) == 2
   assert stitched_report["stitched_occurrence_report"]["stitched_status_sequence"]

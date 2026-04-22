@@ -17,6 +17,7 @@ from threading import Lock
 from typing import Any
 from typing import Callable
 from typing import Iterable
+from typing import Mapping
 from uuid import uuid4
 
 from akra_trader.domain.models import RunComparison
@@ -36638,6 +36639,85 @@ class TradingApplication:
       return normalized
     return None
 
+  @classmethod
+  def _matches_provider_provenance_scheduler_alert_occurrence_search(
+    cls,
+    *,
+    row: Mapping[str, Any],
+    search: str | None,
+  ) -> bool:
+    if not isinstance(search, str) or not search.strip():
+      return True
+    alert = row.get("alert")
+    narrative = row.get("narrative")
+    primary_focus = alert.primary_focus if isinstance(alert, OperatorAlert) else None
+    symbols = alert.symbols if isinstance(alert, OperatorAlert) else ()
+    search_values: list[Any] = []
+    if isinstance(alert, OperatorAlert):
+      search_values.extend(
+        (
+          alert.occurrence_id,
+          alert.alert_id,
+          alert.category,
+          alert.severity,
+          alert.status,
+          alert.summary,
+          alert.detail,
+          alert.source,
+          alert.run_id,
+          alert.session_id,
+          alert.symbol,
+          alert.timeframe,
+          alert.timeline_key,
+          alert.detected_at.isoformat(),
+          alert.resolved_at.isoformat() if alert.resolved_at is not None else None,
+          str(alert.timeline_position) if alert.timeline_position is not None else None,
+          str(alert.timeline_total) if alert.timeline_total is not None else None,
+        )
+      )
+      search_values.extend(symbols)
+    if primary_focus is not None:
+      search_values.extend(
+        (
+          primary_focus.symbol,
+          primary_focus.timeframe,
+          primary_focus.policy,
+          primary_focus.reason,
+          *(primary_focus.candidate_symbols or ()),
+          str(primary_focus.candidate_count),
+        )
+      )
+    if isinstance(narrative, Mapping):
+      search_values.extend(
+        (
+          narrative.get("facet"),
+          narrative.get("narrative_mode"),
+          str(narrative.get("occurrence_record_count"))
+          if narrative.get("occurrence_record_count") is not None
+          else None,
+          str(narrative.get("post_resolution_record_count"))
+          if narrative.get("post_resolution_record_count") is not None
+          else None,
+          (
+            narrative.get("narrative_window_ended_at").isoformat()
+            if isinstance(narrative.get("narrative_window_ended_at"), datetime)
+            else narrative.get("narrative_window_ended_at")
+          ),
+          (
+            narrative.get("next_occurrence_detected_at").isoformat()
+            if isinstance(narrative.get("next_occurrence_detected_at"), datetime)
+            else narrative.get("next_occurrence_detected_at")
+          ),
+          *tuple(narrative.get("facet_flags", ()) or ()),
+          *tuple(narrative.get("status_sequence", ()) or ()),
+          *tuple(narrative.get("post_resolution_status_sequence", ()) or ()),
+        )
+      )
+    return cls._matches_provider_provenance_workspace_search(
+      values=search_values,
+      search=search,
+    )
+
   @staticmethod
   def _build_provider_provenance_scheduler_occurrence_detected_at(
     *,
@@ -36888,6 +36968,7 @@ class TradingApplication:
     category: str | None = None,
     status: str | None = None,
     narrative_facet: str | None = None,
+    search: str | None = None,
     limit: int = 25,
     offset: int = 0,
   ) -> dict[str, Any]:
@@ -36929,6 +37010,10 @@ class TradingApplication:
           and "recurring_occurrence" in row["narrative"].get("facet_flags", ())
         )
         or normalized_narrative_facet == "all_occurrences"
+      )
+      and self._matches_provider_provenance_scheduler_alert_occurrence_search(
+        row=row,
+        search=search,
       )
     ]
     total = len(filtered_history)
@@ -36976,6 +37061,7 @@ class TradingApplication:
         "category": normalized_category,
         "status": normalized_status,
         "narrative_facet": normalized_narrative_facet or "all_occurrences",
+        "search": search.strip() if isinstance(search, str) and search.strip() else None,
         "limit": normalized_limit,
         "offset": normalized_offset,
       },
@@ -38001,6 +38087,7 @@ class TradingApplication:
     category: str | None = None,
     status: str | None = None,
     narrative_facet: str | None = None,
+    search: str | None = None,
     offset: int = 0,
     occurrence_limit: int = 8,
     history_limit: int = 25,
@@ -38023,6 +38110,7 @@ class TradingApplication:
       category=normalized_category,
       status=normalized_status,
       narrative_facet=normalized_narrative_facet,
+      search=search,
       limit=normalized_occurrence_limit,
       offset=normalized_offset,
     )
@@ -38243,6 +38331,7 @@ class TradingApplication:
         "narrative_mode": "stitched_multi_occurrence",
         "alert_category": normalized_category,
         "narrative_facet": normalized_narrative_facet or "all_occurrences",
+        "search": search.strip() if isinstance(search, str) and search.strip() else None,
         "occurrence_limit": normalized_occurrence_limit,
         "occurrence_offset": normalized_offset,
         "selected_occurrence_count": len(occurrence_payloads),
@@ -41082,6 +41171,7 @@ def serialize_provider_provenance_scheduler_alert_history(
       "category": query.get("category"),
       "status": query.get("status"),
       "narrative_facet": query.get("narrative_facet"),
+      "search": query.get("search"),
       "limit": int(query.get("limit", 25)),
       "offset": int(query.get("offset", 0)),
     },

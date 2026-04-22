@@ -1671,6 +1671,7 @@ def execute_standalone_surface_binding(
       category=resolved_filters.get("category"),
       status=resolved_filters.get("status"),
       narrative_facet=resolved_filters.get("narrative_facet"),
+      search=resolved_filters.get("search"),
       limit=resolved_filters.get("limit", 25),
       offset=resolved_filters.get("offset", 0),
     )

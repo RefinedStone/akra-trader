@@ -110,6 +110,9 @@ unclear dataset lineage.
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually
+- that same scheduler occurrence timeline now also supports deeper server-side search over
+  occurrence IDs, alert text, market context, and narrative status sequences, so shift leads can
+  isolate the right lag/failure handoff slice before exporting or sharing a stitched report
 - those saved scheduler narrative templates and boards now also support edit, delete, and
   revision-restore workflow, so teams can correct or retire shared review lenses without losing
   the previous incident-handoff snapshot

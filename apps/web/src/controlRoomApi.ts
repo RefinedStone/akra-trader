@@ -396,6 +396,7 @@ export async function listProviderProvenanceSchedulerAlertHistory(params: {
   category?: string;
   status?: string;
   narrativeFacet?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 } = {}) {
@@ -408,6 +409,9 @@ export async function listProviderProvenanceSchedulerAlertHistory(params: {
   }
   if (params.narrativeFacet?.trim()) {
     searchParams.set("narrative_facet", params.narrativeFacet.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
   }
   if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
     searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
@@ -495,6 +499,7 @@ export async function exportProviderProvenanceSchedulerStitchedNarrativeReport(p
   alertCategory?: string;
   status?: string;
   narrativeFacet?: string;
+  search?: string;
   offset?: number;
   occurrenceLimit?: number;
   format?: "json" | "csv";
@@ -509,6 +514,7 @@ export async function exportProviderProvenanceSchedulerStitchedNarrativeReport(p
         alert_category: params.alertCategory?.trim() || null,
         status: params.status?.trim() || null,
         narrative_facet: params.narrativeFacet?.trim() || null,
+        search: params.search?.trim() || null,
         offset:
           typeof params.offset === "number" && Number.isFinite(params.offset)
             ? Math.max(0, Math.min(Math.round(params.offset), 10000))

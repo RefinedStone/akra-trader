@@ -1929,6 +1929,22 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   assert payload["items"][0]["occurrence_id"]
   assert payload["items"][0]["timeline_total"] == 1
 
+  search_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
+    app=app,
+    filters={
+      "search": "healthy",
+      "limit": 10,
+      "offset": 0,
+    },
+  )
+  assert search_payload["query"]["search"] == "healthy"
+  assert search_payload["returned"] >= 1
+  assert any(
+    item["narrative"]["has_post_resolution_history"]
+    for item in search_payload["items"]
+  )
+
 
 def test_provider_provenance_scheduler_history_and_analytics_persist(
   monkeypatch,
@@ -15674,6 +15690,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].filter_param_specs[2].key == (
     "narrative_facet"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].filter_param_specs[3].key == (
+    "search"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].filter_param_specs[-1].key == (
     "offset"

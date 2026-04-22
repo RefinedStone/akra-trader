@@ -236,6 +236,7 @@ class OperatorProviderProvenanceSchedulerNarrativeReportRequest(BaseModel):
   alert_category: str | None = None
   status: str | None = None
   narrative_facet: str | None = None
+  search: str | None = None
   offset: int = 0
   occurrence_limit: int = 8
   format: str = "json"
@@ -2055,6 +2056,7 @@ def create_router(container: Container) -> APIRouter:
         category=request.alert_category,
         status=request.status,
         narrative_facet=request.narrative_facet,
+        search=request.search,
         offset=request.offset,
         occurrence_limit=request.occurrence_limit,
         export_format=request.format,
