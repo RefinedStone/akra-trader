@@ -177,6 +177,9 @@ creation.
   dedicated external scheduler search service with tuned relevance weighting, so future narrative
   retrieval can build on dedicated durable index documents instead of recomputing every token
   stream on demand or coupling the index to the run repository
+- that same retrieval layer now also persists query analytics plus operator relevance feedback and
+  applies learned relevance tuning to later scheduler searches, so future narrative tooling can
+  improve ranking from observed operator behavior rather than only static weighting heuristics
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

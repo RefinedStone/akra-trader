@@ -1602,6 +1602,65 @@ class ProviderProvenanceSchedulerSearchDocumentRecord:
   fields: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+  query_id: str
+  recorded_at: datetime
+  query: str
+  scheduler_key: str = "provider_provenance_reports"
+  expires_at: datetime | None = None
+  category: str | None = None
+  status: str | None = None
+  narrative_facet: str | None = None
+  persistence_mode: str | None = None
+  relevance_model: str | None = None
+  token_count: int = 0
+  operator_count: int = 0
+  boolean_operator_count: int = 0
+  semantic_concept_count: int = 0
+  matched_occurrences: int = 0
+  top_score: int = 0
+  indexed_occurrence_count: int = 0
+  indexed_term_count: int = 0
+  query_terms: tuple[str, ...] = ()
+  query_phrases: tuple[str, ...] = ()
+  query_semantic_concepts: tuple[str, ...] = ()
+  parsed_operators: tuple[str, ...] = ()
+  matched_occurrence_ids: tuple[str, ...] = ()
+  top_cluster_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerSearchFeedbackRecord:
+  feedback_id: str
+  recorded_at: datetime
+  query_id: str
+  query: str
+  occurrence_id: str
+  signal: str
+  scheduler_key: str = "provider_provenance_reports"
+  expires_at: datetime | None = None
+  actor: str = "operator"
+  note: str | None = None
+  category: str | None = None
+  status: str | None = None
+  narrative_facet: str | None = None
+  query_terms: tuple[str, ...] = ()
+  query_phrases: tuple[str, ...] = ()
+  query_semantic_concepts: tuple[str, ...] = ()
+  parsed_operators: tuple[str, ...] = ()
+  matched_fields: tuple[str, ...] = ()
+  semantic_concepts: tuple[str, ...] = ()
+  operator_hits: tuple[str, ...] = ()
+  lexical_score: int = 0
+  semantic_score: int = 0
+  operator_score: int = 0
+  score: int = 0
+  ranking_reason: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "

@@ -55,6 +55,8 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerStitchedReportV
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchQueryAnalyticsRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult
@@ -2926,6 +2928,8 @@ class TradingApplication:
     if callable(prune_records):
       pruned_count = int(prune_records(current_time))
       self._prune_provider_provenance_scheduler_search_document_records()
+      self._prune_provider_provenance_scheduler_search_query_analytics_records()
+      self._prune_provider_provenance_scheduler_search_feedback_records()
       return pruned_count
     original_count = len(self._provider_provenance_scheduler_health_records)
     self._provider_provenance_scheduler_health_records = {
@@ -2934,6 +2938,8 @@ class TradingApplication:
       if record.expires_at is None or record.expires_at > current_time
     }
     self._prune_provider_provenance_scheduler_search_document_records()
+    self._prune_provider_provenance_scheduler_search_query_analytics_records()
+    self._prune_provider_provenance_scheduler_search_feedback_records()
     return original_count - len(self._provider_provenance_scheduler_health_records)
 
   def _save_provider_provenance_scheduler_search_document_record(
@@ -2955,6 +2961,52 @@ class TradingApplication:
     current_time = self._clock()
     return int(
       self._provider_provenance_scheduler_search_backend.prune_provider_provenance_scheduler_search_document_records(
+        current_time
+      )
+    )
+
+  def _save_provider_provenance_scheduler_search_query_analytics_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+  ) -> ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+    return self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_query_analytics_record(
+      record
+    )
+
+  def _list_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchQueryAnalyticsRecord, ...]:
+    return tuple(
+      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_query_analytics_records()
+    )
+
+  def _prune_provider_provenance_scheduler_search_query_analytics_records(self) -> int:
+    current_time = self._clock()
+    return int(
+      self._provider_provenance_scheduler_search_backend.prune_provider_provenance_scheduler_search_query_analytics_records(
+        current_time
+      )
+    )
+
+  def _save_provider_provenance_scheduler_search_feedback_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchFeedbackRecord,
+  ) -> ProviderProvenanceSchedulerSearchFeedbackRecord:
+    return self._provider_provenance_scheduler_search_backend.save_provider_provenance_scheduler_search_feedback_record(
+      record
+    )
+
+  def _list_provider_provenance_scheduler_search_feedback_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchFeedbackRecord, ...]:
+    return tuple(
+      self._provider_provenance_scheduler_search_backend.list_provider_provenance_scheduler_search_feedback_records()
+    )
+
+  def _prune_provider_provenance_scheduler_search_feedback_records(self) -> int:
+    current_time = self._clock()
+    return int(
+      self._provider_provenance_scheduler_search_backend.prune_provider_provenance_scheduler_search_feedback_records(
         current_time
       )
     )
@@ -36838,6 +36890,452 @@ class TradingApplication:
       }
     return lookup
 
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_search_feedback_signal(
+    signal: str | None,
+  ) -> str | None:
+    if not isinstance(signal, str):
+      return None
+    normalized = signal.strip().lower().replace("-", "_")
+    if normalized in {"relevant", "positive", "helpful", "up"}:
+      return "relevant"
+    if normalized in {"not_relevant", "negative", "unhelpful", "down"}:
+      return "not_relevant"
+    return None
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_search_query_feature_set(
+    parsed_query: Mapping[str, Any],
+  ) -> tuple[str, ...]:
+    features: list[str] = []
+    for term in parsed_query.get("terms", ()) or ():
+      if isinstance(term, str) and term.strip():
+        features.append(f"term:{term.strip().lower()}")
+    for phrase in parsed_query.get("phrases", ()) or ():
+      if isinstance(phrase, str) and phrase.strip():
+        features.append(f"phrase:{phrase.strip().lower()}")
+    for concept in parsed_query.get("semantic_concepts", ()) or ():
+      if isinstance(concept, str) and concept.strip():
+        features.append(f"concept:{concept.strip().lower()}")
+    for operator in parsed_query.get("operators", ()) or ():
+      raw_value = operator.get("raw") if isinstance(operator, Mapping) else None
+      if isinstance(raw_value, str) and raw_value.strip():
+        features.append(f"operator:{raw_value.strip().lower()}")
+    return tuple(dict.fromkeys(features))
+
+  def _build_provider_provenance_scheduler_search_tuning_profile(
+    self,
+    *,
+    search_query: str,
+    parsed_query: Mapping[str, Any],
+  ) -> dict[str, Any]:
+    normalized_query = search_query.strip().lower()
+    query_features = set(
+      self._build_provider_provenance_scheduler_search_query_feature_set(parsed_query)
+    )
+    feedback_records = self._list_provider_provenance_scheduler_search_feedback_records()
+    field_adjustments: dict[str, float] = {}
+    semantic_adjustments: dict[str, float] = {}
+    operator_adjustments: dict[str, float] = {}
+    channel_adjustments = {"lexical": 0.0, "semantic": 0.0, "operator": 0.0}
+    contributing_records: list[ProviderProvenanceSchedulerSearchFeedbackRecord] = []
+
+    for record in feedback_records:
+      signal = self._normalize_provider_provenance_scheduler_search_feedback_signal(record.signal)
+      if signal is None:
+        continue
+      record_query = record.query.strip().lower()
+      record_features = {
+        *(f"term:{term.strip().lower()}" for term in record.query_terms if isinstance(term, str) and term.strip()),
+        *(f"phrase:{phrase.strip().lower()}" for phrase in record.query_phrases if isinstance(phrase, str) and phrase.strip()),
+        *(f"concept:{concept.strip().lower()}" for concept in record.query_semantic_concepts if isinstance(concept, str) and concept.strip()),
+        *(f"operator:{operator.strip().lower()}" for operator in record.parsed_operators if isinstance(operator, str) and operator.strip()),
+      }
+      overlap_count = len(query_features.intersection(record_features))
+      feature_count = max(len(query_features), 1)
+      overlap_ratio = overlap_count / feature_count
+      if record_query == normalized_query:
+        overlap_ratio = 1.0
+      if overlap_ratio <= 0.0:
+        continue
+      direction = 1.0 if signal == "relevant" else -1.0
+      weight = direction * max(0.35, min(overlap_ratio, 1.0))
+      contributing_records.append(record)
+      for field_name in record.matched_fields:
+        if isinstance(field_name, str) and field_name.strip():
+          field_adjustments[field_name] = field_adjustments.get(field_name, 0.0) + (weight * 14.0)
+      for concept in record.semantic_concepts:
+        if isinstance(concept, str) and concept.strip():
+          semantic_adjustments[concept] = semantic_adjustments.get(concept, 0.0) + (weight * 18.0)
+      for operator_hit in record.operator_hits:
+        if isinstance(operator_hit, str) and operator_hit.strip():
+          operator_adjustments[operator_hit] = operator_adjustments.get(operator_hit, 0.0) + (weight * 20.0)
+      channel_adjustments["lexical"] += weight * (
+        1.0 + min(max(record.lexical_score, 0), 500) / 250.0
+      )
+      channel_adjustments["semantic"] += weight * (
+        1.0 + min(max(record.semantic_score, 0), 500) / 250.0
+      )
+      channel_adjustments["operator"] += weight * (
+        1.0 + min(max(record.operator_score, 0), 500) / 250.0
+      )
+
+    relevant_count = sum(
+      1
+      for record in contributing_records
+      if self._normalize_provider_provenance_scheduler_search_feedback_signal(record.signal) == "relevant"
+    )
+    not_relevant_count = sum(
+      1
+      for record in contributing_records
+      if self._normalize_provider_provenance_scheduler_search_feedback_signal(record.signal) == "not_relevant"
+    )
+
+    def _clamp_adjustment(value: float, *, limit: int = 40) -> int:
+      return int(max(-limit, min(round(value), limit)))
+
+    normalized_field_adjustments = {
+      field_name: _clamp_adjustment(score)
+      for field_name, score in field_adjustments.items()
+      if _clamp_adjustment(score) != 0
+    }
+    normalized_semantic_adjustments = {
+      concept: _clamp_adjustment(score)
+      for concept, score in semantic_adjustments.items()
+      if _clamp_adjustment(score) != 0
+    }
+    normalized_operator_adjustments = {
+      operator: _clamp_adjustment(score, limit=48)
+      for operator, score in operator_adjustments.items()
+      if _clamp_adjustment(score, limit=48) != 0
+    }
+    normalized_channel_adjustments = {
+      channel: _clamp_adjustment(score, limit=16)
+      for channel, score in channel_adjustments.items()
+    }
+    tuned_feature_count = (
+      len(normalized_field_adjustments)
+      + len(normalized_semantic_adjustments)
+      + len(normalized_operator_adjustments)
+    )
+    return {
+      "version": (
+        "tfidf_field_weight_feedback_v2"
+        if contributing_records
+        else "tfidf_field_weight_v1"
+      ),
+      "active": bool(contributing_records),
+      "feedback_signal_count": len(contributing_records),
+      "relevant_feedback_count": relevant_count,
+      "not_relevant_feedback_count": not_relevant_count,
+      "field_adjustments": normalized_field_adjustments,
+      "semantic_adjustments": normalized_semantic_adjustments,
+      "operator_adjustments": normalized_operator_adjustments,
+      "channel_adjustments": normalized_channel_adjustments,
+      "tuned_feature_count": tuned_feature_count,
+    }
+
+  def _record_provider_provenance_scheduler_search_query_analytics(
+    self,
+    *,
+    recorded_at: datetime,
+    search_query: str,
+    category: str | None,
+    status: str | None,
+    narrative_facet: str | None,
+    parsed_query: Mapping[str, Any],
+    matched_rows: tuple[Mapping[str, Any], ...],
+    indexed_occurrence_count: int,
+    indexed_term_count: int,
+    persistence_mode: str,
+    relevance_model: str,
+    top_cluster_label: str | None,
+  ) -> ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+    record = ProviderProvenanceSchedulerSearchQueryAnalyticsRecord(
+      query_id=uuid4().hex[:12],
+      recorded_at=recorded_at,
+      query=search_query,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="90d",
+        recorded_at=recorded_at,
+      ),
+      category=category,
+      status=status,
+      narrative_facet=narrative_facet,
+      persistence_mode=persistence_mode,
+      relevance_model=relevance_model,
+      token_count=len(parsed_query.get("terms", ())) + len(parsed_query.get("phrases", ())),
+      operator_count=len(parsed_query.get("operators", ())),
+      boolean_operator_count=int(parsed_query.get("boolean_operator_count", 0)),
+      semantic_concept_count=len(parsed_query.get("semantic_concepts", ())),
+      matched_occurrences=len(matched_rows),
+      top_score=max(
+        (int(row.get("search_match", {}).get("score", 0)) for row in matched_rows),
+        default=0,
+      ),
+      indexed_occurrence_count=indexed_occurrence_count,
+      indexed_term_count=indexed_term_count,
+      query_terms=tuple(parsed_query.get("terms", ())),
+      query_phrases=tuple(parsed_query.get("phrases", ())),
+      query_semantic_concepts=tuple(parsed_query.get("semantic_concepts", ())),
+      parsed_operators=tuple(
+        operator.get("raw")
+        for operator in parsed_query.get("operators", ())
+        if isinstance(operator.get("raw"), str)
+      ),
+      matched_occurrence_ids=tuple(
+        row["alert"].occurrence_id
+        for row in matched_rows
+        if isinstance(row.get("alert"), OperatorAlert)
+        and isinstance(row["alert"].occurrence_id, str)
+      ),
+      top_cluster_label=top_cluster_label,
+    )
+    return self._save_provider_provenance_scheduler_search_query_analytics_record(record)
+
+  def _build_provider_provenance_scheduler_search_analytics_summary(
+    self,
+    *,
+    query_record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+    search_query: str,
+    tuning_profile: Mapping[str, Any],
+  ) -> dict[str, Any]:
+    normalized_query = search_query.strip().lower()
+    recent_query_records = tuple(
+      record
+      for record in self._list_provider_provenance_scheduler_search_query_analytics_records()
+      if record.query.strip().lower() == normalized_query
+    )
+    feedback_records = tuple(
+      record
+      for record in self._list_provider_provenance_scheduler_search_feedback_records()
+      if record.query.strip().lower() == normalized_query
+    )
+    relevant_feedback_count = sum(
+      1
+      for record in feedback_records
+      if self._normalize_provider_provenance_scheduler_search_feedback_signal(record.signal) == "relevant"
+    )
+    not_relevant_feedback_count = sum(
+      1
+      for record in feedback_records
+      if self._normalize_provider_provenance_scheduler_search_feedback_signal(record.signal) == "not_relevant"
+    )
+    feedback_count = len(feedback_records)
+    helpful_feedback_ratio_pct = (
+      int(round((relevant_feedback_count / feedback_count) * 100))
+      if feedback_count > 0
+      else 0
+    )
+    return {
+      "query_id": query_record.query_id,
+      "recorded_at": query_record.recorded_at,
+      "recent_query_count": len(recent_query_records),
+      "feedback_count": feedback_count,
+      "relevant_feedback_count": relevant_feedback_count,
+      "not_relevant_feedback_count": not_relevant_feedback_count,
+      "helpful_feedback_ratio_pct": helpful_feedback_ratio_pct,
+      "learned_relevance_active": bool(tuning_profile.get("active")),
+      "tuning_profile_version": tuning_profile.get("version"),
+      "tuned_feature_count": int(tuning_profile.get("tuned_feature_count", 0)),
+      "channel_adjustments": {
+        "lexical": int(tuning_profile.get("channel_adjustments", {}).get("lexical", 0)),
+        "semantic": int(tuning_profile.get("channel_adjustments", {}).get("semantic", 0)),
+        "operator": int(tuning_profile.get("channel_adjustments", {}).get("operator", 0)),
+      },
+      "top_field_adjustments": tuple(
+        {
+          "field": field_name,
+          "score": score,
+        }
+        for field_name, score in sorted(
+          (tuning_profile.get("field_adjustments", {}) or {}).items(),
+          key=lambda item: (-abs(int(item[1])), item[0]),
+        )[:5]
+      ),
+      "top_semantic_adjustments": tuple(
+        {
+          "concept": concept,
+          "score": score,
+        }
+        for concept, score in sorted(
+          (tuning_profile.get("semantic_adjustments", {}) or {}).items(),
+          key=lambda item: (-abs(int(item[1])), item[0]),
+        )[:5]
+      ),
+      "top_operator_adjustments": tuple(
+        {
+          "operator": operator_hit,
+          "score": score,
+        }
+        for operator_hit, score in sorted(
+          (tuning_profile.get("operator_adjustments", {}) or {}).items(),
+          key=lambda item: (-abs(int(item[1])), item[0]),
+        )[:5]
+      ),
+      "recent_queries": tuple(
+        {
+          "query_id": record.query_id,
+          "recorded_at": record.recorded_at,
+          "query": record.query,
+          "matched_occurrences": record.matched_occurrences,
+          "top_score": record.top_score,
+          "relevance_model": record.relevance_model,
+        }
+        for record in recent_query_records[:5]
+      ),
+      "recent_feedback": tuple(
+        {
+          "feedback_id": record.feedback_id,
+          "recorded_at": record.recorded_at,
+          "occurrence_id": record.occurrence_id,
+          "signal": record.signal,
+          "matched_fields": tuple(record.matched_fields),
+          "semantic_concepts": tuple(record.semantic_concepts),
+          "operator_hits": tuple(record.operator_hits),
+          "note": record.note,
+        }
+        for record in feedback_records[:5]
+      ),
+    }
+
+  def record_provider_provenance_scheduler_alert_search_feedback(
+    self,
+    *,
+    query_id: str,
+    query: str,
+    occurrence_id: str,
+    signal: str,
+    matched_fields: tuple[str, ...] | list[str] = (),
+    semantic_concepts: tuple[str, ...] | list[str] = (),
+    operator_hits: tuple[str, ...] | list[str] = (),
+    lexical_score: int = 0,
+    semantic_score: int = 0,
+    operator_score: int = 0,
+    score: int = 0,
+    ranking_reason: str | None = None,
+    note: str | None = None,
+    actor: str = "operator",
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> dict[str, Any]:
+    normalized_signal = self._normalize_provider_provenance_scheduler_search_feedback_signal(signal)
+    if normalized_signal is None:
+      raise ValueError("Scheduler search feedback signal must be relevant or not_relevant.")
+    normalized_query_id = query_id.strip() if isinstance(query_id, str) and query_id.strip() else None
+    normalized_query = query.strip() if isinstance(query, str) and query.strip() else None
+    normalized_occurrence_id = (
+      occurrence_id.strip()
+      if isinstance(occurrence_id, str) and occurrence_id.strip()
+      else None
+    )
+    if normalized_query_id is None or normalized_query is None or normalized_occurrence_id is None:
+      raise ValueError("Scheduler search feedback requires query_id, query, and occurrence_id.")
+    analytics_record = next(
+      (
+        record
+        for record in self._list_provider_provenance_scheduler_search_query_analytics_records()
+        if record.query_id == normalized_query_id
+      ),
+      None,
+    )
+    feedback_record = ProviderProvenanceSchedulerSearchFeedbackRecord(
+      feedback_id=uuid4().hex[:12],
+      recorded_at=self._clock(),
+      query_id=normalized_query_id,
+      query=normalized_query,
+      occurrence_id=normalized_occurrence_id,
+      signal=normalized_signal,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="90d",
+        recorded_at=self._clock(),
+      ),
+      actor=actor.strip() if isinstance(actor, str) and actor.strip() else "operator",
+      note=note.strip() if isinstance(note, str) and note.strip() else None,
+      category=analytics_record.category if analytics_record is not None else None,
+      status=analytics_record.status if analytics_record is not None else None,
+      narrative_facet=analytics_record.narrative_facet if analytics_record is not None else None,
+      query_terms=analytics_record.query_terms if analytics_record is not None else (),
+      query_phrases=analytics_record.query_phrases if analytics_record is not None else (),
+      query_semantic_concepts=(
+        analytics_record.query_semantic_concepts if analytics_record is not None else ()
+      ),
+      parsed_operators=analytics_record.parsed_operators if analytics_record is not None else (),
+      matched_fields=tuple(
+        value.strip()
+        for value in matched_fields
+        if isinstance(value, str) and value.strip()
+      ),
+      semantic_concepts=tuple(
+        value.strip()
+        for value in semantic_concepts
+        if isinstance(value, str) and value.strip()
+      ),
+      operator_hits=tuple(
+        value.strip()
+        for value in operator_hits
+        if isinstance(value, str) and value.strip()
+      ),
+      lexical_score=max(int(lexical_score), 0),
+      semantic_score=max(int(semantic_score), 0),
+      operator_score=max(int(operator_score), 0),
+      score=max(int(score), 0),
+      ranking_reason=(
+        ranking_reason.strip()
+        if isinstance(ranking_reason, str) and ranking_reason.strip()
+        else None
+      ),
+      source_tab_id=(
+        source_tab_id.strip()
+        if isinstance(source_tab_id, str) and source_tab_id.strip()
+        else None
+      ),
+      source_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+    )
+    saved_feedback = self._save_provider_provenance_scheduler_search_feedback_record(
+      feedback_record
+    )
+    feedback_records = tuple(
+      record
+      for record in self._list_provider_provenance_scheduler_search_feedback_records()
+      if record.query.strip().lower() == normalized_query.lower()
+    )
+    relevant_feedback_count = sum(
+      1
+      for record in feedback_records
+      if self._normalize_provider_provenance_scheduler_search_feedback_signal(record.signal) == "relevant"
+    )
+    not_relevant_feedback_count = sum(
+      1
+      for record in feedback_records
+      if self._normalize_provider_provenance_scheduler_search_feedback_signal(record.signal) == "not_relevant"
+    )
+    total_feedback_count = len(feedback_records)
+    return {
+      "feedback_id": saved_feedback.feedback_id,
+      "query_id": saved_feedback.query_id,
+      "query": saved_feedback.query,
+      "occurrence_id": saved_feedback.occurrence_id,
+      "signal": saved_feedback.signal,
+      "feedback_count": total_feedback_count,
+      "relevant_feedback_count": relevant_feedback_count,
+      "not_relevant_feedback_count": not_relevant_feedback_count,
+      "helpful_feedback_ratio_pct": (
+        int(round((relevant_feedback_count / total_feedback_count) * 100))
+        if total_feedback_count > 0
+        else 0
+      ),
+      "learned_relevance_hint": (
+        "Feedback will influence future ranking for similar scheduler searches."
+        if total_feedback_count > 0
+        else "Feedback recorded."
+      ),
+    }
+
   @classmethod
   def _matches_provider_provenance_scheduler_alert_occurrence_search(
     cls,
@@ -37802,6 +38300,7 @@ class TradingApplication:
     parsed_query: Mapping[str, Any],
     index: Mapping[str, Any] | None = None,
     document: Mapping[str, Any] | None = None,
+    tuning_profile: Mapping[str, Any] | None = None,
   ) -> dict[str, Any] | None:
     terms = parsed_query["terms"]
     phrases = parsed_query["phrases"]
@@ -37822,6 +38321,8 @@ class TradingApplication:
     exact_match = False
     field_hits = 0
     operator_hits: list[str] = []
+    tuning_signals: list[str] = []
+    learned_score = 0
     total_documents = int(index.get("document_count", 0)) if isinstance(index, Mapping) else 0
     average_document_length = (
       float(index.get("average_document_length", 0.0))
@@ -37939,6 +38440,35 @@ class TradingApplication:
       semantic_score += 110 * len(semantic_hits)
       if len(highlights) < 3:
         highlights.append(f"semantic: {', '.join(semantic_hits)}")
+    if isinstance(tuning_profile, Mapping) and tuning_profile.get("active"):
+      field_adjustments = tuning_profile.get("field_adjustments", {}) or {}
+      semantic_adjustments = tuning_profile.get("semantic_adjustments", {}) or {}
+      operator_adjustments = tuning_profile.get("operator_adjustments", {}) or {}
+      channel_adjustments = tuning_profile.get("channel_adjustments", {}) or {}
+      for field_name in matched_fields:
+        adjustment = int(field_adjustments.get(field_name, 0))
+        if adjustment == 0:
+          continue
+        learned_score += adjustment
+        tuning_signals.append(f"field {field_name} {adjustment:+d}")
+      for concept in semantic_hits:
+        adjustment = int(semantic_adjustments.get(concept, 0))
+        if adjustment == 0:
+          continue
+        learned_score += adjustment
+        tuning_signals.append(f"semantic {concept} {adjustment:+d}")
+      for operator_hit in operator_hits:
+        adjustment = int(operator_adjustments.get(operator_hit, 0))
+        if adjustment == 0:
+          continue
+        learned_score += adjustment
+        tuning_signals.append(f"operator {operator_hit} {adjustment:+d}")
+      learned_score += int(channel_adjustments.get("lexical", 0)) * max(
+        len(matched_terms) + len(matched_phrases),
+        1 if lexical_score > 0 else 0,
+      )
+      learned_score += int(channel_adjustments.get("semantic", 0)) * len(semantic_hits)
+      learned_score += int(channel_adjustments.get("operator", 0)) * len(operator_hits)
     score = lexical_score + semantic_score + operator_score
     if score <= 0:
       return None
@@ -37952,6 +38482,7 @@ class TradingApplication:
       score += 40
     if exact_match:
       score += 60
+    score += learned_score
     ranking_reason_parts = []
     if exact_match:
       ranking_reason_parts.append("exact field match")
@@ -37965,6 +38496,8 @@ class TradingApplication:
       ranking_reason_parts.append(
         f"{lexical_units_matched} of {lexical_unit_total} lexical unit(s) matched"
       )
+    if learned_score != 0:
+      ranking_reason_parts.append(f"feedback tuned {learned_score:+d}")
     ranking_reason_parts.append(f"{field_hits} ranked field(s)")
     return {
       "score": score,
@@ -37980,7 +38513,16 @@ class TradingApplication:
       "lexical_score": lexical_score,
       "semantic_score": semantic_score,
       "operator_score": operator_score,
-      "relevance_model": "tfidf_field_weight_v1",
+      "learned_score": learned_score,
+      "feedback_signal_count": int(tuning_profile.get("feedback_signal_count", 0))
+      if isinstance(tuning_profile, Mapping)
+      else 0,
+      "tuning_signals": tuple(tuning_signals[:4]),
+      "relevance_model": (
+        str(tuning_profile.get("version"))
+        if isinstance(tuning_profile, Mapping) and isinstance(tuning_profile.get("version"), str)
+        else "tfidf_field_weight_v1"
+      ),
       "ranking_reason": " · ".join(ranking_reason_parts),
     }
 
@@ -38658,6 +39200,7 @@ class TradingApplication:
       eligible_history.append(row)
     filtered_history: list[dict[str, Any]] = []
     retrieval_clusters: tuple[dict[str, Any], ...] = ()
+    search_analytics = None
     parsed_search = (
       self._parse_provider_provenance_scheduler_alert_search_query(normalized_search)
       if normalized_search is not None
@@ -38676,6 +39219,10 @@ class TradingApplication:
         rows=tuple(eligible_history),
         search_projection_lookup=search_projection_lookup,
       )
+      tuning_profile = self._build_provider_provenance_scheduler_search_tuning_profile(
+        search_query=normalized_search,
+        parsed_query=parsed_search or {},
+      )
       matched_document_ids = self._evaluate_provider_provenance_scheduler_alert_search_query(
         index=search_index,
         parsed_query=parsed_search or {},
@@ -38690,6 +39237,7 @@ class TradingApplication:
           parsed_query=parsed_search or {},
           index=search_index,
           document=document,
+          tuning_profile=tuning_profile,
         )
         if search_match is None:
           continue
@@ -38801,7 +39349,7 @@ class TradingApplication:
           if persistence_modes
           else "ephemeral_occurrence_projection"
         ),
-        "relevance_model": "tfidf_field_weight_v1",
+        "relevance_model": tuning_profile.get("version", "tfidf_field_weight_v1"),
         "parsed_terms": tuple(parsed_search.get("terms", ())),
         "parsed_phrases": tuple(parsed_search.get("phrases", ())),
         "parsed_operators": tuple(
@@ -38819,6 +39367,26 @@ class TradingApplication:
           else None
         ),
       }
+      analytics_record = self._record_provider_provenance_scheduler_search_query_analytics(
+        recorded_at=current_time,
+        search_query=normalized_search,
+        category=normalized_category,
+        status=normalized_status,
+        narrative_facet=normalized_narrative_facet or "all_occurrences",
+        parsed_query=parsed_search or {},
+        matched_rows=tuple(filtered_history),
+        indexed_occurrence_count=len(eligible_history),
+        indexed_term_count=int(search_index.get("indexed_term_count", 0)),
+        persistence_mode=search_summary["persistence_mode"],
+        relevance_model=search_summary["relevance_model"],
+        top_cluster_label=search_summary["top_cluster_label"],
+      )
+      search_summary["query_id"] = analytics_record.query_id
+      search_analytics = self._build_provider_provenance_scheduler_search_analytics_summary(
+        query_record=analytics_record,
+        search_query=normalized_search,
+        tuning_profile=tuning_profile,
+      )
     return {
       "generated_at": current_time,
       "query": {
@@ -38846,6 +39414,7 @@ class TradingApplication:
         "by_category": summary_by_category,
       },
       "search_summary": search_summary,
+      "search_analytics": search_analytics,
       "retrieval_clusters": retrieval_clusters,
       "items": tuple(items),
       "total": total,
@@ -40162,6 +40731,7 @@ class TradingApplication:
         "previous_offset": alert_history_payload["previous_offset"],
       },
       "search_summary": alert_history_payload.get("search_summary"),
+      "search_analytics": alert_history_payload.get("search_analytics"),
       "retrieval_clusters": alert_history_payload.get("retrieval_clusters"),
       "occurrences": occurrence_payloads,
       "stitched_status_sequence": stitched_segments,
@@ -42973,6 +43543,7 @@ def serialize_provider_provenance_scheduler_alert_history(
     },
     "search_summary": (
       {
+        "query_id": payload.get("search_summary", {}).get("query_id"),
         "query": payload.get("search_summary", {}).get("query"),
         "mode": payload.get("search_summary", {}).get("mode"),
         "token_count": int(payload.get("search_summary", {}).get("token_count", 0)),
@@ -43008,6 +43579,103 @@ def serialize_provider_provenance_scheduler_alert_history(
         "query_plan": list(payload.get("search_summary", {}).get("query_plan", ())),
       }
       if isinstance(payload.get("search_summary"), dict)
+      else None
+    ),
+    "search_analytics": (
+      {
+        "query_id": payload.get("search_analytics", {}).get("query_id"),
+        "recorded_at": (
+          payload.get("search_analytics", {}).get("recorded_at").isoformat()
+          if isinstance(payload.get("search_analytics", {}).get("recorded_at"), datetime)
+          else payload.get("search_analytics", {}).get("recorded_at")
+        ),
+        "recent_query_count": int(payload.get("search_analytics", {}).get("recent_query_count", 0)),
+        "feedback_count": int(payload.get("search_analytics", {}).get("feedback_count", 0)),
+        "relevant_feedback_count": int(
+          payload.get("search_analytics", {}).get("relevant_feedback_count", 0)
+        ),
+        "not_relevant_feedback_count": int(
+          payload.get("search_analytics", {}).get("not_relevant_feedback_count", 0)
+        ),
+        "helpful_feedback_ratio_pct": int(
+          payload.get("search_analytics", {}).get("helpful_feedback_ratio_pct", 0)
+        ),
+        "learned_relevance_active": bool(
+          payload.get("search_analytics", {}).get("learned_relevance_active", False)
+        ),
+        "tuning_profile_version": payload.get("search_analytics", {}).get("tuning_profile_version"),
+        "tuned_feature_count": int(payload.get("search_analytics", {}).get("tuned_feature_count", 0)),
+        "channel_adjustments": {
+          "lexical": int(
+            payload.get("search_analytics", {}).get("channel_adjustments", {}).get("lexical", 0)
+          ),
+          "semantic": int(
+            payload.get("search_analytics", {}).get("channel_adjustments", {}).get("semantic", 0)
+          ),
+          "operator": int(
+            payload.get("search_analytics", {}).get("channel_adjustments", {}).get("operator", 0)
+          ),
+        },
+        "top_field_adjustments": [
+          {
+            "field": entry.get("field"),
+            "score": int(entry.get("score", 0)),
+          }
+          for entry in payload.get("search_analytics", {}).get("top_field_adjustments", ())
+          if isinstance(entry, dict)
+        ],
+        "top_semantic_adjustments": [
+          {
+            "concept": entry.get("concept"),
+            "score": int(entry.get("score", 0)),
+          }
+          for entry in payload.get("search_analytics", {}).get("top_semantic_adjustments", ())
+          if isinstance(entry, dict)
+        ],
+        "top_operator_adjustments": [
+          {
+            "operator": entry.get("operator"),
+            "score": int(entry.get("score", 0)),
+          }
+          for entry in payload.get("search_analytics", {}).get("top_operator_adjustments", ())
+          if isinstance(entry, dict)
+        ],
+        "recent_queries": [
+          {
+            "query_id": entry.get("query_id"),
+            "recorded_at": (
+              entry.get("recorded_at").isoformat()
+              if isinstance(entry.get("recorded_at"), datetime)
+              else entry.get("recorded_at")
+            ),
+            "query": entry.get("query"),
+            "matched_occurrences": int(entry.get("matched_occurrences", 0)),
+            "top_score": int(entry.get("top_score", 0)),
+            "relevance_model": entry.get("relevance_model"),
+          }
+          for entry in payload.get("search_analytics", {}).get("recent_queries", ())
+          if isinstance(entry, dict)
+        ],
+        "recent_feedback": [
+          {
+            "feedback_id": entry.get("feedback_id"),
+            "recorded_at": (
+              entry.get("recorded_at").isoformat()
+              if isinstance(entry.get("recorded_at"), datetime)
+              else entry.get("recorded_at")
+            ),
+            "occurrence_id": entry.get("occurrence_id"),
+            "signal": entry.get("signal"),
+            "matched_fields": list(entry.get("matched_fields", ())),
+            "semantic_concepts": list(entry.get("semantic_concepts", ())),
+            "operator_hits": list(entry.get("operator_hits", ())),
+            "note": entry.get("note"),
+          }
+          for entry in payload.get("search_analytics", {}).get("recent_feedback", ())
+          if isinstance(entry, dict)
+        ],
+      }
+      if isinstance(payload.get("search_analytics"), dict)
       else None
     ),
     "retrieval_clusters": [
@@ -43111,6 +43779,11 @@ def serialize_provider_provenance_scheduler_alert_history(
             "lexical_score": int(item.get("search_match", {}).get("lexical_score", 0)),
             "semantic_score": int(item.get("search_match", {}).get("semantic_score", 0)),
             "operator_score": int(item.get("search_match", {}).get("operator_score", 0)),
+            "learned_score": int(item.get("search_match", {}).get("learned_score", 0)),
+            "feedback_signal_count": int(
+              item.get("search_match", {}).get("feedback_signal_count", 0)
+            ),
+            "tuning_signals": list(item.get("search_match", {}).get("tuning_signals", ())),
             "relevance_model": item.get("search_match", {}).get("relevance_model"),
             "ranking_reason": item.get("search_match", {}).get("ranking_reason"),
           }

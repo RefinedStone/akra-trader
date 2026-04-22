@@ -27,6 +27,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.engine import make_url
 
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchQueryAnalyticsRecord
 from akra_trader.port_contracts.search import ProviderProvenanceSchedulerSearchBackendPort
 
 
@@ -53,6 +55,29 @@ provider_provenance_scheduler_search_documents = Table(
   Column("expires_at", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_search_query_analytics = Table(
+  "provider_provenance_scheduler_search_query_analytics",
+  metadata,
+  Column("query_id", String, primary_key=True),
+  Column("scheduler_key", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("query", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_search_feedback = Table(
+  "provider_provenance_scheduler_search_feedback",
+  metadata,
+  Column("feedback_id", String, primary_key=True),
+  Column("scheduler_key", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("query_id", String, nullable=False, index=True),
+  Column("query", String, nullable=False, index=True),
+  Column("occurrence_id", String, nullable=False, index=True),
+  Column("signal", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
 
 
 class _SchedulerSearchDocumentPruneRequest(BaseModel):
@@ -67,6 +92,30 @@ class _SchedulerSearchDocumentListResponse(BaseModel):
   items: list[ProviderProvenanceSchedulerSearchDocumentRecord]
 
 
+class _SchedulerSearchAnalyticsPruneRequest(BaseModel):
+  current_time: datetime
+
+
+class _SchedulerSearchAnalyticsPruneResponse(BaseModel):
+  deleted_count: int
+
+
+class _SchedulerSearchAnalyticsListResponse(BaseModel):
+  items: list[ProviderProvenanceSchedulerSearchQueryAnalyticsRecord]
+
+
+class _SchedulerSearchFeedbackPruneRequest(BaseModel):
+  current_time: datetime
+
+
+class _SchedulerSearchFeedbackPruneResponse(BaseModel):
+  deleted_count: int
+
+
+class _SchedulerSearchFeedbackListResponse(BaseModel):
+  items: list[ProviderProvenanceSchedulerSearchFeedbackRecord]
+
+
 def _normalize_service_auth_token(value: str | None) -> str | None:
   if not isinstance(value, str):
     return None
@@ -79,6 +128,14 @@ class InMemoryProviderProvenanceSchedulerSearchStore:
     self._records: OrderedDict[str, ProviderProvenanceSchedulerSearchDocumentRecord] = (
       OrderedDict()
     )
+    self._analytics_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+    ] = OrderedDict()
+    self._feedback_records: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerSearchFeedbackRecord,
+    ] = OrderedDict()
 
   def save_provider_provenance_scheduler_search_document_record(
     self,
@@ -113,9 +170,77 @@ class InMemoryProviderProvenanceSchedulerSearchStore:
     )
     return original_count - len(self._records)
 
+  def save_provider_provenance_scheduler_search_query_analytics_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+  ) -> ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+    self._analytics_records[record.query_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchQueryAnalyticsRecord, ...]:
+    return tuple(
+      sorted(
+        self._analytics_records.values(),
+        key=lambda record: (record.recorded_at, record.query_id),
+        reverse=True,
+      )
+    )
+
+  def prune_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    original_count = len(self._analytics_records)
+    self._analytics_records = OrderedDict(
+      (
+        query_id,
+        record,
+      )
+      for query_id, record in self._analytics_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._analytics_records)
+
+  def save_provider_provenance_scheduler_search_feedback_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchFeedbackRecord,
+  ) -> ProviderProvenanceSchedulerSearchFeedbackRecord:
+    self._feedback_records[record.feedback_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_search_feedback_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchFeedbackRecord, ...]:
+    return tuple(
+      sorted(
+        self._feedback_records.values(),
+        key=lambda record: (record.recorded_at, record.feedback_id),
+        reverse=True,
+      )
+    )
+
+  def prune_provider_provenance_scheduler_search_feedback_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    original_count = len(self._feedback_records)
+    self._feedback_records = OrderedDict(
+      (
+        feedback_id,
+        record,
+      )
+      for feedback_id, record in self._feedback_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._feedback_records)
+
 
 class SqlAlchemyProviderProvenanceSchedulerSearchStore:
   _record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchDocumentRecord)
+  _analytics_record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchQueryAnalyticsRecord)
+  _feedback_record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchFeedbackRecord)
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
@@ -178,24 +303,213 @@ class SqlAlchemyProviderProvenanceSchedulerSearchStore:
       )
     return result.rowcount or 0
 
+  def save_provider_provenance_scheduler_search_query_analytics_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+  ) -> ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+    payload = self._analytics_record_adapter.dump_python(record, mode="json")
+    row = {
+      "query_id": record.query_id,
+      "scheduler_key": record.scheduler_key,
+      "recorded_at": record.recorded_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "query": record.query,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_search_query_analytics.c.query_id).where(
+          provider_provenance_scheduler_search_query_analytics.c.query_id == record.query_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_search_query_analytics).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_search_query_analytics)
+          .where(provider_provenance_scheduler_search_query_analytics.c.query_id == record.query_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchQueryAnalyticsRecord, ...]:
+    statement = select(provider_provenance_scheduler_search_query_analytics.c.payload).order_by(
+      provider_provenance_scheduler_search_query_analytics.c.recorded_at.desc(),
+      provider_provenance_scheduler_search_query_analytics.c.query_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._analytics_record_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def prune_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_scheduler_search_query_analytics).where(
+          provider_provenance_scheduler_search_query_analytics.c.expires_at.is_not(None),
+          provider_provenance_scheduler_search_query_analytics.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
+  def save_provider_provenance_scheduler_search_feedback_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchFeedbackRecord,
+  ) -> ProviderProvenanceSchedulerSearchFeedbackRecord:
+    payload = self._feedback_record_adapter.dump_python(record, mode="json")
+    row = {
+      "feedback_id": record.feedback_id,
+      "scheduler_key": record.scheduler_key,
+      "recorded_at": record.recorded_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "query_id": record.query_id,
+      "query": record.query,
+      "occurrence_id": record.occurrence_id,
+      "signal": record.signal,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_search_feedback.c.feedback_id).where(
+          provider_provenance_scheduler_search_feedback.c.feedback_id == record.feedback_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_search_feedback).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_search_feedback)
+          .where(provider_provenance_scheduler_search_feedback.c.feedback_id == record.feedback_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_search_feedback_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchFeedbackRecord, ...]:
+    statement = select(provider_provenance_scheduler_search_feedback.c.payload).order_by(
+      provider_provenance_scheduler_search_feedback.c.recorded_at.desc(),
+      provider_provenance_scheduler_search_feedback.c.feedback_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._feedback_record_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def prune_provider_provenance_scheduler_search_feedback_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_scheduler_search_feedback).where(
+          provider_provenance_scheduler_search_feedback.c.expires_at.is_not(None),
+          provider_provenance_scheduler_search_feedback.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
   def _ensure_schema(self) -> None:
     inspector = inspect(self._engine)
-    existing_indexes = {
-      index["name"]
-      for index in inspector.get_indexes("provider_provenance_scheduler_search_documents")
+    existing_indexes_by_table = {
+      table_name: {
+        index["name"]
+        for index in inspector.get_indexes(table_name)
+      }
+      for table_name in (
+        "provider_provenance_scheduler_search_documents",
+        "provider_provenance_scheduler_search_query_analytics",
+        "provider_provenance_scheduler_search_feedback",
+      )
     }
     index_specs = (
-      ("ix_provider_provenance_scheduler_search_documents_scheduler_key", "scheduler_key"),
-      ("ix_provider_provenance_scheduler_search_documents_recorded_at", "recorded_at"),
-      ("ix_provider_provenance_scheduler_search_documents_expires_at", "expires_at"),
+      (
+        "provider_provenance_scheduler_search_documents",
+        "ix_provider_provenance_scheduler_search_documents_scheduler_key",
+        "scheduler_key",
+      ),
+      (
+        "provider_provenance_scheduler_search_documents",
+        "ix_provider_provenance_scheduler_search_documents_recorded_at",
+        "recorded_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_documents",
+        "ix_provider_provenance_scheduler_search_documents_expires_at",
+        "expires_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_query_analytics",
+        "ix_provider_provenance_scheduler_search_query_analytics_scheduler_key",
+        "scheduler_key",
+      ),
+      (
+        "provider_provenance_scheduler_search_query_analytics",
+        "ix_provider_provenance_scheduler_search_query_analytics_recorded_at",
+        "recorded_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_query_analytics",
+        "ix_provider_provenance_scheduler_search_query_analytics_expires_at",
+        "expires_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_query_analytics",
+        "ix_provider_provenance_scheduler_search_query_analytics_query",
+        "query",
+      ),
+      (
+        "provider_provenance_scheduler_search_feedback",
+        "ix_provider_provenance_scheduler_search_feedback_scheduler_key",
+        "scheduler_key",
+      ),
+      (
+        "provider_provenance_scheduler_search_feedback",
+        "ix_provider_provenance_scheduler_search_feedback_recorded_at",
+        "recorded_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_feedback",
+        "ix_provider_provenance_scheduler_search_feedback_expires_at",
+        "expires_at",
+      ),
+      (
+        "provider_provenance_scheduler_search_feedback",
+        "ix_provider_provenance_scheduler_search_feedback_query_id",
+        "query_id",
+      ),
+      (
+        "provider_provenance_scheduler_search_feedback",
+        "ix_provider_provenance_scheduler_search_feedback_query",
+        "query",
+      ),
+      (
+        "provider_provenance_scheduler_search_feedback",
+        "ix_provider_provenance_scheduler_search_feedback_occurrence_id",
+        "occurrence_id",
+      ),
+      (
+        "provider_provenance_scheduler_search_feedback",
+        "ix_provider_provenance_scheduler_search_feedback_signal",
+        "signal",
+      ),
     )
     with self._engine.begin() as connection:
-      for index_name, column_name in index_specs:
-        if index_name in existing_indexes:
+      for table_name, index_name, column_name in index_specs:
+        if index_name in existing_indexes_by_table.get(table_name, set()):
           continue
         connection.exec_driver_sql(
           "CREATE INDEX IF NOT EXISTS "
-          f"{index_name} ON provider_provenance_scheduler_search_documents ({column_name})"
+          f"{index_name} ON {table_name} ({column_name})"
         )
 
 
@@ -225,6 +539,42 @@ class ProviderProvenanceSchedulerSearchService:
     current_time: datetime,
   ) -> int:
     return self._store.prune_provider_provenance_scheduler_search_document_records(current_time)
+
+  def save_provider_provenance_scheduler_search_query_analytics_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+  ) -> ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+    return self._store.save_provider_provenance_scheduler_search_query_analytics_record(record)
+
+  def list_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchQueryAnalyticsRecord, ...]:
+    return self._store.list_provider_provenance_scheduler_search_query_analytics_records()
+
+  def prune_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    return self._store.prune_provider_provenance_scheduler_search_query_analytics_records(
+      current_time
+    )
+
+  def save_provider_provenance_scheduler_search_feedback_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchFeedbackRecord,
+  ) -> ProviderProvenanceSchedulerSearchFeedbackRecord:
+    return self._store.save_provider_provenance_scheduler_search_feedback_record(record)
+
+  def list_provider_provenance_scheduler_search_feedback_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchFeedbackRecord, ...]:
+    return self._store.list_provider_provenance_scheduler_search_feedback_records()
+
+  def prune_provider_provenance_scheduler_search_feedback_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    return self._store.prune_provider_provenance_scheduler_search_feedback_records(current_time)
 
 
 def create_provider_provenance_scheduler_search_service_app(
@@ -271,6 +621,64 @@ def create_provider_provenance_scheduler_search_service_app(
       )
     )
 
+  @app.post("/provider-provenance-scheduler-search/analytics")
+  def save_query_analytics(
+    record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+    authorization: str | None = Header(default=None),
+  ) -> ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+    _require_authorization(authorization)
+    return service.save_provider_provenance_scheduler_search_query_analytics_record(record)
+
+  @app.get("/provider-provenance-scheduler-search/analytics")
+  def list_query_analytics(
+    authorization: str | None = Header(default=None),
+  ) -> _SchedulerSearchAnalyticsListResponse:
+    _require_authorization(authorization)
+    return _SchedulerSearchAnalyticsListResponse(
+      items=list(service.list_provider_provenance_scheduler_search_query_analytics_records())
+    )
+
+  @app.post("/provider-provenance-scheduler-search/analytics/prune")
+  def prune_query_analytics(
+    request: _SchedulerSearchAnalyticsPruneRequest,
+    authorization: str | None = Header(default=None),
+  ) -> _SchedulerSearchAnalyticsPruneResponse:
+    _require_authorization(authorization)
+    return _SchedulerSearchAnalyticsPruneResponse(
+      deleted_count=service.prune_provider_provenance_scheduler_search_query_analytics_records(
+        request.current_time
+      )
+    )
+
+  @app.post("/provider-provenance-scheduler-search/feedback")
+  def save_feedback(
+    record: ProviderProvenanceSchedulerSearchFeedbackRecord,
+    authorization: str | None = Header(default=None),
+  ) -> ProviderProvenanceSchedulerSearchFeedbackRecord:
+    _require_authorization(authorization)
+    return service.save_provider_provenance_scheduler_search_feedback_record(record)
+
+  @app.get("/provider-provenance-scheduler-search/feedback")
+  def list_feedback(
+    authorization: str | None = Header(default=None),
+  ) -> _SchedulerSearchFeedbackListResponse:
+    _require_authorization(authorization)
+    return _SchedulerSearchFeedbackListResponse(
+      items=list(service.list_provider_provenance_scheduler_search_feedback_records())
+    )
+
+  @app.post("/provider-provenance-scheduler-search/feedback/prune")
+  def prune_feedback(
+    request: _SchedulerSearchFeedbackPruneRequest,
+    authorization: str | None = Header(default=None),
+  ) -> _SchedulerSearchFeedbackPruneResponse:
+    _require_authorization(authorization)
+    return _SchedulerSearchFeedbackPruneResponse(
+      deleted_count=service.prune_provider_provenance_scheduler_search_feedback_records(
+        request.current_time
+      )
+    )
+
   return app
 
 
@@ -299,14 +707,58 @@ class EmbeddedProviderProvenanceSchedulerSearchServiceClient(
   ) -> int:
     return self._service.prune_provider_provenance_scheduler_search_document_records(current_time)
 
+  def save_provider_provenance_scheduler_search_query_analytics_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+  ) -> ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+    return self._service.save_provider_provenance_scheduler_search_query_analytics_record(record)
+
+  def list_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchQueryAnalyticsRecord, ...]:
+    return self._service.list_provider_provenance_scheduler_search_query_analytics_records()
+
+  def prune_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    return self._service.prune_provider_provenance_scheduler_search_query_analytics_records(
+      current_time
+    )
+
+  def save_provider_provenance_scheduler_search_feedback_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchFeedbackRecord,
+  ) -> ProviderProvenanceSchedulerSearchFeedbackRecord:
+    return self._service.save_provider_provenance_scheduler_search_feedback_record(record)
+
+  def list_provider_provenance_scheduler_search_feedback_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchFeedbackRecord, ...]:
+    return self._service.list_provider_provenance_scheduler_search_feedback_records()
+
+  def prune_provider_provenance_scheduler_search_feedback_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    return self._service.prune_provider_provenance_scheduler_search_feedback_records(
+      current_time
+    )
+
 
 class HttpProviderProvenanceSchedulerSearchServiceClient(
   ProviderProvenanceSchedulerSearchBackendPort
 ):
   persistence_mode = "external_scheduler_search_service"
   _record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchDocumentRecord)
+  _analytics_record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchQueryAnalyticsRecord)
+  _feedback_record_adapter = TypeAdapter(ProviderProvenanceSchedulerSearchFeedbackRecord)
   _list_response_adapter = TypeAdapter(_SchedulerSearchDocumentListResponse)
   _prune_response_adapter = TypeAdapter(_SchedulerSearchDocumentPruneResponse)
+  _analytics_list_response_adapter = TypeAdapter(_SchedulerSearchAnalyticsListResponse)
+  _analytics_prune_response_adapter = TypeAdapter(_SchedulerSearchAnalyticsPruneResponse)
+  _feedback_list_response_adapter = TypeAdapter(_SchedulerSearchFeedbackListResponse)
+  _feedback_prune_response_adapter = TypeAdapter(_SchedulerSearchFeedbackPruneResponse)
 
   def __init__(
     self,
@@ -356,6 +808,74 @@ class HttpProviderProvenanceSchedulerSearchServiceClient(
       payload={"current_time": current_time.isoformat()},
     )
     parsed = self._prune_response_adapter.validate_python(response)
+    return parsed.deleted_count
+
+  def save_provider_provenance_scheduler_search_query_analytics_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchQueryAnalyticsRecord,
+  ) -> ProviderProvenanceSchedulerSearchQueryAnalyticsRecord:
+    payload = self._analytics_record_adapter.dump_python(record, mode="json")
+    response = self._request(
+      method="POST",
+      path="/provider-provenance-scheduler-search/analytics",
+      payload=payload,
+    )
+    return self._analytics_record_adapter.validate_python(response)
+
+  def list_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchQueryAnalyticsRecord, ...]:
+    response = self._request(
+      method="GET",
+      path="/provider-provenance-scheduler-search/analytics",
+    )
+    parsed = self._analytics_list_response_adapter.validate_python(response)
+    return tuple(parsed.items)
+
+  def prune_provider_provenance_scheduler_search_query_analytics_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    response = self._request(
+      method="POST",
+      path="/provider-provenance-scheduler-search/analytics/prune",
+      payload={"current_time": current_time.isoformat()},
+    )
+    parsed = self._analytics_prune_response_adapter.validate_python(response)
+    return parsed.deleted_count
+
+  def save_provider_provenance_scheduler_search_feedback_record(
+    self,
+    record: ProviderProvenanceSchedulerSearchFeedbackRecord,
+  ) -> ProviderProvenanceSchedulerSearchFeedbackRecord:
+    payload = self._feedback_record_adapter.dump_python(record, mode="json")
+    response = self._request(
+      method="POST",
+      path="/provider-provenance-scheduler-search/feedback",
+      payload=payload,
+    )
+    return self._feedback_record_adapter.validate_python(response)
+
+  def list_provider_provenance_scheduler_search_feedback_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerSearchFeedbackRecord, ...]:
+    response = self._request(
+      method="GET",
+      path="/provider-provenance-scheduler-search/feedback",
+    )
+    parsed = self._feedback_list_response_adapter.validate_python(response)
+    return tuple(parsed.items)
+
+  def prune_provider_provenance_scheduler_search_feedback_records(
+    self,
+    current_time: datetime,
+  ) -> int:
+    response = self._request(
+      method="POST",
+      path="/provider-provenance-scheduler-search/feedback/prune",
+      payload={"current_time": current_time.isoformat()},
+    )
+    parsed = self._feedback_prune_response_adapter.validate_python(response)
     return parsed.deleted_count
 
   def _request(

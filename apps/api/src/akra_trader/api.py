@@ -244,6 +244,25 @@ class OperatorProviderProvenanceSchedulerNarrativeReportRequest(BaseModel):
   drilldown_history_limit: int = 24
 
 
+class OperatorProviderProvenanceSchedulerSearchFeedbackRequest(BaseModel):
+  query_id: str
+  query: str
+  occurrence_id: str
+  signal: str
+  matched_fields: list[str] = Field(default_factory=list)
+  semantic_concepts: list[str] = Field(default_factory=list)
+  operator_hits: list[str] = Field(default_factory=list)
+  lexical_score: int = 0
+  semantic_score: int = 0
+  operator_score: int = 0
+  score: int = 0
+  ranking_reason: str | None = None
+  note: str | None = None
+  actor: str = "operator"
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
 class OperatorProviderProvenanceAnalyticsPresetCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -2074,6 +2093,42 @@ def create_router(container: Container) -> APIRouter:
     methods=["POST"],
     name="export_operator_provider_provenance_scheduler_stitched_narrative_report",
     summary="Export a stitched multi-occurrence scheduler narrative report",
+  )
+
+  def record_operator_provider_provenance_scheduler_search_feedback(
+    request: OperatorProviderProvenanceSchedulerSearchFeedbackRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return app.record_provider_provenance_scheduler_alert_search_feedback(
+        query_id=request.query_id,
+        query=request.query,
+        occurrence_id=request.occurrence_id,
+        signal=request.signal,
+        matched_fields=tuple(request.matched_fields),
+        semantic_concepts=tuple(request.semantic_concepts),
+        operator_hits=tuple(request.operator_hits),
+        lexical_score=request.lexical_score,
+        semantic_score=request.semantic_score,
+        operator_score=request.operator_score,
+        score=request.score,
+        ranking_reason=request.ranking_reason,
+        note=request.note,
+        actor=request.actor,
+        source_tab_id=request.source_tab_id,
+        source_tab_label=request.source_tab_label,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  router.add_api_route(
+    "/operator/provider-provenance-analytics/scheduler-alerts/search-feedback",
+    record_operator_provider_provenance_scheduler_search_feedback,
+    methods=["POST"],
+    name="record_operator_provider_provenance_scheduler_search_feedback",
+    summary="Record operator feedback for scheduler search ranking",
   )
 
   return router

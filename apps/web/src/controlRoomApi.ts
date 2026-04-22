@@ -15,6 +15,7 @@ import type {
   ProviderProvenanceExportJobPolicyResult,
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerAlertHistoryPayload,
+  ProviderProvenanceSchedulerSearchFeedbackResult,
   ProviderProvenanceSchedulerHealthExportPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry,
@@ -532,6 +533,62 @@ export async function exportProviderProvenanceSchedulerStitchedNarrativeReport(p
           typeof params.drilldownHistoryLimit === "number" && Number.isFinite(params.drilldownHistoryLimit)
             ? Math.max(1, Math.min(Math.round(params.drilldownHistoryLimit), 100))
             : 24,
+      }),
+    },
+  );
+}
+
+export async function recordProviderProvenanceSchedulerSearchFeedback(params: {
+  queryId: string;
+  query: string;
+  occurrenceId: string;
+  signal: "relevant" | "not_relevant";
+  matchedFields?: string[];
+  semanticConcepts?: string[];
+  operatorHits?: string[];
+  lexicalScore?: number;
+  semanticScore?: number;
+  operatorScore?: number;
+  score?: number;
+  rankingReason?: string | null;
+  note?: string | null;
+  actor?: string;
+  sourceTabId?: string;
+  sourceTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerSearchFeedbackResult>(
+    "/operator/provider-provenance-analytics/scheduler-alerts/search-feedback",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        query_id: params.queryId,
+        query: params.query,
+        occurrence_id: params.occurrenceId,
+        signal: params.signal,
+        matched_fields: params.matchedFields ?? [],
+        semantic_concepts: params.semanticConcepts ?? [],
+        operator_hits: params.operatorHits ?? [],
+        lexical_score:
+          typeof params.lexicalScore === "number" && Number.isFinite(params.lexicalScore)
+            ? Math.max(0, Math.round(params.lexicalScore))
+            : 0,
+        semantic_score:
+          typeof params.semanticScore === "number" && Number.isFinite(params.semanticScore)
+            ? Math.max(0, Math.round(params.semanticScore))
+            : 0,
+        operator_score:
+          typeof params.operatorScore === "number" && Number.isFinite(params.operatorScore)
+            ? Math.max(0, Math.round(params.operatorScore))
+            : 0,
+        score:
+          typeof params.score === "number" && Number.isFinite(params.score)
+            ? Math.max(0, Math.round(params.score))
+            : 0,
+        ranking_reason: params.rankingReason ?? null,
+        note: params.note ?? null,
+        actor: params.actor?.trim() || "operator",
+        source_tab_id: params.sourceTabId?.trim() || null,
+        source_tab_label: params.sourceTabLabel?.trim() || null,
       }),
     },
   );

@@ -5027,6 +5027,7 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert search_payload["search_summary"]["indexed_term_count"] > 0
   assert search_payload["search_summary"]["persistence_mode"] == "embedded_scheduler_search_service"
   assert search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_v1"
+  assert search_payload["search_summary"]["query_id"]
   assert (
     search_payload["search_summary"]["retrieval_cluster_mode"]
     == "cross_occurrence_semantic_vector_cluster_v1"
@@ -5046,8 +5047,46 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert "status:resolved" in search_payload["items"][0]["search_match"]["operator_hits"]
   assert "recovery" in search_payload["items"][0]["search_match"]["semantic_concepts"]
   assert search_payload["items"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_v1"
+  assert search_payload["search_analytics"]["feedback_count"] == 0
   assert search_payload["items"][0]["retrieval_cluster"]["cluster_id"]
   assert search_payload["items"][0]["retrieval_cluster"]["label"]
+
+  feedback_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-alerts/search-feedback",
+    json={
+      "query_id": search_payload["search_summary"]["query_id"],
+      "query": search_payload["query"]["search"],
+      "occurrence_id": search_payload["items"][0]["occurrence_id"],
+      "signal": "relevant",
+      "matched_fields": search_payload["items"][0]["search_match"]["matched_fields"],
+      "semantic_concepts": search_payload["items"][0]["search_match"]["semantic_concepts"],
+      "operator_hits": search_payload["items"][0]["search_match"]["operator_hits"],
+      "lexical_score": search_payload["items"][0]["search_match"]["lexical_score"],
+      "semantic_score": search_payload["items"][0]["search_match"]["semantic_score"],
+      "operator_score": search_payload["items"][0]["search_match"]["operator_score"],
+      "score": search_payload["items"][0]["search_match"]["score"],
+      "ranking_reason": search_payload["items"][0]["search_match"]["ranking_reason"],
+    },
+  )
+  assert feedback_response.status_code == 200
+  feedback_payload = feedback_response.json()
+  assert feedback_payload["feedback_count"] == 1
+
+  tuned_search_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-alerts",
+    params={
+      "search": "status:resolved AND (recovered OR healthy) AND NOT category:failure",
+      "limit": 10,
+      "offset": 0,
+    },
+  )
+  assert tuned_search_response.status_code == 200
+  tuned_search_payload = tuned_search_response.json()
+  assert tuned_search_payload["search_summary"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
+  assert tuned_search_payload["search_analytics"]["feedback_count"] == 1
+  assert tuned_search_payload["search_analytics"]["learned_relevance_active"] is True
+  assert tuned_search_payload["items"][0]["search_match"]["relevance_model"] == "tfidf_field_weight_feedback_v2"
+  assert tuned_search_payload["items"][0]["search_match"]["feedback_signal_count"] >= 1
 
 
 def test_operator_visibility_endpoint_can_reconstruct_mixed_status_scheduler_narrative(

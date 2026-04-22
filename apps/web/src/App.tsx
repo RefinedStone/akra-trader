@@ -129,6 +129,7 @@ import {
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
+  recordProviderProvenanceSchedulerSearchFeedback,
   resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRevision,
   restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevision,
@@ -4296,6 +4297,8 @@ export default function App() {
     useState<string | null>(null);
   const [providerProvenanceSchedulerAlertHistoryOffset, setProviderProvenanceSchedulerAlertHistoryOffset] =
     useState(0);
+  const [providerProvenanceSchedulerSearchFeedbackPendingOccurrenceKey, setProviderProvenanceSchedulerSearchFeedbackPendingOccurrenceKey] =
+    useState<string | null>(null);
   const [providerProvenanceSchedulerDrilldownBucketKey, setProviderProvenanceSchedulerDrilldownBucketKey] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerExports, setProviderProvenanceSchedulerExports] =
@@ -7013,6 +7016,51 @@ export default function App() {
       if (providerProvenanceSchedulerStitchedReportViewAuditRequestIdRef.current === stitchedViewAuditRequestId) {
         setProviderProvenanceSchedulerStitchedReportViewAuditsLoading(false);
       }
+    }
+  }
+
+  async function submitProviderProvenanceSchedulerSearchFeedback(
+    alert: ProviderProvenanceSchedulerAlertHistoryPayload["items"][number],
+    signal: "relevant" | "not_relevant",
+  ) {
+    const queryId = providerProvenanceSchedulerAlertHistory?.search_summary?.query_id?.trim();
+    const query = providerProvenanceAnalyticsQuery.search_query.trim();
+    const occurrenceId = alert.occurrence_id?.trim();
+    if (!queryId || !query || !occurrenceId || !alert.search_match) {
+      setProviderProvenanceWorkspaceFeedback(
+        "Scheduler search feedback requires an active ranked search result.",
+      );
+      return;
+    }
+    const occurrenceKey = getOperatorAlertOccurrenceKey(alert);
+    setProviderProvenanceSchedulerSearchFeedbackPendingOccurrenceKey(occurrenceKey);
+    try {
+      const result = await recordProviderProvenanceSchedulerSearchFeedback({
+        queryId,
+        query,
+        occurrenceId,
+        signal,
+        matchedFields: alert.search_match.matched_fields,
+        semanticConcepts: alert.search_match.semantic_concepts,
+        operatorHits: alert.search_match.operator_hits,
+        lexicalScore: alert.search_match.lexical_score,
+        semanticScore: alert.search_match.semantic_score,
+        operatorScore: alert.search_match.operator_score,
+        score: alert.search_match.score,
+        rankingReason: alert.search_match.ranking_reason ?? null,
+        sourceTabId: activeWorkspace,
+        sourceTabLabel: "control-room",
+      });
+      setProviderProvenanceWorkspaceFeedback(
+        `Recorded ${formatWorkflowToken(result.signal)} feedback for ${occurrenceId}. ${result.learned_relevance_hint ?? ""}`.trim(),
+      );
+      await loadProviderProvenanceSchedulerSurfaces();
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler search feedback failed: ${(error as Error).message}`,
+      );
+    } finally {
+      setProviderProvenanceSchedulerSearchFeedbackPendingOccurrenceKey(null);
     }
   }
 
@@ -18966,6 +19014,11 @@ export default function App() {
                                           : ""}
                                       </span>
                                     ) : null}
+                                    {providerProvenanceSchedulerAlertHistory?.search_analytics ? (
+                                      <span className="run-filter-summary-chip">
+                                        Feedback {providerProvenanceSchedulerAlertHistory.search_analytics.feedback_count} · helpful {providerProvenanceSchedulerAlertHistory.search_analytics.helpful_feedback_ratio_pct}% · tuned {providerProvenanceSchedulerAlertHistory.search_analytics.tuned_feature_count}
+                                      </span>
+                                    ) : null}
                                   </div>
                                   <div className="market-data-provenance-history-actions">
                                     <label className="run-form-field">
@@ -19125,6 +19178,95 @@ export default function App() {
                                         : "Page 1"}
                                     </span>
                                   </div>
+                                  {providerProvenanceSchedulerAlertHistory?.search_analytics ? (
+                                    <>
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Scheduler search analytics</strong>
+                                        <p>
+                                          Query analytics, operator feedback, and learned tuning for the active
+                                          scheduler narrative retrieval slice.
+                                        </p>
+                                      </div>
+                                      <div className="run-filter-summary-chip-row">
+                                        <span className="run-filter-summary-chip">
+                                          Query {providerProvenanceSchedulerAlertHistory.search_analytics.query_id}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Recent runs {providerProvenanceSchedulerAlertHistory.search_analytics.recent_query_count}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Feedback {providerProvenanceSchedulerAlertHistory.search_analytics.relevant_feedback_count} relevant · {providerProvenanceSchedulerAlertHistory.search_analytics.not_relevant_feedback_count} not relevant
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Learned {providerProvenanceSchedulerAlertHistory.search_analytics.learned_relevance_active ? "active" : "cold"} · {providerProvenanceSchedulerAlertHistory.search_analytics.tuning_profile_version ?? "n/a"}
+                                        </span>
+                                        <span className="run-filter-summary-chip">
+                                          Channel Δ lexical {providerProvenanceSchedulerAlertHistory.search_analytics.channel_adjustments.lexical} · semantic {providerProvenanceSchedulerAlertHistory.search_analytics.channel_adjustments.semantic} · operator {providerProvenanceSchedulerAlertHistory.search_analytics.channel_adjustments.operator}
+                                        </span>
+                                      </div>
+                                      <table className="data-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Tuning</th>
+                                            <th>Recent queries</th>
+                                            <th>Recent feedback</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          <tr>
+                                            <td>
+                                              <strong>Field tuning</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {providerProvenanceSchedulerAlertHistory.search_analytics.top_field_adjustments.length
+                                                  ? providerProvenanceSchedulerAlertHistory.search_analytics.top_field_adjustments
+                                                      .map((entry) => `${entry.field} ${entry.score > 0 ? "+" : ""}${entry.score}`)
+                                                      .join(" · ")
+                                                  : "No learned field adjustments yet."}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {providerProvenanceSchedulerAlertHistory.search_analytics.top_semantic_adjustments.length
+                                                  ? providerProvenanceSchedulerAlertHistory.search_analytics.top_semantic_adjustments
+                                                      .map((entry) => `${entry.concept} ${entry.score > 0 ? "+" : ""}${entry.score}`)
+                                                      .join(" · ")
+                                                  : "No learned semantic adjustments yet."}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {providerProvenanceSchedulerAlertHistory.search_analytics.top_operator_adjustments.length
+                                                  ? providerProvenanceSchedulerAlertHistory.search_analytics.top_operator_adjustments
+                                                      .map((entry) => `${entry.operator} ${entry.score > 0 ? "+" : ""}${entry.score}`)
+                                                      .join(" · ")
+                                                  : "No learned operator adjustments yet."}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>Recent queries</strong>
+                                              {providerProvenanceSchedulerAlertHistory.search_analytics.recent_queries.length ? (
+                                                providerProvenanceSchedulerAlertHistory.search_analytics.recent_queries.map((entry) => (
+                                                  <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-analytics-query-${entry.query_id}`}>
+                                                    {entry.query} · top {entry.top_score} · {entry.matched_occurrences} match(es)
+                                                  </p>
+                                                ))
+                                              ) : (
+                                                <p className="run-lineage-symbol-copy">No persisted query analytics yet.</p>
+                                              )}
+                                            </td>
+                                            <td>
+                                              <strong>Recent feedback</strong>
+                                              {providerProvenanceSchedulerAlertHistory.search_analytics.recent_feedback.length ? (
+                                                providerProvenanceSchedulerAlertHistory.search_analytics.recent_feedback.map((entry) => (
+                                                  <p className="run-lineage-symbol-copy" key={`provider-scheduler-search-feedback-${entry.feedback_id}`}>
+                                                    {entry.occurrence_id} · {formatWorkflowToken(entry.signal)} · {entry.matched_fields.join(", ") || "ranked fields"}
+                                                  </p>
+                                                ))
+                                              ) : (
+                                                <p className="run-lineage-symbol-copy">No feedback recorded for this query yet.</p>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                    </>
+                                  ) : null}
                                   {providerProvenanceSchedulerAlertRetrievalClusters.length ? (
                                     <>
                                       <div className="market-data-provenance-history-head">
@@ -19287,7 +19429,12 @@ export default function App() {
                                                 ) : null}
                                                 {alert.search_match?.relevance_model ? (
                                                   <p className="run-lineage-symbol-copy">
-                                                    Relevance {alert.search_match.relevance_model} · lexical {alert.search_match.lexical_score} · semantic {alert.search_match.semantic_score} · operator {alert.search_match.operator_score}
+                                                    Relevance {alert.search_match.relevance_model} · lexical {alert.search_match.lexical_score} · semantic {alert.search_match.semantic_score} · operator {alert.search_match.operator_score} · learned {alert.search_match.learned_score}
+                                                  </p>
+                                                ) : null}
+                                                {alert.search_match?.tuning_signals.length ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Learned signals {alert.search_match.tuning_signals.join(" · ")}
                                                   </p>
                                                 ) : null}
                                                 {alert.retrieval_cluster?.vector_terms.length ? (
@@ -19296,6 +19443,34 @@ export default function App() {
                                                   </p>
                                                 ) : null}
                                                 <div className="market-data-provenance-history-actions">
+                                                  {alert.search_match && providerProvenanceSchedulerAlertHistory?.search_summary?.query_id ? (
+                                                    <>
+                                                      <button
+                                                        className="ghost-button"
+                                                        disabled={
+                                                          providerProvenanceSchedulerSearchFeedbackPendingOccurrenceKey === getOperatorAlertOccurrenceKey(alert)
+                                                        }
+                                                        onClick={() => {
+                                                          void submitProviderProvenanceSchedulerSearchFeedback(alert, "relevant");
+                                                        }}
+                                                        type="button"
+                                                      >
+                                                        Relevant
+                                                      </button>
+                                                      <button
+                                                        className="ghost-button"
+                                                        disabled={
+                                                          providerProvenanceSchedulerSearchFeedbackPendingOccurrenceKey === getOperatorAlertOccurrenceKey(alert)
+                                                        }
+                                                        onClick={() => {
+                                                          void submitProviderProvenanceSchedulerSearchFeedback(alert, "not_relevant");
+                                                        }}
+                                                        type="button"
+                                                      >
+                                                        Not relevant
+                                                      </button>
+                                                    </>
+                                                  ) : null}
                                                   <button
                                                     className="ghost-button"
                                                     onClick={() => {

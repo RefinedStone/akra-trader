@@ -1326,6 +1326,7 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     occurrence_ids: string[];
   }[];
   search_summary?: {
+    query_id?: string | null;
     query?: string | null;
     mode?: string | null;
     token_count: number;
@@ -1349,6 +1350,53 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
     parsed_operators: string[];
     semantic_concepts: string[];
     query_plan: string[];
+  } | null;
+  search_analytics?: {
+    query_id: string;
+    recorded_at: string;
+    recent_query_count: number;
+    feedback_count: number;
+    relevant_feedback_count: number;
+    not_relevant_feedback_count: number;
+    helpful_feedback_ratio_pct: number;
+    learned_relevance_active: boolean;
+    tuning_profile_version?: string | null;
+    tuned_feature_count: number;
+    channel_adjustments: {
+      lexical: number;
+      semantic: number;
+      operator: number;
+    };
+    top_field_adjustments: {
+      field: string;
+      score: number;
+    }[];
+    top_semantic_adjustments: {
+      concept: string;
+      score: number;
+    }[];
+    top_operator_adjustments: {
+      operator: string;
+      score: number;
+    }[];
+    recent_queries: {
+      query_id: string;
+      recorded_at: string;
+      query: string;
+      matched_occurrences: number;
+      top_score: number;
+      relevance_model?: string | null;
+    }[];
+    recent_feedback: {
+      feedback_id: string;
+      recorded_at: string;
+      occurrence_id: string;
+      signal: string;
+      matched_fields: string[];
+      semantic_concepts: string[];
+      operator_hits: string[];
+      note?: string | null;
+    }[];
   } | null;
   items: (OperatorAlertEntry & {
     narrative: {
@@ -1378,6 +1426,9 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
       lexical_score: number;
       semantic_score: number;
       operator_score: number;
+      learned_score: number;
+      feedback_signal_count: number;
+      tuning_signals: string[];
       relevance_model?: string | null;
       ranking_reason?: string | null;
     } | null;
@@ -1395,6 +1446,19 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
   has_more: boolean;
   next_offset?: number | null;
   previous_offset?: number | null;
+};
+
+export type ProviderProvenanceSchedulerSearchFeedbackResult = {
+  feedback_id: string;
+  query_id: string;
+  query: string;
+  occurrence_id: string;
+  signal: string;
+  feedback_count: number;
+  relevant_feedback_count: number;
+  not_relevant_feedback_count: number;
+  helpful_feedback_ratio_pct: number;
+  learned_relevance_hint?: string | null;
 };
 
 export type ProviderProvenanceSchedulerHealthStatusSeriesEntry = {

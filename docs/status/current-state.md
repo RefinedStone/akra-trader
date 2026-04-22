@@ -233,6 +233,10 @@ It is not yet a finished live trading product:
   dedicated external scheduler search service and uses tuned ranked relevance, so the
   boolean/full-text path can reuse dedicated scheduler index material instead of reading search
   payloads back out of health records or the run repository
+- that same scheduler retrieval now also records query analytics, captures operator relevance
+  feedback, and applies learned relevance tuning back into later searches, so ranked occurrence
+  review can adapt to what operators actually marked as useful instead of staying on static
+  field weights alone
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

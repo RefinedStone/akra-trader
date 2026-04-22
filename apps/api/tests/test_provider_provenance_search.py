@@ -21,6 +21,8 @@ from akra_trader.adapters.provider_provenance_search import (
   create_provider_provenance_scheduler_search_service_app,
 )
 from akra_trader.domain.models import ProviderProvenanceSchedulerSearchDocumentRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchFeedbackRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerSearchQueryAnalyticsRecord
 
 
 class FakeResponse:
@@ -91,3 +93,89 @@ def test_http_scheduler_search_service_client_round_trips_documents() -> None:
   assert len(listed) == 1
   assert listed[0].semantic_concepts == ("recovery", "lag")
   assert deleted == 1
+
+
+def test_http_scheduler_search_service_client_round_trips_analytics_and_feedback() -> None:
+  service = ProviderProvenanceSchedulerSearchService(
+    store=InMemoryProviderProvenanceSchedulerSearchStore()
+  )
+  service_app = create_provider_provenance_scheduler_search_service_app(
+    service=service,
+    auth_token="search-token",
+  )
+  analytics_record = ProviderProvenanceSchedulerSearchQueryAnalyticsRecord(
+    query_id="query-1",
+    recorded_at=datetime(2026, 4, 22, 12, 5, tzinfo=UTC),
+    expires_at=datetime(2026, 4, 29, 12, 5, tzinfo=UTC),
+    query="status:resolved AND recovered",
+    token_count=2,
+    matched_occurrences=2,
+    top_score=440,
+    query_terms=("recovered",),
+    parsed_operators=("status:resolved",),
+  )
+  feedback_record = ProviderProvenanceSchedulerSearchFeedbackRecord(
+    feedback_id="feedback-1",
+    recorded_at=datetime(2026, 4, 22, 12, 6, tzinfo=UTC),
+    expires_at=datetime(2026, 4, 29, 12, 6, tzinfo=UTC),
+    query_id="query-1",
+    query="status:resolved AND recovered",
+    occurrence_id="occ-1",
+    signal="relevant",
+    matched_fields=("summary", "status_sequence"),
+    semantic_concepts=("recovery",),
+    operator_hits=("status:resolved",),
+    lexical_score=220,
+    semantic_score=110,
+    operator_score=160,
+    score=530,
+  )
+
+  with TestClient(service_app) as service_client:
+    def fake_urlopen(request, timeout: float):
+      response = service_client.request(
+        request.get_method(),
+        request.full_url,
+        content=request.data,
+        headers=dict(request.headers),
+      )
+      body = response.content
+      if response.status_code >= 400:
+        raise urllib_error.HTTPError(
+          request.full_url,
+          response.status_code,
+          getattr(response, "reason_phrase", "search service error"),
+          hdrs=response.headers,
+          fp=BytesIO(body),
+        )
+      return FakeResponse(response.status_code, body)
+
+    backend = HttpProviderProvenanceSchedulerSearchServiceClient(
+      service_url="https://search-service.example",
+      auth_token="search-token",
+      urlopen=fake_urlopen,
+    )
+
+    saved_analytics = backend.save_provider_provenance_scheduler_search_query_analytics_record(
+      analytics_record
+    )
+    saved_feedback = backend.save_provider_provenance_scheduler_search_feedback_record(
+      feedback_record
+    )
+    listed_analytics = backend.list_provider_provenance_scheduler_search_query_analytics_records()
+    listed_feedback = backend.list_provider_provenance_scheduler_search_feedback_records()
+    deleted_analytics = backend.prune_provider_provenance_scheduler_search_query_analytics_records(
+      analytics_record.expires_at + timedelta(seconds=1)  # type: ignore[operator]
+    )
+    deleted_feedback = backend.prune_provider_provenance_scheduler_search_feedback_records(
+      feedback_record.expires_at + timedelta(seconds=1)  # type: ignore[operator]
+    )
+
+  assert saved_analytics.query_id == "query-1"
+  assert saved_feedback.feedback_id == "feedback-1"
+  assert len(listed_analytics) == 1
+  assert listed_analytics[0].parsed_operators == ("status:resolved",)
+  assert len(listed_feedback) == 1
+  assert listed_feedback[0].signal == "relevant"
+  assert deleted_analytics == 1
+  assert deleted_feedback == 1
