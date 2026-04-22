@@ -21,6 +21,16 @@ from typing import Iterable
 from typing import Mapping
 from uuid import uuid4
 
+from akra_trader.application_flows.strategy_catalog import StrategyCatalogFlow
+from akra_trader.application_flows.strategy_catalog import _apply_registration_snapshot_metadata
+from akra_trader.application_flows.strategy_catalog import _build_run_experiment_metadata
+from akra_trader.application_flows.strategy_catalog import _merge_preset_parameters
+from akra_trader.application_flows.strategy_catalog import _normalize_experiment_filter_value
+from akra_trader.application_flows.strategy_catalog import _normalize_experiment_identifier
+from akra_trader.application_flows.strategy_catalog import _normalize_experiment_tags
+from akra_trader.application_flows.strategy_catalog import serialize_preset
+from akra_trader.application_flows.strategy_catalog import serialize_preset_revision
+from akra_trader.application_flows.strategy_catalog import serialize_strategy
 from akra_trader.adapters.provider_provenance_search import (
   EmbeddedProviderProvenanceSchedulerSearchServiceClient,
 )
@@ -600,6 +610,12 @@ class TradingApplication:
     self._strategies = strategies
     self._references = references
     self._presets = presets or _EphemeralExperimentPresetCatalog()
+    self._strategy_catalog_flow = StrategyCatalogFlow(
+      strategies=self._strategies,
+      references=self._references,
+      presets=self._presets,
+      clock=self._clock,
+    )
     self._runs = runs
     self._provider_provenance_scheduler_search_backend = (
       provider_provenance_scheduler_search_backend
@@ -833,23 +849,21 @@ class TradingApplication:
     lifecycle_stage: str | None = None,
     version: str | None = None,
   ) -> list[StrategyMetadata]:
-    return self._strategies.list_strategies(
-      runtime=lane,
+    return self._strategy_catalog_flow.list_strategies(
+      lane=lane,
       lifecycle_stage=lifecycle_stage,
       version=version,
     )
 
   def list_references(self) -> list[ReferenceSource]:
-    return self._references.list_entries()
+    return self._strategy_catalog_flow.list_references()
 
   def register_strategy(self, *, strategy_id: str, module_path: str, class_name: str) -> StrategyMetadata:
-    registration = StrategyRegistration(
+    return self._strategy_catalog_flow.register_strategy(
       strategy_id=strategy_id,
       module_path=module_path,
       class_name=class_name,
-      registered_at=datetime.now(UTC),
     )
-    return self._strategies.register(registration)
 
   def list_presets(
     self,
@@ -858,14 +872,14 @@ class TradingApplication:
     timeframe: str | None = None,
     lifecycle_stage: str | None = None,
   ) -> list[ExperimentPreset]:
-    return self._presets.list_presets(
-      strategy_id=_normalize_experiment_filter_value(strategy_id),
-      timeframe=_normalize_experiment_filter_value(timeframe),
-      lifecycle_stage=_normalize_preset_lifecycle_stage(lifecycle_stage),
+    return self._strategy_catalog_flow.list_presets(
+      strategy_id=strategy_id,
+      timeframe=timeframe,
+      lifecycle_stage=lifecycle_stage,
     )
 
   def get_preset(self, *, preset_id: str) -> ExperimentPreset:
-    return self._get_preset_or_raise(preset_id)
+    return self._strategy_catalog_flow.get_preset(preset_id=preset_id)
 
   def create_preset(
     self,
@@ -879,67 +893,16 @@ class TradingApplication:
     parameters: dict[str, Any] | None = None,
     benchmark_family: str | None = None,
   ) -> ExperimentPreset:
-    normalized_name = name.strip()
-    if not normalized_name:
-      raise ValueError("Preset name is required.")
-    normalized_preset_id = _normalize_experiment_identifier(preset_id or name)
-    if normalized_preset_id is None:
-      raise ValueError("Preset ID is required.")
-    if self._presets.get_preset(normalized_preset_id) is not None:
-      raise ValueError(f"Preset already exists: {normalized_preset_id}")
-    normalized_strategy_id = _normalize_experiment_filter_value(strategy_id)
-    self._validate_preset_strategy(strategy_id=normalized_strategy_id)
-    normalized_timeframe = _normalize_experiment_filter_value(timeframe)
-    normalized_parameters = deepcopy(parameters or {})
-    if normalized_parameters and normalized_strategy_id is None:
-      raise ValueError("Preset parameters require a strategy_id.")
-    current_time = self._clock()
-    preset = ExperimentPreset(
-      preset_id=normalized_preset_id,
-      name=normalized_name,
-      description=description.strip(),
-      strategy_id=normalized_strategy_id,
-      timeframe=normalized_timeframe,
-      benchmark_family=_normalize_experiment_identifier(benchmark_family),
-      tags=_normalize_experiment_tags(tags),
-      parameters=normalized_parameters,
-      lifecycle=ExperimentPreset.Lifecycle(
-        stage="draft",
-        updated_at=current_time,
-        updated_by="operator",
-        last_action="created",
-        history=(
-          ExperimentPreset.LifecycleEvent(
-            action="created",
-            actor="operator",
-            reason="preset_created",
-            occurred_at=current_time,
-            from_stage=None,
-            to_stage="draft",
-          ),
-        ),
-      ),
-      revisions=(
-        _build_preset_revision(
-          preset_id=normalized_preset_id,
-          revision_number=1,
-          action="created",
-          actor="operator",
-          reason="preset_created",
-          occurred_at=current_time,
-          name=normalized_name,
-          description=description.strip(),
-          strategy_id=normalized_strategy_id,
-          timeframe=normalized_timeframe,
-          benchmark_family=_normalize_experiment_identifier(benchmark_family),
-          tags=_normalize_experiment_tags(tags),
-          parameters=normalized_parameters,
-        ),
-      ),
-      created_at=current_time,
-      updated_at=current_time,
+    return self._strategy_catalog_flow.create_preset(
+      name=name,
+      preset_id=preset_id,
+      description=description,
+      strategy_id=strategy_id,
+      timeframe=timeframe,
+      tags=tags,
+      parameters=parameters,
+      benchmark_family=benchmark_family,
     )
-    return self._presets.save_preset(preset)
 
   def update_preset(
     self,
@@ -949,115 +912,21 @@ class TradingApplication:
     actor: str = "operator",
     reason: str = "manual_preset_edit",
   ) -> ExperimentPreset:
-    preset = self._get_preset_or_raise(preset_id)
-    allowed_fields = {
-      "name",
-      "description",
-      "strategy_id",
-      "timeframe",
-      "benchmark_family",
-      "tags",
-      "parameters",
-    }
-    unexpected_fields = sorted(set(changes) - allowed_fields)
-    if unexpected_fields:
-      raise ValueError(f"Unsupported preset update fields: {', '.join(unexpected_fields)}")
-    if not changes:
-      raise ValueError("Preset update requires at least one field.")
-
-    next_name = preset.name
-    if "name" in changes:
-      candidate_name = str(changes["name"] or "").strip()
-      if not candidate_name:
-        raise ValueError("Preset name is required.")
-      next_name = candidate_name
-
-    next_description = preset.description
-    if "description" in changes:
-      next_description = str(changes["description"] or "").strip()
-
-    next_strategy_id = preset.strategy_id
-    if "strategy_id" in changes:
-      next_strategy_id = _normalize_experiment_filter_value(changes["strategy_id"])
-
-    next_timeframe = preset.timeframe
-    if "timeframe" in changes:
-      next_timeframe = _normalize_experiment_filter_value(changes["timeframe"])
-
-    next_benchmark_family = preset.benchmark_family
-    if "benchmark_family" in changes:
-      next_benchmark_family = _normalize_experiment_identifier(changes["benchmark_family"])
-
-    next_tags = preset.tags
-    if "tags" in changes:
-      next_tags = _normalize_experiment_tags(changes["tags"])
-
-    next_parameters = deepcopy(preset.parameters)
-    if "parameters" in changes:
-      candidate_parameters = changes["parameters"]
-      if candidate_parameters is None:
-        next_parameters = {}
-      elif isinstance(candidate_parameters, dict):
-        next_parameters = deepcopy(candidate_parameters)
-      else:
-        raise ValueError("Preset parameters must be a JSON object.")
-
-    self._validate_preset_strategy(strategy_id=next_strategy_id)
-    if next_parameters and next_strategy_id is None:
-      raise ValueError("Preset parameters require a strategy_id.")
-
-    if (
-      next_name == preset.name
-      and next_description == preset.description
-      and next_strategy_id == preset.strategy_id
-      and next_timeframe == preset.timeframe
-      and next_benchmark_family == preset.benchmark_family
-      and next_tags == preset.tags
-      and next_parameters == preset.parameters
-    ):
-      return preset
-
-    current_time = self._clock()
-    normalized_actor = (actor or "operator").strip() or "operator"
-    normalized_reason = (reason or "manual_preset_edit").strip() or "manual_preset_edit"
-    updated = replace(
-      preset,
-      name=next_name,
-      description=next_description,
-      strategy_id=next_strategy_id,
-      timeframe=next_timeframe,
-      benchmark_family=next_benchmark_family,
-      tags=next_tags,
-      parameters=next_parameters,
-      updated_at=current_time,
-      revisions=(
-        *preset.revisions,
-        _build_preset_revision(
-          preset_id=preset.preset_id,
-          revision_number=len(preset.revisions) + 1,
-          action="updated",
-          actor=normalized_actor,
-          reason=normalized_reason,
-          occurred_at=current_time,
-          name=next_name,
-          description=next_description,
-          strategy_id=next_strategy_id,
-          timeframe=next_timeframe,
-          benchmark_family=next_benchmark_family,
-          tags=next_tags,
-          parameters=next_parameters,
-        ),
-      ),
+    return self._strategy_catalog_flow.update_preset(
+      preset_id=preset_id,
+      changes=changes,
+      actor=actor,
+      reason=reason,
     )
-    return self._presets.save_preset(updated)
 
   def list_preset_revisions(
     self,
     *,
     preset_id: str,
   ) -> tuple[ExperimentPreset.Revision, ...]:
-    preset = self._get_preset_or_raise(preset_id)
-    return tuple(reversed(preset.revisions))
+    return self._strategy_catalog_flow.list_preset_revisions(
+      preset_id=preset_id,
+    )
 
   def restore_preset_revision(
     self,
@@ -1067,51 +936,12 @@ class TradingApplication:
     actor: str = "operator",
     reason: str = "manual_preset_revision_restore",
   ) -> ExperimentPreset:
-    preset = self._get_preset_or_raise(preset_id)
-    target_revision = next(
-      (revision for revision in preset.revisions if revision.revision_id == revision_id),
-      None,
+    return self._strategy_catalog_flow.restore_preset_revision(
+      preset_id=preset_id,
+      revision_id=revision_id,
+      actor=actor,
+      reason=reason,
     )
-    if target_revision is None:
-      raise LookupError(f"Preset revision not found: {revision_id}")
-
-    current_time = self._clock()
-    normalized_actor = (actor or "operator").strip() or "operator"
-    normalized_reason = (reason or "manual_preset_revision_restore").strip() or "manual_preset_revision_restore"
-    restored = replace(
-      preset,
-      name=target_revision.name,
-      description=target_revision.description,
-      strategy_id=target_revision.strategy_id,
-      timeframe=target_revision.timeframe,
-      benchmark_family=target_revision.benchmark_family,
-      tags=target_revision.tags,
-      parameters=deepcopy(target_revision.parameters),
-      updated_at=current_time,
-      revisions=(
-        *preset.revisions,
-        _build_preset_revision(
-          preset_id=preset.preset_id,
-          revision_number=len(preset.revisions) + 1,
-          action="restored",
-          actor=normalized_actor,
-          reason=normalized_reason,
-          occurred_at=current_time,
-          source_revision_id=target_revision.revision_id,
-          name=target_revision.name,
-          description=target_revision.description,
-          strategy_id=target_revision.strategy_id,
-          timeframe=target_revision.timeframe,
-          benchmark_family=target_revision.benchmark_family,
-          tags=target_revision.tags,
-          parameters=target_revision.parameters,
-        ),
-      ),
-    )
-    self._validate_preset_strategy(strategy_id=restored.strategy_id)
-    if restored.parameters and restored.strategy_id is None:
-      raise ValueError("Preset parameters require a strategy_id.")
-    return self._presets.save_preset(restored)
 
   def apply_preset_lifecycle_action(
     self,
@@ -1121,63 +951,18 @@ class TradingApplication:
     actor: str = "operator",
     reason: str = "manual_preset_lifecycle_action",
   ) -> ExperimentPreset:
-    normalized_preset_id = _normalize_experiment_identifier(preset_id)
-    if normalized_preset_id is None:
-      raise ValueError("Preset ID is required.")
-    preset = self._presets.get_preset(normalized_preset_id)
-    if preset is None:
-      raise LookupError(f"Preset not found: {normalized_preset_id}")
-    normalized_action = _normalize_preset_lifecycle_action(action)
-    if normalized_action is None:
-      raise ValueError(f"Unsupported preset lifecycle action: {action}")
-    current_stage = preset.lifecycle.stage
-    target_stage = _resolve_preset_lifecycle_target_stage(
-      current_stage=current_stage,
-      action=normalized_action,
+    return self._strategy_catalog_flow.apply_preset_lifecycle_action(
+      preset_id=preset_id,
+      action=action,
+      actor=actor,
+      reason=reason,
     )
-    current_time = self._clock()
-    updated = replace(
-      preset,
-      lifecycle=replace(
-        preset.lifecycle,
-        stage=target_stage,
-        updated_at=current_time,
-        updated_by=(actor or "operator").strip() or "operator",
-        last_action=normalized_action,
-        history=(
-          *preset.lifecycle.history,
-          ExperimentPreset.LifecycleEvent(
-            action=normalized_action,
-            actor=(actor or "operator").strip() or "operator",
-            reason=(reason or normalized_action).strip() or normalized_action,
-            occurred_at=current_time,
-            from_stage=current_stage,
-            to_stage=target_stage,
-          ),
-        ),
-      ),
-      updated_at=current_time,
-    )
-    return self._presets.save_preset(updated)
 
   def _get_preset_or_raise(self, preset_id: str) -> ExperimentPreset:
-    normalized_preset_id = _normalize_experiment_identifier(preset_id)
-    if normalized_preset_id is None:
-      raise ValueError("Preset ID is required.")
-    preset = self._presets.get_preset(normalized_preset_id)
-    if preset is None:
-      raise LookupError(f"Preset not found: {normalized_preset_id}")
-    return preset
+    return self._strategy_catalog_flow.get_preset_or_raise(preset_id)
 
   def _validate_preset_strategy(self, *, strategy_id: str | None) -> None:
-    if strategy_id is None:
-      return
-    available_strategy_ids = {
-      strategy.strategy_id
-      for strategy in self._strategies.list_strategies()
-    }
-    if strategy_id not in available_strategy_ids:
-      raise ValueError(f"Strategy not found for preset: {strategy_id}")
+    self._strategy_catalog_flow.validate_preset_strategy(strategy_id=strategy_id)
 
   def list_runs(
     self,
@@ -32250,81 +32035,14 @@ class TradingApplication:
     strategy_id: str,
     timeframe: str,
   ) -> ExperimentPreset | None:
-    normalized_preset_id = _normalize_experiment_identifier(preset_id)
-    if normalized_preset_id is None:
-      return None
-    preset = self._presets.get_preset(normalized_preset_id)
-    if preset is None:
-      raise ValueError(f"Preset not found: {normalized_preset_id}")
-    if preset.lifecycle.stage == "archived":
-      raise ValueError(f"Preset {normalized_preset_id} is archived and cannot be launched.")
-    if preset.strategy_id is not None and preset.strategy_id != strategy_id:
-      raise ValueError(
-        f"Preset {normalized_preset_id} is pinned to strategy {preset.strategy_id}, not {strategy_id}."
-      )
-    if preset.timeframe is not None and preset.timeframe != timeframe:
-      raise ValueError(
-        f"Preset {normalized_preset_id} is pinned to timeframe {preset.timeframe}, not {timeframe}."
-      )
-    return preset
+    return self._strategy_catalog_flow.resolve_experiment_preset(
+      preset_id=preset_id,
+      strategy_id=strategy_id,
+      timeframe=timeframe,
+    )
 
   def _migrate_legacy_preset_from_run(self, run: RunRecord) -> ExperimentPreset | None:
-    preset_id = _normalize_experiment_identifier(run.provenance.experiment.preset_id)
-    if preset_id is None:
-      return None
-    existing = self._presets.get_preset(preset_id)
-    if existing is not None:
-      return existing
-    preset = ExperimentPreset(
-      preset_id=preset_id,
-      name=preset_id,
-      description="Migrated from legacy run metadata.",
-      strategy_id=run.config.strategy_id,
-      timeframe=run.config.timeframe,
-      benchmark_family=_normalize_experiment_identifier(
-        run.provenance.experiment.benchmark_family
-      ),
-      tags=_normalize_experiment_tags(run.provenance.experiment.tags),
-      parameters=deepcopy(run.config.parameters),
-      lifecycle=ExperimentPreset.Lifecycle(
-        stage="draft",
-        updated_at=run.started_at,
-        updated_by="system",
-        last_action="migrated",
-        history=(
-          ExperimentPreset.LifecycleEvent(
-            action="migrated",
-            actor="system",
-            reason="legacy_run_metadata_migration",
-            occurred_at=run.started_at,
-            from_stage=None,
-            to_stage="draft",
-          ),
-        ),
-      ),
-      revisions=(
-        _build_preset_revision(
-          preset_id=preset_id,
-          revision_number=1,
-          action="migrated",
-          actor="system",
-          reason="legacy_run_metadata_migration",
-          occurred_at=run.started_at,
-          name=preset_id,
-          description="Migrated from legacy run metadata.",
-          strategy_id=run.config.strategy_id,
-          timeframe=run.config.timeframe,
-          benchmark_family=_normalize_experiment_identifier(
-            run.provenance.experiment.benchmark_family
-          ),
-          tags=_normalize_experiment_tags(run.provenance.experiment.tags),
-          parameters=run.config.parameters,
-        ),
-      ),
-      created_at=run.started_at,
-      updated_at=run.started_at,
-    )
-    return self._presets.save_preset(preset)
+    return self._strategy_catalog_flow.migrate_legacy_preset_from_run(run)
 
   def _resolve_rerun_source(self, *, rerun_boundary_id: str) -> RunRecord:
     candidates = self._runs.list_runs(rerun_boundary_id=rerun_boundary_id)
@@ -32512,200 +32230,6 @@ class TradingApplication:
       TradingApplication._resolve_rerun_end_at(run),
       None,
     )
-
-
-def _normalize_experiment_filter_value(value: str | None) -> str | None:
-  if value is None:
-    return None
-  candidate = value.strip()
-  return candidate or None
-
-
-def _apply_registration_snapshot_metadata(
-  *,
-  metadata: StrategyMetadata,
-  registration: StrategyRegistration | None,
-) -> StrategyMetadata:
-  if registration is None or metadata.lifecycle.registered_at is not None:
-    return metadata
-  base_semantics = metadata.catalog_semantics
-  parameter_contract = (
-    base_semantics.parameter_contract
-    or (
-      "Publishes a typed parameter schema for presets and semantic diffs."
-      if metadata.parameter_schema
-      else "Does not advertise a typed parameter schema; presets can only store freeform parameters."
-    )
-  )
-  operator_notes = tuple(
-    dict.fromkeys((*base_semantics.operator_notes, "Imported from a locally registered module path."))
-  )
-  return replace(
-    metadata,
-    lifecycle=StrategyLifecycle(
-      stage=metadata.lifecycle.stage,
-      registered_at=registration.registered_at,
-    ),
-    catalog_semantics=StrategyCatalogSemantics(
-      strategy_kind="imported_module",
-      execution_model=(
-        base_semantics.execution_model
-        or "Loaded from a locally registered module and executed through the declared runtime."
-      ),
-      parameter_contract=parameter_contract,
-      source_descriptor=f"{registration.module_path}:{registration.class_name}",
-      operator_notes=operator_notes,
-    ),
-  )
-
-
-def _normalize_experiment_identifier(value: str | None) -> str | None:
-  candidate = _normalize_experiment_filter_value(value)
-  if candidate is None:
-    return None
-  normalized = re.sub(r"[^a-z0-9._:-]+", "_", candidate.lower())
-  normalized = re.sub(r"_+", "_", normalized).strip("_")
-  return normalized or None
-
-
-def _normalize_experiment_tags(tags: Iterable[str] | None) -> tuple[str, ...]:
-  if tags is None:
-    return ()
-  normalized: list[str] = []
-  seen: set[str] = set()
-  for tag in tags:
-    normalized_tag = _normalize_experiment_identifier(tag)
-    if normalized_tag is None or normalized_tag in seen:
-      continue
-    seen.add(normalized_tag)
-    normalized.append(normalized_tag)
-  return tuple(normalized)
-
-
-def _normalize_preset_lifecycle_stage(stage: str | None) -> str | None:
-  candidate = _normalize_experiment_filter_value(stage)
-  if candidate is None:
-    return None
-  normalized = candidate.lower().replace(" ", "_")
-  if normalized not in {"draft", "benchmark_candidate", "sandbox_candidate", "live_candidate", "archived"}:
-    return None
-  return normalized
-
-
-def _normalize_preset_lifecycle_action(action: str | None) -> str | None:
-  candidate = _normalize_experiment_filter_value(action)
-  if candidate is None:
-    return None
-  normalized = candidate.lower().replace(" ", "_")
-  if normalized not in {"promote", "archive", "restore"}:
-    return None
-  return normalized
-
-
-def _resolve_preset_lifecycle_target_stage(*, current_stage: str, action: str) -> str:
-  normalized_stage = _normalize_preset_lifecycle_stage(current_stage)
-  if normalized_stage is None:
-    raise ValueError(f"Unsupported preset lifecycle stage: {current_stage}")
-  if action == "archive":
-    if normalized_stage == "archived":
-      raise ValueError("Preset is already archived.")
-    return "archived"
-  if action == "restore":
-    if normalized_stage != "archived":
-      raise ValueError("Only archived presets can be restored.")
-    return "draft"
-  promotion_order = ("draft", "benchmark_candidate", "sandbox_candidate", "live_candidate")
-  if normalized_stage == "archived":
-    raise ValueError("Archived presets must be restored before promotion.")
-  if normalized_stage == promotion_order[-1]:
-    raise ValueError("Preset is already at the live_candidate stage.")
-  current_index = promotion_order.index(normalized_stage)
-  return promotion_order[current_index + 1]
-
-
-def _merge_preset_parameters(
-  *,
-  preset: ExperimentPreset | None,
-  requested_parameters: dict[str, Any] | None,
-) -> dict[str, Any]:
-  merged = deepcopy(preset.parameters) if preset is not None else {}
-  for key, value in deepcopy(requested_parameters or {}).items():
-    merged[key] = value
-  return merged
-
-
-def _build_run_experiment_metadata(
-  *,
-  tags: Iterable[str] = (),
-  preset: ExperimentPreset | None = None,
-  benchmark_family: str | None = None,
-  strategy_metadata: StrategyMetadata,
-) -> RunExperimentMetadata:
-  normalized_benchmark_family = _normalize_experiment_identifier(
-    benchmark_family or (preset.benchmark_family if preset is not None else None)
-  )
-  if normalized_benchmark_family is None and strategy_metadata.runtime == "freqtrade_reference":
-    normalized_benchmark_family = _normalize_experiment_identifier(
-      f"reference:{strategy_metadata.reference_id or strategy_metadata.strategy_id}"
-    )
-  merged_tags = tuple(tags)
-  if preset is not None:
-    merged_tags = (*preset.tags, *merged_tags)
-  return RunExperimentMetadata(
-    tags=_normalize_experiment_tags(merged_tags),
-    preset_id=preset.preset_id if preset is not None else None,
-    benchmark_family=normalized_benchmark_family,
-  )
-
-
-def _build_preset_revision(
-  *,
-  preset_id: str,
-  revision_number: int,
-  action: str,
-  actor: str,
-  reason: str,
-  occurred_at: datetime,
-  name: str,
-  description: str,
-  strategy_id: str | None,
-  timeframe: str | None,
-  benchmark_family: str | None,
-  tags: tuple[str, ...],
-  parameters: dict[str, Any],
-  source_revision_id: str | None = None,
-) -> ExperimentPreset.Revision:
-  normalized_actor = (actor or "operator").strip() or "operator"
-  normalized_reason = (reason or action).strip() or action
-  return ExperimentPreset.Revision(
-    revision_id=f"{preset_id}:r{revision_number:04d}",
-    actor=normalized_actor,
-    reason=normalized_reason,
-    created_at=occurred_at,
-    action=action,
-    source_revision_id=source_revision_id,
-    name=name,
-    description=description,
-    strategy_id=strategy_id,
-    timeframe=timeframe,
-    benchmark_family=benchmark_family,
-    tags=tuple(tags),
-    parameters=deepcopy(parameters),
-  )
-
-
-def _serialize_preset_lifecycle_event(event: ExperimentPreset.LifecycleEvent) -> dict[str, Any]:
-  payload = asdict(event)
-  payload["occurred_at"] = event.occurred_at.isoformat()
-  return payload
-
-
-def serialize_preset_revision(revision: ExperimentPreset.Revision) -> dict[str, Any]:
-  payload = asdict(revision)
-  payload["tags"] = list(revision.tags)
-  payload["created_at"] = revision.created_at.isoformat()
-  return payload
-
 
 def serialize_replay_intent_alias_record(record: ReplayIntentAliasRecord) -> dict[str, Any]:
   return {
@@ -34840,28 +34364,3 @@ def serialize_run_metrics_response(
     subresource_key="metrics",
     capabilities=capabilities,
   )
-
-
-def serialize_preset(preset: ExperimentPreset) -> dict:
-  payload = asdict(preset)
-  payload["tags"] = list(preset.tags)
-  payload["lifecycle"]["history"] = [
-    _serialize_preset_lifecycle_event(event)
-    for event in preset.lifecycle.history
-  ]
-  payload["revisions"] = [
-    serialize_preset_revision(revision)
-    for revision in preset.revisions
-  ]
-  payload["created_at"] = preset.created_at.isoformat()
-  payload["updated_at"] = preset.updated_at.isoformat()
-  return payload
-
-
-def serialize_strategy(strategy: StrategyMetadata) -> dict:
-  payload = asdict(strategy)
-  payload["asset_types"] = [asset_type.value for asset_type in strategy.asset_types]
-  payload["supported_timeframes"] = list(strategy.supported_timeframes)
-  payload["version_lineage"] = list(strategy.version_lineage or (strategy.version,))
-  payload["catalog_semantics"]["operator_notes"] = list(strategy.catalog_semantics.operator_notes)
-  return payload
