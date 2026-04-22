@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-  from akra_trader.domain.models import AssetType
-  from akra_trader.domain.models import WarmupSpec
+  from akra_trader.domain.model_types.run_execution import AssetType
+  from akra_trader.domain.model_types.run_execution import WarmupSpec
 else:
   AssetType = Any
   WarmupSpec = Any
@@ -25,7 +25,7 @@ __all__ = [
 
 
 def _default_warmup_spec() -> WarmupSpec:
-  from akra_trader.domain.models import WarmupSpec
+  from akra_trader.domain.model_types.run_execution import WarmupSpec
 
   return WarmupSpec(required_bars=0)
 
@@ -151,3 +151,7 @@ class StrategyRegistration:
   module_path: str
   class_name: str
   registered_at: datetime
+
+
+from akra_trader.domain.model_types.run_execution import AssetType as AssetType
+from akra_trader.domain.model_types.run_execution import WarmupSpec as WarmupSpec

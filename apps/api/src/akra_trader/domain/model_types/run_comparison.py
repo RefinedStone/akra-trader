@@ -8,8 +8,8 @@ from akra_trader.domain.model_types.strategy_catalog import RunExperimentMetadat
 from akra_trader.domain.model_types.strategy_catalog import StrategyCatalogSemantics
 
 if TYPE_CHECKING:
-  from akra_trader.domain.models import BenchmarkArtifact
-  from akra_trader.domain.models import ReferenceSource
+  from akra_trader.domain.model_types.run_execution import BenchmarkArtifact
+  from akra_trader.domain.model_types.run_execution import ReferenceSource
 
 
 @dataclass(frozen=True)
