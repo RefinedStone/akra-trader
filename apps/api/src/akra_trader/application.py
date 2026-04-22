@@ -420,6 +420,15 @@ from akra_trader.application_support.provider_governance_policy_mutations import
 from akra_trader.application_support.provider_governance_policy_mutations import (
   update_provider_provenance_scheduler_search_moderation_catalog_governance_policy as update_provider_provenance_scheduler_search_moderation_catalog_governance_policy_support,
 )
+from akra_trader.application_support.provider_governance_policy_reads import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_policies as list_provider_provenance_scheduler_search_moderation_catalog_governance_policies_support,
+)
+from akra_trader.application_support.provider_governance_policy_reads import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits as list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_support,
+)
+from akra_trader.application_support.provider_governance_policy_reads import (
+  list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions as list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions_support,
+)
 from akra_trader.application_support.provider_governance_records import (
   get_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record as get_provider_provenance_scheduler_search_moderation_catalog_governance_meta_plan_record_support,
 )
@@ -39271,56 +39280,12 @@ class TradingApplication:
     search: str | None = None,
     limit: int = 50,
   ) -> dict[str, Any]:
-    normalized_action_scope = (
-      self._normalize_provider_provenance_scheduler_search_moderation_catalog_governance_action_scope(
-        action_scope
-      )
-      if isinstance(action_scope, str) and action_scope.strip()
-      else None
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_policies_support(
+      self,
+      action_scope=action_scope,
+      search=search,
+      limit=limit,
     )
-    normalized_limit = max(1, min(limit, 200))
-    records = []
-    for record in self._list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_records():
-      if normalized_action_scope is not None and record.action_scope != normalized_action_scope:
-        continue
-      if not self._matches_provider_provenance_workspace_search(
-        values=(
-          record.governance_policy_id,
-          record.name,
-          record.description,
-          record.action_scope,
-          record.guidance,
-          record.default_moderation_status,
-          record.governance_view,
-          record.created_by_tab_id,
-          record.created_by_tab_label,
-        ),
-        search=search,
-      ):
-        continue
-      records.append(
-        self._serialize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record(
-          replace(
-            record,
-            status=self._normalize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_status(
-              record.status
-            ),
-          )
-        )
-      )
-    return {
-      "generated_at": self._clock(),
-      "query": {
-        "action_scope": normalized_action_scope,
-        "search": search.strip() if isinstance(search, str) and search.strip() else None,
-        "limit": normalized_limit,
-      },
-      "available_filters": {
-        "action_scopes": ("any", "update", "delete", "restore"),
-      },
-      "total": len(records),
-      "items": tuple(records[:normalized_limit]),
-    }
 
   def update_provider_provenance_scheduler_search_moderation_catalog_governance_policy(
     self,
@@ -39386,22 +39351,10 @@ class TradingApplication:
     self,
     governance_policy_id: str,
   ) -> dict[str, Any]:
-    current = self._get_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record(
-      governance_policy_id
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revisions_support(
+      self,
+      governance_policy_id,
     )
-    history = tuple(
-      self._serialize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_record(
-        revision
-      )
-      for revision in self._list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision_records()
-      if revision.governance_policy_id == current.governance_policy_id
-    )
-    return {
-      "policy": self._serialize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_record(
-        current
-      ),
-      "history": history,
-    }
 
   def restore_provider_provenance_scheduler_search_moderation_catalog_governance_policy_revision(
     self,
@@ -39430,52 +39383,14 @@ class TradingApplication:
     search: str | None = None,
     limit: int = 50,
   ) -> dict[str, Any]:
-    normalized_policy_id = (
-      governance_policy_id.strip()
-      if isinstance(governance_policy_id, str) and governance_policy_id.strip()
-      else None
+    return list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audits_support(
+      self,
+      governance_policy_id=governance_policy_id,
+      action=action,
+      actor_tab_id=actor_tab_id,
+      search=search,
+      limit=limit,
     )
-    normalized_action = (
-      action.strip().lower().replace("-", "_")
-      if isinstance(action, str) and action.strip()
-      else None
-    )
-    normalized_actor = (
-      actor_tab_id.strip()
-      if isinstance(actor_tab_id, str) and actor_tab_id.strip()
-      else None
-    )
-    normalized_limit = max(1, min(limit, 200))
-    items: list[dict[str, Any]] = []
-    for record in self._list_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_records():
-      if normalized_policy_id is not None and record.governance_policy_id != normalized_policy_id:
-        continue
-      if normalized_action is not None and record.action != normalized_action:
-        continue
-      if normalized_actor is not None and (record.actor_tab_id or "") != normalized_actor:
-        continue
-      if not self._matches_provider_provenance_workspace_search(
-        values=(
-          record.governance_policy_id,
-          record.name,
-          record.action,
-          record.reason,
-          record.detail,
-          record.actor_tab_id,
-          record.actor_tab_label,
-        ),
-        search=search,
-      ):
-        continue
-      items.append(
-        self._serialize_provider_provenance_scheduler_search_moderation_catalog_governance_policy_audit_record(
-          record
-        )
-      )
-    return {
-      "items": tuple(items[:normalized_limit]),
-      "total": len(items),
-    }
 
   def bulk_govern_provider_provenance_scheduler_search_moderation_catalog_governance_policies(
     self,
