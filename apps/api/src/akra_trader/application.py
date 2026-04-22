@@ -328,6 +328,9 @@ from akra_trader.application_support.guarded_live_runtime import (
   sync_guarded_live_session as sync_guarded_live_session_support,
 )
 from akra_trader.application_support import guarded_live_alert_workflows as guarded_live_alert_workflows_support
+from akra_trader.application_support import guarded_live_payload_helpers as guarded_live_payload_helpers_support
+from akra_trader.application_support import guarded_live_remediation_support as guarded_live_remediation_support
+from akra_trader.application_support import guarded_live_incident_support as guarded_live_incident_support
 from akra_trader.application_support.provider_governance_catalog_plan_workflows import (
   apply_provider_provenance_scheduler_search_moderation_catalog_governance_plan as apply_provider_provenance_scheduler_search_moderation_catalog_governance_plan_support,
 )
@@ -15980,130 +15983,42 @@ class TradingApplication:
 
   @staticmethod
   def _normalize_external_incident_event_kind(event_kind: str) -> str:
-    normalized = event_kind.strip().lower().replace("-", "_")
-    mapping = {
-      "recovery_requested": "remediation_requested",
-      "recovery_started": "remediation_started",
-      "recovered": "remediation_completed",
-      "recovery_completed": "remediation_completed",
-      "recovery_failed": "remediation_failed",
-    }
-    return mapping.get(normalized, normalized)
+    return guarded_live_payload_helpers_support._normalize_external_incident_event_kind(event_kind)
 
   @staticmethod
   def _first_non_empty_string(*values: Any) -> str | None:
-    for value in values:
-      if not isinstance(value, str):
-        continue
-      stripped = value.strip()
-      if stripped:
-        return stripped
-    return None
+    return guarded_live_payload_helpers_support._first_non_empty_string(*values)
 
   @staticmethod
   def _extract_payload_mapping(value: Any) -> dict[str, Any]:
-    if isinstance(value, dict):
-      return value
-    return {}
+    return guarded_live_payload_helpers_support._extract_payload_mapping(value)
 
   @classmethod
   def _merge_payload_mappings(cls, *values: Any) -> dict[str, Any]:
-    merged: dict[str, Any] = {}
-    for value in values:
-      if isinstance(value, dict):
-        merged.update(cls._extract_payload_mapping(value))
-    return merged
+    return guarded_live_payload_helpers_support._merge_payload_mappings(cls, *values)
 
   @classmethod
   def _extract_string_tuple(cls, *values: Any) -> tuple[str, ...]:
-    items: list[str] = []
-    for value in values:
-      if isinstance(value, str):
-        stripped = value.strip()
-        if stripped and stripped not in items:
-          items.append(stripped)
-        continue
-      if isinstance(value, (list, tuple, set)):
-        for item in value:
-          if not isinstance(item, str):
-            continue
-          stripped = item.strip()
-          if stripped and stripped not in items:
-            items.append(stripped)
-    return tuple(items)
+    return guarded_live_payload_helpers_support._extract_string_tuple(cls, *values)
 
   @classmethod
   def _parse_payload_datetime(cls, value: Any) -> datetime | None:
-    if isinstance(value, datetime):
-      return value
-    if not isinstance(value, str):
-      return None
-    candidate = value.strip()
-    if not candidate:
-      return None
-    if candidate.endswith("Z"):
-      candidate = f"{candidate[:-1]}+00:00"
-    try:
-      return datetime.fromisoformat(candidate)
-    except ValueError:
-      return None
+    return guarded_live_payload_helpers_support._parse_payload_datetime(cls, value)
 
   @staticmethod
   def _parse_payload_int(*values: Any) -> int | None:
-    for value in values:
-      if isinstance(value, bool):
-        continue
-      if isinstance(value, int):
-        return value
-      if isinstance(value, float) and value.is_integer():
-        return int(value)
-      if not isinstance(value, str):
-        continue
-      candidate = value.strip()
-      if not candidate:
-        continue
-      try:
-        return int(candidate)
-      except ValueError:
-        continue
-    return None
+    return guarded_live_payload_helpers_support._parse_payload_int(*values)
 
   @classmethod
   def _normalize_incident_workflow_payload_value(cls, value: Any) -> Any:
-    if value is None or isinstance(value, (str, bool)):
-      return value
-    if isinstance(value, datetime):
-      return value.isoformat()
-    if isinstance(value, int):
-      return value
-    if isinstance(value, float):
-      return value
-    if isinstance(value, Number):
-      return float(value)
-    if isinstance(value, dict):
-      normalized: dict[str, Any] = {}
-      for key, nested_value in value.items():
-        key_copy = str(key).strip()
-        if not key_copy:
-          continue
-        normalized[key_copy] = cls._normalize_incident_workflow_payload_value(nested_value)
-      return normalized
-    if isinstance(value, (list, tuple, set)):
-      return [cls._normalize_incident_workflow_payload_value(item) for item in value]
-    return str(value)
+    return guarded_live_payload_helpers_support._normalize_incident_workflow_payload_value(cls, value)
 
   @classmethod
   def _normalize_incident_workflow_payload(
     cls,
     payload: dict[str, Any] | None,
   ) -> dict[str, Any]:
-    if not payload:
-      return {}
-    return {
-      key_copy: cls._normalize_incident_workflow_payload_value(value)
-      for key, value in payload.items()
-      if (key_copy := str(key).strip())
-    }
+    return guarded_live_payload_helpers_support._normalize_incident_workflow_payload(cls, payload)
 
   @staticmethod
   def _merge_incident_workflow_payload(
@@ -16111,24 +16026,10 @@ class TradingApplication:
     existing: dict[str, Any],
     incoming: dict[str, Any],
   ) -> dict[str, Any]:
-    if not existing:
-      return dict(incoming)
-    if not incoming:
-      return dict(existing)
-    merged = dict(existing)
-    merged.update(incoming)
-    return merged
+    return guarded_live_payload_helpers_support._merge_incident_workflow_payload(existing=existing, incoming=incoming)
 
   def _extract_incident_payload_reference(self, payload: dict[str, Any]) -> str | None:
-    return self._first_non_empty_string(
-      payload.get("workflow_reference"),
-      payload.get("provider_workflow_reference"),
-      payload.get("reference"),
-      payload.get("job_reference"),
-      payload.get("job_id"),
-      payload.get("execution_id"),
-      payload.get("recovery_id"),
-    )
+    return guarded_live_payload_helpers_support._extract_incident_payload_reference(self, payload)
 
   @staticmethod
   def _provider_recovery_lifecycle_for_remediation_state(remediation_state: str) -> str:
@@ -32909,34 +32810,7 @@ class TradingApplication:
     delivery_history: tuple[OperatorIncidentDelivery, ...],
     current_time: datetime,
   ) -> tuple[tuple[str, str, int], ...]:
-    due_retries: list[tuple[str, str, int]] = []
-    incidents_by_id = {incident.event_id: incident for incident in incident_events}
-    latest_by_key = self._latest_delivery_records_by_key(delivery_history=delivery_history)
-
-    for latest in latest_by_key.values():
-      incident = incidents_by_id.get(latest.incident_event_id)
-      if incident is None:
-        continue
-      if incident.kind == "incident_opened" and not self._incident_is_still_active(
-        incident=incident,
-        incident_events=incident_events,
-      ):
-        continue
-      if (
-        incident.kind == "incident_opened"
-        and incident.acknowledgment_state == "acknowledged"
-        and not latest.phase.startswith("provider_")
-      ):
-        continue
-      if latest.status != "retry_scheduled" or latest.next_retry_at is None:
-        continue
-      if latest.next_retry_at > current_time:
-        continue
-      if latest.attempt_number >= self._operator_alert_delivery_max_attempts:
-        continue
-      due_retries.append((latest.incident_event_id, latest.target, latest.attempt_number + 1))
-    due_retries.sort()
-    return tuple(due_retries)
+    return guarded_live_incident_support._collect_due_incident_retries(self, incident_events=incident_events, delivery_history=delivery_history, current_time=current_time)
 
   def _apply_incident_delivery_state(
     self,
@@ -32944,78 +32818,7 @@ class TradingApplication:
     incident_events: tuple[OperatorIncidentEvent, ...],
     delivery_history: tuple[OperatorIncidentDelivery, ...],
   ) -> tuple[OperatorIncidentEvent, ...]:
-    latest_by_key = self._latest_delivery_records_by_key(delivery_history=delivery_history)
-
-    refreshed: list[OperatorIncidentEvent] = []
-    for incident in incident_events:
-      delivery_records = tuple(
-        record
-        for key, record in latest_by_key.items()
-        if key[0] == incident.event_id
-        and not key[2].startswith("provider_")
-      )
-      provider_records = tuple(
-        record
-        for key, record in latest_by_key.items()
-        if key[0] == incident.event_id
-        and key[2].startswith("provider_")
-      )
-      latest_provider_record = self._latest_provider_workflow_record(records=provider_records)
-      prefer_provider_authoritative = (
-        incident.external_last_synced_at is not None
-        and (
-          latest_provider_record is None
-          or latest_provider_record.attempted_at <= incident.external_last_synced_at
-        )
-      )
-      refreshed.append(
-        replace(
-          incident,
-          delivery_state=self._resolve_incident_delivery_state(records=delivery_records),
-          provider_workflow_state=(
-            incident.provider_workflow_state
-            if prefer_provider_authoritative
-            else (
-              self._resolve_incident_delivery_state(records=provider_records)
-              if provider_records
-              else incident.provider_workflow_state
-            )
-          ),
-          provider_workflow_action=(
-            incident.provider_workflow_action
-            if prefer_provider_authoritative
-            else (
-              latest_provider_record.provider_action
-              if latest_provider_record is not None
-              else incident.provider_workflow_action
-            )
-          ),
-          provider_workflow_last_attempted_at=(
-            incident.provider_workflow_last_attempted_at
-            if prefer_provider_authoritative
-            else (
-              latest_provider_record.attempted_at
-              if latest_provider_record is not None
-              else incident.provider_workflow_last_attempted_at
-            )
-          ),
-          provider_workflow_reference=(
-            incident.provider_workflow_reference
-            if prefer_provider_authoritative
-            else (
-              latest_provider_record.external_reference
-              if latest_provider_record is not None and latest_provider_record.external_reference is not None
-              else incident.provider_workflow_reference
-            )
-          ),
-          remediation=self._refresh_incident_remediation_state(
-            incident=incident,
-            latest_by_key=latest_by_key,
-          ),
-        )
-      )
-    refreshed.sort(key=lambda event: event.timestamp, reverse=True)
-    return tuple(refreshed)
+    return guarded_live_incident_support._apply_incident_delivery_state(self, incident_events=incident_events, delivery_history=delivery_history)
 
   def _refresh_incident_remediation_state(
     self,
@@ -33023,65 +32826,7 @@ class TradingApplication:
     incident: OperatorIncidentEvent,
     latest_by_key: dict[tuple[str, str, str], OperatorIncidentDelivery],
   ) -> OperatorIncidentRemediation:
-    remediation = incident.remediation
-    if remediation.state == "not_applicable":
-      return remediation
-    remediation_records = tuple(
-      record
-      for key, record in latest_by_key.items()
-      if key[0] == incident.event_id and key[2] == "provider_remediate"
-    )
-    if not remediation_records:
-      return remediation
-    latest_record = self._latest_provider_workflow_record(records=remediation_records)
-    prefer_provider_authoritative = (
-      incident.external_last_synced_at is not None
-      and (
-        latest_record is None
-        or latest_record.attempted_at <= incident.external_last_synced_at
-      )
-    )
-    if prefer_provider_authoritative:
-      return remediation
-    next_state = self._resolve_remediation_delivery_state(
-      records=remediation_records,
-      current_state=remediation.state,
-    )
-    return replace(
-      remediation,
-      state=next_state,
-      last_attempted_at=(
-        latest_record.attempted_at if latest_record is not None else remediation.last_attempted_at
-      ),
-      provider=(
-        latest_record.external_provider
-        if latest_record is not None and latest_record.external_provider is not None
-        else remediation.provider
-      ),
-      reference=(
-        latest_record.external_reference
-        if latest_record is not None and latest_record.external_reference is not None
-        else remediation.reference
-      ),
-      provider_recovery=self._refresh_provider_recovery_phase_graphs(
-        provider_recovery=replace(
-          remediation.provider_recovery,
-          status_machine=self._build_provider_recovery_status_machine(
-            existing=remediation.provider_recovery.status_machine,
-            remediation_state=next_state,
-            event_kind=remediation.provider_recovery.status_machine.last_event_kind,
-            workflow_state=self._resolve_incident_delivery_state(records=remediation_records),
-            workflow_action=(
-              latest_record.provider_action if latest_record is not None else remediation.provider_recovery.status_machine.workflow_action
-            ),
-            attempt_number=latest_record.attempt_number if latest_record is not None else remediation.provider_recovery.status_machine.attempt_number,
-            detail=latest_record.detail if latest_record is not None else remediation.provider_recovery.status_machine.last_detail,
-            event_at=latest_record.attempted_at if latest_record is not None else remediation.provider_recovery.status_machine.last_event_at,
-          ),
-        ),
-        synced_at=latest_record.attempted_at if latest_record is not None else self._clock(),
-      ),
-    )
+    return guarded_live_incident_support._refresh_incident_remediation_state(self, incident=incident, latest_by_key=latest_by_key)
 
   def _request_incident_remediation(
     self,
@@ -33107,26 +32852,7 @@ class TradingApplication:
     records: tuple[OperatorIncidentDelivery, ...],
     current_state: str,
   ) -> str:
-    if current_state in {
-      "executed",
-      "partial",
-      "failed",
-      "skipped",
-      "completed",
-      "provider_recovering",
-      "provider_recovered",
-    }:
-      return current_state
-    delivery_state = self._resolve_incident_delivery_state(records=records)
-    mapping = {
-      "delivered": "requested",
-      "partial": "requested",
-      "retrying": "retrying",
-      "failed": "failed",
-      "suppressed": "suppressed",
-      "not_configured": current_state,
-    }
-    return mapping.get(delivery_state, current_state)
+    return guarded_live_incident_support._resolve_remediation_delivery_state(self, records=records, current_state=current_state)
 
   def _execute_local_incident_remediation(
     self,
@@ -33162,12 +32888,7 @@ class TradingApplication:
     incident: OperatorIncidentEvent,
     state: GuardedLiveState,
   ) -> RunRecord | None:
-    if incident.run_id is not None and (run := self._runs.get_run(incident.run_id)) is not None:
-      return run
-    owner_run_id = state.session_handoff.owner_run_id or state.ownership.owner_run_id
-    if owner_run_id is None:
-      return None
-    return self._runs.get_run(owner_run_id)
+    return guarded_live_remediation_support._resolve_guarded_live_remediation_run(self, incident=incident, state=state)
 
   @staticmethod
   def _resolve_guarded_live_remediation_identity(
@@ -33175,13 +32896,7 @@ class TradingApplication:
     run: RunRecord | None,
     state: GuardedLiveState,
   ) -> tuple[str, str]:
-    if run is not None:
-      symbol = run.config.symbols[0] if run.config.symbols else "unknown"
-      timeframe = run.config.timeframe or "unknown"
-      return symbol, timeframe
-    symbol = state.session_handoff.symbol or state.ownership.symbol or "unknown"
-    timeframe = state.session_handoff.timeframe or "unknown"
-    return symbol, timeframe
+    return guarded_live_remediation_support._resolve_guarded_live_remediation_identity(run=run, state=state)
 
   def _build_guarded_live_state_for_local_session_remediation(
     self,
@@ -33192,35 +32907,7 @@ class TradingApplication:
     reason: str,
     session_handoff: GuardedLiveVenueSessionHandoff,
   ) -> GuardedLiveState:
-    session = run.provenance.runtime_session
-    current_time = self._clock()
-    existing = state.ownership
-    return replace(
-      state,
-      ownership=GuardedLiveSessionOwnership(
-        state="owned",
-        owner_run_id=run.config.run_id,
-        owner_session_id=session.session_id if session is not None else existing.owner_session_id,
-        symbol=run.config.symbols[0] if run.config.symbols else existing.symbol,
-        claimed_at=existing.claimed_at if existing.owner_run_id == run.config.run_id else current_time,
-        claimed_by=existing.claimed_by if existing.owner_run_id == run.config.run_id else actor,
-        last_heartbeat_at=session.last_heartbeat_at if session is not None else existing.last_heartbeat_at,
-        last_order_sync_at=current_time,
-        last_resumed_at=existing.last_resumed_at,
-        last_reason=reason,
-        last_released_at=None,
-      ),
-      order_book=self._build_guarded_live_order_book_sync(run=run),
-      session_restore=self._resolve_guarded_live_session_restore_state(
-        run=run,
-        existing=state.session_restore,
-      ),
-      session_handoff=self._resolve_guarded_live_session_handoff_state(
-        run=run,
-        existing=state.session_handoff,
-        session_handoff=session_handoff,
-      ),
-    )
+    return guarded_live_remediation_support._build_guarded_live_state_for_local_session_remediation(self, state=state, run=run, actor=actor, reason=reason, session_handoff=session_handoff)
 
   @staticmethod
   def _summarize_guarded_live_session_remediation_result(
@@ -33228,121 +32915,27 @@ class TradingApplication:
     remediation_kind: str,
     handoff: GuardedLiveVenueSessionHandoff,
   ) -> str:
-    symbol = handoff.symbol or "unknown"
-    timeframe = handoff.timeframe or "unknown"
-    if remediation_kind == "channel_restore":
-      detail = (
-        f"{remediation_kind}:{symbol}:{timeframe}:channel_restore={handoff.channel_restore_state};"
-        f"continuation={handoff.channel_continuation_state};"
-        f"transport={handoff.transport};source={handoff.source};state={handoff.state}"
-      )
-      if handoff.channel_last_restored_at is not None:
-        detail += f";restored_at={handoff.channel_last_restored_at.isoformat()}"
-      if handoff.channel_last_continued_at is not None:
-        detail += f";continued_at={handoff.channel_last_continued_at.isoformat()}"
-      if handoff.issues:
-        detail += f";issues={','.join(handoff.issues[:3])}"
-      return detail
-    detail = (
-      f"{remediation_kind}:{symbol}:{timeframe}:order_book={handoff.order_book_state};"
-      f"transport={handoff.transport};source={handoff.source};state={handoff.state};"
-      f"rebuilds={handoff.order_book_rebuild_count};gaps={handoff.order_book_gap_count}"
-    )
-    if handoff.order_book_last_rebuilt_at is not None:
-      detail += f";rebuilt_at={handoff.order_book_last_rebuilt_at.isoformat()}"
-    if handoff.order_book_best_bid_price is not None or handoff.order_book_best_ask_price is not None:
-      detail += (
-        f";top_of_book={handoff.order_book_best_bid_price or 0.0:.8f}/"
-        f"{handoff.order_book_best_ask_price or 0.0:.8f}"
-      )
-    if handoff.issues:
-      detail += f";issues={','.join(handoff.issues[:3])}"
-    return detail
+    return guarded_live_remediation_support._summarize_guarded_live_session_remediation_result(remediation_kind=remediation_kind, handoff=handoff)
 
   def _resolve_market_data_remediation_targets(
     self,
     *,
     incident: OperatorIncidentEvent,
   ) -> tuple[str | None, tuple[str, ...]]:
-    remediation = incident.remediation
-    timeframe: str | None = None
-    venue: str | None = None
-    alert_parts = incident.alert_id.split(":")
-    if remediation.kind == "recent_sync" and len(alert_parts) == 3 and alert_parts[1] == "market-data":
-      timeframe = alert_parts[2]
-    elif remediation.kind in {
-      "historical_backfill",
-      "candle_repair",
-      "venue_fault_review",
-      "market_data_review",
-    } and len(alert_parts) == 4 and alert_parts[1].startswith("market-data-"):
-      venue = alert_parts[2]
-      timeframe = alert_parts[3]
-
-    symbols: list[str] = []
-    if incident.run_id is not None and (run := self._runs.get_run(incident.run_id)) is not None:
-      timeframe = timeframe or run.config.timeframe
-      venue = venue or run.config.venue
-      return timeframe, tuple(dict.fromkeys(run.config.symbols))
-
-    if timeframe is None:
-      return None, ()
-
-    try:
-      status = self._market_data.get_status(timeframe)
-    except Exception:
-      status = None
-    if status is not None:
-      venue = venue or status.venue
-      for instrument in status.instruments:
-        symbol = self._symbol_from_instrument_id(instrument.instrument_id)
-        if symbol not in symbols:
-          symbols.append(symbol)
-
-    if venue is not None and incident.run_id is None:
-      live_runs = [
-        run
-        for run in self._runs.list_runs(mode=RunMode.LIVE.value)
-        if run.config.timeframe == timeframe and run.config.venue == venue
-      ]
-      if live_runs:
-        live_symbols = [
-          symbol
-          for run in live_runs
-          for symbol in run.config.symbols
-          if symbol in symbols or not symbols
-        ]
-        if live_symbols:
-          symbols = list(dict.fromkeys(live_symbols))
-
-    return timeframe, tuple(dict.fromkeys(symbols))
+    return guarded_live_remediation_support._resolve_market_data_remediation_targets(self, incident=incident)
 
   @staticmethod
   def _resolve_local_remediation_state(
     *,
     results: tuple[MarketDataRemediationResult, ...],
   ) -> str:
-    executed = sum(result.status in {"executed", "skipped"} for result in results)
-    failed = sum(result.status == "failed" for result in results)
-    if failed and executed:
-      return "partial"
-    if failed:
-      return "failed"
-    if results and all(result.status == "skipped" for result in results):
-      return "skipped"
-    return "executed"
+    return guarded_live_remediation_support._resolve_local_remediation_state(results=results)
 
   @staticmethod
   def _summarize_local_remediation_results(
     results: tuple[MarketDataRemediationResult, ...],
   ) -> str:
-    if not results:
-      return "not_executed"
-    detail_copy = [result.detail for result in results if result.detail]
-    summary = " ".join(detail_copy[:2]) if detail_copy else "local_remediation_executed"
-    if len(detail_copy) > 2:
-      summary += f" Additional jobs: {len(detail_copy) - 2}."
-    return summary
+    return guarded_live_remediation_support._summarize_local_remediation_results(results)
 
   def _pull_sync_guarded_live_provider_recovery(
     self,
@@ -33386,60 +32979,7 @@ class TradingApplication:
     pull_sync: OperatorIncidentProviderPullSync,
     payload: dict[str, Any],
   ) -> str | None:
-    explicit_event = self._first_non_empty_string(
-      payload.get("event_kind"),
-      payload.get("recovery_event_kind"),
-      payload.get("last_event_kind"),
-      self._extract_payload_mapping(payload.get("status_machine")).get("last_event_kind"),
-    )
-    if explicit_event is not None:
-      return self._normalize_external_incident_event_kind(explicit_event)
-
-    remediation_state = self._first_non_empty_string(
-      pull_sync.remediation_state,
-      payload.get("recovery_state"),
-      payload.get("status"),
-    )
-    if remediation_state is not None:
-      normalized_state = remediation_state.strip().lower().replace("-", "_")
-      remediation_mapping = {
-        "requested": "remediation_requested",
-        "provider_requested": "remediation_requested",
-        "recovering": "remediation_started",
-        "running": "remediation_started",
-        "in_progress": "remediation_started",
-        "provider_recovering": "remediation_started",
-        "recovered": "remediation_completed",
-        "provider_recovered": "remediation_completed",
-        "completed": "remediation_completed",
-        "verified": "remediation_completed",
-        "resolved": "resolved",
-        "failed": "remediation_failed",
-        "provider_failed": "remediation_failed",
-      }
-      if normalized_state in remediation_mapping:
-        return remediation_mapping[normalized_state]
-
-    workflow_state = self._first_non_empty_string(
-      pull_sync.workflow_state,
-      payload.get("workflow_state"),
-    )
-    if workflow_state is None:
-      return None
-    normalized_workflow_state = workflow_state.strip().lower().replace("-", "_")
-    workflow_mapping = {
-      "triggered": "triggered",
-      "open": "triggered",
-      "active": "triggered",
-      "acknowledged": "acknowledged",
-      "escalated": "escalated",
-      "resolved": "resolved",
-      "closed": "resolved",
-    }
-    resolved = workflow_mapping.get(normalized_workflow_state)
-    if resolved == "resolved" and incident.kind == "incident_opened" and incident.remediation.state != "not_applicable":
-      return None
-    return resolved
+    return guarded_live_payload_helpers_support._resolve_provider_pull_sync_event_kind(self, incident=incident, pull_sync=pull_sync, payload=payload)
 
   def _refresh_guarded_live_incident_workflow(
     self,
@@ -33465,60 +33005,24 @@ class TradingApplication:
     records: tuple[OperatorIncidentDelivery, ...],
     current_time: datetime,
   ) -> tuple[OperatorIncidentDelivery, ...]:
-    updated: list[OperatorIncidentDelivery] = []
-    for record in records:
-      if record.status != "failed":
-        updated.append(record)
-        continue
-      if record.attempt_number >= self._operator_alert_delivery_max_attempts:
-        updated.append(record)
-        continue
-      updated.append(
-        replace(
-          record,
-          status="retry_scheduled",
-          next_retry_at=current_time + timedelta(
-            seconds=self._resolve_delivery_backoff_seconds(record.attempt_number)
-          ),
-        )
-      )
-    return tuple(updated)
+    return guarded_live_incident_support._apply_delivery_retry_policy(self, records=records, current_time=current_time)
 
   def _resolve_delivery_backoff_seconds(self, attempt_number: int) -> int:
-    multiplier = self._operator_alert_delivery_backoff_multiplier ** max(attempt_number - 1, 0)
-    backoff = int(self._operator_alert_delivery_initial_backoff_seconds * multiplier)
-    return min(backoff, self._operator_alert_delivery_max_backoff_seconds)
+    return guarded_live_incident_support._resolve_delivery_backoff_seconds(self, attempt_number)
 
   @staticmethod
   def _resolve_incident_delivery_state(
     *,
     records: tuple[OperatorIncidentDelivery, ...],
   ) -> str:
-    if not records:
-      return "not_configured"
-    statuses = {record.status for record in records}
-    if statuses <= {"delivered", "retry_suppressed"} and "delivered" in statuses:
-      return "delivered"
-    if "retry_scheduled" in statuses:
-      return "retrying"
-    if statuses == {"retry_suppressed"}:
-      return "suppressed"
-    if "delivered" in statuses:
-      return "partial"
-    return "failed"
+    return guarded_live_incident_support._resolve_incident_delivery_state(records=records)
 
   @staticmethod
   def _latest_delivery_records_by_key(
     *,
     delivery_history: tuple[OperatorIncidentDelivery, ...],
   ) -> dict[tuple[str, str, str], OperatorIncidentDelivery]:
-    latest_by_key: dict[tuple[str, str, str], OperatorIncidentDelivery] = {}
-    for record in delivery_history:
-      key = (record.incident_event_id, record.target, record.phase)
-      existing = latest_by_key.get(key)
-      if existing is None or record.attempt_number > existing.attempt_number:
-        latest_by_key[key] = record
-    return latest_by_key
+    return guarded_live_incident_support._latest_delivery_records_by_key(delivery_history=delivery_history)
 
   def _latest_incident_delivery_record(
     self,
@@ -33527,31 +33031,14 @@ class TradingApplication:
     incident_event_id: str,
     target: str,
   ) -> OperatorIncidentDelivery | None:
-    latest_by_key = self._latest_delivery_records_by_key(delivery_history=delivery_history)
-    candidates = [
-      record
-      for key, record in latest_by_key.items()
-      if key[0] == incident_event_id and key[1] == target
-    ]
-    if not candidates:
-      return None
-    candidates.sort(key=lambda record: (record.phase == "escalation", record.attempt_number), reverse=True)
-    return candidates[0]
+    return guarded_live_incident_support._latest_incident_delivery_record(self, delivery_history=delivery_history, incident_event_id=incident_event_id, target=target)
 
   @staticmethod
   def _latest_provider_workflow_record(
     *,
     records: tuple[OperatorIncidentDelivery, ...],
   ) -> OperatorIncidentDelivery | None:
-    if not records:
-      return None
-    return max(
-      records,
-      key=lambda record: (
-        record.attempted_at,
-        record.attempt_number,
-      ),
-    )
+    return guarded_live_incident_support._latest_provider_workflow_record(records=records)
 
   @staticmethod
   def _replace_incident_event(
@@ -33559,12 +33046,7 @@ class TradingApplication:
     incident_events: tuple[OperatorIncidentEvent, ...],
     updated_incident: OperatorIncidentEvent,
   ) -> tuple[OperatorIncidentEvent, ...]:
-    replaced = [
-      updated_incident if incident.event_id == updated_incident.event_id else incident
-      for incident in incident_events
-    ]
-    replaced.sort(key=lambda event: event.timestamp, reverse=True)
-    return tuple(replaced)
+    return guarded_live_incident_support._replace_incident_event(incident_events=incident_events, updated_incident=updated_incident)
 
   @staticmethod
   def _incident_is_still_active(
@@ -33572,14 +33054,7 @@ class TradingApplication:
     incident: OperatorIncidentEvent,
     incident_events: tuple[OperatorIncidentEvent, ...],
   ) -> bool:
-    if incident.kind != "incident_opened":
-      return False
-    for candidate in incident_events:
-      if candidate.alert_id != incident.alert_id or candidate.kind != "incident_resolved":
-        continue
-      if candidate.timestamp >= incident.timestamp:
-        return False
-    return True
+    return guarded_live_incident_support._incident_is_still_active(incident=incident, incident_events=incident_events)
 
   @staticmethod
   def _find_latest_open_incident_for_alert(
@@ -33588,17 +33063,7 @@ class TradingApplication:
     alert_id: str,
     resolved_at: datetime,
   ) -> OperatorIncidentEvent | None:
-    candidates = [
-      incident
-      for incident in incident_events
-      if incident.kind == "incident_opened"
-      and incident.alert_id == alert_id
-      and incident.timestamp <= resolved_at
-    ]
-    if not candidates:
-      return None
-    candidates.sort(key=lambda incident: incident.timestamp, reverse=True)
-    return candidates[0]
+    return guarded_live_incident_support._find_latest_open_incident_for_alert(incident_events=incident_events, alert_id=alert_id, resolved_at=resolved_at)
 
   @staticmethod
   def _incident_has_provider_workflow_phase(
@@ -33607,10 +33072,7 @@ class TradingApplication:
     delivery_history: tuple[OperatorIncidentDelivery, ...],
     phase: str,
   ) -> bool:
-    latest_by_key = TradingApplication._latest_delivery_records_by_key(
-      delivery_history=delivery_history,
-    )
-    return any(key[0] == incident_event_id and key[2] == phase for key in latest_by_key)
+    return guarded_live_incident_support._incident_has_provider_workflow_phase(incident_event_id=incident_event_id, delivery_history=delivery_history, phase=phase)
 
   def _require_active_guarded_live_incident(
     self,
@@ -33618,14 +33080,7 @@ class TradingApplication:
     state: GuardedLiveState,
     event_id: str,
   ) -> OperatorIncidentEvent:
-    incident = next((event for event in state.incident_events if event.event_id == event_id), None)
-    if incident is None:
-      raise LookupError("Guarded-live incident not found")
-    if incident.kind != "incident_opened":
-      raise ValueError("Only active incident_opened records can be acknowledged or escalated")
-    if not self._incident_is_still_active(incident=incident, incident_events=state.incident_events):
-      raise ValueError("Guarded-live incident is no longer active")
-    return incident
+    return guarded_live_incident_support._require_active_guarded_live_incident(self, state=state, event_id=event_id)
 
   def _find_guarded_live_incident_for_external_sync(
     self,
@@ -33634,32 +33089,7 @@ class TradingApplication:
     alert_id: str | None,
     external_reference: str | None,
   ) -> OperatorIncidentEvent:
-    candidates = [
-      incident
-      for incident in state.incident_events
-      if incident.kind == "incident_opened"
-      and (
-        (alert_id is not None and incident.alert_id == alert_id)
-        or (
-          external_reference is not None
-          and (
-            incident.external_reference == external_reference
-            or incident.provider_workflow_reference == external_reference
-            or incident.alert_id == external_reference
-          )
-        )
-      )
-    ]
-    if not candidates:
-      raise LookupError("Guarded-live incident not found for external sync")
-    candidates.sort(
-      key=lambda incident: (
-        self._incident_is_still_active(incident=incident, incident_events=state.incident_events),
-        incident.timestamp,
-      ),
-      reverse=True,
-    )
-    return candidates[0]
+    return guarded_live_incident_support._find_guarded_live_incident_for_external_sync(self, state=state, alert_id=alert_id, external_reference=external_reference)
 
   @staticmethod
   def _suppress_pending_incident_retries(
@@ -33669,26 +33099,7 @@ class TradingApplication:
     reason: str,
     phase: str | None = None,
   ) -> tuple[OperatorIncidentDelivery, ...]:
-    updated: list[OperatorIncidentDelivery] = []
-    for record in delivery_history:
-      if record.incident_event_id != incident_event_id:
-        updated.append(record)
-        continue
-      if phase is not None and record.phase != phase:
-        updated.append(record)
-        continue
-      if record.status != "retry_scheduled":
-        updated.append(record)
-        continue
-      updated.append(
-        replace(
-          record,
-          status="retry_suppressed",
-          next_retry_at=None,
-          detail=f"{record.detail}; retry_suppressed:{reason}",
-        )
-      )
-    return tuple(updated)
+    return guarded_live_incident_support._suppress_pending_incident_retries(delivery_history=delivery_history, incident_event_id=incident_event_id, reason=reason, phase=phase)
 
   def _sync_incident_provider_workflow(
     self,
@@ -33723,46 +33134,11 @@ class TradingApplication:
     occurred_at: datetime,
     external_reference: str | None,
   ) -> tuple[OperatorIncidentDelivery, ...]:
-    phase = self._provider_phase_for_event_kind(event_kind)
-    if phase is None:
-      return delivery_history
-    provider_prefix = self._normalize_paging_provider(provider) or provider
-    updated_history = self._suppress_pending_incident_retries(
-      delivery_history=delivery_history,
-      incident_event_id=incident.event_id,
-      reason=f"external_confirmed:{provider_prefix}:{event_kind}",
-      phase=phase,
-    )
-    confirmation = OperatorIncidentDelivery(
-      delivery_id=f"{incident.event_id}:{provider_prefix}_external:{event_kind}:{occurred_at.isoformat()}",
-      incident_event_id=incident.event_id,
-      alert_id=incident.alert_id,
-      incident_kind=incident.kind,
-      target=f"{provider_prefix}_external_sync",
-      status="delivered",
-      attempted_at=occurred_at,
-      detail=f"external_provider_confirmed:{event_kind}:{detail}",
-      phase=phase,
-      provider_action=phase.removeprefix("provider_"),
-      external_provider=provider_prefix,
-      external_reference=external_reference,
-      source=incident.source,
-    )
-    return (confirmation, *updated_history)
+    return guarded_live_incident_support._confirm_external_provider_workflow(self, delivery_history=delivery_history, incident=incident, provider=provider, event_kind=event_kind, detail=detail, occurred_at=occurred_at, external_reference=external_reference)
 
   @staticmethod
   def _provider_phase_for_event_kind(event_kind: str) -> str | None:
-    mapping = {
-      "triggered": "provider_trigger",
-      "acknowledged": "provider_acknowledge",
-      "escalated": "provider_escalate",
-      "resolved": "provider_resolve",
-      "remediation_requested": "provider_remediate",
-      "remediation_started": "provider_remediate",
-      "remediation_completed": "provider_remediate",
-      "remediation_failed": "provider_remediate",
-    }
-    return mapping.get(event_kind)
+    return guarded_live_incident_support._provider_phase_for_event_kind(event_kind)
 
   def _incident_has_exhausted_initial_delivery(
     self,
@@ -33770,13 +33146,7 @@ class TradingApplication:
     incident: OperatorIncidentEvent,
     delivery_history: tuple[OperatorIncidentDelivery, ...],
   ) -> bool:
-    latest_by_key = self._latest_delivery_records_by_key(delivery_history=delivery_history)
-    initial_records = [
-      record
-      for key, record in latest_by_key.items()
-      if key[0] == incident.event_id and key[2] == "initial"
-    ]
-    return any(record.status == "failed" for record in initial_records)
+    return guarded_live_incident_support._incident_has_exhausted_initial_delivery(self, incident=incident, delivery_history=delivery_history)
 
   def _escalate_incident_event(
     self,
@@ -33799,9 +33169,7 @@ class TradingApplication:
     )
 
   def _resolve_incident_escalation_backoff_seconds(self, escalation_level: int) -> int:
-    multiplier = self._operator_alert_incident_escalation_backoff_multiplier ** max(escalation_level - 1, 0)
-    backoff = int(self._operator_alert_incident_ack_timeout_seconds * multiplier)
-    return min(backoff, self._operator_alert_delivery_max_backoff_seconds)
+    return guarded_live_incident_support._resolve_incident_escalation_backoff_seconds(self, escalation_level)
 
   def _build_live_operator_alerts_for_run(
     self,
