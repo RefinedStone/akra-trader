@@ -1,3 +1,5 @@
+from akra_trader.domain.model_types.benchmark_artifact_metadata import *
+from akra_trader.domain.model_types.market_data_remediation import *
 from akra_trader.domain.model_types.provider_provenance import *
 from akra_trader.domain.model_types.run_surface_contracts import *
 from akra_trader.domain.model_types.run_execution import *
