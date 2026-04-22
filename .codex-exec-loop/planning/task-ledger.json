@@ -365,16 +365,31 @@
       "id": "task-llm-sensitivity-domain-models-operator-guarded-live-family-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split operator and guarded-live model families out of domain/models.py",
-      "description": "Continue the `domain/models.py` compatibility re-export pattern by extracting the remaining operator and guarded-live model families into `domain/model_types/*` modules so new backend feature work no longer defaults to the broad shared model file.",
-      "status": "ready",
+      "description": "Completed the `domain/models.py` bounded-family extraction by moving operator runtime and guarded-live model ownership into `domain/model_types/operator_runtime.py` and `domain/model_types/guarded_live.py`, leaving `models.py` and `model_types/__init__.py` as compatibility wildcard re-export surfaces only.",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T23:58:00+09:00",
+      "updated_at": "2026-04-22T23:59:10+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The direction detail and current-state docs explicitly note that provider-provenance records already moved behind domain/models.py compatibility imports, while the remaining operator and guarded-live families still need the same bounded-family treatment.",
-      "priority_reason": "Promoted to ready because the previous guarded-live queue head is now complete with no follow-up left in that file, and this is the highest-priority remaining executable decomposition task for continuing the `llm-sensitivity-decomposition` lane."
+      "direction_relation_note": "The latest main-session reply confirms commit `fd8efd5` moved `OperatorAlert` and provider-recovery or incident visibility ownership into `operator_runtime.py` and `GuardedLive*` state, session, recovery, and status ownership into `guarded_live.py`, preserving the import surface through wildcard re-exports from `models.py` and `model_types/__init__.py`.",
+      "priority_reason": "Marked done because the main session completed the family split, validated it with `python -m py_compile` plus targeted guarded-live and operator regression coverage (`apps/api/tests/test_application.py` 12 cases and `apps/api/tests/test_api.py` 5 cases), and pushed commit `fd8efd5` to `origin/main`."
+    },
+    {
+      "id": "task-llm-sensitivity-domain-models-market-data-status-sync-family-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split market-data status and sync-lineage model families out of domain/models.py",
+      "description": "Continue shrinking `domain/models.py` by extracting the remaining market-data status, lineage history, ingestion job, gap-window, sync-checkpoint, sync-failure, and remediation result model family into a bounded `domain/model_types/*` module while keeping `models.py` as the compatibility import surface.",
+      "status": "ready",
+      "base_priority": 83,
+      "dynamic_priority_delta": 24,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T23:59:30+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "After the operator and guarded-live split landed, the largest cohesive family still owned directly by `domain/models.py` is the market-data status and sync-lineage block around `InstrumentStatus`, `MarketDataStatus`, `MarketDataLineageHistoryRecord`, `MarketDataIngestionJobRecord`, `GapWindow`, `SyncCheckpoint`, `SyncFailure`, and `MarketDataRemediationResult`, which fits the same bounded-family extraction pattern already used for provider provenance and runtime families.",
+      "priority_reason": "Promoted to ready because the previous queue head is complete with no remaining follow-up in scope, and this is the clearest immediately executable next decomposition step for reducing `domain/models.py` breadth without changing the import surface."
     }
   ]
 }
