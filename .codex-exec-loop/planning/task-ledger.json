@@ -395,16 +395,31 @@
       "id": "task-llm-sensitivity-domain-models-run-surface-contract-family-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split run-surface capability and shared-contract model family out of domain/models.py",
-      "description": "Continue shrinking `domain/models.py` by moving the run-surface capability contract family around `RunSurfaceCapabilities`, `RunSurfaceSharedContract`, and `default_run_surface_shared_contracts()` into a bounded `domain/model_types/run_surface_contracts.py` module while keeping `models.py` and `model_types/__init__.py` as compatibility re-export surfaces.",
-      "status": "ready",
+      "description": "Completed the `domain/models.py` run-surface contract extraction by moving `ComparisonEligibility*`, `RunSurfaceCapabilities`, `RunSurfaceSharedContract`, `default_run_surface_shared_contracts()`, and the related `RUN_SURFACE_*` schema/order constants into `domain/model_types/run_surface_contracts.py`, leaving `models.py` and `model_types/__init__.py` as compatibility re-export surfaces.",
+      "status": "done",
       "base_priority": 84,
       "dynamic_priority_delta": 25,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T00:05:00+09:00",
+      "updated_at": "2026-04-23T00:18:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "With provider provenance, operator runtime, guarded-live, market-data status, and sync-lineage ownership moved out, the largest cohesive block still owned by `domain/models.py` is the run-surface capability/shared-contract family spanning `RunSurfaceCapabilities`, `RunSurfaceSharedContract`, and the shared-contract factory. That block already behaves like a bounded contract module and matches the same compatibility re-export pattern used by the previous model-family splits.",
-      "priority_reason": "Promoted to ready because the previous queue head is complete with no remaining follow-up in scope, and this is the clearest immediately executable next decomposition step for reducing `domain/models.py` breadth without changing the import surface."
+      "direction_relation_note": "The latest main-session reply confirms commit `230b323` moved the run-surface capability/shared-contract family into `run_surface_contracts.py`, cleaned up the previous `provider_provenance.py` ownership bleed, preserved compatibility re-exports from `models.py` and `model_types/__init__.py`, and left no remaining work inside this task scope.",
+      "priority_reason": "Marked done because the main session completed the extraction, validated it with `python -m py_compile` plus focused `test_application.py` and `test_api.py` coverage for run-surface metadata, committed it as `230b323`, and pushed it to `origin/main`."
+    },
+    {
+      "id": "task-llm-sensitivity-domain-models-run-comparison-family-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split run-comparison read-model family out of domain/models.py",
+      "description": "Continue shrinking `domain/models.py` by moving the comparison read-model family around `RunExperimentMetadata`, `RunComparisonRun`, `RunComparisonMetricRow`, `RunComparisonNarrative`, and `RunComparison` into a bounded `domain/model_types/run_comparison.py` module while keeping `models.py` and `model_types/__init__.py` as compatibility re-export surfaces.",
+      "status": "ready",
+      "base_priority": 85,
+      "dynamic_priority_delta": 27,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T00:18:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "With provider provenance, operator runtime, guarded-live, market-data status, sync-lineage, and run-surface contracts moved out, the most cohesive comparison-specific block still owned by `domain/models.py` is the `RunComparison*` read-model set plus `RunExperimentMetadata`. That family already represents comparison serialization concerns and can follow the same compatibility re-export pattern as the previous model-family splits without changing the API surface.",
+      "priority_reason": "Promoted to ready because the previous queue head is complete with no remaining follow-up in scope, and the run-comparison read-model block is now the clearest immediately executable `domain/models.py` decomposition step aligned with the direction's comparison-serialization focus."
     }
   ]
 }
