@@ -113,6 +113,9 @@ unclear dataset lineage.
 - that same scheduler occurrence timeline now also supports deeper server-side search over
   occurrence IDs, alert text, market context, and narrative status sequences, so shift leads can
   isolate the right lag/failure handoff slice before exporting or sharing a stitched report
+- that same scheduler occurrence search now also exposes weighted ranking metadata and highlights,
+  so incident review can explain why a given lag/failure narrative matched the current query
+  before a stitched export is handed to the next operator
 - those saved scheduler narrative templates and boards now also support edit, delete, and
   revision-restore workflow, so teams can correct or retire shared review lenses without losing
   the previous incident-handoff snapshot

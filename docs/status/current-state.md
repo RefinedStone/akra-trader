@@ -216,6 +216,9 @@ It is not yet a finished live trading product:
 - that same scheduler occurrence timeline now also honors deeper server-side search across
   occurrence IDs, alert text, market context, and narrative status sequences, so operators can
   narrow stitched review slices without paging through broad lag/failure histories by hand
+- that same scheduler occurrence search now also returns weighted retrieval ranking, matched
+  fields, and search highlights, so operators can see why one narrative ranked above another
+  instead of treating the timeline as a flat substring-filtered list
 - those scheduler templates and registry boards now also carry edit, delete, and revision-restore
   workflow, so operators can evolve or retire saved narrative lenses without losing prior
   snapshots

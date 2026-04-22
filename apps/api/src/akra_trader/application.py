@@ -36648,75 +36648,250 @@ class TradingApplication:
   ) -> bool:
     if not isinstance(search, str) or not search.strip():
       return True
+    return cls._build_provider_provenance_scheduler_alert_occurrence_search_match(
+      row=row,
+      search=search,
+    ) is not None
+
+  @staticmethod
+  def _tokenize_provider_provenance_scheduler_alert_search_query(
+    search: str,
+  ) -> tuple[str, ...]:
+    tokens = tuple(dict.fromkeys(re.findall(r"[a-z0-9:_./-]+", search.lower())))
+    return tokens or ((search.strip().lower(),) if search.strip() else ())
+
+  @staticmethod
+  def _truncate_provider_provenance_scheduler_search_highlight(
+    value: str,
+    *,
+    max_length: int = 72,
+  ) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= max_length:
+      return normalized
+    return f"{normalized[:max_length - 1].rstrip()}…"
+
+  @classmethod
+  def _build_provider_provenance_scheduler_alert_occurrence_search_fields(
+    cls,
+    *,
+    row: Mapping[str, Any],
+  ) -> tuple[tuple[str, int, tuple[str, ...]], ...]:
     alert = row.get("alert")
     narrative = row.get("narrative")
-    primary_focus = alert.primary_focus if isinstance(alert, OperatorAlert) else None
-    symbols = alert.symbols if isinstance(alert, OperatorAlert) else ()
-    search_values: list[Any] = []
-    if isinstance(alert, OperatorAlert):
-      search_values.extend(
-        (
-          alert.occurrence_id,
-          alert.alert_id,
-          alert.category,
-          alert.severity,
-          alert.status,
-          alert.summary,
-          alert.detail,
-          alert.source,
-          alert.run_id,
-          alert.session_id,
-          alert.symbol,
-          alert.timeframe,
-          alert.timeline_key,
-          alert.detected_at.isoformat(),
-          alert.resolved_at.isoformat() if alert.resolved_at is not None else None,
-          str(alert.timeline_position) if alert.timeline_position is not None else None,
-          str(alert.timeline_total) if alert.timeline_total is not None else None,
-        )
-      )
-      search_values.extend(symbols)
-    if primary_focus is not None:
-      search_values.extend(
-        (
-          primary_focus.symbol,
-          primary_focus.timeframe,
-          primary_focus.policy,
-          primary_focus.reason,
-          *(primary_focus.candidate_symbols or ()),
-          str(primary_focus.candidate_count),
-        )
-      )
-    if isinstance(narrative, Mapping):
-      search_values.extend(
-        (
-          narrative.get("facet"),
-          narrative.get("narrative_mode"),
-          str(narrative.get("occurrence_record_count"))
-          if narrative.get("occurrence_record_count") is not None
-          else None,
-          str(narrative.get("post_resolution_record_count"))
-          if narrative.get("post_resolution_record_count") is not None
-          else None,
-          (
-            narrative.get("narrative_window_ended_at").isoformat()
-            if isinstance(narrative.get("narrative_window_ended_at"), datetime)
-            else narrative.get("narrative_window_ended_at")
-          ),
-          (
-            narrative.get("next_occurrence_detected_at").isoformat()
-            if isinstance(narrative.get("next_occurrence_detected_at"), datetime)
-            else narrative.get("next_occurrence_detected_at")
-          ),
-          *tuple(narrative.get("facet_flags", ()) or ()),
-          *tuple(narrative.get("status_sequence", ()) or ()),
-          *tuple(narrative.get("post_resolution_status_sequence", ()) or ()),
-        )
-      )
-    return cls._matches_provider_provenance_workspace_search(
-      values=search_values,
-      search=search,
+    if not isinstance(alert, OperatorAlert):
+      return ()
+    primary_focus = alert.primary_focus
+    facet_flags = tuple(narrative.get("facet_flags", ()) or ()) if isinstance(narrative, Mapping) else ()
+    status_sequence = tuple(narrative.get("status_sequence", ()) or ()) if isinstance(narrative, Mapping) else ()
+    post_resolution_status_sequence = (
+      tuple(narrative.get("post_resolution_status_sequence", ()) or ())
+      if isinstance(narrative, Mapping)
+      else ()
     )
+    return (
+      (
+        "occurrence_id",
+        180,
+        tuple(
+          value
+          for value in (alert.occurrence_id, alert.alert_id)
+          if isinstance(value, str) and value.strip()
+        ),
+      ),
+      (
+        "summary",
+        170,
+        tuple(
+          value
+          for value in (alert.summary, alert.detail)
+          if isinstance(value, str) and value.strip()
+        ),
+      ),
+      (
+        "market_context",
+        150,
+        tuple(
+          value
+          for value in (alert.symbol, alert.timeframe, *alert.symbols)
+          if isinstance(value, str) and value.strip()
+        ),
+      ),
+      (
+        "primary_focus",
+        145,
+        tuple(
+          value
+          for value in (
+            primary_focus.symbol if primary_focus is not None else None,
+            primary_focus.timeframe if primary_focus is not None else None,
+            primary_focus.policy if primary_focus is not None else None,
+            primary_focus.reason if primary_focus is not None else None,
+            *(primary_focus.candidate_symbols if primary_focus is not None else ()),
+          )
+          if isinstance(value, str) and value.strip()
+        ),
+      ),
+      (
+        "status_sequence",
+        150,
+        tuple(
+          value
+          for value in (
+            *status_sequence,
+            " -> ".join(status_sequence) if status_sequence else None,
+            *post_resolution_status_sequence,
+            " -> ".join(post_resolution_status_sequence) if post_resolution_status_sequence else None,
+          )
+          if isinstance(value, str) and value.strip()
+        ),
+      ),
+      (
+        "narrative",
+        120,
+        tuple(
+          value
+          for value in (
+            narrative.get("facet") if isinstance(narrative, Mapping) else None,
+            narrative.get("narrative_mode") if isinstance(narrative, Mapping) else None,
+            *facet_flags,
+            str(narrative.get("occurrence_record_count"))
+            if isinstance(narrative, Mapping) and narrative.get("occurrence_record_count") is not None
+            else None,
+            str(narrative.get("post_resolution_record_count"))
+            if isinstance(narrative, Mapping) and narrative.get("post_resolution_record_count") is not None
+            else None,
+          )
+          if isinstance(value, str) and value.strip()
+        ),
+      ),
+      (
+        "classification",
+        90,
+        tuple(
+          value
+          for value in (
+            alert.category,
+            alert.severity,
+            alert.status,
+            alert.source,
+            alert.run_id,
+            alert.session_id,
+            alert.timeline_key,
+          )
+          if isinstance(value, str) and value.strip()
+        ),
+      ),
+      (
+        "timeline",
+        55,
+        tuple(
+          value
+          for value in (
+            str(alert.timeline_position) if alert.timeline_position is not None else None,
+            str(alert.timeline_total) if alert.timeline_total is not None else None,
+            alert.detected_at.isoformat(),
+            alert.resolved_at.isoformat() if alert.resolved_at is not None else None,
+          )
+          if isinstance(value, str) and value.strip()
+        ),
+      ),
+    )
+
+  @classmethod
+  def _build_provider_provenance_scheduler_alert_occurrence_search_match(
+    cls,
+    *,
+    row: Mapping[str, Any],
+    search: str | None,
+  ) -> dict[str, Any] | None:
+    if not isinstance(search, str) or not search.strip():
+      return None
+    normalized_search = search.strip().lower()
+    tokens = cls._tokenize_provider_provenance_scheduler_alert_search_query(normalized_search)
+    if not tokens:
+      return None
+    matched_terms: set[str] = set()
+    matched_fields: list[str] = []
+    highlights: list[str] = []
+    score = 0
+    phrase_match = False
+    exact_match = False
+    field_hits = 0
+    for field_name, field_weight, field_values in (
+      cls._build_provider_provenance_scheduler_alert_occurrence_search_fields(row=row)
+    ):
+      best_field_score = 0
+      best_field_highlight: str | None = None
+      field_matched_terms: set[str] = set()
+      field_phrase_match = False
+      field_exact_match = False
+      for raw_value in field_values:
+        normalized_value = raw_value.strip().lower()
+        if not normalized_value:
+          continue
+        value_score = 0
+        if normalized_search == normalized_value:
+          value_score += field_weight * 5
+          field_exact_match = True
+          field_phrase_match = True
+        elif normalized_search in normalized_value:
+          value_score += field_weight * 3
+          field_phrase_match = True
+        for token in tokens:
+          if token == normalized_value:
+            value_score += field_weight * 3
+            field_matched_terms.add(token)
+          elif normalized_value.startswith(token):
+            value_score += field_weight * 2
+            field_matched_terms.add(token)
+          elif token in normalized_value:
+            value_score += field_weight
+            field_matched_terms.add(token)
+        if value_score > best_field_score:
+          best_field_score = value_score
+          best_field_highlight = (
+            f"{field_name}: {cls._truncate_provider_provenance_scheduler_search_highlight(raw_value)}"
+          )
+      if best_field_score <= 0:
+        continue
+      field_hits += 1
+      matched_terms.update(field_matched_terms)
+      matched_fields.append(field_name)
+      if best_field_highlight is not None and best_field_highlight not in highlights:
+        highlights.append(best_field_highlight)
+      if field_phrase_match:
+        phrase_match = True
+      if field_exact_match:
+        exact_match = True
+      score += best_field_score
+    if score <= 0:
+      return None
+    coverage = len(matched_terms) / len(tokens)
+    coverage_pct = int(round(coverage * 100))
+    score += coverage_pct * 2
+    score += field_hits * 5
+    if phrase_match:
+      score += 40
+    if exact_match:
+      score += 60
+    ranking_reason_parts = []
+    if exact_match:
+      ranking_reason_parts.append("exact field match")
+    elif phrase_match:
+      ranking_reason_parts.append("phrase match")
+    ranking_reason_parts.append(f"{len(matched_terms)} of {len(tokens)} term(s) matched")
+    ranking_reason_parts.append(f"{field_hits} ranked field(s)")
+    return {
+      "score": score,
+      "matched_terms": tuple(sorted(matched_terms)),
+      "matched_fields": tuple(matched_fields),
+      "term_coverage_pct": coverage_pct,
+      "phrase_match": phrase_match,
+      "exact_match": exact_match,
+      "highlights": tuple(highlights[:3]),
+      "ranking_reason": " · ".join(ranking_reason_parts),
+    }
 
   @staticmethod
   def _build_provider_provenance_scheduler_occurrence_detected_at(
@@ -36982,40 +37157,54 @@ class TradingApplication:
     normalized_narrative_facet = self._normalize_provider_provenance_scheduler_alert_history_narrative_facet(
       narrative_facet
     )
+    normalized_search = search.strip() if isinstance(search, str) and search.strip() else None
     normalized_limit = max(1, min(limit, 200))
     normalized_offset = max(offset, 0)
-    filtered_history = [
-      row
-      for row in history_rows
+    filtered_history: list[dict[str, Any]] = []
+    for row in history_rows:
+      if normalized_category is not None and row["alert"].category != normalized_category:
+        continue
+      if normalized_status is not None and row["alert"].status != normalized_status:
+        continue
       if (
-        normalized_category is None
-        or row["alert"].category == normalized_category
-      )
-      and (
-        normalized_status is None
-        or row["alert"].status == normalized_status
-      )
-      and (
-        normalized_narrative_facet is None
-        or (
-          normalized_narrative_facet == "resolved_narratives"
-          and bool(row["narrative"].get("can_reconstruct_narrative"))
+        normalized_narrative_facet is not None
+        and normalized_narrative_facet != "all_occurrences"
+        and not (
+          (
+            normalized_narrative_facet == "resolved_narratives"
+            and bool(row["narrative"].get("can_reconstruct_narrative"))
+          )
+          or (
+            normalized_narrative_facet == "post_resolution_recovery"
+            and bool(row["narrative"].get("has_post_resolution_history"))
+          )
+          or (
+            normalized_narrative_facet == "recurring_occurrences"
+            and "recurring_occurrence" in row["narrative"].get("facet_flags", ())
+          )
         )
-        or (
-          normalized_narrative_facet == "post_resolution_recovery"
-          and bool(row["narrative"].get("has_post_resolution_history"))
-        )
-        or (
-          normalized_narrative_facet == "recurring_occurrences"
-          and "recurring_occurrence" in row["narrative"].get("facet_flags", ())
-        )
-        or normalized_narrative_facet == "all_occurrences"
-      )
-      and self._matches_provider_provenance_scheduler_alert_occurrence_search(
+      ):
+        continue
+      search_match = self._build_provider_provenance_scheduler_alert_occurrence_search_match(
         row=row,
-        search=search,
+        search=normalized_search,
       )
-    ]
+      if normalized_search is not None and search_match is None:
+        continue
+      filtered_history.append({**row, "search_match": search_match})
+    if normalized_search is not None:
+      filtered_history = sorted(
+        filtered_history,
+        key=lambda row: (
+          row.get("search_match", {}).get("score", 0),
+          row.get("search_match", {}).get("term_coverage_pct", 0),
+          1 if row.get("search_match", {}).get("exact_match") else 0,
+          1 if row.get("search_match", {}).get("phrase_match") else 0,
+          row["alert"].resolved_at or row["alert"].detected_at,
+          row["alert"].detected_at,
+        ),
+        reverse=True,
+      )
     total = len(filtered_history)
     items = filtered_history[normalized_offset:normalized_offset + normalized_limit]
     next_offset = (
@@ -37055,13 +37244,37 @@ class TradingApplication:
       }
       for category_key in categories
     )
+    search_summary = None
+    if normalized_search is not None:
+      search_summary = {
+        "query": normalized_search,
+        "mode": "weighted_field_ranking",
+        "token_count": len(
+          self._tokenize_provider_provenance_scheduler_alert_search_query(normalized_search)
+        ),
+        "matched_occurrences": total,
+        "top_score": max(
+          (int(row.get("search_match", {}).get("score", 0)) for row in filtered_history),
+          default=0,
+        ),
+        "max_term_coverage_pct": max(
+          (
+            int(row.get("search_match", {}).get("term_coverage_pct", 0))
+            for row in filtered_history
+          ),
+          default=0,
+        ),
+        "phrase_match_count": sum(
+          1 for row in filtered_history if bool(row.get("search_match", {}).get("phrase_match"))
+        ),
+      }
     return {
       "generated_at": current_time,
       "query": {
         "category": normalized_category,
         "status": normalized_status,
         "narrative_facet": normalized_narrative_facet or "all_occurrences",
-        "search": search.strip() if isinstance(search, str) and search.strip() else None,
+        "search": normalized_search,
         "limit": normalized_limit,
         "offset": normalized_offset,
       },
@@ -37081,6 +37294,7 @@ class TradingApplication:
         "resolved_count": sum(1 for alert in history if alert.status == "resolved"),
         "by_category": summary_by_category,
       },
+      "search_summary": search_summary,
       "items": tuple(items),
       "total": total,
       "returned": len(items),
@@ -38211,6 +38425,7 @@ class TradingApplication:
               else narrative.get("next_occurrence_detected_at")
             ),
           },
+          "search_match": deepcopy(occurrence.get("search_match")),
           "window_started_at": occurrence_context["detected_at"].isoformat(),
           "window_ended_at": occurrence_context["export_window_end"].isoformat(),
           "record_count": len(occurrence_records),
@@ -38393,6 +38608,7 @@ class TradingApplication:
         "next_offset": alert_history_payload["next_offset"],
         "previous_offset": alert_history_payload["previous_offset"],
       },
+      "search_summary": alert_history_payload.get("search_summary"),
       "occurrences": occurrence_payloads,
       "stitched_status_sequence": stitched_segments,
       "by_category": tuple(by_category[key] for key in sorted(by_category)),
@@ -41196,6 +41412,21 @@ def serialize_provider_provenance_scheduler_alert_history(
         for entry in summary.get("by_category", ())
       ],
     },
+    "search_summary": (
+      {
+        "query": payload.get("search_summary", {}).get("query"),
+        "mode": payload.get("search_summary", {}).get("mode"),
+        "token_count": int(payload.get("search_summary", {}).get("token_count", 0)),
+        "matched_occurrences": int(payload.get("search_summary", {}).get("matched_occurrences", 0)),
+        "top_score": int(payload.get("search_summary", {}).get("top_score", 0)),
+        "max_term_coverage_pct": int(
+          payload.get("search_summary", {}).get("max_term_coverage_pct", 0)
+        ),
+        "phrase_match_count": int(payload.get("search_summary", {}).get("phrase_match_count", 0)),
+      }
+      if isinstance(payload.get("search_summary"), dict)
+      else None
+    ),
     "items": [
       {
         **serialize_operator_alert(
@@ -41260,6 +41491,20 @@ def serialize_provider_provenance_scheduler_alert_history(
             else None
           ),
         },
+        "search_match": (
+          {
+            "score": int(item.get("search_match", {}).get("score", 0)),
+            "matched_terms": list(item.get("search_match", {}).get("matched_terms", ())),
+            "matched_fields": list(item.get("search_match", {}).get("matched_fields", ())),
+            "term_coverage_pct": int(item.get("search_match", {}).get("term_coverage_pct", 0)),
+            "phrase_match": bool(item.get("search_match", {}).get("phrase_match", False)),
+            "exact_match": bool(item.get("search_match", {}).get("exact_match", False)),
+            "highlights": list(item.get("search_match", {}).get("highlights", ())),
+            "ranking_reason": item.get("search_match", {}).get("ranking_reason"),
+          }
+          if isinstance(item, dict) and isinstance(item.get("search_match"), dict)
+          else None
+        ),
       }
       for item in items
     ],

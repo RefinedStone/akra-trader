@@ -161,6 +161,9 @@ creation.
 - that same scheduler occurrence surface now also has deeper server-side search over occurrence
   IDs, alert text, market context, and narrative status sequences, so future stitched-report and
   handoff tooling can query narrower scheduler narratives without client-only filtering
+- that same scheduler search surface now also computes weighted retrieval ranking plus matched
+  field highlights, so future narrative-review tooling can sort and explain scheduler matches
+  instead of only returning an unranked filtered occurrence set
 - those scheduler narrative templates and boards now also support edit/delete/version workflow,
   so the saved scheduler review layer can evolve with durable revision restore instead of only
   appending new one-off entries

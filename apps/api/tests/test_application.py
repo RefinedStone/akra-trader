@@ -1939,11 +1939,15 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
     },
   )
   assert search_payload["query"]["search"] == "healthy"
+  assert search_payload["search_summary"]["mode"] == "weighted_field_ranking"
+  assert search_payload["search_summary"]["top_score"] > 0
   assert search_payload["returned"] >= 1
   assert any(
     item["narrative"]["has_post_resolution_history"]
     for item in search_payload["items"]
   )
+  assert search_payload["items"][0]["search_match"]["score"] > 0
+  assert "status_sequence" in search_payload["items"][0]["search_match"]["matched_fields"]
 
 
 def test_provider_provenance_scheduler_history_and_analytics_persist(

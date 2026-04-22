@@ -1307,6 +1307,15 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
       resolved_count: number;
     }[];
   };
+  search_summary?: {
+    query?: string | null;
+    mode?: string | null;
+    token_count: number;
+    matched_occurrences: number;
+    top_score: number;
+    max_term_coverage_pct: number;
+    phrase_match_count: number;
+  } | null;
   items: (OperatorAlertEntry & {
     narrative: {
       facet?: string | null;
@@ -1321,6 +1330,16 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
       narrative_window_ended_at?: string | null;
       next_occurrence_detected_at?: string | null;
     };
+    search_match?: {
+      score: number;
+      matched_terms: string[];
+      matched_fields: string[];
+      term_coverage_pct: number;
+      phrase_match: boolean;
+      exact_match: boolean;
+      highlights: string[];
+      ranking_reason?: string | null;
+    } | null;
   })[];
   total: number;
   returned: number;

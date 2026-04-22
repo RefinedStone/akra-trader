@@ -652,6 +652,18 @@ function formatProviderProvenanceSchedulerTimelineSummary(
     : `${occurrenceLabel} is the current ${categoryLabel} occurrence.`;
 }
 
+function formatProviderProvenanceSchedulerSearchMatchSummary(
+  searchMatch:
+    | ProviderProvenanceSchedulerAlertHistoryPayload["items"][number]["search_match"]
+    | null
+    | undefined,
+) {
+  if (!searchMatch) {
+    return null;
+  }
+  return `Search score ${searchMatch.score} · ${searchMatch.term_coverage_pct}% coverage · ${searchMatch.matched_fields.join(", ") || "ranked fields"}`;
+}
+
 function buildProviderProvenanceSchedulerAlertWorkflowReason(
   alert: OperatorVisibilityAlertEntry,
   mode: "workflow" | "escalation",
@@ -18891,6 +18903,11 @@ export default function App() {
                                         providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet,
                                       )}
                                     </span>
+                                    {providerProvenanceSchedulerAlertHistory?.search_summary ? (
+                                      <span className="run-filter-summary-chip">
+                                        Search ranked · {providerProvenanceSchedulerAlertHistory.search_summary.matched_occurrences} match(es) · top {providerProvenanceSchedulerAlertHistory.search_summary.top_score}
+                                      </span>
+                                    ) : null}
                                   </div>
                                   <div className="market-data-provenance-history-actions">
                                     <label className="run-form-field">
@@ -19090,6 +19107,11 @@ export default function App() {
                                                 {alert.occurrence_id ? (
                                                   <p className="run-lineage-symbol-copy">{alert.occurrence_id}</p>
                                                 ) : null}
+                                                {alert.search_match ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatProviderProvenanceSchedulerSearchMatchSummary(alert.search_match)}
+                                                  </p>
+                                                ) : null}
                                                 {alert.narrative.can_reconstruct_narrative ? (
                                                   <p className="run-lineage-symbol-copy">
                                                     Sequence {alert.narrative.status_sequence.join(" → ") || "n/a"}
@@ -19116,6 +19138,14 @@ export default function App() {
                                                   <p className="run-lineage-symbol-copy">
                                                     Next recurrence detected {formatTimestamp(alert.narrative.next_occurrence_detected_at)}
                                                   </p>
+                                                ) : null}
+                                                {alert.search_match?.highlights.length ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Match {alert.search_match.highlights.join(" · ")}
+                                                  </p>
+                                                ) : null}
+                                                {alert.search_match?.ranking_reason ? (
+                                                  <p className="run-lineage-symbol-copy">{alert.search_match.ranking_reason}</p>
                                                 ) : null}
                                                 <div className="market-data-provenance-history-actions">
                                                   <button
