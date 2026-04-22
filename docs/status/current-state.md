@@ -201,6 +201,10 @@ It is not yet a finished live trading product:
 - those same stitched-report governance registries now also stage through the shared governance
   approval queue with reusable policy templates and catalogs, so queue-slice/default-policy bundle
   changes can be previewed, approved, applied, and rolled back instead of mutating directly
+- that same stitched-report governance registry workspace now also exposes its own registry-only
+  approval-queue slice and stitched-governance-registry policy-catalog surface, so teams can
+  review registry plans and apply registry-scoped queue defaults without pivoting back to the
+  broader shared scheduler governance panels
 - that scheduler occurrence workspace now also exposes a narrative facet plus dedicated named
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those

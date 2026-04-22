@@ -100,6 +100,10 @@ unclear dataset lineage.
   reusable policy templates and catalogs, so queue-slice/default-policy bundle changes can enter
   preview, approval, apply, and rollback workflow before they touch the active stitched handoff
   configuration
+- that same stitched-report governance registry workspace now also exposes a registry-only
+  approval queue and stitched-governance-registry policy-catalog surface, so registry bundle
+  review and queue-defaulting can stay in the stitched handoff surface instead of detouring
+  through the generic scheduler governance queue
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually

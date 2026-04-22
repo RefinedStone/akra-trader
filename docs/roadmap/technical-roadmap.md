@@ -148,6 +148,10 @@ creation.
   with reusable policy templates and catalogs, so stitched queue/default bundles can follow the
   same preview, approval, apply, and rollback discipline as the rest of the scheduler governance
   layer
+- that stitched-report governance registry workspace now also has its own registry-only approval
+  queue and stitched-governance-registry policy-catalog surface, so registry bundle review and
+  queue-defaulting can happen in place instead of only through the broader shared governance
+  surfaces
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand
