@@ -140,6 +140,9 @@ It is not yet a finished live trading product:
 - the stitched-governance layer now composes a stitched-report-views collaborator and a registry-
   lifecycle collaborator instead of keeping saved views, stitched approval slices, and registry
   lifecycle surfaces inline in one module
+- the stitched registry-lifecycle layer now composes dedicated review and editor-history
+  collaborators instead of keeping registry queue/catalog review, registry editing, audits, and
+  revision history in one module
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body
