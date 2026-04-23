@@ -207,9 +207,12 @@ Active move map:
    runtime triage or `App.tsx`; keep the Governance policy templates card split between a
    dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
    hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
-   giant governance surface inline in `RuntimeProviderProvenanceWorkspaceCards.tsx`, and keep the
-  hierarchy-step-template section split between draft, registry, versions, and audit
-  collaborators instead of rebuilding that cross-catalog governance surface inline in one module,
+   giant governance surface inline in `RuntimeProviderProvenanceWorkspaceCards.tsx`; keep the
+   scheduler narrative templates surface routed through a dedicated card wrapper instead of
+   rebuilding template drafting, bulk governance, registry listing, and revision history inline
+   in `RuntimeProviderProvenanceWorkspaceCards.tsx`, and keep the hierarchy-step-template section
+   split between draft, registry, versions, and audit
+   collaborators instead of rebuilding that cross-catalog governance surface inline in one module,
   and keep the registry layer split between bulk-selection-stage, bulk-step-stage, and
   registry-table collaborators instead of collapsing bulk staging and the registry table back
   together, and keep the registry-table layer split between row-detail and row-action

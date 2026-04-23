@@ -130,6 +130,9 @@ It is not yet a finished live trading product:
   through a dedicated card plus template-registry, policy-catalog, catalog-hierarchy,
   hierarchy-step-template, and policy-catalog-audit collaborators instead of one giant governance
   card body inside `RuntimeProviderProvenanceWorkspaceCards`
+- the provider-provenance workspace cards layer now routes the scheduler narrative templates
+  surface through a dedicated card wrapper instead of keeping template drafting, bulk governance,
+  registry listing, and revision history inline inside `RuntimeProviderProvenanceWorkspaceCards`
 - the hierarchy-step-template collaborator now composes dedicated draft, registry, versions, and
   audit collaborators instead of keeping template drafting, bulk cross-catalog governance,
   revision history, and audit review inline in one section module
