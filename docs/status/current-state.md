@@ -189,6 +189,10 @@ It is not yet a finished live trading product:
 - the governance-catalog-hierarchy editor collaborator now composes dedicated editor-metadata-form
   and editor-patch-textarea collaborators instead of mixing metadata form controls and patch
   textarea ownership inline in one editor module
+- the governance-catalog-hierarchy versions collaborator now routes revision history through a
+  dedicated versions-table collaborator, and the versions-table layer now composes dedicated
+  version-row-detail and version-row-action collaborators instead of keeping revision review and
+  restore actions inline in one section module
 - the governance-policy-catalog registry-table collaborator now composes dedicated row-detail and
   row-action collaborators instead of mixing catalog/default review cells and row actions inline
   in one table owner
