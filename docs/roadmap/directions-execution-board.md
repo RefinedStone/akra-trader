@@ -230,7 +230,8 @@ Active move map:
    in one module; keep the audit-history revision table body split between recorded, snapshot, and
    action cell collaborators instead of rebuilding the revision row inline, and keep the audit-
    event table body split between when, action, actor, and detail cell collaborators instead of
-   rebuilding the audit row inline
+   rebuilding the audit row inline; keep the audit filter bar split between select and text-input
+   collaborators instead of rebuilding all audit filters in one block
 9. keep stitched registry editing split between draft, bulk-edit, and table collaborators, and
    keep table split between listing, row-detail, row-action-cell, and revision-selection
    collaborators instead of recombining registry drafting, selection governance, bulk edit

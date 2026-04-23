@@ -2,6 +2,8 @@
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActionCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActionCellSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActorCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActorCellSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditDetailCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditDetailCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterSelectSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterSelectSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterTextInputSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterTextInputSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditWhenCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditWhenCellSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection";
@@ -21,71 +23,12 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAudi
           </p>
         </div>
         <div className="filter-bar">
-          <label>
-            <span>Registry</span>
-            <select
-              onChange={(event) =>
-                setProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter((current) => ({
-                  ...current,
-                  registry_id: event.target.value,
-                }))
-              }
-              value={providerProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter.registry_id}
-            >
-              <option value="">All registries</option>
-              {providerProvenanceSchedulerStitchedReportGovernanceRegistries.map((entry) => (
-                <option key={entry.registry_id} value={entry.registry_id}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Action</span>
-            <select
-              onChange={(event) =>
-                setProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter((current) => ({
-                  ...current,
-                  action: event.target.value,
-                }))
-              }
-              value={providerProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter.action}
-            >
-              <option value={ALL_FILTER_VALUE}>All actions</option>
-              <option value="created">Created</option>
-              <option value="updated">Updated</option>
-              <option value="deleted">Deleted</option>
-              <option value="restored">Restored</option>
-            </select>
-          </label>
-          <label>
-            <span>Actor tab</span>
-            <input
-              onChange={(event) =>
-                setProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter((current) => ({
-                  ...current,
-                  actor_tab_id: event.target.value,
-                }))
-              }
-              placeholder="tab_ops"
-              type="text"
-              value={providerProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter.actor_tab_id}
-            />
-          </label>
-          <label>
-            <span>Search</span>
-            <input
-              onChange={(event) =>
-                setProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter((current) => ({
-                  ...current,
-                  search: event.target.value,
-                }))
-              }
-              placeholder="lag reviewed"
-              type="text"
-              value={providerProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter.search}
-            />
-          </label>
+          <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterSelectSection
+            model={model}
+          />
+          <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterTextInputSection
+            model={model}
+          />
         </div>
         {providerProvenanceSchedulerStitchedReportGovernanceRegistryAuditsLoading ? (
           <p className="empty-state">Loading stitched governance registry audit…</p>

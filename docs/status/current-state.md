@@ -156,7 +156,8 @@ It is not yet a finished live trading product:
   dedicated revision-recorded, revision-snapshot, and revision-action cell collaborators instead
   of keeping the revision row body inline in one section module, and now routes the audit-event
   table body through dedicated audit-when, audit-action, audit-actor, and audit-detail cell
-  collaborators instead of keeping the audit row inline
+  collaborators instead of keeping the audit row inline; the audit filter bar is now split between
+  dedicated select and text-input collaborators instead of keeping all audit filters in one block
 - the stitched registry table layer now composes dedicated listing and revision-selection
   collaborators, and now also routes each registry row body through dedicated row-detail and
   row-action-cell collaborators instead of keeping registry listing state, row details, and
