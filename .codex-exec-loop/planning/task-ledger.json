@@ -695,16 +695,31 @@
       "id": "task-llm-sensitivity-provider-provenance-stitched-report-bulk-approval-stage-subflow-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split stitched report bulk approval stage ownership into limit controls and preview collaborators",
-      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportBulkApprovalStageSection.tsx` further so staged numeric bulk-limit editing and bulk preview/approval triggering stop becoming the next stitched-report local pressure point while the new limit/policy composer stays import-stable.",
-      "status": "ready",
+      "description": "Completed the stitched report bulk approval-stage split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportBulkApprovalStageSection.tsx` to a thin composer and moving numeric bulk-limit input ownership into `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` while staged bulk preview/approval triggering moved into `RuntimeProviderProvenanceSchedulerStitchedReportBulkPreviewSection.tsx`.",
+      "status": "done",
       "base_priority": 99,
       "dynamic_priority_delta": 45,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T23:50:00+09:00",
+      "updated_at": "2026-04-23T23:59:40+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says `RuntimeProviderProvenanceSchedulerStitchedReportBulkApprovalStageSection.tsx` is now the next local pressure point inside the freshly split bulk limit/policy layer after commit `fc373dd`, making it the clearest immediate executable follow-up.",
-      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task, the prior bulk limit/policy-stage head is now complete, and the latest reply directly names the bulk-approval-stage collaborator as the next local pressure point."
+      "direction_relation_note": "The latest main-session reply confirms commit `2e8a076` pushed this split: `RuntimeProviderProvenanceSchedulerStitchedReportBulkApprovalStageSection.tsx` dropped from 104 lines to a 14-line composer that now delegates limit input ownership to `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` and preview triggering to `RuntimeProviderProvenanceSchedulerStitchedReportBulkPreviewSection.tsx`.",
+      "priority_reason": "Marked done because the queued bulk-approval-stage split landed, updated the status/docs board, passed `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build`, and was pushed to `origin/main`; the next local pressure point now sits in `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx`."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-stitched-report-bulk-limit-controls-subflow-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split stitched report bulk limit controls ownership into narrower staged limit collaborators",
+      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` further so staged numeric bulk-limit editing stops becoming the next stitched-report local pressure point while the new bulk-approval composer and preview collaborator stay import-stable.",
+      "status": "ready",
+      "base_priority": 100,
+      "dynamic_priority_delta": 46,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T23:59:40+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly says `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` is now the next local pressure point after the bulk-approval-stage split landed in commit `2e8a076`, making it the clearest immediate executable follow-up inside the stitched-report scheduler lane.",
+      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task, the prior bulk-approval-stage head is now complete, and the latest reply directly identifies `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` as the next local pressure point."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-report-approval-policy-subflow-split",
@@ -716,10 +731,10 @@
       "dynamic_priority_delta": 29,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T23:50:00+09:00",
+      "updated_at": "2026-04-23T23:59:40+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says `RuntimeProviderProvenanceSchedulerStitchedReportApprovalPolicySection.tsx` still remains the larger stitched-report-views collaborator even after the bulk limit/policy-stage split, so it stays the broader downstream split candidate once the more local bulk-approval-stage hotspot is reduced.",
-      "priority_reason": "Kept proposed because it remains the next larger stitched-report-views boundary, but the latest reply explicitly prioritizes the newly exposed `RuntimeProviderProvenanceSchedulerStitchedReportBulkApprovalStageSection.tsx` hotspot as the immediate next executable task."
+      "direction_relation_note": "The latest main-session reply says `RuntimeProviderProvenanceSchedulerStitchedReportApprovalPolicySection.tsx` still remains the larger stitched-report-views collaborator even after the bulk-approval-stage split, so it stays the broader downstream split candidate once the newly exposed bulk-limit-controls hotspot is reduced.",
+      "priority_reason": "Kept proposed because it remains the next larger stitched-report-views boundary, but the latest reply directly prioritizes `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` as the immediate next executable task after commit `2e8a076`."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-editor-history-subflow-split",
