@@ -131,6 +131,8 @@ It is not yet a finished live trading product:
   longer carries that focused provider export body inline
 - focused lineage history now routes through a dedicated provider-provenance collaborator, so
   `RuntimeDataIncidentTriagePanel` no longer carries that lineage history body inline
+- focused ingestion jobs now route through a dedicated provider-provenance collaborator, so
+  `RuntimeDataIncidentTriagePanel` no longer carries that ingestion jobs body inline
 - the provider-provenance scheduler workspace now routes through dedicated automation, moderation,
   stitched-governance, and shared-export sections instead of one giant scheduler body
 - the scheduler moderation workspace now composes separate alert-review, moderation-governance,
