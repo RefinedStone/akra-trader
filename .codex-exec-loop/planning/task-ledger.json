@@ -845,16 +845,31 @@
       "id": "task-llm-sensitivity-provider-provenance-stitched-report-approval-queue-toggle-reset-subflow-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split stitched report approval queue toggle/reset ownership into filter-select and reset/apply collaborators",
-      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection.tsx` further so queue-state/lane/priority/policy select controls separate cleanly from reset or apply action wiring while the stitched-report approval queue surface stays import-stable.",
-      "status": "ready",
+      "description": "Completed the stitched report approval queue toggle/reset split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection.tsx` to a thin composer and moving queue-state/lane/priority select ownership into `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection.tsx` while policy template/catalog/sort plus reset/apply controls moved into `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection.tsx`.",
+      "status": "done",
       "base_priority": 99,
       "dynamic_priority_delta": 41,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T01:35:00+09:00",
+      "updated_at": "2026-04-24T02:05:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection.tsx` is now the largest remaining local pressure point inside stitched-report approval after the filter-bar split landed, making it the clearest immediate continuation in the same boundary.",
-      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task, the prior filter-bar head is now complete, and the latest reply identifies `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection.tsx` as the next immediate executable hotspot ahead of the policy-catalog follow-up."
+      "direction_relation_note": "The latest main-session reply confirms this split landed: `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection.tsx` is now a thin composer, `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection.tsx` owns the queue-state/lane/priority selects, and `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection.tsx` owns the reset/apply-side controls.",
+      "priority_reason": "Marked done because the queued toggle/reset split landed, `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md` were updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `4f6cfc5` was pushed to `origin/main`; the remaining stitched-report approval pressure now sits first in `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection.tsx` and then in `RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSection.tsx`."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-stitched-report-approval-queue-reset-apply-subflow-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split stitched report approval queue reset/apply ownership into selection and action collaborators",
+      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection.tsx` further so policy template/catalog/sort selection state separates cleanly from reset/apply action wiring while the stitched-report approval queue surface stays import-stable.",
+      "status": "ready",
+      "base_priority": 100,
+      "dynamic_priority_delta": 42,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-24T02:05:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly identifies `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection.tsx` as the first remaining local pressure point inside stitched-report approval after the toggle/reset split landed.",
+      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task, the prior toggle/reset head is now complete, and the latest reply names `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection.tsx` as the next immediate executable hotspot ahead of the policy-catalog follow-up."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-report-policy-catalog-subflow-split",
@@ -866,10 +881,10 @@
       "dynamic_priority_delta": 39,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T01:35:00+09:00",
+      "updated_at": "2026-04-24T02:05:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says `RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSection.tsx` remains the next decomposition candidate after the newly exposed `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection.tsx` hotspot inside the stitched-report approval lane.",
-      "priority_reason": "Kept as `proposed` because it remains the next clear follow-up in the same boundary, but builtin next-task progression should first drain the narrower toggle/reset hotspot that the latest reply identifies as the most immediate remaining pressure point."
+      "direction_relation_note": "The latest main-session reply says `RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSection.tsx` remains the second remaining decomposition candidate after the newly exposed `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection.tsx` hotspot inside the stitched-report approval lane.",
+      "priority_reason": "Kept as `proposed` because it remains the next clear follow-up in the same boundary, but builtin next-task progression should first drain the narrower reset/apply hotspot that the latest reply identifies as the most immediate remaining pressure point."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-editor-history-subflow-split",
