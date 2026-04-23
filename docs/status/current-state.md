@@ -155,6 +155,9 @@ It is not yet a finished live trading product:
 - the stitched report policy-catalog review layer now composes dedicated default-body and
   catalog-state collaborators instead of keeping catalog state and default policy detail cells
   inline in one module
+- the stitched report policy-catalog review layer now also composes dedicated table-shell and
+  row-detail collaborators instead of keeping table structure and row composition inline in one
+  module
 - the stitched report approval-queue layer now composes dedicated queue-state and action
   collaborators instead of keeping queue filters/loading state and per-plan action review inline in
   one module

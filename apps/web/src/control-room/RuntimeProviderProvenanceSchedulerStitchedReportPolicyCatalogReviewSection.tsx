@@ -1,6 +1,5 @@
 // @ts-nocheck
-import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDefaultBodySection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDefaultBodySection";
-import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogStateSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogStateSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogTableShellSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogTableShellSection";
 
 export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogReviewSection({
   model,
@@ -54,34 +53,10 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogRev
           />
         </label>
       </div>
-      {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.length ? (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Catalog</th>
-              <th>Defaults</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.map((catalog) => (
-              <tr key={`provider-scheduler-stitched-governance-catalog-${catalog.catalog_id}`}>
-                <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogStateSection
-                  catalog={catalog}
-                  model={model}
-                />
-                <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDefaultBodySection
-                  catalog={catalog}
-                  model={model}
-                />
-                <SelectionSection catalog={catalog} model={model} />
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="empty-state">No stitched report policy catalogs match the current search.</p>
-      )}
+      <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogTableShellSection
+        SelectionSection={SelectionSection}
+        model={model}
+      />
     </div>
   );
 }
