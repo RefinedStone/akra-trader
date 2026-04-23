@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogActionCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogActionCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionStateSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionStateSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionSection({
   model,
   catalog,
@@ -9,41 +12,11 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSel
   const {} = model;
 
   return (
-    <td>
-      <div className="market-data-provenance-history-actions">
-        <button
-          className="ghost-button"
-          disabled={catalog.status !== "active"}
-          onClick={() => {
-            applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
-          }}
-          type="button"
-        >
-          Use defaults
-        </button>
-        <button
-          className="ghost-button"
-          disabled={catalog.status !== "active" || !catalog.hierarchy_steps.length}
-          onClick={() => {
-            applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
-            void stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy(catalog);
-          }}
-          type="button"
-        >
-          Stage queue
-        </button>
-        <button
-          className="ghost-button"
-          onClick={() => {
-            openProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogInSharedSurface(
-              catalog,
-            );
-          }}
-          type="button"
-        >
-          Open shared catalog
-        </button>
-      </div>
-    </td>
+    <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogActionCellSection model={model}>
+      <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionStateSection
+        catalog={catalog}
+        model={model}
+      />
+    </RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogActionCellSection>
   );
 }

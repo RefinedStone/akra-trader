@@ -149,6 +149,9 @@ It is not yet a finished live trading product:
 - the stitched report policy-catalog layer now composes dedicated review and selection
   collaborators instead of keeping catalog review details and catalog action selection inline in one
   module
+- the stitched report policy-catalog selection layer now composes dedicated action-cell and
+  selection-state collaborators instead of keeping the action cell wrapper and button state inline
+  in one module
 - the stitched report policy-catalog review layer now composes dedicated default-body and
   catalog-state collaborators instead of keeping catalog state and default policy detail cells
   inline in one module
