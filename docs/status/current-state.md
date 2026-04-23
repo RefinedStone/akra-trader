@@ -155,6 +155,9 @@ It is not yet a finished live trading product:
 - the stitched report approval-queue layer now composes dedicated queue-state and action
   collaborators instead of keeping queue filters/loading state and per-plan action review inline in
   one module
+- the stitched report approval-queue action layer now composes dedicated review-state and mutation
+  collaborators instead of keeping plan review state cells and queue mutation controls inline in
+  one module
 - the stitched report approval queue-state layer now composes dedicated summary and filter-state
   collaborators instead of keeping queue summary context and filter/loading state inline in one
   module
