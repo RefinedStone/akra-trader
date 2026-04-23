@@ -142,6 +142,9 @@ It is not yet a finished live trading product:
 - the scheduler narrative registry card now composes dedicated bulk-governance, registry-table,
   and revision-history collaborators instead of mixing bulk governance, registry rows, and
   registry revision history inline in one card body
+- the provider-provenance workspace cards layer now routes the approval queue surface through a
+  dedicated card wrapper instead of keeping queue summaries, batch actions, filters, queue rows,
+  and selected-plan review inline inside `RuntimeProviderProvenanceWorkspaceCards`
 - the scheduler narrative registry bulk-governance collaborator now composes dedicated
   governance-bar and bulk-edit-stage collaborators instead of mixing selection-policy preview
   actions and advanced bulk edit staging inline in one governance module

@@ -217,7 +217,10 @@ Active move map:
    registry drafting, bulk governance, registry listing, and revision history inline in
    `RuntimeProviderProvenanceWorkspaceCards.tsx`, and keep that scheduler narrative registry card
    split between dedicated bulk-governance, registry-table, and revision-history collaborators
-   instead of recombining those flows inline in one card body; keep the scheduler narrative
+   instead of recombining those flows inline in one card body; keep the approval queue surface
+   routed through a dedicated card wrapper instead of rebuilding queue summaries, batch actions,
+   filters, queue rows, and selected-plan review inline in
+   `RuntimeProviderProvenanceWorkspaceCards.tsx`; keep the scheduler narrative
    registry bulk-governance collaborator split between governance-bar and bulk-edit-stage
    collaborators instead of recombining selection-policy preview actions and advanced bulk edit
    staging inline in one governance module; keep the scheduler narrative registry table
