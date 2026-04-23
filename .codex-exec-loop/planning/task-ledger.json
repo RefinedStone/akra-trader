@@ -1535,16 +1535,31 @@
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-surface-leaf-followup-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Trim stitched registry queue-surface and policy-catalog-surface leaves into stable summary/filter/empty-state collaborators",
-      "description": "Continue the stitched-registry follow-up below `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryQueueSurfaceSection.tsx` and `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSurfaceSection.tsx` so the remaining summary, filter/search, and empty-state leaf ownership settles into bounded collaborators instead of drifting back into the new surface shells.",
-      "status": "ready",
+      "description": "Completed the stitched-registry surface-leaf follow-up by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryQueueSurfaceSection.tsx` to composition over dedicated queue summary, async-state, and empty-state collaborators while `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSurfaceSection.tsx` now composes policy-catalog summary, existing search, and empty-state collaborators.",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 67,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T00:52:00+09:00",
+      "updated_at": "2026-04-25T01:08:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says the next stitched-registry pressure now sits under `queue-surface` and `policy-catalog-surface`, especially around the remaining summary/filter/empty-state leaves, while larger shell-level separation in `review` is largely finished.",
-      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the previous `review` queue head finished in commit `a8cd92e`, and this is the clearest immediately executable follow-up before the lane turns into a broader cross-workspace surface choice."
+      "direction_relation_note": "The latest main-session reply confirms this follow-up landed in commit `897e2ef`, with `queue-surface` now composing `queue-summary`, existing filter leaves, async-state, and empty-state collaborators, and `policy-catalog-surface` composing `policy-catalog-summary`, existing search, and empty-state collaborators.",
+      "priority_reason": "Marked `done` because the main session completed the queued surface-leaf split, updated `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md`, passed `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build`, and pushed commit `897e2ef` to `origin/main`; the next stitched-registry pressure now sits in queue/policy row-level leaves or a later jump to another workspace surface."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-stitched-registry-row-leaf-followup-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Trim stitched registry queue and policy row leaves into stable detail/action collaborators",
+      "description": "Continue the stitched-registry lane below the stabilized `queue-surface` and `policy-catalog-surface` wrappers by extracting the next row-level leaf ownership in queue and policy listing rows into bounded detail/action collaborators, so the remaining per-row rendering and action wiring stops accumulating back inside the surface-level shells and table/list composers.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 69,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-25T01:08:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply says the larger stitched-registry shell and summary/filter/empty-state cleanup is mostly finished and names queue/policy row-side leaves as the next local pressure point before considering a jump to another workspace surface.",
+      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the prior `queue-surface`/`policy-catalog-surface` follow-up finished in commit `897e2ef`, and row-leaf extraction is the clearest immediately executable continuation inside the same stitched-registry lane."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-leaf-rebalance-decision",
@@ -1556,10 +1571,10 @@
       "dynamic_priority_delta": 56,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T00:52:00+09:00",
+      "updated_at": "2026-04-25T01:08:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply now puts stitched-registry tail work below the new `queue-surface` and `policy-catalog-surface` wrappers or in another workspace surface entirely, so the rebalance audit remains relevant but is still a judgment pass after the clearer leaf-level follow-up lands.",
-      "priority_reason": "Kept `proposed` because the main reply still leaves this as an operator-judgment boundary audit, while builtin next-task should consume the more concrete `queue-surface`/`policy-catalog-surface` leaf split first."
+      "direction_relation_note": "The latest main-session reply now narrows the immediate stitched-registry continuation to queue/policy row leaves or a move to another workspace surface, so the rebalance audit remains relevant but is still a later judgment pass after the clearer row-level follow-up lands.",
+      "priority_reason": "Kept `proposed` because the newest reply offers a more concrete stitched-registry row-leaf execution step for builtin next-task, while this audit still depends on operator judgment about whether some newly tiny collaborators should be recombined."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-focused-readback-export-history-split",
