@@ -205,15 +205,18 @@ Active move map:
    real provider/query-builder families move under bounded submodules, and keep provider-
    provenance saved workspace cards owned by dedicated route collaborators instead of re-expanding
    runtime triage or `App.tsx`
-2. keep query-builder replay intent, replay review, replay promotion approval, expression
+2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
+   instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
+   into `RuntimeDataIncidentTriagePanel.tsx`
+3. keep query-builder replay intent, replay review, replay promotion approval, expression
    authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
    feature-owned hooks and section collaborators instead of re-expanding the main component body;
    the next pressure points are the remaining large workspace modules plus backend compatibility
    files such as standalone surface catalogs and `application.py`
-3. keep `domain/models.py` import-compatible while model families move under `domain/model_types/*`
-4. keep shrinking `application.py` by moving pure comparison and serializer flows into
+4. keep `domain/models.py` import-compatible while model families move under `domain/model_types/*`
+5. keep shrinking `application.py` by moving pure comparison and serializer flows into
    `application_support/*`
-5. use route smoke tests as a floor before further `App.tsx` extraction
+6. use route smoke tests as a floor before further `App.tsx` extraction
 
 Exit evidence:
 
