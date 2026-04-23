@@ -130,6 +130,9 @@ It is not yet a finished live trading product:
   through a dedicated card plus template-registry, policy-catalog, catalog-hierarchy,
   hierarchy-step-template, and policy-catalog-audit collaborators instead of one giant governance
   card body inside `RuntimeProviderProvenanceWorkspaceCards`
+- the hierarchy-step-template collaborator now composes dedicated draft, registry, versions, and
+  audit collaborators instead of keeping template drafting, bulk cross-catalog governance,
+  revision history, and audit review inline in one section module
 - focused provider readback, persisted export history, and shared export registry flows now route
   through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
   longer carries that focused provider export body inline
