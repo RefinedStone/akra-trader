@@ -215,7 +215,10 @@ Active move map:
   together, and keep the registry-table layer split between row-detail and row-action
   collaborators instead of recombining cell review and row mutations inline; keep the versions
   layer split between a versions-table collaborator plus version-row-detail and version-row-action
-  collaborators instead of rebuilding revision review and restore controls inline
+  collaborators instead of rebuilding revision review and restore controls inline, and keep the
+  audit layer split between audit-filter and audit-table collaborators plus audit-summary,
+  audit-template, and audit-actor row cells instead of rebuilding filter controls and audit rows
+  inline
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
