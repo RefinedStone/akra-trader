@@ -139,6 +139,9 @@ It is not yet a finished live trading product:
 - the scheduler narrative template bulk-governance collaborator now composes dedicated
   governance-bar and bulk-edit-stage collaborators instead of mixing selection-policy preview
   actions and advanced bulk edit staging inline in one governance module
+- the scheduler narrative template registry-table collaborator now composes dedicated table-view
+  and row-detail collaborators instead of mixing table shell, row review, and row actions inline
+  in one registry module
 - the hierarchy-step-template collaborator now composes dedicated draft, registry, versions, and
   audit collaborators instead of keeping template drafting, bulk cross-catalog governance,
   revision history, and audit review inline in one section module

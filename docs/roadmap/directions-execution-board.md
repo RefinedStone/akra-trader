@@ -215,7 +215,10 @@ Active move map:
    collaborators instead of recombining those flows inline in one card body; keep the scheduler
    narrative template bulk-governance collaborator split between governance-bar and
    bulk-edit-stage collaborators instead of recombining selection-policy preview actions and
-   advanced bulk edit staging inline in one governance module, and keep the hierarchy-step-
+   advanced bulk edit staging inline in one governance module; keep the scheduler narrative
+   template registry-table collaborator split between table-view and row-detail collaborators
+   instead of recombining table shell, row review, and row actions inline in one registry
+   module, and keep the hierarchy-step-
    template section split between draft, registry, versions, and audit
    collaborators instead of rebuilding that cross-catalog governance surface inline in one module,
   and keep the registry layer split between bulk-selection-stage, bulk-step-stage, and
