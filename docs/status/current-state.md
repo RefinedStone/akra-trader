@@ -126,6 +126,9 @@ It is not yet a finished live trading product:
   saved report, cross-focus query, scheduler workspace, analytics review, and shared registry audit
   flows, so runtime incident triage no longer carries that provider-provenance workspace body
   inline
+- focused provider readback, persisted export history, and shared export registry flows now route
+  through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
+  longer carries that focused provider export body inline
 - the provider-provenance scheduler workspace now routes through dedicated automation, moderation,
   stitched-governance, and shared-export sections instead of one giant scheduler body
 - the scheduler moderation workspace now composes separate alert-review, moderation-governance,

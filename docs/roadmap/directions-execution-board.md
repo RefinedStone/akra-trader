@@ -207,7 +207,9 @@ Active move map:
    runtime triage or `App.tsx`
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
-   into `RuntimeDataIncidentTriagePanel.tsx`
+   into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
+   export history owned by dedicated provider-provenance collaborators instead of rebuilding that
+   export body inline in triage
 3. keep the provider-provenance scheduler workspace split by bounded sections such as automation,
    moderation, stitched governance, and shared exports instead of rebuilding one giant scheduler
    collaborator
