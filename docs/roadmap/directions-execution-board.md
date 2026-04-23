@@ -226,7 +226,11 @@ Active move map:
    `RuntimeProviderProvenanceSchedulerExportsSection` split between dedicated exports-registry,
    export-policy, and export-audit-history collaborators instead of recombining shared export
    registry rows, selected export routing policy controls, and audit trail rows inline in one
-   scheduler exports module;
+   scheduler exports module; keep
+   `RuntimeProviderProvenanceSchedulerExportAuditHistorySection` split between dedicated
+   audit-history-summary and audit-history-table collaborators instead of recombining selected
+   export identity copy with audit loading, error, empty, and history table states inline in one
+   audit-history module;
    keep the Governance policy templates card split between a
    dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
    hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
