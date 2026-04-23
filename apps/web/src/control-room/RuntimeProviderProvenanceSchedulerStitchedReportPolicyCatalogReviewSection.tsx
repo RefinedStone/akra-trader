@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDefaultBodySection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDefaultBodySection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogStateSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogStateSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogReviewSection({
   model,
   SelectionSection,
@@ -63,32 +66,14 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogRev
           <tbody>
             {providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogs.map((catalog) => (
               <tr key={`provider-scheduler-stitched-governance-catalog-${catalog.catalog_id}`}>
-                <td>
-                  <strong>{catalog.name}</strong>
-                  <p className="run-lineage-symbol-copy">
-                    {formatWorkflowToken(catalog.status)} · {catalog.policy_template_ids.length} linked template(s)
-                  </p>
-                  <p className="run-lineage-symbol-copy">
-                    Scope {formatWorkflowToken(catalog.item_type_scope)} ·{" "}
-                    {formatWorkflowToken(catalog.action_scope)}
-                  </p>
-                  <p className="run-lineage-symbol-copy">
-                    {catalog.description || "No stitched report catalog description recorded."}
-                  </p>
-                </td>
-                <td>
-                  <strong>{catalog.default_policy_template_name ?? "No default policy template"}</strong>
-                  <p className="run-lineage-symbol-copy">
-                    {formatWorkflowToken(catalog.approval_lane)} ·{" "}
-                    {formatWorkflowToken(catalog.approval_priority)}
-                  </p>
-                  <p className="run-lineage-symbol-copy">
-                    {catalog.hierarchy_steps.length} hierarchy step(s)
-                  </p>
-                  {catalog.guidance ? (
-                    <p className="run-lineage-symbol-copy">{catalog.guidance}</p>
-                  ) : null}
-                </td>
+                <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogStateSection
+                  catalog={catalog}
+                  model={model}
+                />
+                <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDefaultBodySection
+                  catalog={catalog}
+                  model={model}
+                />
                 <SelectionSection catalog={catalog} model={model} />
               </tr>
             ))}
