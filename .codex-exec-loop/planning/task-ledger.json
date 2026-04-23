@@ -2045,16 +2045,16 @@
       "id": "task-llm-sensitivity-provider-provenance-scheduler-narrative-registry-card-selection",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Extract Scheduler narrative registry as the next large inline workspace card after narrative templates",
-      "description": "Once the `Scheduler narrative templates` lane finishes stabilizing its remaining `registry table` and `revision history` hotspots, pull the still-inline `Scheduler narrative registry` surface out of `apps/web/src/control-room/RuntimeProviderProvenanceWorkspaceCards.tsx` into its own bounded card wrapper so the workspace card shell keeps shrinking by major scheduler narrative surfaces rather than reopening tiny leaves.",
-      "status": "proposed",
+      "description": "Now that the `Scheduler narrative templates` lane has stabilized through the registry-table and revision-history splits, pull the still-inline `Scheduler narrative registry` surface out of `apps/web/src/control-room/RuntimeProviderProvenanceWorkspaceCards.tsx` into its own bounded card wrapper so the workspace card shell keeps shrinking by major scheduler narrative surfaces instead of revisiting already-small narrative-template leaves.",
+      "status": "ready",
       "base_priority": 89,
-      "dynamic_priority_delta": 41,
+      "dynamic_priority_delta": 46,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T09:05:00+09:00",
+      "updated_at": "2026-04-25T09:25:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply still identifies the outer `Scheduler narrative registry` card as a remaining large inline workspace surface, but now the scheduler narrative templates lane has only `registry table` and `revision history` as the remaining local hotspots ahead of that larger card extraction.",
-      "priority_reason": "Kept `proposed` because the next executable work remains inside the scheduler narrative templates lane, with `RuntimeProviderProvenanceSchedulerNarrativeTemplateRegistryTableSection.tsx` now first and `RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionHistorySection.tsx` immediately behind it, so the larger `Scheduler narrative registry` card should wait until those local boundaries settle."
+      "direction_relation_note": "The latest main-session reply says the scheduler narrative templates lane is now composition-stable after the revision-history split and explicitly points to the outer `Scheduler narrative registry` card as the next larger pressure point, ahead of any further leaf-level refinement.",
+      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the prior revision-history queue head is complete, and the latest reply directly names `Scheduler narrative registry` as the next major executable surface before `Approval queue`."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-scheduler-approval-queue-card-selection",
@@ -2063,13 +2063,13 @@
       "description": "After the narrative-template and narrative-registry surfaces settle, move the still-inline `Approval queue` card out of `apps/web/src/control-room/RuntimeProviderProvenanceWorkspaceCards.tsx` into its own bounded card wrapper so the workspace shell stops retaining another giant scheduler/governance body.",
       "status": "proposed",
       "base_priority": 88,
-      "dynamic_priority_delta": 40,
+      "dynamic_priority_delta": 42,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T08:50:00+09:00",
+      "updated_at": "2026-04-25T09:25:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply still names the outer `Approval queue` card as a remaining large inline workspace surface, but only after both the scheduler narrative templates lane and the scheduler narrative registry card are addressed.",
-      "priority_reason": "Kept `proposed` because it remains a downstream large-card continuation behind the scheduler narrative templates local follow-ups and the larger `Scheduler narrative registry` extraction."
+      "direction_relation_note": "The latest main-session reply names the outer `Approval queue` card as the other major remaining scheduler workspace surface, but positions it behind the newly preferred `Scheduler narrative registry` card once the narrative-template lane is considered stable.",
+      "priority_reason": "Kept `proposed` because the latest reply explicitly frames it as the next large-card continuation after `Scheduler narrative registry`, so it should stay queued just behind the new ready head."
     },
     {
       "id": "task-llm-sensitivity-control-room-app-provider-provenance-route-model-ownership-split",
@@ -2210,16 +2210,16 @@
       "id": "task-llm-sensitivity-provider-provenance-scheduler-narrative-template-revision-history-section-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split Scheduler narrative template revision history section into narrower history-table and revision-action collaborators",
-      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionHistorySection.tsx` so the remaining scheduler narrative templates lane pressure shifts out of one owner by separating the history table shell from row review/detail and restore/apply action collaborators, following the same boundary pattern that just landed for the registry table.",
-      "status": "ready",
+      "description": "Completed the revision-history split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionHistorySection.tsx` to head and async branching ownership while moving the revision table shell into `RuntimeProviderProvenanceSchedulerNarrativeTemplateHistoryTableSection.tsx` and row mutation controls into `RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionActionSection.tsx`, leaving the scheduler narrative templates lane composition-stable.",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 45,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T09:18:00+09:00",
+      "updated_at": "2026-04-25T09:25:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly identifies `RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionHistorySection.tsx` as the next local pressure point after the registry-table split completed, making it the clearest builtin continuation inside the same scheduler narrative templates lane.",
-      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the previous queue-head registry-table split is now complete, and the latest reply directly names revision history as the next local executable hotspot before larger workspace-card extractions."
+      "direction_relation_note": "The latest main-session reply confirms `RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionHistorySection.tsx` now owns only the head and async branching while `RuntimeProviderProvenanceSchedulerNarrativeTemplateHistoryTableSection.tsx` and `RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionActionSection.tsx` own the table and row mutation concerns, closing the queued revision-history hotspot.",
+      "priority_reason": "Marked `done` because the main session completed the split, updated the status/docs board, passed `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build`, and pushed commit `19ca588` to `origin/main`; the next queue head moves to the larger `Scheduler narrative registry` card rather than another small narrative-template leaf."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-scheduler-narrative-template-registry-row-action-leaf-split",
@@ -2228,13 +2228,13 @@
       "description": "If the registry table still carries too much behavior after the empty-state, table shell, and row detail split, extract the remaining row action controls from the scheduler narrative template registry surface into a dedicated leaf collaborator so the table view owner stays focused on row iteration and wiring only.",
       "status": "proposed",
       "base_priority": 84,
-      "dynamic_priority_delta": 36,
+      "dynamic_priority_delta": 31,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T09:18:00+09:00",
+      "updated_at": "2026-04-25T09:25:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the registry table may still benefit from a later row-action leaf split, but frames it as optional and secondary to the revision-history hotspot that is now the clear next continuation.",
-      "priority_reason": "Left `proposed` because it is executable but not the best immediate queue head: the latest reply explicitly prioritizes the revision-history section next and only suggests the row-action leaf as a possible later refinement if the registry table still feels overloaded."
+      "direction_relation_note": "The latest main-session reply says the scheduler narrative templates lane is now stable enough to move on to larger workspace cards, which makes any remaining registry row-action leaf split an optional cleanup rather than the next planned continuation.",
+      "priority_reason": "Kept `proposed` because it remains executable but the latest reply explicitly recommends moving to `Scheduler narrative registry` or `Approval queue` instead of continuing to shave smaller registry/revision leaves."
     }
   ]
 }
