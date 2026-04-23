@@ -203,8 +203,9 @@ Active move map:
 
 1. keep `controlRoomApi.ts` and `controlRoomDefinitions.ts` as compatibility barrels while the
    real provider/query-builder families move under bounded submodules
-2. keep moving query-builder replay intent and governance orchestration into feature-owned hooks
-   and collaborators instead of re-expanding the main component body
+2. keep moving query-builder replay intent, expression authoring, and coordination-simulation
+   orchestration into feature-owned hooks and collaborators instead of re-expanding the main
+   component body
 3. keep `domain/models.py` import-compatible while model families move under `domain/model_types/*`
 4. keep shrinking `application.py` by moving pure comparison and serializer flows into
    `application_support/*`
