@@ -155,6 +155,10 @@ It is not yet a finished live trading product:
 - the scheduler exports-registry-table collaborator now composes dedicated row-detail and
   row-action collaborators instead of mixing shared export review cells with per-row export
   actions inline in one exports-registry-table module
+- the scheduler export-policy collaborator now composes dedicated export-policy-draft,
+  export-policy-summary, and export-policy-action collaborators instead of mixing routing draft
+  controls, current policy summary, and escalation action triggers inline in one export-policy
+  module
 - the scheduler export audit-history collaborator now composes dedicated audit-history-summary
   and audit-history-table collaborators instead of mixing selected export identity copy with
   audit loading, error, empty, and history table states inline in one audit-history module

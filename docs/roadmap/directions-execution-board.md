@@ -234,6 +234,10 @@ Active move map:
    `RuntimeProviderProvenanceSchedulerExportsRegistryTableSection` split between dedicated
    row-detail and row-action collaborators instead of recombining shared export review cells
    with per-row export actions inline in one exports-registry-table module; keep
+   `RuntimeProviderProvenanceSchedulerExportPolicySection` split between dedicated
+   export-policy-draft, export-policy-summary, and export-policy-action collaborators instead of
+   recombining routing draft controls, current policy summary, and escalation action triggers
+   inline in one export-policy module; keep
    `RuntimeProviderProvenanceSchedulerExportAuditHistorySection` split between dedicated
    audit-history-summary and audit-history-table collaborators instead of recombining selected
    export identity copy with audit loading, error, empty, and history table states inline in one
