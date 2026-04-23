@@ -152,6 +152,9 @@ It is not yet a finished live trading product:
 - the stitched report approval queue-state layer now composes dedicated summary and filter-state
   collaborators instead of keeping queue summary context and filter/loading state inline in one
   module
+- the stitched report approval queue filter-state layer now composes dedicated filter-bar and
+  async-state collaborators instead of keeping queue filters and async loading/error state inline in
+  one module
 - the stitched report saved-view layer now composes dedicated bulk-edit, revision-review, and
   audit collaborators instead of keeping selection governance, revision restore, and team audit
   flows inline in one module
