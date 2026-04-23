@@ -1,14 +1,14 @@
 // @ts-nocheck
-import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueAsyncStateSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueAsyncStateSection";
-import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterBarSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterBarSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueryInputSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueryInputSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection";
 
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterStateSection({ model }: { model: any }) {
   const {} = model;
 
   return (
-    <>
-      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterBarSection model={model} />
-      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueAsyncStateSection model={model} />
-    </>
+    <div className="filter-bar">
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection model={model} />
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueryInputSection model={model} />
+    </div>
   );
 }
