@@ -241,6 +241,9 @@ Active move map:
    `RuntimeProviderProvenanceSchedulerExportPolicyDraftSection` split between dedicated
    draft-form and draft-targets collaborators instead of recombining route and approval draft
    controls with custom delivery target checkbox state inline in one export-policy-draft module;
+   keep `RuntimeProviderProvenanceSchedulerExportPolicyActionSection` split between dedicated
+   policy-save-action and approval-escalation-action collaborators instead of recombining draft
+   persistence with approval and escalation triggers inline in one export-policy-action module;
    keep
    `RuntimeProviderProvenanceSchedulerExportAuditHistorySection` split between dedicated
    audit-history-summary and audit-history-table collaborators instead of recombining selected
