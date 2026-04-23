@@ -229,9 +229,9 @@ Active move map:
    recombining queue/catalog review, registry drafting, bulk edits, and history/audit maintenance
    in one module
 9. keep stitched registry editing split between draft, bulk-edit, and table collaborators, and
-   keep table split between listing and revision-selection collaborators instead of recombining
-   registry drafting, selection governance, bulk edit staging, registry listing, and revision
-   selection in one module
+   keep table split between listing, row-detail, row-action-cell, and revision-selection
+   collaborators instead of recombining registry drafting, selection governance, bulk edit
+   staging, registry listing, row details, action controls, and revision selection in one module
 10. keep stitched registry bulk-edit split between selection-summary, selection-actions,
     metadata-stage, queue-stage, and policy-stage collaborators instead of recombining selection
     governance and bulk edit staging controls in one module

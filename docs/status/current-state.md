@@ -150,8 +150,9 @@ It is not yet a finished live trading product:
   selection-actions, metadata-stage, queue-stage, and policy-stage collaborators instead of
   keeping selection governance and bulk edit staging controls inline in one section module
 - the stitched registry table layer now composes dedicated listing and revision-selection
-  collaborators instead of keeping registry listing state and revision toggle selection inline in
-  one section module
+  collaborators, and now also routes each registry row body through dedicated row-detail and
+  row-action-cell collaborators instead of keeping registry listing state, row details, and
+  revision toggle selection inline in one section module
 - the stitched report views layer now composes dedicated saved-view and approval-policy
   collaborators instead of keeping saved-view lifecycle, stitched approval queue, and policy
   catalogs inline in one module
