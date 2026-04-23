@@ -126,6 +126,8 @@ It is not yet a finished live trading product:
   saved report, cross-focus query, scheduler workspace, analytics review, and shared registry audit
   flows, so runtime incident triage no longer carries that provider-provenance workspace body
   inline
+- the provider-provenance scheduler workspace now routes through dedicated automation, moderation,
+  stitched-governance, and shared-export sections instead of one giant scheduler body
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body
