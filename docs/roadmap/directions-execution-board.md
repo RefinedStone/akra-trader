@@ -212,7 +212,9 @@ Active move map:
    export body inline in triage, and keep focused lineage history owned by a dedicated
    provider-provenance collaborator instead of rebuilding that history body inline, and keep
    focused ingestion jobs owned by a dedicated provider-provenance collaborator instead of
-   rebuilding that jobs body inline
+   rebuilding that jobs body inline, and keep focused lineage incident history owned by a
+   dedicated provider-provenance collaborator instead of rebuilding that incident history body
+   inline
 3. keep the provider-provenance scheduler workspace split by bounded sections such as automation,
    moderation, stitched governance, and shared exports instead of rebuilding one giant scheduler
    collaborator
