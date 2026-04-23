@@ -204,10 +204,10 @@ Active move map:
 1. keep `controlRoomApi.ts` and `controlRoomDefinitions.ts` as compatibility barrels while the
    real provider/query-builder families move under bounded submodules, and keep provider-
    provenance saved workspace cards owned by dedicated route collaborators instead of re-expanding
-   runtime triage or `App.tsx`; the next provider-provenance decomposition target after triage
-   cleanup is `RuntimeProviderProvenanceWorkspaceCards.tsx`, starting with the giant Governance
-   policy templates card that still combines template drafting, policy-catalog workflow, hierarchy
-   step templates, and audit history in one owner
+   runtime triage or `App.tsx`; keep the Governance policy templates card split between a
+   dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
+   hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
+   giant governance surface inline in `RuntimeProviderProvenanceWorkspaceCards.tsx`
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
