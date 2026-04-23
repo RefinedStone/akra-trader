@@ -179,6 +179,10 @@ It is not yet a finished live trading product:
   stage, bulk-description-stage, and bulk-default-template-stage collaborators instead of mixing
   name prefix/suffix edits, description staging, and default-template staging inline in one
   metadata owner
+- the governance-catalog-hierarchy collaborator now composes dedicated bulk-selection-stage, bulk-
+  patch-stage, table, editor, and versions collaborators instead of mixing bulk governance
+  staging, captured-step review, direct step editing, and step revision history inline in one
+  governance section module
 - the governance-policy-catalog registry-table collaborator now composes dedicated row-detail and
   row-action collaborators instead of mixing catalog/default review cells and row actions inline
   in one table owner

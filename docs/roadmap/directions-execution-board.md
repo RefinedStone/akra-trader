@@ -241,11 +241,14 @@ Active move map:
   inline in one action owner; keep the governance-policy-catalog bulk-metadata-stage layer split
   between bulk-name-stage, bulk-description-stage, and bulk-default-template-stage collaborators
   instead of rebuilding name prefix/suffix edits, description staging, and default-template
-  staging inline in one metadata owner; keep the governance-policy-catalog registry-table layer
-  split between row-detail and row-action collaborators instead of recombining catalog/default
-  review and row actions inline; keep the governance-policy-catalog versions layer split between a
-  versions-table collaborator plus version-row-detail and version-row-action collaborators instead
-  of rebuilding revision review and restore controls inline
+  staging inline in one metadata owner; keep the governance-catalog-hierarchy layer split between
+  bulk-selection-stage, bulk-patch-stage, table, editor, and versions collaborators instead of
+  rebuilding bulk governance staging, captured-step review, direct step editing, and step
+  revision history inline in one governance section module; keep the governance-policy-catalog
+  registry-table layer split between row-detail and row-action collaborators instead of
+  recombining catalog/default review and row actions inline; keep the governance-policy-catalog
+  versions layer split between a versions-table collaborator plus version-row-detail and version-
+  row-action collaborators instead of rebuilding revision review and restore controls inline
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
