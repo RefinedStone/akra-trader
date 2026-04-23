@@ -142,6 +142,9 @@ It is not yet a finished live trading product:
 - the scheduler narrative template registry-table collaborator now composes dedicated table-view
   and row-detail collaborators instead of mixing table shell, row review, and row actions inline
   in one registry module
+- the scheduler narrative template revision-history collaborator now composes dedicated
+  history-table and revision-action collaborators instead of mixing revision table shell and
+  revision mutations inline in one history module
 - the hierarchy-step-template collaborator now composes dedicated draft, registry, versions, and
   audit collaborators instead of keeping template drafting, bulk cross-catalog governance,
   revision history, and audit review inline in one section module
