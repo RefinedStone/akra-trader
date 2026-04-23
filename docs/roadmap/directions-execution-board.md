@@ -227,7 +227,10 @@ Active move map:
 8. keep stitched registry-lifecycle split between review ownership and editor-history ownership
    instead of recombining queue/catalog review, registry editing, and history/audit maintenance in
    one module
-9. keep query-builder replay intent, replay review, replay promotion approval, expression
+9. keep stitched report views split between saved-view lifecycle ownership and approval-policy
+   ownership instead of recombining saved view administration, stitched approval queue, and policy
+   catalog review in one module
+10. keep query-builder replay intent, replay review, replay promotion approval, expression
    authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
    feature-owned hooks and section collaborators instead of re-expanding the main component body;
    the next pressure points are the remaining large workspace modules plus backend compatibility
