@@ -234,7 +234,8 @@ Active move map:
    staging, registry listing, row details, action controls, and revision selection in one module
 10. keep stitched registry bulk-edit split between selection-summary, selection-actions,
     metadata-stage, queue-stage, and policy-stage collaborators instead of recombining selection
-    governance and bulk edit staging controls in one module
+    governance and bulk edit staging controls in one module; keep governance-policy selection in
+    the policy-stage instead of duplicating it in selection-action controls
 11. keep stitched report views split between saved-view lifecycle ownership and approval-policy
    ownership instead of recombining saved view administration, stitched approval queue, and policy
    catalog review in one module
