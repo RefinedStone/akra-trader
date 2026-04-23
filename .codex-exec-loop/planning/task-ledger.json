@@ -560,16 +560,31 @@
       "id": "task-llm-sensitivity-provider-provenance-scheduler-moderation-governance-section-flow-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split the moderation-governance section into policy catalog and approval queue modules",
-      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerModerationGovernanceSection.tsx` so policy catalogs, governance policies, meta-policies, and approval queues move into narrower workspace-owned collaborators while keeping the scheduler moderation route imports and behavior stable.",
-      "status": "ready",
+      "description": "Completed the moderation-governance decomposition by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerModerationGovernanceSection.tsx` to a thin composer and moving the policy-catalog surface into `RuntimeProviderProvenanceSchedulerModerationPolicyCatalogSection.tsx` and the approval-queue surface into `RuntimeProviderProvenanceSchedulerModerationApprovalQueueSection.tsx` while preserving the shared scheduler moderation framing.",
+      "status": "done",
       "base_priority": 101,
       "dynamic_priority_delta": 34,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T23:10:00+09:00",
+      "updated_at": "2026-04-23T23:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says the next remaining split is inside `RuntimeProviderProvenanceSchedulerModerationGovernanceSection.tsx`, which still combines policy catalogs, governance policies, meta-policies, and approval queues in one file after the broader moderation-section split landed.",
-      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task and the latest reply names this exact moderation-governance decomposition as the immediate next executable follow-up."
+      "direction_relation_note": "The latest main-session reply confirms commit `b482d29` pushed this split: `RuntimeProviderProvenanceSchedulerModerationGovernanceSection.tsx` is now a 52-line wrapper, with policy-catalog ownership moved into `RuntimeProviderProvenanceSchedulerModerationPolicyCatalogSection.tsx` and approval-queue ownership moved into `RuntimeProviderProvenanceSchedulerModerationApprovalQueueSection.tsx`.",
+      "priority_reason": "Marked done because the queued moderation-governance split landed, passed `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build`, and was already pushed to `origin/main`; the remaining pressure moved into the new policy-catalog collaborator."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-scheduler-moderation-policy-catalog-subsection-flow-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split the moderation policy-catalog module into catalog, governance policy, and meta-policy collaborators",
+      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerModerationPolicyCatalogSection.tsx` so policy catalog views, governance policy flows, and meta-policy surfaces move into narrower workspace-owned collaborators while keeping the scheduler moderation-governance imports and behavior stable.",
+      "status": "ready",
+      "base_priority": 102,
+      "dynamic_priority_delta": 35,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T23:20:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly says the next remaining split is inside `RuntimeProviderProvenanceSchedulerModerationPolicyCatalogSection.tsx`, which still combines policy catalogs, governance policies, and meta-policies after the broader moderation-governance wrapper split landed.",
+      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task and the latest reply names this policy-catalog decomposition as the immediate next executable follow-up."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-governance-section-flow-split",
@@ -581,10 +596,10 @@
       "dynamic_priority_delta": 25,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T23:10:00+09:00",
+      "updated_at": "2026-04-23T23:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply identifies `RuntimeProviderProvenanceSchedulerStitchedGovernanceSection.tsx` as the next large pressure point in the same lane after the newly isolated moderation-governance collaborator is reduced.",
-      "priority_reason": "Kept proposed because it is now the clear follow-up immediately after the moderation-governance split, but the main session still names that narrower governance-section decomposition as the first executable step."
+      "direction_relation_note": "The latest main-session reply still identifies `RuntimeProviderProvenanceSchedulerStitchedGovernanceSection.tsx` as the next large scheduler-owned pressure point, but only after the newly isolated moderation policy-catalog collaborator is reduced.",
+      "priority_reason": "Kept proposed because it remains the broader scheduler follow-up after the current policy-catalog decomposition, but the latest reply explicitly names the policy-catalog split as the first executable next step."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-focused-readback-export-history-split",
