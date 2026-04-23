@@ -1895,31 +1895,31 @@
       "id": "task-llm-sensitivity-provider-provenance-governance-policy-catalog-bulk-action-section-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Decompose RuntimeProviderProvenanceGovernancePolicyCatalogBulkActionSection into bounded action collaborators",
-      "description": "Reduce `apps/web/src/control-room/RuntimeProviderProvenanceGovernancePolicyCatalogBulkActionSection.tsx` to bulk-action composition only by extracting the remaining mixed action/state ownership into narrower collaborators for update, delete/restore, and shared execution feedback while preserving the governance policy catalog bulk-edit surface.",
-      "status": "ready",
+      "description": "Completed the bulk action leaf split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceGovernancePolicyCatalogBulkActionSection.tsx` to a thin composer and moving delete, restore, and update ownership into `RuntimeProviderProvenanceGovernancePolicyCatalogBulkDeleteActionSection.tsx`, `RuntimeProviderProvenanceGovernancePolicyCatalogBulkRestoreActionSection.tsx`, and `RuntimeProviderProvenanceGovernancePolicyCatalogBulkUpdateActionSection.tsx`.",
+      "status": "done",
       "base_priority": 93,
       "dynamic_priority_delta": 46,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T06:05:00+09:00",
+      "updated_at": "2026-04-25T06:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the governance policy catalog lane has already cleaned up many bulk-edit leaves and explicitly identifies `RuntimeProviderProvenanceGovernancePolicyCatalogBulkActionSection.tsx` as the next local pressure point because it still mixes action and state ownership in one leaf.",
-      "priority_reason": "Promoted to `ready` because builtin next-task should continue with one immediately executable follow-up, and the latest reply names `RuntimeProviderProvenanceGovernancePolicyCatalogBulkActionSection.tsx` as the first concrete mixed ownership hotspot left in the same bulk-edit subtree with no further operator decision needed."
+      "direction_relation_note": "The latest main-session reply confirms `RuntimeProviderProvenanceGovernancePolicyCatalogBulkActionSection.tsx` is now just a thin composer over dedicated delete, restore, and update collaborators, and notes that the remaining local bulk-edit pressure has shifted to `RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection.tsx`.",
+      "priority_reason": "Marked `done` because the queued bulk-action decomposition landed, `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md` were updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `acc3b15` was pushed to `origin/main`."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-governance-policy-catalog-bulk-selection-section-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Decompose RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection into selection state and summary collaborators",
-      "description": "Split `apps/web/src/control-room/RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection.tsx` into narrower collaborators once the action leaf settles, so selection summary, toggle state, and selection-scoped helper ownership stop sharing one bulk-edit leaf.",
-      "status": "proposed",
+      "description": "Split `apps/web/src/control-room/RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection.tsx` into narrower collaborators for selection summary, toggle state, and selection-scoped helper ownership so the remaining large bulk-edit leaf in the governance policy catalog lane stops sharing those concerns inline.",
+      "status": "ready",
       "base_priority": 91,
-      "dynamic_priority_delta": 44,
+      "dynamic_priority_delta": 49,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T06:05:00+09:00",
+      "updated_at": "2026-04-25T06:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply identifies `RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection.tsx` as the other remaining bulk-edit leaf still carrying mixed action/state pressure, but presents it as an alternate local hotspot alongside `BulkActionSection.tsx` rather than the singular next step.",
-      "priority_reason": "Kept `proposed` because there is still one clearer immediate continuation in `BulkActionSection.tsx`; `BulkSelectionSection.tsx` remains a strong local follow-up if the action leaf split lands cleanly or proves larger than expected."
+      "direction_relation_note": "The latest main-session reply explicitly says the remaining comparatively large leaf in the governance policy catalog bulk-edit lane is `RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection.tsx`, after the bulk action body was split into delete, restore, and update collaborators.",
+      "priority_reason": "Promoted to `ready` because builtin next-task should continue with one immediately executable follow-up, and the latest reply directly names `RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection.tsx` as the next concrete leaf to decompose with no further operator decision required."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-governance-catalog-hierarchy-section-split",
@@ -1931,10 +1931,10 @@
       "dynamic_priority_delta": 34,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T05:20:00+09:00",
+      "updated_at": "2026-04-25T06:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply closes the versions-section hotspot and instead narrows the immediate governance policy catalog follow-up to a `RuntimeProviderProvenanceGovernancePolicyCatalogBulkEditSection.tsx` re-evaluation, leaving hierarchy as a later card-level alternative once that local lane either splits further or is explicitly exhausted.",
-      "priority_reason": "Kept `proposed` because the newest reply identifies a more local executable follow-up in the bulk-edit subtree, so the broader catalog-hierarchy split should stay queued behind that lower-risk continuation."
+      "direction_relation_note": "The latest main-session reply moves the immediate bulk-edit continuation to `RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection.tsx` and says the following step is a choice between trimming smaller staged leaves further or moving to another governance collaborator, which keeps hierarchy as one of the next broader-card alternatives after the selection leaf settles.",
+      "priority_reason": "Kept `proposed` because the latest reply still leaves a clearer immediate executable continuation in the bulk-selection leaf, while hierarchy remains a broader governance collaborator option once that local pass is complete."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-workspace-cards-next-inline-scheduler-surface-selection",
@@ -1946,10 +1946,10 @@
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T05:20:00+09:00",
+      "updated_at": "2026-04-25T06:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply closes the versions split and says the next decision is whether to keep cutting inside `RuntimeProviderProvenanceGovernancePolicyCatalogBulkEditSection.tsx` or move outward to other large governance collaborators, so broader workspace-card selection remains the alternate path if the local bulk-edit pass no longer pays off.",
-      "priority_reason": "Kept `proposed` because the newest reply still leaves one more concrete local follow-up inside the current governance policy catalog lane before a broader workspace-card selection becomes the best next executable move."
+      "direction_relation_note": "The latest main-session reply now puts `RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection.tsx` first and then frames the follow-up as a choice between cutting smaller staged leaves such as `bulk-name-stage` again or moving outward to a different governance collaborator, so broader workspace-card selection remains the explicit alternative once the bulk-selection leaf is addressed.",
+      "priority_reason": "Kept `proposed` because the latest reply still provides one concrete local executable task before the broader governance-or-scheduler card choice becomes the right queue head, but this proposal now captures that next decision point."
     },
     {
       "id": "task-llm-sensitivity-control-room-app-provider-provenance-route-model-ownership-split",
