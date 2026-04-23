@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportBulkApprovalTriggerSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportBulkApprovalTriggerSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportBulkPreviewSection({ model }: { model: any }) {
   const {} = model;
 
@@ -6,21 +8,7 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportBulkPreviewSecti
     <label>
       <span>Action</span>
       <div className="market-data-provenance-history-actions">
-        <button
-          className="ghost-button"
-          disabled={
-            !selectedProviderProvenanceSchedulerStitchedReportViewIds.length
-            || providerProvenanceSchedulerStitchedReportViewBulkAction !== null
-          }
-          onClick={() => {
-            void runProviderProvenanceSchedulerStitchedReportViewBulkGovernance("update");
-          }}
-          type="button"
-        >
-          {providerProvenanceSchedulerStitchedReportViewBulkAction === "update"
-            ? "Previewing…"
-            : "Preview bulk edit"}
-        </button>
+        <RuntimeProviderProvenanceSchedulerStitchedReportBulkApprovalTriggerSection model={model} />
       </div>
     </label>
   );
