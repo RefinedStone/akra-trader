@@ -220,7 +220,9 @@ Active move map:
   audit-template, and audit-actor row cells instead of rebuilding filter controls and audit rows
   inline; keep the governance-policy-template registry split between draft, catalog-workflow,
   registry-table, versions, and audit collaborators instead of rebuilding template editing,
-  catalog bundling, registry listing, revision history, and audit review inline in one module
+  catalog bundling, registry listing, revision history, and audit review inline in one module;
+  keep the governance-policy-template registry-table layer split between row-detail and row-action
+  collaborators instead of recombining template/scope review and row actions inline
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared

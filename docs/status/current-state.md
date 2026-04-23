@@ -151,6 +151,9 @@ It is not yet a finished live trading product:
   workflow, registry-table, versions, and audit collaborators instead of mixing template editing,
   catalog bundling, registry listing, revision history, and audit review inline in one section
   module
+- the governance-policy-template registry-table collaborator now composes dedicated row-detail and
+  row-action collaborators instead of mixing template/scope review cells and row actions inline in
+  one table owner
 - focused provider readback, persisted export history, and shared export registry flows now route
   through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
   longer carries that focused provider export body inline
