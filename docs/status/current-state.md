@@ -172,7 +172,9 @@ It is not yet a finished live trading product:
   surface owns the queue summary/filter/loading shell above the queue table, and the policy-
   catalog surface owns the catalog summary/search shell above the policy catalog table; the queue
   and policy-catalog surfaces now route stable summary and empty-state leaves through dedicated
-  collaborators instead of keeping those summary and empty-state blocks inline
+  collaborators instead of keeping those summary and empty-state blocks inline; queue rows now
+  route through dedicated plan-detail, preview-detail, and action collaborators, and policy rows
+  now route through dedicated catalog-detail, defaults-detail, and action collaborators
 - the stitched registry review layer now routes the approval-queue table through dedicated queue-
   table and queue-row collaborators, and routes the registry policy-catalog table through
   dedicated policy-catalog-table and policy-catalog-row collaborators instead of keeping both

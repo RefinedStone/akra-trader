@@ -240,7 +240,9 @@ Active move map:
    collaborators instead of rebuilding those table shells and row bodies inline; keep the review
    filter bars split between queue-filter-state, queue-filter-policy, queue-filter-query, and
    policy-catalog-search collaborators instead of rebuilding all review filters inline; keep the
-   queue and policy-catalog surfaces routed through dedicated summary and empty-state leaves
+   queue and policy-catalog surfaces routed through dedicated summary and empty-state leaves; keep
+   queue rows split between plan-detail, preview-detail, and action collaborators, and keep
+   policy rows split between catalog-detail, defaults-detail, and action collaborators
 9. keep stitched registry editing split between draft, bulk-edit, and table collaborators, and
    keep draft split between identity-stage, default-policy-stage, action, and search
    collaborators instead of recombining registry drafting inputs, default policy staging,
