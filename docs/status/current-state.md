@@ -170,6 +170,9 @@ It is not yet a finished live trading product:
 - the stitched report approval-queue commit-control layer now composes dedicated plan-gate and
   commit-action collaborators instead of keeping mutation gating and dispatch controls inline in one
   module
+- the stitched report approval-queue plan-gate layer now composes dedicated eligibility-state and
+  label-policy collaborators instead of keeping mutation eligibility checks and button-label policy
+  inline in one module
 - the stitched report approval queue-state layer now composes dedicated summary and filter-state
   collaborators instead of keeping queue summary context and filter/loading state inline in one
   module
