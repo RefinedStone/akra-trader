@@ -146,6 +146,9 @@ It is not yet a finished live trading product:
 - the stitched registry editing layer now composes dedicated draft, bulk-edit, and table
   collaborators instead of keeping registry drafting, selection governance, bulk edit staging, and
   registry listing inline in one section module
+- the stitched registry draft layer now composes dedicated identity-stage, default-policy-stage,
+  action, and search collaborators instead of keeping registry drafting inputs, default policy
+  staging, save/cancel actions, and registry search inline in one section module
 - the stitched registry bulk-edit layer now composes dedicated selection-summary,
   selection-actions, metadata-stage, queue-stage, and policy-stage collaborators instead of
   keeping selection governance and bulk edit staging controls inline in one section module; the

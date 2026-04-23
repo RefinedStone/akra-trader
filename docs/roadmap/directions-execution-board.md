@@ -238,7 +238,10 @@ Active move map:
    split between queue-filter-state, queue-filter-policy, queue-filter-query, and policy-catalog-
    search collaborators instead of rebuilding all review filters inline
 9. keep stitched registry editing split between draft, bulk-edit, and table collaborators, and
-   keep table split between listing, table-header, header-selection, row-selection, row-detail,
+   keep draft split between identity-stage, default-policy-stage, action, and search
+   collaborators instead of recombining registry drafting inputs, default policy staging,
+   save/cancel actions, and registry search in one module; keep table split between listing,
+   table-header, header-selection, row-selection, row-detail,
    row-action-cell, and revision-selection collaborators instead of recombining registry drafting,
    selection governance, bulk edit staging, registry listing, header shell, row selection, row
    details, action controls, and revision selection in one module
