@@ -500,31 +500,31 @@
       "id": "task-llm-sensitivity-query-builder-replay-provenance-runtime-candidate-review-body-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Extract replay provenance and runtime-candidate review body out of RunSurfaceCollectionQueryBuilderContent.tsx",
-      "description": "Continue the query-builder decomposition by moving the remaining replay provenance explanation and runtime-candidate review body that still renders inline in `apps/web/src/features/query-builder/RunSurfaceCollectionQueryBuilderContent.tsx` into feature-owned collaborators so the replay review surface stops depending on a giant component body for its explanatory rendering logic.",
-      "status": "ready",
+      "description": "Completed the replay provenance/runtime-candidate review extraction by moving collision causal-chain review into `QueryBuilderReplayCollisionReviewSection.tsx`, bundle diff and clause re-evaluation preview into `QueryBuilderSimulationDiffReviewSection.tsx`, replay-step action/provenance review into `QueryBuilderReplayStepActionReviewSection.tsx`, and shared runtime-candidate drill-through rendering into `QueryBuilderRuntimeCandidateTraceReview.tsx`, cutting `RunSurfaceCollectionQueryBuilderContent.tsx` from 7,989 lines to 6,409 lines.",
+      "status": "done",
       "base_priority": 100,
       "dynamic_priority_delta": 37,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T21:28:00+09:00",
+      "updated_at": "2026-04-23T22:06:20+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says the replay provenance and runtime-candidate review body still sits inline in `RunSurfaceCollectionQueryBuilderContent.tsx` after commit `0d53774`, making it the next obvious extraction target in the same decomposition lane.",
-      "priority_reason": "Promoted to the queue head because the operator asked to continue with one queued task, the immediately previous replay-governance extraction landed cleanly, and the main-session reply names this remaining inline review body as the direct next executable follow-up."
+      "direction_relation_note": "The latest main-session reply confirms commit `025053d` extracted the remaining replay provenance and runtime-candidate review body into dedicated query-builder review sections and a shared trace review renderer, and updated the status/roadmap docs to show that this inline review body is no longer a remaining pressure point inside `RunSurfaceCollectionQueryBuilderContent.tsx`.",
+      "priority_reason": "Marked done because the main session completed the extraction, validated it with `cd apps/web && npm run typecheck` and `cd apps/web && npm run build`, and pushed commit `025053d` to `origin/main`."
     },
     {
       "id": "task-llm-sensitivity-app-provider-provenance-workspace-route-extraction",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Extract provider-provenance workspace route ownership out of App.tsx",
       "description": "Move the provider-provenance and search-moderation workspace state, dense JSX, and direct `controlRoomApi`/`controlRoomDefinitions` usage out of `apps/web/src/App.tsx` into a feature-owned route module so `App.tsx` stops owning that bounded flow directly.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 97,
-      "dynamic_priority_delta": 24,
+      "dynamic_priority_delta": 27,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T20:53:48+09:00",
+      "updated_at": "2026-04-23T22:06:20+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "This stays in the lane because the direction still calls out compatibility barrels and route ownership cleanup, but the latest main-session reply and roadmap update moved the immediate pressure point to `RunSurfaceCollectionQueryBuilderContent.tsx` after replay intent/governance extraction landed.",
-      "priority_reason": "Kept as a near-term proposal because `App.tsx` route ownership still matters, but the just-validated query-builder split exposes a clearer immediate continuation path for reducing code volume without reopening the route shell again first."
+      "direction_relation_note": "The latest main-session reply says the next large pressure point now sits around `App.tsx` and other large workspace modules rather than inside the query-builder replay review body, so the existing provider-provenance/search-moderation route extraction becomes the clearest already-defined continuation in this decomposition lane.",
+      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the previous queue head is now complete, and this is the highest-priority executable `App.tsx` decomposition task already represented in the ledger."
     },
     {
       "id": "task-llm-sensitivity-control-room-provider-provenance-api-module-split",
@@ -570,6 +570,51 @@
       "source_turn_id": null,
       "direction_relation_note": "The `data-trust-and-lineage` detail doc still lists operator-facing lineage action guidance, retention policy, and drill/runbook validation as immediate gaps, but the ledger had no follow-up task representing that work.",
       "priority_reason": "Left proposed because the operator request for this turn was to re-evaluate the empty queue and choose the most immediate executable head; the frontend decomposition hotspot is clearer for immediate execution, while this data-trust pack remains a valid next proposal under the active direction."
+    },
+    {
+      "id": "task-llm-sensitivity-application-residual-bounded-flow-decomposition",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Identify and extract the next residual bounded workflow cluster out of application.py",
+      "description": "Audit the remaining large helper/workflow ownership inside `apps/api/app/application.py`, choose the highest-density bounded cluster that is still not delegation-only, and move it into a focused `application_support` module without reopening already-completed governance and guarded-live splits.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 16,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T22:06:20+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly names `application.py` as one of the remaining large-module pressure points after the query-builder replay provenance extraction landed, but it does not yet pin the exact next bounded cluster strongly enough to auto-promote ahead of the existing `App.tsx` task.",
+      "priority_reason": "Left proposed because the lane still has a clearer immediate `App.tsx` continuation, while the exact residual `application.py` ownership slice needs one more pass of boundary selection before it becomes the next executable queue head."
+    },
+    {
+      "id": "task-llm-sensitivity-standalone-surface-catalog-module-decomposition",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Decompose the standalone surface catalog module family into bounded ownership files",
+      "description": "Break the remaining standalone surface catalog implementation into narrower feature-owned modules so catalog listing, metadata assembly, capability wiring, and related support code stop accumulating in a single large ownership surface.",
+      "status": "proposed",
+      "base_priority": 87,
+      "dynamic_priority_delta": 15,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T22:06:20+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly calls out the standalone surface catalog family as a remaining large target in the same decomposition program, but it does not outrank the already-defined `App.tsx` route extraction for immediate next execution.",
+      "priority_reason": "Kept proposed because it is a valid large-module follow-up surfaced by the latest status update, but the queue already has a more direct post-query-builder continuation in `App.tsx`."
+    },
+    {
+      "id": "task-llm-sensitivity-long-tail-provider-module-decomposition",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split the next long-tail provider module into bounded feature-owned slices",
+      "description": "Choose the highest-churn long-tail provider module that still mixes unrelated ownership concerns, then extract its read/write orchestration, contracts, or provider-specific helpers into narrower modules while keeping import compatibility stable.",
+      "status": "proposed",
+      "base_priority": 86,
+      "dynamic_priority_delta": 14,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T22:06:20+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply names long-tail provider modules as another remaining pressure point after the replay provenance extraction, but does not identify a single module strongly enough to schedule automatically ahead of the `App.tsx` continuation.",
+      "priority_reason": "Left proposed because the exact provider module choice still needs operator or explorer judgment, whereas the route extraction already has a concrete bounded surface and clearer execution path."
     }
   ]
 }
