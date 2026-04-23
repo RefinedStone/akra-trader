@@ -235,7 +235,8 @@ Active move map:
 10. keep stitched registry bulk-edit split between selection-summary, selection-actions,
     metadata-stage, queue-stage, and policy-stage collaborators instead of recombining selection
     governance and bulk edit staging controls in one module; keep governance-policy selection in
-    the policy-stage instead of duplicating it in selection-action controls
+    the policy-stage instead of duplicating it in selection-action controls, and keep preview bulk-
+    edit dispatch in a dedicated policy preview-action collaborator
 11. keep stitched report views split between saved-view lifecycle ownership and approval-policy
    ownership instead of recombining saved view administration, stitched approval queue, and policy
    catalog review in one module

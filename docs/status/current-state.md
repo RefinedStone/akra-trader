@@ -150,7 +150,8 @@ It is not yet a finished live trading product:
   selection-actions, metadata-stage, queue-stage, and policy-stage collaborators instead of
   keeping selection governance and bulk edit staging controls inline in one section module; the
   policy-stage now owns governance-policy staging without duplicating that selector in the
-  selection-action controls
+  selection-action controls, and routes preview bulk-edit dispatch through a dedicated policy
+  preview-action collaborator
 - the stitched registry table layer now composes dedicated listing and revision-selection
   collaborators, and now also routes each registry row body through dedicated row-detail and
   row-action-cell collaborators instead of keeping registry listing state, row details, and

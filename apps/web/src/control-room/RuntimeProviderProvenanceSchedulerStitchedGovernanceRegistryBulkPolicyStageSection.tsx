@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkPolicyPreviewActionSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkPolicyPreviewActionSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkPolicyStageSection({ model }: { model: any }) {
   const {} = model;
 
@@ -67,26 +69,9 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulk
       </label>
       <label>
         <span>Action</span>
-        <div className="market-data-provenance-history-actions">
-          <button
-            className="ghost-button"
-            disabled={
-              !selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryIds.length
-              || providerProvenanceSchedulerStitchedReportGovernanceRegistryBulkAction
-              !== null
-            }
-            onClick={() => {
-              void runProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkGovernance(
-                "update",
-              );
-            }}
-            type="button"
-          >
-            {providerProvenanceSchedulerStitchedReportGovernanceRegistryBulkAction === "update"
-              ? "Previewing…"
-              : "Preview bulk edit"}
-          </button>
-        </div>
+        <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkPolicyPreviewActionSection
+          model={model}
+        />
       </label>
     </>
   );
