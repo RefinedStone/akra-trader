@@ -184,15 +184,16 @@ It is not yet a finished live trading product:
 - the stitched report approval-queue preview-cell layer now composes dedicated preview-headline,
   rollback-summary, and preview-count leaf collaborators instead of keeping preview-state copy
   inline in one cell owner
-- the stitched report approval-queue mutation layer now keeps the action-cell shell while
-  composing dedicated mutation-action and mutation-commit-control leaf collaborators instead of
-  mounting queue-action and commit-control flows directly in the row owner
+- the stitched report approval-queue mutation layer now keeps the action-cell shell while directly
+  composing queue-action and commit-control collaborators instead of routing those row actions
+  through extra mutation leaf wrappers
 - the stitched report approval-queue queue-action leaf now composes dedicated dispatch and
   status-view collaborators instead of keeping shared-queue dispatch and selected-state copy inline
   in one leaf owner
-- the stitched report approval-queue commit-control layer now routes through dedicated plan-gate
-  and commit-action leaf collaborators instead of mounting those subtree entrypoints directly in the
-  parent owner
+- the stitched report approval-queue commit-control layer now directly composes per-mutation
+  plan-gate collaborators, and the plan-gate layer now mounts commit-action directly once
+  eligibility-state and label-policy are resolved, instead of routing through extra passthrough
+  leaf wrappers
 - the stitched report approval-queue commit-action layer now composes dedicated dispatch-flow and
   mutation-trigger collaborators instead of keeping mutation dispatch branching and button rendering
   inline in one module

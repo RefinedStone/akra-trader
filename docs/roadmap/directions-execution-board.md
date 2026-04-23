@@ -271,14 +271,15 @@ Active move map:
     rollback-summary, and preview-count leaf collaborators instead of recombining preview-state
     copy in one cell owner
 24. keep stitched report approval-queue mutation ownership focused on the action-cell shell while
-    composing mutation-action and mutation-commit-control leaf collaborators instead of mounting
-    queue-action and commit-control flows directly in the row owner
+    directly composing queue-action and commit-control collaborators instead of routing those row
+    actions through extra mutation leaf wrappers
 25. keep stitched report approval-queue queue-action leaf ownership split between dispatch and
     status-view collaborators instead of recombining shared-queue dispatch and selected-state copy
     in one leaf owner
-26. keep stitched report approval-queue commit-control subtree routed through plan-gate and
-    commit-action leaf collaborators instead of mounting those subtree entrypoints directly in the
-    parent owner
+26. keep stitched report approval-queue commit-control ownership directly composing per-mutation
+    plan-gate collaborators, and keep plan-gate directly mounting commit-action once
+    eligibility-state and label-policy resolve, instead of routing subtree entrypoints through
+    extra passthrough leaf wrappers
 27. keep stitched report approval-queue commit-action ownership split between dispatch-flow and
     mutation-trigger collaborators instead of recombining mutation dispatch branching and button
     rendering in one module
