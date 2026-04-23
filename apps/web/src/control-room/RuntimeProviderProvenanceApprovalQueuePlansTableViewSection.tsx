@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { RuntimeProviderProvenanceApprovalQueuePlanRowDetailSection } from "./RuntimeProviderProvenanceApprovalQueuePlanRowDetailSection";
+import { RuntimeProviderProvenanceApprovalQueuePlanRowActionSection } from "./RuntimeProviderProvenanceApprovalQueuePlanRowActionSection";
 
 export function RuntimeProviderProvenanceApprovalQueuePlansTableViewSection({
   model,
@@ -49,19 +50,7 @@ export function RuntimeProviderProvenanceApprovalQueuePlansTableViewSection({
               />
             </td>
             <RuntimeProviderProvenanceApprovalQueuePlanRowDetailSection plan={plan} />
-            <td>
-              <div className="market-data-provenance-history-actions">
-                <button
-                  className="ghost-button"
-                  onClick={() => {
-                    setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(plan.plan_id);
-                  }}
-                  type="button"
-                >
-                  {selectedProviderProvenanceSchedulerNarrativeGovernancePlanId === plan.plan_id ? "Selected" : "Inspect"}
-                </button>
-              </div>
-            </td>
+            <RuntimeProviderProvenanceApprovalQueuePlanRowActionSection plan={plan} />
           </tr>
         ))}
       </tbody>

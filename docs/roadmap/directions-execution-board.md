@@ -226,6 +226,9 @@ Active move map:
    review inline in one card body; keep the approval queue plans-table collaborator split between
    dedicated table-view and row-detail collaborators instead of recombining table shell, row
    review, and row selection actions inline in one queue table module; keep the approval queue
+   plans-table table-view collaborator split between dedicated row-detail and row-action
+   collaborators instead of recombining row review cells and inspect selection actions inline in
+   one table-view module; keep the approval queue
    selected-plan-detail collaborator split between dedicated review and preview-detail
    collaborators instead of recombining plan summary review, approval actions, and preview diff
    detail inline in one selected-plan module; keep the approval queue selected-plan-review

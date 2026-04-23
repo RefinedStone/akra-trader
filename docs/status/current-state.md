@@ -151,6 +151,9 @@ It is not yet a finished live trading product:
 - the approval queue plans-table collaborator now composes dedicated table-view and row-detail
   collaborators instead of mixing table shell, row review, and row selection actions inline in
   one queue table module
+- the approval queue plans-table table-view collaborator now composes dedicated row-detail and
+  row-action collaborators instead of mixing row review cells and inspect selection actions
+  inline in one table-view module
 - the approval queue selected-plan-detail collaborator now composes dedicated review and
   preview-detail collaborators instead of mixing plan summary review, approval actions, and
   preview diff detail inline in one selected-plan module
