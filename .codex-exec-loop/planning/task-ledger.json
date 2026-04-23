@@ -1835,16 +1835,31 @@
       "id": "task-llm-sensitivity-provider-provenance-governance-policy-catalog-versions-section-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Decompose RuntimeProviderProvenanceGovernancePolicyCatalogVersionsSection into bounded collaborators",
-      "description": "Split `apps/web/src/control-room/RuntimeProviderProvenanceGovernancePolicyCatalogVersionsSection.tsx` into a thinner versions shell plus revision-table, version-detail, and row-action collaborators now that the registry-table shell has stabilized, so revision history becomes the next bounded surface inside the governance policy catalog lane instead of remaining a mixed table-plus-row owner.",
-      "status": "ready",
+      "description": "Completed the versions-section decomposition by reducing `apps/web/src/control-room/RuntimeProviderProvenanceGovernancePolicyCatalogVersionsSection.tsx` to the outer shell plus async/empty branching while moving revision-table ownership into `RuntimeProviderProvenanceGovernancePolicyCatalogVersionsTableSection.tsx`, row detail into `RuntimeProviderProvenanceGovernancePolicyCatalogVersionRowDetailSection.tsx`, and row actions into `RuntimeProviderProvenanceGovernancePolicyCatalogVersionRowActionSection.tsx`.",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 41,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T05:00:00+09:00",
+      "updated_at": "2026-04-25T05:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says `RuntimeProviderProvenanceGovernancePolicyCatalogVersionsSection.tsx` is now the next local pressure point inside the governance policy catalog lane after the registry-table row split landed.",
-      "priority_reason": "Promoted to `ready` because builtin next-task should continue with one concrete executable follow-up, and the latest reply directly names the versions section as the next bounded decomposition target after commit `75b573b`."
+      "direction_relation_note": "The latest main-session reply confirms this split landed in commit `6d7bbac`: the versions section now owns only the outer shell and async/empty branching while revision-table, row-detail, and row-action ownership moved into dedicated collaborators, with the status docs updated to match.",
+      "priority_reason": "Marked `done` because the queued versions-section split landed, `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md` were updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `6d7bbac` was pushed to `origin/main`; the next local pressure now sits in `RuntimeProviderProvenanceGovernancePolicyCatalogBulkEditSection.tsx`, with broader card-level governance collaborator selection as the alternate."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-governance-policy-catalog-bulk-edit-section-followup",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Re-evaluate RuntimeProviderProvenanceGovernancePolicyCatalogBulkEditSection as the next bounded governance policy catalog split",
+      "description": "Inspect `apps/web/src/control-room/RuntimeProviderProvenanceGovernancePolicyCatalogBulkEditSection.tsx` now that the sibling registry-table and versions surfaces have stabilized, then either split its remaining mixed bulk-edit responsibilities into narrower collaborators or confirm that the next decomposition step should move to a larger governance collaborator outside the current card.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 42,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-25T05:20:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply says the governance policy catalog lane has already established boundaries for bulk-edit and registry-table, and explicitly names `RuntimeProviderProvenanceGovernancePolicyCatalogBulkEditSection.tsx` as the next local pressure point to judge before moving outward to larger governance collaborators.",
+      "priority_reason": "Promoted to `ready` because builtin next-task should continue with one concrete executable follow-up, and the newest reply narrows the immediate decision to a local `BulkEditSection` pass before a broader card-level governance move."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-governance-catalog-hierarchy-section-split",
@@ -1856,10 +1871,10 @@
       "dynamic_priority_delta": 34,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T05:00:00+09:00",
+      "updated_at": "2026-04-25T05:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply narrows the immediate governance policy catalog follow-up to `RuntimeProviderProvenanceGovernancePolicyCatalogVersionsSection.tsx`, leaving the hierarchy surface as the next card-level alternative only after the versions lane settles.",
-      "priority_reason": "Kept `proposed` because the latest reply provides a clearer executable next step in the versions section, so the broader catalog-hierarchy split should remain queued behind that more local continuation."
+      "direction_relation_note": "The latest main-session reply closes the versions-section hotspot and instead narrows the immediate governance policy catalog follow-up to a `RuntimeProviderProvenanceGovernancePolicyCatalogBulkEditSection.tsx` re-evaluation, leaving hierarchy as a later card-level alternative once that local lane either splits further or is explicitly exhausted.",
+      "priority_reason": "Kept `proposed` because the newest reply identifies a more local executable follow-up in the bulk-edit subtree, so the broader catalog-hierarchy split should stay queued behind that lower-risk continuation."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-workspace-cards-next-inline-scheduler-surface-selection",
@@ -1871,10 +1886,10 @@
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T05:00:00+09:00",
+      "updated_at": "2026-04-25T05:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply confirms the registry-table split is complete and narrows the remaining governance policy templates card pressure to the versions section first, with catalog hierarchy still trailing behind it, so broader workspace-card selection should wait until that local lane is reduced.",
-      "priority_reason": "Kept `proposed` because the latest reply still supplies direct executable work inside the current governance policy catalog lane, making a broader workspace-card selection premature until the versions and catalog-hierarchy hotspots settle."
+      "direction_relation_note": "The latest main-session reply closes the versions split and says the next decision is whether to keep cutting inside `RuntimeProviderProvenanceGovernancePolicyCatalogBulkEditSection.tsx` or move outward to other large governance collaborators, so broader workspace-card selection remains the alternate path if the local bulk-edit pass no longer pays off.",
+      "priority_reason": "Kept `proposed` because the newest reply still leaves one more concrete local follow-up inside the current governance policy catalog lane before a broader workspace-card selection becomes the best next executable move."
     },
     {
       "id": "task-llm-sensitivity-control-room-app-provider-provenance-route-model-ownership-split",
