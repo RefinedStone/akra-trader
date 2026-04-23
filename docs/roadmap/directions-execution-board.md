@@ -211,8 +211,10 @@ Active move map:
 3. keep the provider-provenance scheduler workspace split by bounded sections such as automation,
    moderation, stitched governance, and shared exports instead of rebuilding one giant scheduler
    collaborator
-4. keep scheduler moderation flows split between alert review and governance queue ownership
-   instead of recombining retrieval review, catalog governance, and approval queues in one module
+4. keep scheduler moderation flows split between alert review and governance queue ownership,
+   and keep moderation-governance split between policy-catalog ownership and approval-queue
+   ownership instead of recombining retrieval review, catalog governance, and approval queues in
+   one module
 5. keep query-builder replay intent, replay review, replay promotion approval, expression
    authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
    feature-owned hooks and section collaborators instead of re-expanding the main component body;

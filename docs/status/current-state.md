@@ -129,7 +129,8 @@ It is not yet a finished live trading product:
 - the provider-provenance scheduler workspace now routes through dedicated automation, moderation,
   stitched-governance, and shared-export sections instead of one giant scheduler body
 - the scheduler moderation workspace now composes separate alert-review, moderation-governance,
-  and alert-timeline sections instead of one combined moderation surface
+  and alert-timeline sections, and the moderation-governance layer further splits policy-catalog
+  ownership from approval-queue ownership instead of recombining those flows in one module
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body
