@@ -231,7 +231,10 @@ Active move map:
    action cell collaborators instead of rebuilding the revision row inline, and keep the audit-
    event table body split between when, action, actor, and detail cell collaborators instead of
    rebuilding the audit row inline; keep the audit filter bar split between select and text-input
-   collaborators instead of rebuilding all audit filters in one block
+   collaborators instead of rebuilding all audit filters in one block; keep the review approval-
+   queue table split between queue-table and queue-row collaborators, and keep the registry
+   policy-catalog table split between policy-catalog-table and policy-catalog-row collaborators
+   instead of rebuilding those table shells and row bodies inline
 9. keep stitched registry editing split between draft, bulk-edit, and table collaborators, and
    keep table split between listing, row-detail, row-action-cell, and revision-selection
    collaborators instead of recombining registry drafting, selection governance, bulk edit
