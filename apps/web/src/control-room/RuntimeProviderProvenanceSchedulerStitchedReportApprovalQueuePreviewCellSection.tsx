@@ -1,4 +1,8 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePreviewCountSummarySection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePreviewCountSummarySection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePreviewHeadlineSummarySection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePreviewHeadlineSummarySection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueRollbackSummarySection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueRollbackSummarySection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePreviewCellSection({
   model,
   plan,
@@ -6,16 +10,20 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePre
   model: any;
   plan: any;
 }) {
-  const {} = model;
-
   return (
     <td>
-      <strong>{formatProviderProvenanceSchedulerNarrativeGovernancePlanSummary(plan)}</strong>
-      <p className="run-lineage-symbol-copy">{plan.rollback_summary}</p>
-      <p className="run-lineage-symbol-copy">
-        {plan.preview_items.length} preview row(s) · rollback ready{" "}
-        {plan.rollback_ready_count}
-      </p>
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePreviewHeadlineSummarySection
+        model={model}
+        plan={plan}
+      />
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueRollbackSummarySection
+        model={model}
+        plan={plan}
+      />
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePreviewCountSummarySection
+        model={model}
+        plan={plan}
+      />
     </td>
   );
 }

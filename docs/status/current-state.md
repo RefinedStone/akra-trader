@@ -181,6 +181,9 @@ It is not yet a finished live trading product:
 - the stitched report approval-queue plan-cell layer now composes dedicated identity-summary,
   origin-summary, and approval-summary leaf collaborators instead of keeping plan metadata copy
   inline in one cell owner
+- the stitched report approval-queue preview-cell layer now composes dedicated preview-headline,
+  rollback-summary, and preview-count leaf collaborators instead of keeping preview-state copy
+  inline in one cell owner
 - the stitched report approval-queue mutation layer now keeps the action-cell shell while
   composing dedicated mutation-action and mutation-commit-control leaf collaborators instead of
   mounting queue-action and commit-control flows directly in the row owner
