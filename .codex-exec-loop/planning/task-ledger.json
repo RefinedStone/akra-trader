@@ -1550,16 +1550,16 @@
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-row-leaf-followup-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Trim stitched registry queue and policy row leaves into stable detail/action collaborators",
-      "description": "Continue the stitched-registry lane below the stabilized `queue-surface` and `policy-catalog-surface` wrappers by extracting the next row-level leaf ownership in queue and policy listing rows into bounded detail/action collaborators, so the remaining per-row rendering and action wiring stops accumulating back inside the surface-level shells and table/list composers.",
-      "status": "ready",
+      "description": "Completed the stitched-registry row-leaf follow-up by reducing `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryQueueRowSection.tsx` to composition over dedicated `plan-detail`, `preview-detail`, and `action` collaborators while `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogRowSection.tsx` now composes `catalog-detail`, `defaults-detail`, and `action` collaborators.",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 69,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T01:08:00+09:00",
+      "updated_at": "2026-04-25T01:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the larger stitched-registry shell and summary/filter/empty-state cleanup is mostly finished and names queue/policy row-side leaves as the next local pressure point before considering a jump to another workspace surface.",
-      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the prior `queue-surface`/`policy-catalog-surface` follow-up finished in commit `897e2ef`, and row-leaf extraction is the clearest immediately executable continuation inside the same stitched-registry lane."
+      "direction_relation_note": "The latest main-session reply confirms commit `dc91541` pushed this split: the queue row wrapper now composes `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryQueuePlanDetailSection.tsx`, `...QueuePreviewDetailSection.tsx`, and `...QueueActionSection.tsx`, while the policy row wrapper now composes `...PolicyCatalogDetailSection.tsx`, `...PolicyCatalogDefaultsDetailSection.tsx`, and `...PolicyCatalogActionSection.tsx`.",
+      "priority_reason": "Marked `done` because the main session completed the queued row-leaf split, updated `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md`, passed `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build`, and pushed commit `dc91541` to `origin/main`; the next step is better chosen outside these now-stable row wrappers."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-leaf-rebalance-decision",
@@ -1581,15 +1581,15 @@
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Extract focused provider readback and export history out of RuntimeDataIncidentTriagePanel",
       "description": "Move the focused provider readback and export-history strip that still sits at the top of `apps/web/src/control-room/RuntimeDataIncidentTriagePanel.tsx` into a dedicated workspace-owned section once the scheduler workspace decomposition lands, so the triage shell stops retaining local provider-provenance body pressure points.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 93,
-      "dynamic_priority_delta": 21,
+      "dynamic_priority_delta": 25,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T22:48:00+09:00",
+      "updated_at": "2026-04-25T01:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the focused provider readback/export history still remains inline in `RuntimeDataIncidentTriagePanel.tsx`, but places it outside the current scheduler-section lane after the moderation and stitched-governance collaborator follow-ups.",
-      "priority_reason": "Kept proposed because it remains executable, but the latest reply gives two narrower scheduler-collaborator splits as the higher-confidence immediate follow-ups inside the same lane."
+      "direction_relation_note": "The latest main-session reply says the stitched-registry shell and row-leaf decomposition is largely finished and frames the next decision as either over-splitting already-small queue/policy leaves or moving to another large surface; the still-inline focused provider readback/export-history strip in `RuntimeDataIncidentTriagePanel.tsx` is the clearest large-surface continuation already represented in the ledger.",
+      "priority_reason": "Promoted to `ready` because the just-finished stitched-registry row split removed the strongest local pressure point, and moving to the still-large triage readback/export-history strip is a more executable next task than further fragmenting already-small stitched-registry leaves."
     },
     {
       "id": "task-llm-sensitivity-control-room-app-provider-provenance-route-model-ownership-split",
