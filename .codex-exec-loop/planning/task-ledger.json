@@ -1325,16 +1325,31 @@
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-table-state-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split stitched registry table state ownership into listing and revision-selection collaborators",
-      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryTableSection.tsx` so loading/error empty states, registry listing rows, and selected revision/table interaction flows stop accumulating in one collaborator, leaving the stitched registry table surface as a thinner state-and-render composer.",
-      "status": "ready",
+      "description": "Completed the stitched registry table-state split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryTableSection.tsx` to a thin composer and moving listing ownership into `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryListingSection.tsx` while row-level revision toggle ownership moved into `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSelectionSection.tsx`.",
+      "status": "done",
       "base_priority": 94,
       "dynamic_priority_delta": 53,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T23:18:30+09:00",
+      "updated_at": "2026-04-24T23:26:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryTableSection.tsx` is now the next stitched-registry local pressure point after the bulk-edit staging split completed, making it the clearest immediate continuation in the same decomposition lane.",
-      "priority_reason": "Promoted to the single `ready` queue head because the previous bulk-edit task is complete in commit `7cf125c`, the operator asked to continue one queued task, and the main session explicitly names the table section as the next local pressure point before any deeper follow-up inside the newly split bulk-edit collaborators."
+      "direction_relation_note": "The latest main-session reply confirms this split landed in commit `87ab07f`, with the table section now acting as a thin composer over `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryListingSection.tsx` and `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSelectionSection.tsx`, while docs were updated to reflect the narrower ownership boundary.",
+      "priority_reason": "Marked done because the queued table-state split landed, `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md` were updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `87ab07f` was pushed to `origin/main`; the next stitched-registry pressure now moves to the remaining row body detail/action-cell split."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-stitched-registry-row-body-cell-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split stitched registry row body ownership into detail and action-cell collaborators",
+      "description": "Decompose the row body that still lives under `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSelectionSection.tsx` so registry row detail rendering and action-cell/revision controls stop sharing one collaborator, leaving the stitched registry table subtree with a thinner row-level composer.",
+      "status": "ready",
+      "base_priority": 93,
+      "dynamic_priority_delta": 55,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-24T23:26:30+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply says the remaining stitched-registry table pressure is now the row body that still sits in one file, and explicitly names registry row detail/action-cell separation as the next local decomposition point after the listing/revision-selection split.",
+      "priority_reason": "Promoted to the single `ready` queue head because the previous table-state task completed in commit `87ab07f`, the operator asked to continue one queued task, and the row body detail/action-cell split is the most direct executable continuation named in the latest main-session reply."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-bulk-edit-leaf-stage-split",
@@ -1346,10 +1361,10 @@
       "dynamic_priority_delta": 46,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T23:19:00+09:00",
+      "updated_at": "2026-04-24T23:27:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly calls out the new `policy-stage` and `selection-actions` collaborators as the next decomposition candidates inside the stitched registry bulk-edit subtree after the current table-pressure pass.",
-      "priority_reason": "Left as `proposed` because the follow-up is clearly executable but secondary to the table split that the main session identified as the immediate next local pressure point; this keeps the next bulk-edit leaf pass queued without displacing the higher-confidence queue head."
+      "direction_relation_note": "The latest main-session reply keeps `policy-stage` and `selection-actions` as valid stitched-registry follow-ups, but now frames them as the next alternative after the remaining row-body detail/action-cell split under the table subtree.",
+      "priority_reason": "Kept as `proposed` because the follow-up is still clearly executable, but the latest main-session reply makes the row body detail/action-cell split the more direct immediate continuation after commit `87ab07f`; this preserves the bulk-edit leaf pass as the next fallback without duplicating the new queue head."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-focused-readback-export-history-split",
