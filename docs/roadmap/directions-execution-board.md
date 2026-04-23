@@ -228,6 +228,9 @@ Active move map:
    and keep editor-history split between editing and audit-history collaborators instead of
    recombining queue/catalog review, registry drafting, bulk edits, and history/audit maintenance
    in one module
+9. keep stitched registry editing split between draft, bulk-edit, and table collaborators instead
+   of recombining registry drafting, selection governance, bulk edit staging, and registry listing
+   in one module
 9. keep stitched report views split between saved-view lifecycle ownership and approval-policy
    ownership instead of recombining saved view administration, stitched approval queue, and policy
    catalog review in one module
