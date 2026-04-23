@@ -149,6 +149,9 @@ It is not yet a finished live trading product:
 - the stitched report bulk-edit layer now composes dedicated selection-governance, filter-stage,
   and limit-policy-stage collaborators instead of keeping bulk selection, staged filter editing,
   and staged approval controls inline in one module
+- the stitched report bulk limit/policy stage now composes dedicated approval and policy
+  collaborators instead of keeping numeric approval staging and policy template selection inline in
+  one module
 - the stitched registry-lifecycle layer now composes dedicated review and editor-history
   collaborators instead of keeping registry queue/catalog review, registry editing, audits, and
   revision history in one module

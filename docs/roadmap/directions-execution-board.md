@@ -236,7 +236,10 @@ Active move map:
 11. keep stitched report bulk-edit ownership split between selection-governance, filter-stage,
     and limit-policy-stage collaborators instead of recombining bulk selection, staged filter
     edits, and staged approval controls in one module
-12. keep query-builder replay intent, replay review, replay promotion approval, expression
+12. keep stitched report bulk limit/policy stage ownership split between approval and policy
+    collaborators instead of recombining numeric approval staging and policy template selection in
+    one module
+13. keep query-builder replay intent, replay review, replay promotion approval, expression
     authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
     feature-owned hooks and section collaborators instead of re-expanding the main component body;
     the next pressure points are the remaining large workspace modules plus backend compatibility
