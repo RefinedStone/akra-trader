@@ -133,6 +133,9 @@ It is not yet a finished live trading product:
 - the provider-provenance workspace cards layer now routes the scheduler narrative templates
   surface through a dedicated card wrapper instead of keeping template drafting, bulk governance,
   registry listing, and revision history inline inside `RuntimeProviderProvenanceWorkspaceCards`
+- the scheduler narrative templates card now composes dedicated bulk-governance, registry-table,
+  and revision-history collaborators instead of mixing bulk governance, template registry rows,
+  and template revision history inline in one card body
 - the hierarchy-step-template collaborator now composes dedicated draft, registry, versions, and
   audit collaborators instead of keeping template drafting, bulk cross-catalog governance,
   revision history, and audit review inline in one section module

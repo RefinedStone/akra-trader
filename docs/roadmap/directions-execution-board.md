@@ -210,8 +210,10 @@ Active move map:
    giant governance surface inline in `RuntimeProviderProvenanceWorkspaceCards.tsx`; keep the
    scheduler narrative templates surface routed through a dedicated card wrapper instead of
    rebuilding template drafting, bulk governance, registry listing, and revision history inline
-   in `RuntimeProviderProvenanceWorkspaceCards.tsx`, and keep the hierarchy-step-template section
-   split between draft, registry, versions, and audit
+   in `RuntimeProviderProvenanceWorkspaceCards.tsx`, and keep that scheduler narrative templates
+   card split between dedicated bulk-governance, registry-table, and revision-history
+   collaborators instead of recombining those flows inline in one card body, and keep the
+   hierarchy-step-template section split between draft, registry, versions, and audit
    collaborators instead of rebuilding that cross-catalog governance surface inline in one module,
   and keep the registry layer split between bulk-selection-stage, bulk-step-stage, and
   registry-table collaborators instead of collapsing bulk staging and the registry table back
