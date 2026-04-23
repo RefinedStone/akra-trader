@@ -151,6 +151,9 @@ It is not yet a finished live trading product:
 - the approval queue plans-table collaborator now composes dedicated table-view and row-detail
   collaborators instead of mixing table shell, row review, and row selection actions inline in
   one queue table module
+- the approval queue selected-plan-detail collaborator now composes dedicated review and
+  preview-detail collaborators instead of mixing plan summary review, approval actions, and
+  preview diff detail inline in one selected-plan module
 - the scheduler narrative registry bulk-governance collaborator now composes dedicated
   governance-bar and bulk-edit-stage collaborators instead of mixing selection-policy preview
   actions and advanced bulk edit staging inline in one governance module
