@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitControlSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitControlSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMutationSection({
   model,
   plan,
@@ -11,62 +14,14 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMut
   return (
     <td>
       <div className="market-data-provenance-history-actions">
-        <button
-          className="ghost-button"
-          onClick={() => {
-            reviewProviderProvenanceSchedulerStitchedReportGovernancePlanInSharedQueue(plan);
-          }}
-          type="button"
-        >
-          {selectedProviderProvenanceSchedulerNarrativeGovernancePlanId === plan.plan_id
-            ? "Shared queue selected"
-            : "Review in shared queue"}
-        </button>
-        <button
-          className="ghost-button"
-          disabled={
-            plan.status !== "previewed"
-            || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
-          }
-          onClick={() => {
-            void approveProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
-          }}
-          type="button"
-        >
-          {providerProvenanceSchedulerNarrativeGovernancePlanAction === "approve"
-            ? "Approving…"
-            : "Approve"}
-        </button>
-        <button
-          className="ghost-button"
-          disabled={
-            plan.status !== "approved"
-            || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
-          }
-          onClick={() => {
-            void applyProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
-          }}
-          type="button"
-        >
-          {providerProvenanceSchedulerNarrativeGovernancePlanAction === "apply"
-            ? "Applying…"
-            : "Apply"}
-        </button>
-        <button
-          className="ghost-button"
-          disabled={
-            plan.status !== "applied"
-            || providerProvenanceSchedulerNarrativeGovernancePlanAction !== null
-          }
-          onClick={() => {
-            void rollbackProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
-          }}
-          type="button"
-        >
-          {providerProvenanceSchedulerNarrativeGovernancePlanAction === "rollback"
-            ? "Rolling back…"
-            : "Rollback"}
-        </button>
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionSection
+          model={model}
+          plan={plan}
+        />
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitControlSection
+          model={model}
+          plan={plan}
+        />
       </div>
     </td>
   );
