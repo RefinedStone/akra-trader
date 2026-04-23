@@ -1100,16 +1100,31 @@
       "id": "task-llm-sensitivity-provider-provenance-approval-queue-filter-select-reset-selection-fifth-pass-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split approval queue filter-select and reset-selection leaf ownership into narrower selector collaborators",
-      "description": "Revisit `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection.tsx` and `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetSelectionSection.tsx` now that `toggle-reset` directly owns them so any remaining queue-state/lane/priority selector logic and template/catalog selection wiring can be split into bounded leaf collaborators without rebuilding another wrapper tier above them.",
-      "status": "ready",
+      "description": "Completed the approval-queue selector leaf split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection.tsx` to a thin composer over queue-state, lane, and priority selector collaborators while `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetSelectionSection.tsx` now only composes policy-template and policy-catalog selector collaborators, so the remaining pressure moved out of these mixed leaf owners.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 49,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T19:00:00+09:00",
+      "updated_at": "2026-04-24T19:20:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly names `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection.tsx` and `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetSelectionSection.tsx` as the next approval-queue pressure points after the `toggle-reset` wrapper cleanup landed.",
-      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue with one queued task, the prior `toggle-reset/reset-apply` rebalance completed in commit `fa14425`, and the latest reply gives these two leaf sections as the most direct executable continuation ahead of broader approval-queue body work."
+      "direction_relation_note": "The latest main-session reply confirms this selector-leaf pass landed: `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection.tsx` now just composes queue-state/lane/priority selector collaborators, `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetSelectionSection.tsx` now just composes policy-template/policy-catalog selector collaborators, docs were updated, and commit `2fba28b` was pushed to `origin/main`.",
+      "priority_reason": "Marked done because the queued selector split landed, `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md` were updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `2fba28b` was pushed to `origin/main`; the next immediate approval-queue pressure now sits in the remaining `QueryInputSection` leaf, with the broader outer review/action body still queued behind it."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-approval-queue-query-input-sixth-pass-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split approval queue query-input leaf ownership into narrower search-input collaborators",
+      "description": "Revisit `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueryInputSection.tsx` now that the selector leaves are fully decomposed so any remaining freeform search input, clear/apply affordance, helper copy, and keyboard/change wiring can be separated into bounded collaborators without rebuilding another wrapper tier above the leaf.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 51,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-24T19:21:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply says the approval-queue leaf-selector decomposition is complete and explicitly calls out `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueryInputSection.tsx` as the next remaining leaf pressure point before the broader review/action body.",
+      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue with one queued task, the prior selector-leaf pass completed in commit `2fba28b`, and the latest reply directly points to `QueryInputSection` as the tightest executable continuation while outer approval review/action ownership remains a broader backup option."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-approval-queue-outer-queue-action-layer-fourth-pass-split",
@@ -1121,10 +1136,10 @@
       "dynamic_priority_delta": 46,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T19:00:00+09:00",
+      "updated_at": "2026-04-24T19:21:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply keeps the outer approval-queue review/action body as the alternate next pressure point after the `toggle-reset` cleanup, but it now places the `filter-select` and `reset-selection` leaves ahead of that broader body pass.",
-      "priority_reason": "Kept proposed because the latest reply names the outer approval-queue review/action body as a valid follow-up, but the newly exposed `filter-select` / `reset-selection` leaf ownership is the tighter immediate continuation for builtin next-task auto-progression."
+      "direction_relation_note": "The latest main-session reply keeps the outer approval-queue review/action body as a valid follow-up after the selector-leaf split landed, but it now places the remaining `QueryInputSection` leaf ahead of that broader body pass.",
+      "priority_reason": "Kept proposed because the latest reply still names the outer approval-queue review/action body as the next broader pressure point, but builtin next-task auto-progression should consume the more local `QueryInputSection` leaf first before promoting this larger outer-layer rebalance."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-editor-history-subflow-split",
