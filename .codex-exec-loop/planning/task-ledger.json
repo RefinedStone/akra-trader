@@ -1474,32 +1474,32 @@
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-bulk-edit-leaf-action-state-followup-split",
       "direction_id": "llm-sensitivity-decomposition",
-      "title": "Split stitched registry bulk-edit remaining leaf action and staged-state ownership into narrower collaborators",
-      "description": "Inspect the remaining stitched-registry bulk-edit leaf collaborators below `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkEditSection.tsx` and extract whichever leafs still mix local preview/apply actions with staged metadata, queue, or policy state ownership, so the surviving bulk-edit subtree follows the same thin-composer pattern as the finished table selection/header-shell and policy-stage preview splits.",
+      "title": "Split stitched registry bulk-edit remaining metadata-stage and policy-stage staged-state ownership into narrower collaborators",
+      "description": "Continue the stitched-registry bulk-edit leaf cleanup after commit `c22ce26` by treating `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkSelectionActionsSection.tsx` and `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkQueueStageSection.tsx` as finished composer-level splits, then extract the remaining staged-state pressure inside `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkMetadataStageSection.tsx` and `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryBulkPolicyStageSection.tsx` so those leaves stop mixing staged form state with preview/apply orchestration.",
       "status": "ready",
       "base_priority": 90,
       "dynamic_priority_delta": 69,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T00:12:01+09:00",
+      "updated_at": "2026-04-25T00:14:11+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the stitched-registry table header/selection shell is now cleaned up and directly identifies the next pressure point as the remaining `bulk-edit` leaf action/state hierarchy, with additional `review` filter leaf refinement as the alternate follow-up.",
-      "priority_reason": "Promoted to `ready` because the operator asked to continue one queued task, the prior table selection/header-shell head finished in commit `d908efc`, and the latest reply names `bulk-edit` leaf action/state cleanup as the clearest next executable continuation."
+      "direction_relation_note": "The latest main-session reply confirms commit `c22ce26` already split `selection-actions` into toggle/preview collaborators and `queue-stage` into core-state/query collaborators, and then explicitly narrows the remaining bulk-edit pressure to staged-state cleanup inside `metadata-stage` and `policy-stage`.",
+      "priority_reason": "Kept as `ready` with a narrowed scope because the operator asked to continue one queued task, the previous bulk-edit head was partially completed in commit `c22ce26`, and the reply directly names `metadata-stage` plus `policy-stage` staged-state cleanup as the next executable continuation."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-review-filter-leaf-followup-split",
       "direction_id": "llm-sensitivity-decomposition",
-      "title": "Split stitched registry review filter leaf ownership into narrower collaborators",
-      "description": "Inspect the stitched-registry review filter collaborators under `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryReviewSection.tsx` and extract any remaining leafs that still mix filter control shells with local option/state derivation, so the finished review filter subtree matches the thin-composer boundary now used across the registry table and bulk-edit branches.",
+      "title": "Split stitched registry remaining non-review/table leaf ownership into narrower collaborators",
+      "description": "Inspect the stitched-registry leaves that still sit outside the already-decomposed review/table branches after commit `c22ce26`, and extract whichever remaining registry leafs still mix local staged state or action derivation with shell composition so the post-bulk-edit subtree follows the same thin-composer boundary as the finished selection-actions and queue-stage splits.",
       "status": "proposed",
       "base_priority": 89,
-      "dynamic_priority_delta": 60,
+      "dynamic_priority_delta": 59,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T00:12:02+09:00",
+      "updated_at": "2026-04-25T00:14:12+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly keeps `review` filter child leaves as a remaining stitched-registry pressure point even after commit `d908efc` finished the table selection/header-shell split, but it presents that work as secondary to the bulk-edit leaf cleanup.",
-      "priority_reason": "Left as `proposed` because it is a concrete executable follow-up from the latest reply, but the operator asked to continue one queued task and the `bulk-edit` leaf hierarchy was named first as the immediate next step."
+      "direction_relation_note": "The latest main-session reply no longer points back to `review` filter leaves first; instead it names `review`/`table`-external registry leaf decomposition as the alternate follow-up after the narrowed bulk-edit `metadata-stage` and `policy-stage` cleanup.",
+      "priority_reason": "Left as `proposed` because the latest reply keeps this as a valid alternate path after the narrowed bulk-edit staged-state pass, but the operator asked to continue a single queued task and the remaining `metadata-stage`/`policy-stage` work is the more direct next execution target."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-focused-readback-export-history-split",
