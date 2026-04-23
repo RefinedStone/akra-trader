@@ -245,18 +245,20 @@ Active move map:
   bulk-selection-stage, bulk-patch-stage, table, editor, and versions collaborators instead of
   rebuilding bulk governance staging, captured-step review, direct step editing, and step
   revision history inline in one governance section module; keep the governance-catalog-hierarchy
-  table layer split between row-detail and row-action collaborators instead of recombining
-  captured-step review cells and row-level edit/version actions inline in one table owner; keep
-  the governance-catalog-hierarchy editor layer split between editor-metadata-form and editor-
-  patch-textarea collaborators instead of rebuilding metadata form controls and patch textarea
-  ownership inline in one editor module; keep the governance-catalog-hierarchy versions layer
-  split between a versions-table collaborator plus version-row-detail and version-row-action
-  collaborators instead of rebuilding revision review and restore controls inline; keep the
-  governance-policy-catalog registry-table layer split between row-detail and row-action
-  collaborators instead of recombining catalog/default review and row actions inline; keep the
-  governance-policy-catalog versions layer split between a versions-table collaborator plus
-  version-row-detail and version-row-action collaborators instead of rebuilding revision review
-  and restore controls inline
+  bulk-selection-stage layer split between bulk-selection-state and bulk-selection-action
+  collaborators instead of rebuilding staged selection fields and bulk action triggers inline in
+  one bulk staging owner; keep the governance-catalog-hierarchy table layer split between row-
+  detail and row-action collaborators instead of recombining captured-step review cells and row-
+  level edit/version actions inline in one table owner; keep the governance-catalog-hierarchy
+  editor layer split between editor-metadata-form and editor-patch-textarea collaborators instead
+  of rebuilding metadata form controls and patch textarea ownership inline in one editor module;
+  keep the governance-catalog-hierarchy versions layer split between a versions-table collaborator
+  plus version-row-detail and version-row-action collaborators instead of rebuilding revision
+  review and restore controls inline; keep the governance-policy-catalog registry-table layer
+  split between row-detail and row-action collaborators instead of recombining catalog/default
+  review and row actions inline; keep the governance-policy-catalog versions layer split between a
+  versions-table collaborator plus version-row-detail and version-row-action collaborators instead
+  of rebuilding revision review and restore controls inline
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared

@@ -183,6 +183,9 @@ It is not yet a finished live trading product:
   patch-stage, table, editor, and versions collaborators instead of mixing bulk governance
   staging, captured-step review, direct step editing, and step revision history inline in one
   governance section module
+- the governance-catalog-hierarchy bulk-selection-stage collaborator now composes dedicated bulk-
+  selection-state and bulk-selection-action collaborators instead of mixing staged selection
+  fields and bulk action triggers inline in one bulk staging owner
 - the governance-catalog-hierarchy table collaborator now composes dedicated row-detail and row-
   action collaborators instead of mixing captured-step review cells and row-level edit/version
   actions inline in one table owner
