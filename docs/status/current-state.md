@@ -148,6 +148,9 @@ It is not yet a finished live trading product:
 - the scheduler narrative registry table collaborator now composes dedicated table-view and
   row-detail collaborators instead of mixing table shell, row review, and row actions inline in
   one registry module
+- the scheduler narrative registry revision-history collaborator now composes dedicated
+  history-table and revision-action collaborators instead of mixing revision table shell and
+  revision mutations inline in one history module
 - the scheduler narrative template bulk-governance collaborator now composes dedicated
   governance-bar and bulk-edit-stage collaborators instead of mixing selection-policy preview
   actions and advanced bulk edit staging inline in one governance module

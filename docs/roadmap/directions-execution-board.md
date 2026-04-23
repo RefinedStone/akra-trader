@@ -223,6 +223,9 @@ Active move map:
    staging inline in one governance module; keep the scheduler narrative registry table
    collaborator split between table-view and row-detail collaborators instead of recombining
    table shell, row review, and row actions inline in one registry module; keep the scheduler
+   narrative registry revision-history collaborator split between history-table and
+   revision-action collaborators instead of recombining revision table shell and revision
+   mutations inline in one history module; keep the scheduler
    narrative template bulk-governance collaborator split between governance-bar and
    bulk-edit-stage collaborators instead of recombining selection-policy preview actions and
    advanced bulk edit staging inline in one governance module; keep the scheduler narrative
