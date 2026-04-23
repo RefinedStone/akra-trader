@@ -1,4 +1,8 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActionCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActionCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActorCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActorCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditDetailCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditDetailCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditWhenCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditWhenCellSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection";
@@ -104,35 +108,22 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAudi
             <tbody>
               {providerProvenanceSchedulerStitchedReportGovernanceRegistryAudits.map((entry) => (
                 <tr key={`provider-scheduler-stitched-governance-registry-audit-${entry.audit_id}`}>
-                  <td>
-                    <strong>{formatTimestamp(entry.recorded_at)}</strong>
-                    <p className="run-lineage-symbol-copy">{entry.name}</p>
-                  </td>
-                  <td>
-                    <strong>{formatWorkflowToken(entry.action)}</strong>
-                    <p className="run-lineage-symbol-copy">
-                      {formatWorkflowToken(entry.status)} · {" "}
-                      {formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary(
-                        entry.queue_view,
-                      ) ?? "All stitched governance plans"}
-                    </p>
-                  </td>
-                  <td>
-                    <strong>{entry.actor_tab_label ?? entry.actor_tab_id ?? "unknown tab"}</strong>
-                    <p className="run-lineage-symbol-copy">
-                      {entry.actor_tab_id ?? "No tab id recorded."}
-                    </p>
-                  </td>
-                  <td>
-                    <strong>{entry.detail}</strong>
-                    <p className="run-lineage-symbol-copy">{entry.reason}</p>
-                    <p className="run-lineage-symbol-copy">
-                      {entry.default_policy_template_name ?? "No default policy template"}
-                      {entry.default_policy_catalog_name
-                        ? ` · ${entry.default_policy_catalog_name}`
-                        : ""}
-                    </p>
-                  </td>
+                  <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditWhenCellSection
+                    entry={entry}
+                    model={model}
+                  />
+                  <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActionCellSection
+                    entry={entry}
+                    model={model}
+                  />
+                  <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActorCellSection
+                    entry={entry}
+                    model={model}
+                  />
+                  <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditDetailCellSection
+                    entry={entry}
+                    model={model}
+                  />
                 </tr>
               ))}
             </tbody>
