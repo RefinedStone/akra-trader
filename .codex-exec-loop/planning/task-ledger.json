@@ -1385,16 +1385,31 @@
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-audit-history-revision-table-body-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split stitched registry audit-history revision table body into narrower collaborators",
-      "description": "Decompose the revision table body that still lives inside `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditHistorySection.tsx` so selected revision history rows, supporting detail rendering, and any row-level controls stop sharing one audit-history collaborator, leaving the audit subtree as a thinner table composer.",
-      "status": "ready",
+      "description": "Completed the stitched registry audit-history revision table body split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditHistorySection.tsx` to the history table shell and moving recorded, snapshot, and action cell ownership into `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection.tsx`, `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection.tsx`, and `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection.tsx`.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 61,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T23:59:00+09:00",
+      "updated_at": "2026-04-24T23:59:30+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply identifies the stitched-registry audit-history revision table body as the first remaining local pressure point after the `bulk-policy-stage` preview-action split landed, making it the clearest direct continuation in the same stitched-registry subtree.",
-      "priority_reason": "Promoted to the single `ready` queue head because the prior `bulk-policy-stage` preview-action task completed in commit `9bcbf76`, the operator asked to continue exactly one queued task, and the latest reply names audit-history revision table body ahead of the alternate bulk-edit leaf action/state follow-up."
+      "direction_relation_note": "The latest main-session reply confirms this split landed in commit `5ad9ddc`, with the stitched-registry audit-history section now acting as a table shell while recorded/snapshot/action cell ownership moved into dedicated collaborators.",
+      "priority_reason": "Marked done because the queued revision-table-body split landed, `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md` were updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `5ad9ddc` was pushed to `origin/main`; the next stitched-registry pressure now shifts to the remaining audit-event table body, with bulk-edit leaf action/state split still adjacent."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-stitched-registry-audit-history-audit-event-table-body-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split stitched registry audit-history audit-event table body into narrower collaborators",
+      "description": "Decompose the remaining audit-event table body inside `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditHistorySection.tsx` so event row rendering, provenance/detail display, and any row-level actions stop sharing one audit-history collaborator, leaving the audit subtree as a thinner event-table composer alongside the already-split revision table.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 62,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-24T23:59:31+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly names the stitched-registry audit-history audit event table body as the next local pressure point after the revision table body split landed, making it the clearest direct continuation in the same subtree.",
+      "priority_reason": "Promoted to the single `ready` queue head because the previous revision-table-body task completed in commit `5ad9ddc`, the operator asked to continue exactly one queued task, and the latest reply names audit-event table body ahead of the alternate bulk-edit leaf action/state follow-up."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-bulk-edit-leaf-action-state-followup-split",
@@ -1406,10 +1421,10 @@
       "dynamic_priority_delta": 55,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T23:59:00+09:00",
+      "updated_at": "2026-04-24T23:59:32+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly calls out 'bulk-edit below other leafs' action/state separation as the alternate stitched-registry pressure point after the `bulk-policy-stage` preview-action extraction landed.",
-      "priority_reason": "Added as `proposed` because it is now an explicitly named executable follow-up, but the operator asked to continue one queued task and the existing audit-history revision-table-body split remains the more concrete immediate continuation."
+      "direction_relation_note": "The latest main-session reply still calls out stitched-registry bulk-edit leaf action/state separation as an adjacent remaining pressure point, but now frames it behind the freshly surfaced audit-history audit-event table body split.",
+      "priority_reason": "Kept as `proposed` because it remains an explicitly named executable follow-up, but the operator asked to continue one queued task and the latest reply gives the audit-history audit-event table body as the narrower immediate continuation after commit `5ad9ddc`."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-focused-readback-export-history-split",
