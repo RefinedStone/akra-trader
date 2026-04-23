@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueLaneOptionSourceSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueLaneOptionSourceSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueLaneSelectorSection({ model }: { model: any }) {
   const {} = model;
 
@@ -14,18 +16,7 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueLan
         }
         value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_lane}
       >
-        <option value={ALL_FILTER_VALUE}>All lanes</option>
-        {Array.from(
-          new Set(
-            providerProvenanceSchedulerStitchedReportGovernancePlans.map(
-              (entry) => entry.approval_lane,
-            ),
-          ),
-        ).sort().map((lane) => (
-          <option key={lane} value={lane}>
-            {formatWorkflowToken(lane)}
-          </option>
-        ))}
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueLaneOptionSourceSection model={model} />
       </select>
     </label>
   );

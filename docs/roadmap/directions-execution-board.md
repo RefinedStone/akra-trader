@@ -488,7 +488,10 @@ Active move map:
     and priority selector collaborators, and keep reset-selection ownership split between policy-
     template and policy-catalog selector collaborators instead of recombining multiple selector
     bodies in each leaf owner
-35. keep stitched report approval queue query-input ownership split between search-input binding and
+35. keep stitched report approval queue queue-state, lane, and priority selector collaborators
+    split between selector rendering and dedicated option-source collaborators instead of
+    recombining selector option-source calculation inline in each selector leaf
+36. keep stitched report approval queue query-input ownership split between search-input binding and
     search-input field collaborators instead of recombining search filter update wiring and input
     layout in one leaf owner
 36. keep stitched report saved-view lifecycle split between bulk-edit, revision-review, and audit

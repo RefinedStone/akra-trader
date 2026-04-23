@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueStateOptionSourceSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueStateOptionSourceSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueStateSelectorSection({ model }: { model: any }) {
   const {} = model;
 
@@ -19,10 +21,7 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSta
         }
         value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.queue_state}
       >
-        <option value={ALL_FILTER_VALUE}>All states</option>
-        <option value="pending_approval">Pending approval</option>
-        <option value="ready_to_apply">Ready to apply</option>
-        <option value="completed">Completed</option>
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueStateOptionSourceSection model={model} />
       </select>
     </label>
   );

@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePriorityOptionSourceSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePriorityOptionSourceSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePrioritySelectorSection({ model }: { model: any }) {
   const {} = model;
 
@@ -14,11 +16,7 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePri
         }
         value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.approval_priority}
       >
-        <option value={ALL_FILTER_VALUE}>All priorities</option>
-        <option value="low">Low</option>
-        <option value="normal">Normal</option>
-        <option value="high">High</option>
-        <option value="critical">Critical</option>
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePriorityOptionSourceSection model={model} />
       </select>
     </label>
   );
