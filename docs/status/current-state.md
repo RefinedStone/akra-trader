@@ -186,6 +186,9 @@ It is not yet a finished live trading product:
 - the governance-catalog-hierarchy table collaborator now composes dedicated row-detail and row-
   action collaborators instead of mixing captured-step review cells and row-level edit/version
   actions inline in one table owner
+- the governance-catalog-hierarchy editor collaborator now composes dedicated editor-metadata-form
+  and editor-patch-textarea collaborators instead of mixing metadata form controls and patch
+  textarea ownership inline in one editor module
 - the governance-policy-catalog registry-table collaborator now composes dedicated row-detail and
   row-action collaborators instead of mixing catalog/default review cells and row actions inline
   in one table owner
