@@ -155,6 +155,9 @@ It is not yet a finished live trading product:
 - the stitched report policy-catalog selection-state layer now composes dedicated derived-state and
   selection-action collaborators instead of keeping button enablement checks and catalog-selection
   dispatch inline in one module
+- the stitched report policy-catalog selection-action layer now composes dedicated action-dispatch
+  and trigger-wiring collaborators instead of keeping catalog action dispatch and button wiring
+  inline in one module
 - the stitched report policy-catalog review layer now composes dedicated default-body and
   catalog-state collaborators instead of keeping catalog state and default policy detail cells
   inline in one module

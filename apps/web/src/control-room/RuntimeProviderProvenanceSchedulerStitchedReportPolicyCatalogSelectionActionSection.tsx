@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionDispatchSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionDispatchSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionTriggerWiringSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionTriggerWiringSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionSection({
   model,
   catalog,
@@ -10,46 +13,28 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSel
   useDefaultsDisabled: boolean;
   stageQueueDisabled: boolean;
 }) {
-  const {
-    applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog,
-    stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy,
-    openProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogInSharedSurface,
-  } = model;
-
   return (
-    <>
-      <button
-        className="ghost-button"
-        disabled={useDefaultsDisabled}
-        onClick={() => {
-          applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
-        }}
-        type="button"
-      >
-        Use defaults
-      </button>
-      <button
-        className="ghost-button"
-        disabled={stageQueueDisabled}
-        onClick={() => {
-          applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
-          void stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy(catalog);
-        }}
-        type="button"
-      >
-        Stage queue
-      </button>
-      <button
-        className="ghost-button"
-        onClick={() => {
-          openProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogInSharedSurface(
-            catalog,
-          );
-        }}
-        type="button"
-      >
-        Open shared catalog
-      </button>
-    </>
+    <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionDispatchSection
+      catalog={catalog}
+      model={model}
+    >
+      {({
+        handleOpenSharedCatalog,
+        handleStageQueue,
+        handleUseDefaults,
+      }: {
+        handleOpenSharedCatalog: () => void;
+        handleStageQueue: () => void;
+        handleUseDefaults: () => void;
+      }) => (
+        <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionTriggerWiringSection
+          handleOpenSharedCatalog={handleOpenSharedCatalog}
+          handleStageQueue={handleStageQueue}
+          handleUseDefaults={handleUseDefaults}
+          stageQueueDisabled={stageQueueDisabled}
+          useDefaultsDisabled={useDefaultsDisabled}
+        />
+      )}
+    </RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionDispatchSection>
   );
 }
