@@ -222,7 +222,11 @@ Active move map:
    workspace module; keep `RuntimeProviderProvenanceSchedulerAutomationSection` split between
    dedicated overview, daily-trends, drill-down, and recent-history collaborators instead of
    recombining automation summary controls, daily trend tables, hourly drill-down review, and
-   cycle history pagination inline in one scheduler automation module;
+   cycle history pagination inline in one scheduler automation module; keep
+   `RuntimeProviderProvenanceSchedulerExportsSection` split between dedicated exports-registry,
+   export-policy, and export-audit-history collaborators instead of recombining shared export
+   registry rows, selected export routing policy controls, and audit trail rows inline in one
+   scheduler exports module;
    keep the Governance policy templates card split between a
    dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
    hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
