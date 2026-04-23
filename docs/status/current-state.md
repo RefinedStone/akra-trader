@@ -132,6 +132,9 @@ It is not yet a finished live trading product:
 - `RuntimeProviderProvenanceWorkspaceSection` now composes dedicated query-surface and workspace-
   consumers collaborators instead of mixing cross-focus analytics query controls with workspace
   cards, scheduler workspace, analytics workspace, and shared registry audit mounts inline
+- the provider-provenance analytics workspace collaborator now composes dedicated summary,
+  time-series, rollups, and recent-exports collaborators instead of mixing metrics, time-series
+  tables, rollup tables, and cross-focus export rows inline in one analytics module
 - the provider-provenance workspace cards layer now routes the governance policy templates surface
   through a dedicated card plus template-registry, policy-catalog, catalog-hierarchy,
   hierarchy-step-template, and policy-catalog-audit collaborators instead of one giant governance
