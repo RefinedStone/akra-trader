@@ -138,6 +138,9 @@ It is not yet a finished live trading product:
 - `RuntimeProviderProvenanceWorkspaceCards` now composes dedicated dashboard-layout,
   analytics-presets, and dashboard-views card collaborators instead of mixing layout controls,
   preset registry, and shared dashboard view registry inline in one workspace-cards module
+- `RuntimeProviderProvenanceSchedulerWorkspaceSection` now composes dedicated async-state and
+  workspace-surface collaborators instead of mixing scheduler loading/error state with automation,
+  moderation, stitched-governance, and exports mounts inline in one scheduler workspace module
 - the provider-provenance workspace cards layer now routes the governance policy templates surface
   through a dedicated card plus template-registry, policy-catalog, catalog-hierarchy,
   hierarchy-step-template, and policy-catalog-audit collaborators instead of one giant governance

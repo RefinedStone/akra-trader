@@ -216,6 +216,10 @@ Active move map:
    keep `RuntimeProviderProvenanceWorkspaceCards` split between dedicated dashboard-layout,
    analytics-presets, and dashboard-views card collaborators instead of recombining layout
    controls, preset registry, and shared dashboard view registry inline in one cards module;
+   keep `RuntimeProviderProvenanceSchedulerWorkspaceSection` split between dedicated async-state
+   and workspace-surface collaborators instead of recombining scheduler loading/error state with
+   automation, moderation, stitched-governance, and exports mounts inline in one scheduler
+   workspace module;
    keep the Governance policy templates card split between a
    dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
    hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
