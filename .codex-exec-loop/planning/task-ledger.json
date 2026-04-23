@@ -2090,16 +2090,16 @@
       "id": "task-llm-sensitivity-provider-provenance-scheduler-narrative-registry-revision-history-section-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split Scheduler narrative registry revision history section into narrower history-table and revision-action collaborators",
-      "description": "Now that the scheduler narrative registry governance and table owners are thin, revisit `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerNarrativeRegistryRevisionHistorySection.tsx` so revision-history header/async branching, history-table rendering, and revision-level restore or review actions stop accumulating inside a single lane owner.",
-      "status": "ready",
+      "description": "Completed the scheduler narrative registry revision-history split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerNarrativeRegistryRevisionHistorySection.tsx` to header plus async branching while moving revision table rendering into `RuntimeProviderProvenanceSchedulerNarrativeRegistryHistoryTableSection.tsx` and row mutation controls into `RuntimeProviderProvenanceSchedulerNarrativeRegistryRevisionActionSection.tsx`.",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 49,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T10:20:00+09:00",
+      "updated_at": "2026-04-25T10:35:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly names `RuntimeProviderProvenanceSchedulerNarrativeRegistryRevisionHistorySection.tsx` as the next local pressure point after the governance/table split, making it the clearest direct continuation inside the same registry lane.",
-      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the previous queue head completed in commit `ab6651a`, and the latest reply gives a concrete immediate follow-up in the registry lane before the optional table-action leaf split or the broader `Approval queue` card extraction."
+      "direction_relation_note": "The latest main-session reply confirms `RuntimeProviderProvenanceSchedulerNarrativeRegistryRevisionHistorySection.tsx` now owns only the section head and async branching, with history-table and revision-action ownership moved into dedicated collaborators, which closes the queued registry revision-history follow-up.",
+      "priority_reason": "Marked `done` because the main session completed the revision-history split, updated `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md`, passed `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build`, and pushed commit `01bce2e` to `origin/main`; the next immediate pressure shifts from the now-stable registry lane to the broader inline `Approval queue` workspace card."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-scheduler-narrative-registry-table-action-leaf-split",
@@ -2111,25 +2111,25 @@
       "dynamic_priority_delta": 40,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T10:20:00+09:00",
+      "updated_at": "2026-04-25T10:35:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply names the registry table action leaf as another remaining local pressure point, but frames it behind the revision-history section rather than as the first direct continuation.",
-      "priority_reason": "Kept `proposed` because the table action leaf is executable, but the latest reply gives a stronger direct handoff to the revision-history section and the broader `Approval queue` extraction still sits behind the registry lane cleanup."
+      "direction_relation_note": "The latest main-session reply says the registry lane is largely stabilized after the revision-history split and mentions the table-action leaf only as a smaller optional cleanup rather than the next main continuation.",
+      "priority_reason": "Kept `proposed` because the table-action leaf is still executable, but the latest reply explicitly recommends moving on to the broader `Approval queue` workspace card instead of continuing to shave smaller registry leaves."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-scheduler-approval-queue-card-selection",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Extract Approval queue as the next large inline workspace card after the registry-card internals settle",
-      "description": "After the newly introduced `Scheduler narrative registry` card finishes its first internal decomposition pass, move the still-inline `Approval queue` card out of `apps/web/src/control-room/RuntimeProviderProvenanceWorkspaceCards.tsx` into its own bounded card wrapper so the workspace shell stops retaining another giant scheduler/governance body.",
-      "status": "proposed",
+      "description": "Now that the scheduler narrative registry lane has been decomposed through a stable revision-history boundary, move the still-inline `Approval queue` card out of `apps/web/src/control-room/RuntimeProviderProvenanceWorkspaceCards.tsx` into its own bounded card wrapper so the workspace shell stops retaining the next large scheduler/governance body directly.",
+      "status": "ready",
       "base_priority": 88,
       "dynamic_priority_delta": 42,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T10:20:00+09:00",
+      "updated_at": "2026-04-25T10:35:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply still says `Approval queue` is the remaining large inline workspace card at the workspace level, but the immediate registry follow-up has now narrowed further to `RuntimeProviderProvenanceSchedulerNarrativeRegistryRevisionHistorySection.tsx` plus an optional table-action leaf before broadening back out.",
-      "priority_reason": "Kept `proposed` because `Approval queue` remains the next broad workspace-card continuation, but the latest reply explicitly points to the registry revision-history section and remaining table action leaf as the more direct executable follow-up after commit `ab6651a`."
+      "direction_relation_note": "The latest main-session reply says the scheduler narrative registry lane is now mostly cleaned up, with revision history stabilized as a top-level composition boundary, and explicitly recommends moving to `Approval queue` as the next larger workspace card rather than further slicing tiny registry leaves.",
+      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the previous queue head completed in commit `01bce2e`, and the latest reply directly identifies `Approval queue` as the next executable large-surface follow-up."
     },
     {
       "id": "task-llm-sensitivity-control-room-app-provider-provenance-route-model-ownership-split",
