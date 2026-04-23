@@ -135,6 +135,9 @@ It is not yet a finished live trading product:
 - the provider-provenance analytics workspace collaborator now composes dedicated summary,
   time-series, rollups, and recent-exports collaborators instead of mixing metrics, time-series
   tables, rollup tables, and cross-focus export rows inline in one analytics module
+- `RuntimeProviderProvenanceWorkspaceCards` now composes dedicated dashboard-layout,
+  analytics-presets, and dashboard-views card collaborators instead of mixing layout controls,
+  preset registry, and shared dashboard view registry inline in one workspace-cards module
 - the provider-provenance workspace cards layer now routes the governance policy templates surface
   through a dedicated card plus template-registry, policy-catalog, catalog-hierarchy,
   hierarchy-step-template, and policy-catalog-audit collaborators instead of one giant governance

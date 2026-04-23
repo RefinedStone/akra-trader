@@ -213,6 +213,9 @@ Active move map:
    `RuntimeProviderProvenanceAnalyticsWorkspaceSection` split between dedicated summary,
    time-series, rollups, and recent-exports collaborators instead of recombining analytics
    metrics, time-series tables, rollup tables, and cross-focus export rows inline in one module;
+   keep `RuntimeProviderProvenanceWorkspaceCards` split between dedicated dashboard-layout,
+   analytics-presets, and dashboard-views card collaborators instead of recombining layout
+   controls, preset registry, and shared dashboard view registry inline in one cards module;
    keep the Governance policy templates card split between a
    dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
    hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
