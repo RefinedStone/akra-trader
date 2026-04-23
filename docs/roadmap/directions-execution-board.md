@@ -244,7 +244,10 @@ Active move map:
    keep `RuntimeProviderProvenanceSchedulerExportPolicyActionSection` split between dedicated
    policy-save-action and approval-escalation-action collaborators instead of recombining draft
    persistence with approval and escalation triggers inline in one export-policy-action module;
-   keep
+   keep `RuntimeProviderProvenanceSchedulerExportPolicySummarySection` split between dedicated
+   summary-chips and summary-copy collaborators instead of recombining current route and
+   approval chip status with routing and approval narrative copy inline in one
+   export-policy-summary module; keep
    `RuntimeProviderProvenanceSchedulerExportAuditHistorySection` split between dedicated
    audit-history-summary and audit-history-table collaborators instead of recombining selected
    export identity copy with audit loading, error, empty, and history table states inline in one

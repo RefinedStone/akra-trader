@@ -165,6 +165,9 @@ It is not yet a finished live trading product:
 - the scheduler export-policy-action collaborator now composes dedicated policy-save-action and
   approval-escalation-action collaborators instead of mixing draft persistence with approval and
   escalation triggers inline in one export-policy-action module
+- the scheduler export-policy-summary collaborator now composes dedicated summary-chips and
+  summary-copy collaborators instead of mixing current route and approval chip status with
+  routing and approval narrative copy inline in one export-policy-summary module
 - the scheduler export audit-history collaborator now composes dedicated audit-history-summary
   and audit-history-table collaborators instead of mixing selected export identity copy with
   audit loading, error, empty, and history table states inline in one audit-history module
