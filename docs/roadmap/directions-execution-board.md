@@ -245,7 +245,9 @@ Active move map:
 14. keep stitched report bulk limit-controls ownership split between slice-limit and
     history-limit collaborators instead of recombining slice sizing and history sizing inputs in
     one module
-15. keep query-builder replay intent, replay review, replay promotion approval, expression
+15. keep stitched report bulk slice-limit ownership split between window, result, and occurrence
+    collaborators instead of recombining the three slice sizing inputs in one module
+16. keep query-builder replay intent, replay review, replay promotion approval, expression
     authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
     feature-owned hooks and section collaborators instead of re-expanding the main component body;
     the next pressure points are the remaining large workspace modules plus backend compatibility
