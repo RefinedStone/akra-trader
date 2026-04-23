@@ -213,7 +213,9 @@ Active move map:
   and keep the registry layer split between bulk-selection-stage, bulk-step-stage, and
   registry-table collaborators instead of collapsing bulk staging and the registry table back
   together, and keep the registry-table layer split between row-detail and row-action
-  collaborators instead of recombining cell review and row mutations inline
+  collaborators instead of recombining cell review and row mutations inline; keep the versions
+  layer split between a versions-table collaborator plus version-row-detail and version-row-action
+  collaborators instead of rebuilding revision review and restore controls inline
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
