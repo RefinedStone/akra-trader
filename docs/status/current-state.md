@@ -161,6 +161,9 @@ It is not yet a finished live trading product:
 - the stitched report approval queue toggle-reset layer now composes dedicated filter-select and
   reset-apply collaborators instead of keeping queue-state/lane/priority selects mixed with
   template/catalog reset-or-apply controls in one module
+- the stitched report approval queue reset-apply layer now composes dedicated selection and action
+  collaborators instead of keeping template/catalog selection and queue ordering controls inline in
+  one module
 - the stitched report saved-view layer now composes dedicated bulk-edit, revision-review, and
   audit collaborators instead of keeping selection governance, revision restore, and team audit
   flows inline in one module
