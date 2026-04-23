@@ -169,6 +169,9 @@ It is not yet a finished live trading product:
   bulk-metadata-stage, and bulk-action collaborators instead of mixing selection summary/toggle
   controls, staged metadata/default-template edits, and bulk delete/restore/update actions inline
   in one filter-bar owner
+- the governance-policy-catalog bulk-action collaborator now composes dedicated bulk-delete-
+  action, bulk-restore-action, and bulk-update-action collaborators instead of mixing delete,
+  restore, and update action triggers inline in one action owner
 - the governance-policy-catalog bulk-metadata-stage collaborator now composes dedicated bulk-name-
   stage, bulk-description-stage, and bulk-default-template-stage collaborators instead of mixing
   name prefix/suffix edits, description staging, and default-template staging inline in one

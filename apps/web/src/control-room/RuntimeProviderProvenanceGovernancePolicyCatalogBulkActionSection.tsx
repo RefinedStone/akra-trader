@@ -1,4 +1,8 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceGovernancePolicyCatalogBulkDeleteActionSection } from "./RuntimeProviderProvenanceGovernancePolicyCatalogBulkDeleteActionSection";
+import { RuntimeProviderProvenanceGovernancePolicyCatalogBulkRestoreActionSection } from "./RuntimeProviderProvenanceGovernancePolicyCatalogBulkRestoreActionSection";
+import { RuntimeProviderProvenanceGovernancePolicyCatalogBulkUpdateActionSection } from "./RuntimeProviderProvenanceGovernancePolicyCatalogBulkUpdateActionSection";
+
 export function RuntimeProviderProvenanceGovernancePolicyCatalogBulkActionSection({
   model,
 }: {
@@ -10,42 +14,9 @@ export function RuntimeProviderProvenanceGovernancePolicyCatalogBulkActionSectio
     <label>
       <span>Action</span>
       <div className="market-data-provenance-history-actions">
-        <button
-          className="ghost-button"
-          disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries.length}
-          onClick={() => {
-            void runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction("delete");
-          }}
-          type="button"
-        >
-          {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction === "delete"
-            ? "Deleting…"
-            : "Delete selected"}
-        </button>
-        <button
-          className="ghost-button"
-          disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries.length}
-          onClick={() => {
-            void runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction("restore");
-          }}
-          type="button"
-        >
-          {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction === "restore"
-            ? "Restoring…"
-            : "Restore selected"}
-        </button>
-        <button
-          className="ghost-button"
-          disabled={!selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries.length}
-          onClick={() => {
-            void runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction("update");
-          }}
-          type="button"
-        >
-          {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkAction === "update"
-            ? "Updating…"
-            : "Apply bulk edit"}
-        </button>
+        <RuntimeProviderProvenanceGovernancePolicyCatalogBulkDeleteActionSection model={model} />
+        <RuntimeProviderProvenanceGovernancePolicyCatalogBulkRestoreActionSection model={model} />
+        <RuntimeProviderProvenanceGovernancePolicyCatalogBulkUpdateActionSection model={model} />
       </div>
     </label>
   );
