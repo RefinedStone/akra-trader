@@ -123,7 +123,9 @@ import type {
   RunSurfaceCollectionQueryParameterDomainDescriptor,
   RunSurfaceCollectionQuerySchema,
 } from "../../controlRoomDefinitions";
+import { QueryBuilderReplayApplyHistorySection } from "./QueryBuilderReplayApplyHistorySection";
 import { QueryBuilderReplayGovernanceSection } from "./QueryBuilderReplayGovernanceSection";
+import { QueryBuilderReplayPromotionApprovalSection } from "./QueryBuilderReplayPromotionApprovalSection";
 import {
   RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID,
   RUN_SURFACE_COLLECTION_RUNTIME_MISSING,
@@ -367,8 +369,10 @@ import type {
 } from "./model";
 import { useQueryBuilderAuthoringState } from "./useQueryBuilderAuthoringState";
 import { useQueryBuilderExpressionAuthoringFlow } from "./useQueryBuilderExpressionAuthoringFlow";
-import { useQueryBuilderSimulationFlow } from "./useQueryBuilderSimulationFlow";
 import { useQueryBuilderReplayIntentFlow } from "./useQueryBuilderReplayIntentFlow";
+import { useQueryBuilderReplayPromotionApprovalFlow } from "./useQueryBuilderReplayPromotionApprovalFlow";
+import { useQueryBuilderReplayReviewFlow } from "./useQueryBuilderReplayReviewFlow";
+import { useQueryBuilderSimulationFlow } from "./useQueryBuilderSimulationFlow";
 
 export function RunSurfaceCollectionQueryBuilder({
   contracts,
@@ -895,127 +899,41 @@ export function RunSurfaceCollectionQueryBuilder({
     }
     setPredicateRefDraftKey(matchingTemplate.key);
   }, [predicateRefDraftKey, predicateTemplates, replayIntentUrlTemplateKey]);
-  const selectedRefTemplateReplayApplyHistory = useMemo(
-    () => (
-      selectedRefTemplate
-        ? predicateRefReplayApplyHistory.filter((entry) => entry.templateId === selectedRefTemplate.id)
-        : []
-    ),
-    [predicateRefReplayApplyHistory, selectedRefTemplate],
-  );
-  const latestSelectedRefTemplateReplayApplyEntry = useMemo(
-    () => selectedRefTemplateReplayApplyHistory[0] ?? null,
-    [selectedRefTemplateReplayApplyHistory],
-  );
-  const selectedRefTemplateReplayApplySyncAuditTrail = useMemo(
-    () => (
-      selectedRefTemplate
-        ? predicateRefReplayApplySyncAuditTrail.filter((entry) => entry.templateId === selectedRefTemplate.id)
-        : predicateRefReplayApplySyncAuditTrail
-    ),
-    [predicateRefReplayApplySyncAuditTrail, selectedRefTemplate],
-  );
-  const visibleSelectedRefTemplateReplayApplySyncAuditTrail = useMemo(
-    () => selectedRefTemplateReplayApplySyncAuditTrail.filter((entry) => {
-      if (predicateRefReplayApplySyncAuditFilter === "local") {
-        return entry.sourceTabId === predicateRefReplayApplyHistoryTabIdentity.tabId;
-      }
-      if (predicateRefReplayApplySyncAuditFilter === "remote") {
-        return entry.sourceTabId !== predicateRefReplayApplyHistoryTabIdentity.tabId;
-      }
-      if (predicateRefReplayApplySyncAuditFilter === "apply") {
-        return entry.kind.endsWith("_apply");
-      }
-      if (predicateRefReplayApplySyncAuditFilter === "restore") {
-        return entry.kind.endsWith("_restore");
-      }
-      if (predicateRefReplayApplySyncAuditFilter === "conflict") {
-        return entry.kind.includes("conflict");
-      }
-      return true;
-    }),
-    [
-      predicateRefReplayApplyHistoryTabIdentity.tabId,
-      predicateRefReplayApplySyncAuditFilter,
-      selectedRefTemplateReplayApplySyncAuditTrail,
-    ],
-  );
-  const selectedRefTemplateReplayApplyConflicts = useMemo(
-    () => (
-      selectedRefTemplate
-        ? predicateRefReplayApplyConflicts.filter((entry) => entry.templateId === selectedRefTemplate.id)
-        : predicateRefReplayApplyConflicts
-    ),
-    [predicateRefReplayApplyConflicts, selectedRefTemplate],
-  );
-  const selectedRefTemplateReplayApplyConflictReviews = useMemo<PredicateRefReplayApplyConflictDraftReview[]>(
-    () => {
-      const parameterGroupKeyByParameterKey = Object.fromEntries(
-        selectedRefTemplateParameterGroups.flatMap((group) =>
-          group.parameters.map((parameter) => [parameter.key, group.key] as const)),
-      );
-      return selectedRefTemplateReplayApplyConflicts.map((conflict) => {
-        const review = buildPredicateRefReplayApplyConflictReview(
-          conflict,
-          predicateRefReplayApplyHistoryTabIdentity.label,
-          parameterGroupKeyByParameterKey,
-        );
-        const editableItems = [
-          ...review.summaryDiffs,
-          ...review.rowDiffs,
-          ...review.selectionSnapshotDiffs,
-          ...review.bindingSnapshotDiffs,
-        ].filter((item) => item.editable);
-        const storedDraftSources = predicateRefReplayApplyConflictDraftSourcesById[conflict.conflictId] ?? {};
-        const selectedSources = Object.fromEntries(
-          editableItems.map((item) => [item.decisionKey, storedDraftSources[item.decisionKey] ?? "local"]),
-        ) as Record<string, "local" | "remote">;
-        const mergedEntry = buildPredicateRefReplayApplyConflictMergedEntry(conflict, selectedSources);
-        const selectedRemoteCount = Object.values(selectedSources).filter((source) => source === "remote").length;
-        const hasRemoteSelection = selectedRemoteCount > 0;
-        const hasMixedSelection = hasRemoteSelection && selectedRemoteCount < editableItems.length;
-        const mergedPreview = buildPredicateRefReplayApplyConflictResolutionPreview(
-          conflict,
-          mergedEntry,
-          "merged",
-          hasRemoteSelection
-            ? hasMixedSelection
-              ? `Applies a partial reviewed merge with ${selectedRemoteCount} remote field selections and ${editableItems.length - selectedRemoteCount} local field selections.`
-              : `Applies the fully reviewed remote version across all ${editableItems.length} editable field differences.`
-            : "Keeps the local version because no remote field selections are currently staged.",
-        );
-        return {
-          ...review,
-          editableDiffCount: editableItems.length,
-          hasMixedSelection,
-          hasRemoteSelection,
-          mergedEntry,
-          mergedPreview,
-          selectedRemoteCount,
-          selectedSources,
-        };
-      });
-    },
-    [
-      predicateRefReplayApplyConflictDraftSourcesById,
-      predicateRefReplayApplyHistoryTabIdentity.label,
-      selectedRefTemplateParameterGroups,
-      selectedRefTemplateReplayApplyConflicts,
-    ],
-  );
-  const activePredicateRefReplayApplyConflictSimulationReview = useMemo(
-    () => (
-      predicateRefReplayApplyConflictSimulationConflictId
-        ? selectedRefTemplateReplayApplyConflictReviews.find(
-            (review) => review.conflict.conflictId === predicateRefReplayApplyConflictSimulationConflictId,
-          ) ?? null
-        : null
-    ),
-    [
-      predicateRefReplayApplyConflictSimulationConflictId,
-      selectedRefTemplateReplayApplyConflictReviews,
-    ],
-  );
+  const {
+    activePredicateRefReplayApplyConflictSimulationReview,
+    appendPredicateRefReplayApplySyncAuditEntry,
+    focusPredicateRefReplayApplyConflictDecision,
+    latestSelectedRefTemplateReplayApplyEntry,
+    resetPredicateRefReplayApplyConflictDraftSource,
+    resolvePredicateRefReplayApplyConflict,
+    selectedRefTemplateReplayApplyConflictReviews,
+    selectedRefTemplateReplayApplyConflicts,
+    selectedRefTemplateReplayApplyHistory,
+    selectedRefTemplateReplayApplySyncAuditTrail,
+    setPredicateRefReplayApplyConflictDraftSource,
+    setPredicateRefReplayApplyConflictFocusedDecisionState,
+    setPredicateRefReplayApplyConflictRowRef,
+    togglePredicateRefReplayApplyConflictSimulationFieldPickSource,
+    visibleSelectedRefTemplateReplayApplySyncAuditTrail,
+  } = useQueryBuilderReplayReviewFlow({
+    predicateRefReplayApplyConflictDraftSourcesById,
+    predicateRefReplayApplyConflictFocusedDecision,
+    predicateRefReplayApplyConflictSimulationConflictId,
+    predicateRefReplayApplyConflicts,
+    predicateRefReplayApplyHistory,
+    predicateRefReplayApplyHistoryRef,
+    predicateRefReplayApplyHistoryTabIdentity,
+    predicateRefReplayApplySyncAuditFilter,
+    predicateRefReplayApplySyncAuditTrail,
+    predicateRefReplayApplyConflictRowRefs,
+    selectedRefTemplate,
+    selectedRefTemplateParameterGroups,
+    setPredicateRefReplayApplyConflictDraftSourcesById,
+    setPredicateRefReplayApplyConflictFocusedDecision,
+    setPredicateRefReplayApplyConflicts,
+    setPredicateRefReplayApplyHistory,
+    setPredicateRefReplayApplySyncAuditTrail,
+  });
   useEffect(() => {
     predicateRefReplayApplyHistoryRef.current = predicateRefReplayApplyHistory;
   }, [predicateRefReplayApplyHistory]);
@@ -1025,175 +943,6 @@ export function RunSurfaceCollectionQueryBuilder({
   useEffect(() => {
     predicateRefReplayApplyConflictPolicyRef.current = predicateRefReplayApplyConflictPolicy;
   }, [predicateRefReplayApplyConflictPolicy]);
-  const appendPredicateRefReplayApplySyncAuditEntry = useCallback(
-    (entry: PredicateRefReplayApplySyncAuditEntry) => {
-      setPredicateRefReplayApplySyncAuditTrail((current) =>
-        mergePredicateRefReplayApplySyncAuditEntries(current, [entry]),
-      );
-    },
-    [],
-  );
-  const setPredicateRefReplayApplyConflictDraftSource = useCallback(
-    (
-      conflictId: string,
-      decisionKey: string,
-      source: "local" | "remote",
-    ) => {
-      setPredicateRefReplayApplyConflictDraftSourcesById((current) => ({
-        ...current,
-        [conflictId]: {
-          ...(current[conflictId] ?? {}),
-          [decisionKey]: source,
-        },
-      }));
-    },
-    [],
-  );
-  const setPredicateRefReplayApplyConflictFocusedDecisionState = useCallback(
-    (conflictId: string, decisionKey: string) => {
-      setPredicateRefReplayApplyConflictFocusedDecision({ conflictId, decisionKey });
-    },
-    [],
-  );
-  const resetPredicateRefReplayApplyConflictDraftSource = useCallback((conflictId: string) => {
-    setPredicateRefReplayApplyConflictDraftSourcesById((current) => {
-      if (!current[conflictId]) {
-        return current;
-      }
-      const next = { ...current };
-      delete next[conflictId];
-      return next;
-    });
-  }, []);
-  const focusPredicateRefReplayApplyConflictDecision = useCallback(
-    (conflictId: string, decisionKey: string) => {
-      setPredicateRefReplayApplyConflictFocusedDecisionState(conflictId, decisionKey);
-      const refKey = `${conflictId}:${decisionKey}`;
-      requestAnimationFrame(() => {
-        const node = predicateRefReplayApplyConflictRowRefs.current[refKey];
-        if (!node) {
-          return;
-        }
-        node.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-        node.focus({
-          preventScroll: true,
-        });
-      });
-    },
-    [setPredicateRefReplayApplyConflictFocusedDecisionState],
-  );
-  const togglePredicateRefReplayApplyConflictSimulationFieldPickSource = useCallback(
-    (decisionKey: string) => {
-      if (!activePredicateRefReplayApplyConflictSimulationReview) {
-        return;
-      }
-      setPredicateRefReplayApplyConflictFocusedDecisionState(
-        activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
-        decisionKey,
-      );
-      const currentSource =
-        activePredicateRefReplayApplyConflictSimulationReview.selectedSources[decisionKey] ?? "local";
-      setPredicateRefReplayApplyConflictDraftSource(
-        activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
-        decisionKey,
-        currentSource === "remote" ? "local" : "remote",
-      );
-    },
-    [
-      activePredicateRefReplayApplyConflictSimulationReview,
-      setPredicateRefReplayApplyConflictFocusedDecisionState,
-      setPredicateRefReplayApplyConflictDraftSource,
-    ],
-  );
-  const resolvePredicateRefReplayApplyConflict = useCallback(
-    (
-      conflict: PredicateRefReplayApplyConflictEntry,
-      resolution: "local" | "remote" | "merged",
-      mergedEntry?: PredicateRefReplayApplyHistoryEntry | null,
-    ) => {
-      if (resolution !== "local") {
-        const nextEntry = resolution === "remote" ? conflict.remoteEntry : mergedEntry ?? conflict.localEntry;
-        setPredicateRefReplayApplyHistory((current) => {
-          const next = mergePredicateRefReplayApplyHistoryEntries(
-            current.filter((entry) => entry.id !== conflict.entryId),
-            [nextEntry],
-          );
-          predicateRefReplayApplyHistoryRef.current = next;
-          return next;
-        });
-      }
-      setPredicateRefReplayApplyConflictDraftSourcesById((current) => {
-        if (!current[conflict.conflictId]) {
-          return current;
-        }
-        const next = { ...current };
-        delete next[conflict.conflictId];
-        return next;
-      });
-      setPredicateRefReplayApplyConflicts((current) =>
-        current.filter((entry) => entry.conflictId !== conflict.conflictId),
-      );
-      appendPredicateRefReplayApplySyncAuditEntry({
-        at: new Date().toISOString(),
-        auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
-        detail:
-          resolution === "remote"
-            ? `${predicateRefReplayApplyHistoryTabIdentity.label} accepted the remote replay history override from ${conflict.sourceTabLabel}.`
-            : resolution === "merged"
-              ? `${predicateRefReplayApplyHistoryTabIdentity.label} applied a reviewed replay history merge against ${conflict.sourceTabLabel}.`
-            : `${predicateRefReplayApplyHistoryTabIdentity.label} kept the local replay history version over ${conflict.sourceTabLabel}.`,
-        entryId: conflict.entryId,
-        kind: "conflict_resolved",
-        sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
-        sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
-        templateId: conflict.templateId,
-        templateLabel: conflict.templateLabel,
-      });
-    },
-    [
-      appendPredicateRefReplayApplySyncAuditEntry,
-      predicateRefReplayApplyHistoryTabIdentity.label,
-      predicateRefReplayApplyHistoryTabIdentity.tabId,
-    ],
-  );
-  useEffect(() => {
-    setPredicateRefReplayApplyConflictDraftSourcesById((current) => {
-      const activeConflictIds = new Set(predicateRefReplayApplyConflicts.map((entry) => entry.conflictId));
-      let changed = false;
-      const next = Object.fromEntries(
-        Object.entries(current).filter(([conflictId]) => {
-          const keep = activeConflictIds.has(conflictId);
-          if (!keep) {
-            changed = true;
-          }
-          return keep;
-        }),
-      );
-      return changed ? next : current;
-    });
-  }, [predicateRefReplayApplyConflicts]);
-  useEffect(() => {
-    if (!predicateRefReplayApplyConflictFocusedDecision) {
-      return;
-    }
-    const stillExists = selectedRefTemplateReplayApplyConflictReviews.some((review) =>
-      review.conflict.conflictId === predicateRefReplayApplyConflictFocusedDecision.conflictId
-      && [
-        ...review.summaryDiffs,
-        ...review.rowDiffs,
-        ...review.selectionSnapshotDiffs,
-        ...review.bindingSnapshotDiffs,
-      ].some((item) => item.decisionKey === predicateRefReplayApplyConflictFocusedDecision.decisionKey));
-    if (!stillExists) {
-      setPredicateRefReplayApplyConflictFocusedDecision(null);
-    }
-  }, [
-    predicateRefReplayApplyConflictFocusedDecision,
-    selectedRefTemplateReplayApplyConflictReviews,
-  ]);
   useEffect(() => {
     const conflictedEntryIds = new Set(
       predicateRefReplayApplyConflicts.map((entry: PredicateRefReplayApplyConflictEntry) => entry.entryId),
@@ -2630,6 +2379,21 @@ export function RunSurfaceCollectionQueryBuilder({
       simulatedPredicateRefSolverReplayAttributionByGroupKey,
     ],
   );
+  const activateReplayConflictSimulationReview = useCallback(
+    (review: PredicateRefReplayApplyConflictDraftReview) => {
+      setPredicateRefReplayApplyConflictSimulationConflictId(review.conflict.conflictId);
+      const firstGroupKey = review.mergedEntry.rows[0]?.groupKey ?? "";
+      if (firstGroupKey) {
+        focusReplayApplyConflictSimulationTrace(firstGroupKey, review.conflict.conflictId);
+        return;
+      }
+      bundleCoordinationSimulationPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    },
+    [focusReplayApplyConflictSimulationTrace],
+  );
   const focusRuntimeCandidateReplayTrace = useCallback((params: {
     diffItemKey?: string | null;
     groupKey?: string | null;
@@ -2779,175 +2543,50 @@ export function RunSurfaceCollectionQueryBuilder({
     simulatedPredicateRefSolverReplayAttributionByGroupKey,
     simulatedPredicateRefSolverReplay,
   ]);
-  useEffect(() => {
-    setBundleCoordinationSimulationPromotionDecisionsByGroupKey({});
-    setBundleCoordinationSimulationApprovalDecisionsByGroupKey({});
-    setBundleCoordinationSimulationApprovalOpen(false);
-  }, [
+  const {
+    applyApprovedReplayDraft,
+    approvedSimulatedPredicateRefReplayPromotionSelections,
+    approvedSimulatedPredicateRefReplayPromotionSummary,
+    canReviewReplayFinalSummary,
+    canReviewStagedReplayDraft,
+    closeReplayApprovalReview,
+    closeReplayFinalSummary,
+    openReplayApprovalReview,
+    openReplayFinalSummary,
+    simulatedPredicateRefReplayPromotionDraft,
+    simulatedPredicateRefReplayPromotionPreviewRows,
+    stagedSimulatedPredicateRefReplayPromotionSelections,
+    toggleReplayApprovalDecision,
+    toggleReplayPromotionDecision,
+    visibleSimulatedPredicateRefReplayApprovalRows,
+  } = useQueryBuilderReplayPromotionApprovalFlow({
+    activeSimulatedPredicateRefSolverReplayFilteredActions,
+    activeSimulatedPredicateRefSolverReplayIndex,
+    appendPredicateRefReplayApplySyncAuditEntry,
+    applyPredicateRefGroupPresetBundles,
+    bundleCoordinationSimulationApprovalDecisionsByGroupKey,
+    bundleCoordinationSimulationApprovalDiffOnly,
+    bundleCoordinationSimulationApprovalOpen,
     bundleCoordinationSimulationPolicy,
-    bundleCoordinationSimulationScope,
-    bundleCoordinationSimulationReplayGroupFilter,
+    bundleCoordinationSimulationPromotionDecisionsByGroupKey,
     bundleCoordinationSimulationReplayActionTypeFilter,
     bundleCoordinationSimulationReplayEdgeFilter,
-    activeSimulatedPredicateRefSolverReplayIndex,
-    selectedRefTemplate?.id,
-  ]);
-  const simulatedPredicateRefReplayPromotionDraft = useMemo(() => {
-    type PromotionGroup = ReturnType<typeof groupRunSurfaceCollectionQueryBuilderTemplateParameters>[number];
-    const targetSelections = new Map<string, {
-      group: PromotionGroup;
-      bundlesByKey: Map<string, RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState>;
-    }>();
-    activeSimulatedPredicateRefSolverReplayFilteredActions.forEach((action) => {
-      action.dependencyEdges.forEach((edge) => {
-        if (
-          bundleCoordinationSimulationReplayEdgeFilter !== "all"
-          && edge.key !== bundleCoordinationSimulationReplayEdgeFilter
-        ) {
-          return;
-        }
-        const group = simulatedCoordinationGroups.find((candidate) => candidate.key === edge.targetGroupKey);
-        if (!group) {
-          return;
-        }
-        const bundle =
-          getSortedTemplateGroupPresetBundles(group.presetBundles).find(
-            (candidate) => candidate.key === edge.targetBundleKey,
-          ) ?? null;
-        if (!bundle) {
-          return;
-        }
-        const existing = targetSelections.get(group.key);
-        if (existing) {
-          existing.bundlesByKey.set(bundle.key, bundle);
-          return;
-        }
-        targetSelections.set(group.key, {
-          group,
-          bundlesByKey: new Map([[bundle.key, bundle]]),
-        });
-      });
-    });
-    const promotableSelections: Array<{
-      group: PromotionGroup;
-      bundle: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState;
-    }> = [];
-    const conflicts: Array<{
-      groupLabel: string;
-      bundleLabels: string[];
-    }> = [];
-    targetSelections.forEach(({ group, bundlesByKey }) => {
-      const bundles = Array.from(bundlesByKey.values());
-      if (bundles.length === 1) {
-        promotableSelections.push({
-          group,
-          bundle: bundles[0],
-        });
-        return;
-      }
-      conflicts.push({
-        groupLabel: group.label,
-        bundleLabels: bundles.map((bundle) => bundle.label),
-      });
-    });
-    return {
-      promotableSelections,
-      conflicts,
-    };
-  }, [
-    activeSimulatedPredicateRefSolverReplayFilteredActions,
-    bundleCoordinationSimulationReplayEdgeFilter,
+    bundleCoordinationSimulationReplayGroupFilter,
+    bundleCoordinationSimulationScope,
+    coordinatedPredicateRefGroupBundleState,
     getSortedTemplateGroupPresetBundles,
-    simulatedCoordinationGroups,
-  ]);
-  const simulatedPredicateRefReplayPromotionPreviewRows = useMemo(
-    () => simulatedPredicateRefReplayPromotionDraft.promotableSelections.map(({ group, bundle }) => {
-      const currentBundleKey =
-        coordinatedPredicateRefGroupBundleState.resolvedSelectionsByGroupKey[group.key] ?? "";
-      const simulatedBundleKey =
-        simulatedPredicateRefGroupBundleState?.resolvedSelectionsByGroupKey[group.key] ?? "";
-      const currentBundle =
-        getSortedTemplateGroupPresetBundles(group.presetBundles).find((candidate) => candidate.key === currentBundleKey)
-        ?? null;
-      const simulatedBundle =
-        getSortedTemplateGroupPresetBundles(group.presetBundles).find((candidate) => candidate.key === simulatedBundleKey)
-        ?? null;
-      const currentStatus =
-        coordinatedPredicateRefGroupBundleState.policyTraceByGroupKey[group.key]?.statusLabel ?? "Idle";
-      const simulatedStatus =
-        simulatedPredicateRefGroupBundleState?.policyTraceByGroupKey[group.key]?.statusLabel ?? "Idle";
-      return {
-        group,
-        promotedBundle: bundle,
-        currentBundleLabel: currentBundle?.label ?? "No bundle",
-        simulatedBundleLabel: simulatedBundle?.label ?? "No bundle",
-        currentStatus,
-        simulatedStatus,
-        matchesSimulation: simulatedBundle?.key === bundle.key,
-        changesCurrent: currentBundle?.key !== bundle.key,
-      };
-    }),
-    [
-      coordinatedPredicateRefGroupBundleState.policyTraceByGroupKey,
-      coordinatedPredicateRefGroupBundleState.resolvedSelectionsByGroupKey,
-      getSortedTemplateGroupPresetBundles,
-      simulatedPredicateRefGroupBundleState,
-      simulatedPredicateRefReplayPromotionDraft.promotableSelections,
-    ],
-  );
-  const stagedSimulatedPredicateRefReplayPromotionSelections = useMemo(
-    () => simulatedPredicateRefReplayPromotionPreviewRows.filter((row) =>
-      bundleCoordinationSimulationPromotionDecisionsByGroupKey[row.group.key] ?? true,
-    ),
-    [
-      bundleCoordinationSimulationPromotionDecisionsByGroupKey,
-      simulatedPredicateRefReplayPromotionPreviewRows,
-    ],
-  );
-  const visibleSimulatedPredicateRefReplayApprovalRows = useMemo(
-    () => (
-      bundleCoordinationSimulationApprovalDiffOnly
-        ? stagedSimulatedPredicateRefReplayPromotionSelections.filter((row) =>
-            row.changesCurrent || !row.matchesSimulation,
-          )
-        : stagedSimulatedPredicateRefReplayPromotionSelections
-    ),
-    [
-      bundleCoordinationSimulationApprovalDiffOnly,
-      stagedSimulatedPredicateRefReplayPromotionSelections,
-    ],
-  );
-  const approvedSimulatedPredicateRefReplayPromotionSelections = useMemo(
-    () => stagedSimulatedPredicateRefReplayPromotionSelections.filter((row) =>
-      bundleCoordinationSimulationApprovalDecisionsByGroupKey[row.group.key] ?? true,
-    ),
-    [
-      bundleCoordinationSimulationApprovalDecisionsByGroupKey,
-      stagedSimulatedPredicateRefReplayPromotionSelections,
-    ],
-  );
-  const approvedSimulatedPredicateRefReplayPromotionSummary = useMemo(() => ({
-    total: approvedSimulatedPredicateRefReplayPromotionSelections.length,
-    changesCurrentCount: approvedSimulatedPredicateRefReplayPromotionSelections.filter((row) =>
-      row.changesCurrent,
-    ).length,
-    matchesSimulationCount: approvedSimulatedPredicateRefReplayPromotionSelections.filter((row) =>
-      row.matchesSimulation,
-    ).length,
-  }), [approvedSimulatedPredicateRefReplayPromotionSelections]);
-  useEffect(() => {
-    if (
-      !bundleCoordinationSimulationApprovalOpen
-      || !selectedRefTemplate
-      || !approvedSimulatedPredicateRefReplayPromotionSelections.length
-    ) {
-      setBundleCoordinationSimulationFinalSummaryOpen(false);
-    }
-  }, [
-    approvedSimulatedPredicateRefReplayPromotionSelections,
-    bundleCoordinationSimulationApprovalOpen,
+    predicateRefDraftBindings,
+    predicateRefGroupBundleSelections,
+    predicateRefReplayApplyHistoryTabIdentity,
     selectedRefTemplate,
-  ]);
+    setBundleCoordinationSimulationApprovalDecisionsByGroupKey,
+    setBundleCoordinationSimulationApprovalOpen,
+    setBundleCoordinationSimulationFinalSummaryOpen,
+    setBundleCoordinationSimulationPromotionDecisionsByGroupKey,
+    setPredicateRefReplayApplyHistory,
+    simulatedCoordinationGroups,
+    simulatedPredicateRefGroupBundleState,
+  });
   useEffect(() => {
     if (
       bundleCoordinationSimulationReplayActionTypeFilter !== "all"
@@ -6818,38 +6457,72 @@ export function RunSurfaceCollectionQueryBuilder({
                                     </select>
                                   </label>
                                 </div>
-                                <div className="run-surface-query-builder-actions">
-                                  <button
-                                    className="ghost-button"
-                                    disabled={
-                                      !stagedSimulatedPredicateRefReplayPromotionSelections.length
-                                      || simulatedPredicateRefReplayPromotionDraft.conflicts.length > 0
-                                    }
-                                    onClick={() => {
-                                      if (!stagedSimulatedPredicateRefReplayPromotionSelections.length) {
-                                        return;
-                                      }
-                                      setBundleCoordinationSimulationApprovalDecisionsByGroupKey(
-                                        Object.fromEntries(
-                                          stagedSimulatedPredicateRefReplayPromotionSelections.map((row) => [
-                                            row.group.key,
-                                            true,
-                                          ]),
-                                        ),
-                                      );
-                                      setBundleCoordinationSimulationFinalSummaryOpen(false);
-                                      setBundleCoordinationSimulationApprovalOpen(true);
-                                    }}
-                                    type="button"
-                                  >
-                                    Review staged replay draft
-                                  </button>
-                                </div>
+                                <QueryBuilderReplayPromotionApprovalSection
+                                  approval={{
+                                    approvedSelections: approvedSimulatedPredicateRefReplayPromotionSelections,
+                                    approvalOpen: bundleCoordinationSimulationApprovalOpen,
+                                    canReviewReplayFinalSummary,
+                                    canReviewStagedReplayDraft,
+                                    diffOnly: bundleCoordinationSimulationApprovalDiffOnly,
+                                    finalSummaryOpen: bundleCoordinationSimulationFinalSummaryOpen,
+                                    previewRows: simulatedPredicateRefReplayPromotionPreviewRows,
+                                    stagedSelections: stagedSimulatedPredicateRefReplayPromotionSelections,
+                                    summary: approvedSimulatedPredicateRefReplayPromotionSummary,
+                                    visibleApprovalRows: visibleSimulatedPredicateRefReplayApprovalRows,
+                                  }}
+                                  callbacks={{
+                                    applyApprovedReplayDraft,
+                                    closeReplayApprovalReview,
+                                    closeReplayFinalSummary,
+                                    openReplayApprovalReview,
+                                    openReplayFinalSummary,
+                                    setDiffOnly: setBundleCoordinationSimulationApprovalDiffOnly,
+                                    toggleReplayApprovalDecision,
+                                    toggleReplayPromotionDecision,
+                                  }}
+                                  draft={{
+                                    conflicts: simulatedPredicateRefReplayPromotionDraft.conflicts,
+                                  }}
+                                />
+                                <QueryBuilderReplayApplyHistorySection
+                                  callbacks={{
+                                    activateReplayConflictSimulationReview,
+                                    focusReplayApplyConflictSimulationTrace,
+                                    resetPredicateRefReplayApplyConflictDraftSource,
+                                    resolvePredicateRefReplayApplyConflict,
+                                    restorePredicateRefReplayApplyHistoryEntry,
+                                    setPredicateRefReplayApplyConflictDraftSource,
+                                    setPredicateRefReplayApplyConflictFocusedDecisionState,
+                                    setPredicateRefReplayApplyConflictPolicy,
+                                    setPredicateRefReplayApplyConflictRowRef,
+                                    setPredicateRefReplayApplySyncAuditFilter,
+                                    setPredicateRefReplayApplySyncMode,
+                                  }}
+                                  helpers={{
+                                    formatRelativeTimestampLabel,
+                                  }}
+                                  review={{
+                                    latestSelectedRefTemplateReplayApplyEntry,
+                                    predicateRefReplayApplyConflictFocusedDecision,
+                                    predicateRefReplayApplyConflictPolicy,
+                                    predicateRefReplayApplyConflictSimulationConflictId,
+                                    predicateRefReplayApplyHistoryTabIdentity,
+                                    predicateRefReplayApplySyncAuditFilter,
+                                    predicateRefReplayApplySyncMode,
+                                    selectedRefTemplateReplayApplyConflictReviews,
+                                    selectedRefTemplateReplayApplyConflicts,
+                                    selectedRefTemplateReplayApplyHistory,
+                                    selectedRefTemplateReplayApplySyncAuditTrail,
+                                    simulatedCoordinationGroups,
+                                    visibleSelectedRefTemplateReplayApplySyncAuditTrail,
+                                  }}
+                                />
                                 <input
                                   className="run-surface-query-builder-trace-slider"
                                   max={Math.max(0, simulatedPredicateRefSolverReplay.length - 1)}
                                   min={0}
-                                  onChange={(event) => setBundleCoordinationSimulationReplayIndex(Number(event.target.value))}
+                                  onChange={(event) =>
+                                    setBundleCoordinationSimulationReplayIndex(Number(event.target.value))}
                                   type="range"
                                   value={activeSimulatedPredicateRefSolverReplayIndex}
                                 />
@@ -6876,933 +6549,41 @@ export function RunSurfaceCollectionQueryBuilder({
                                     ) : null}
                                     {activeSimulatedPredicateRefSolverReplayFilteredActions.length ? (
                                       <p className="run-note">
-                                        {`Reviewed collision field picks are annotated on any replay group touched by the current simulation override.`}
+                                        Reviewed collision field picks are annotated on any replay group touched by the
+                                        current simulation override.
                                       </p>
-                                    ) : null}
-                                    {simulatedPredicateRefReplayPromotionPreviewRows.length ? (
-                                      <p className="run-note">
-                                        {`Staged promotion currently applies ${stagedSimulatedPredicateRefReplayPromotionSelections
-                                          .map((entry) => `${entry.group.label} → ${entry.promotedBundle.label}`)
-                                          .join(", ") || "no groups"} from the filtered replay edge set.`}
-                                      </p>
-                                    ) : null}
-                                    {simulatedPredicateRefReplayPromotionDraft.conflicts.length ? (
-                                      <p className="run-note">
-                                        {`Promotion is blocked by conflicting target bundles in ${simulatedPredicateRefReplayPromotionDraft.conflicts
-                                          .map((conflict) => `${conflict.groupLabel} (${conflict.bundleLabels.join(", ")})`)
-                                          .join("; ")}.`}
-                                      </p>
-                                    ) : null}
-                                    {simulatedPredicateRefReplayPromotionPreviewRows.length ? (
-                                      <div className="run-surface-query-builder-trace-list">
-                                        {simulatedPredicateRefReplayPromotionPreviewRows.map((row) => {
-                                          const isSelected =
-                                            bundleCoordinationSimulationPromotionDecisionsByGroupKey[row.group.key] ?? true;
-                                          return (
-                                            <div
-                                              className={`run-surface-query-builder-trace-step is-${
-                                                row.matchesSimulation
-                                                  ? "success"
-                                                  : row.changesCurrent
-                                                    ? "info"
-                                                    : "muted"
-                                              }`}
-                                              key={`promotion-preview:${row.group.key}`}
-                                            >
-                                              <strong>{row.group.label}</strong>
-                                              <p>
-                                                {`${row.currentStatus} · ${row.currentBundleLabel} → ${row.simulatedStatus} · ${row.simulatedBundleLabel} → draft ${row.promotedBundle.label}`}
-                                              </p>
-                                              <div className="run-surface-query-builder-actions">
-                                                <button
-                                                  className={`ghost-button${isSelected ? " is-active" : ""}`}
-                                                  onClick={() =>
-                                                    setBundleCoordinationSimulationPromotionDecisionsByGroupKey((current) => ({
-                                                      ...current,
-                                                      [row.group.key]: !(current[row.group.key] ?? true),
-                                                    }))}
-                                                  type="button"
-                                                >
-                                                  {isSelected ? "Staged for apply" : "Skipped"}
-                                                </button>
-                                              </div>
-                                              <div className="run-surface-query-builder-trace-chip-list">
-                                                <span className={`run-surface-query-builder-trace-chip${row.matchesSimulation ? " is-active" : ""}`}>
-                                                  {row.matchesSimulation ? "Matches simulated bundle" : "Differs from simulated bundle"}
-                                                </span>
-                                                <span className={`run-surface-query-builder-trace-chip${row.changesCurrent ? " is-active" : ""}`}>
-                                                  {row.changesCurrent ? "Changes current resolution" : "Keeps current resolution"}
-                                                </span>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : null}
-                                    {bundleCoordinationSimulationApprovalOpen ? (
-                                      <div className="run-surface-query-builder-trace-panel is-nested">
-                                        <div className="run-surface-query-builder-card-head">
-                                          <strong>Replay apply approval</strong>
-                                          <span className="run-surface-query-builder-trace-status is-info">
-                                            {`${approvedSimulatedPredicateRefReplayPromotionSelections.length}/${stagedSimulatedPredicateRefReplayPromotionSelections.length} approved`}
-                                          </span>
-                                        </div>
-                                        <div className="run-surface-query-builder-actions">
-                                          <button
-                                            className="ghost-button"
-                                            onClick={() => setBundleCoordinationSimulationApprovalOpen(false)}
-                                            type="button"
-                                          >
-                                            Close review
-                                          </button>
-                                          <button
-                                            className="ghost-button"
-                                            disabled={
-                                              !selectedRefTemplate
-                                              || !approvedSimulatedPredicateRefReplayPromotionSelections.length
-                                            }
-                                            onClick={() => {
-                                              if (!selectedRefTemplate || !approvedSimulatedPredicateRefReplayPromotionSelections.length) {
-                                                return;
-                                              }
-                                              setBundleCoordinationSimulationFinalSummaryOpen(true);
-                                            }}
-                                            type="button"
-                                          >
-                                            Review final summary
-                                          </button>
-                                        </div>
-                                        <label className="run-surface-query-builder-checkbox">
-                                          <input
-                                            checked={bundleCoordinationSimulationApprovalDiffOnly}
-                                            onChange={(event) =>
-                                              setBundleCoordinationSimulationApprovalDiffOnly(event.target.checked)}
-                                            type="checkbox"
-                                          />
-                                          <span>Diff-only confirmation</span>
-                                        </label>
-                                        <p className="run-note">
-                                          Review the three-way comparison before apply:
-                                          current live resolution, simulated policy outcome, and promoted replay draft.
-                                        </p>
-                                        {visibleSimulatedPredicateRefReplayApprovalRows.length ? (
-                                          <div className="run-surface-query-builder-trace-list">
-                                            {visibleSimulatedPredicateRefReplayApprovalRows.map((row) => {
-                                              const isApproved =
-                                                bundleCoordinationSimulationApprovalDecisionsByGroupKey[row.group.key] ?? true;
-                                              return (
-                                                <div
-                                                  className={`run-surface-query-builder-trace-step is-${
-                                                    row.matchesSimulation
-                                                      ? "success"
-                                                      : row.changesCurrent
-                                                        ? "info"
-                                                        : "muted"
-                                                  }`}
-                                                  key={`approval-preview:${row.group.key}`}
-                                                >
-                                                  <strong>{row.group.label}</strong>
-                                                  <div className="run-surface-query-builder-trace-chip-list">
-                                                    <span className="run-surface-query-builder-trace-chip">
-                                                      {`Current · ${row.currentStatus} · ${row.currentBundleLabel}`}
-                                                    </span>
-                                                    <span className="run-surface-query-builder-trace-chip">
-                                                      {`Simulated · ${row.simulatedStatus} · ${row.simulatedBundleLabel}`}
-                                                    </span>
-                                                    <span className="run-surface-query-builder-trace-chip is-active">
-                                                      {`Draft · ${row.promotedBundle.label}`}
-                                                    </span>
-                                                  </div>
-                                                  <div className="run-surface-query-builder-actions">
-                                                    <button
-                                                      className={`ghost-button${isApproved ? " is-active" : ""}`}
-                                                      onClick={() =>
-                                                        setBundleCoordinationSimulationApprovalDecisionsByGroupKey((current) => ({
-                                                          ...current,
-                                                          [row.group.key]: !(current[row.group.key] ?? true),
-                                                        }))}
-                                                      type="button"
-                                                    >
-                                                      {isApproved ? "Approved" : "Rejected"}
-                                                    </button>
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        ) : (
-                                          <div className="run-surface-query-builder-trace-step is-muted">
-                                            <strong>No approval rows</strong>
-                                            <p>
-                                              {bundleCoordinationSimulationApprovalDiffOnly
-                                                ? "Diff-only confirmation is hiding rows that do not differ from the current or simulated state."
-                                                : "There are no staged replay rows available for approval."}
-                                            </p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : null}
-                                    {bundleCoordinationSimulationFinalSummaryOpen ? (
-                                      <div
-                                        aria-modal="true"
-                                        className="run-surface-query-builder-modal-backdrop"
-                                        onClick={() => setBundleCoordinationSimulationFinalSummaryOpen(false)}
-                                        role="dialog"
-                                      >
-                                        <div
-                                          className="run-surface-query-builder-modal"
-                                          onClick={(event) => event.stopPropagation()}
-                                        >
-                                          <div className="run-surface-query-builder-card-head">
-                                            <strong>Final replay apply summary</strong>
-                                            <span>{`${approvedSimulatedPredicateRefReplayPromotionSummary.total} approved rows`}</span>
-                                          </div>
-                                          <p className="run-note">
-                                            Confirm the exact replay draft changes before they become live manual overrides.
-                                            This final summary always shows every approved row, even if diff-only confirmation hid some rows in review.
-                                          </p>
-                                          <div className="run-surface-query-builder-trace-chip-list">
-                                            <span className="run-surface-query-builder-trace-chip is-active">
-                                              {`${approvedSimulatedPredicateRefReplayPromotionSummary.changesCurrentCount} change current`}
-                                            </span>
-                                            <span className="run-surface-query-builder-trace-chip">
-                                              {`${approvedSimulatedPredicateRefReplayPromotionSummary.matchesSimulationCount} match simulated`}
-                                            </span>
-                                            <span className="run-surface-query-builder-trace-chip">
-                                              {`${Math.max(
-                                                0,
-                                                approvedSimulatedPredicateRefReplayPromotionSummary.total
-                                                  - approvedSimulatedPredicateRefReplayPromotionSummary.matchesSimulationCount,
-                                              )} diverge from simulated`}
-                                            </span>
-                                          </div>
-                                          <div className="run-surface-query-builder-trace-list">
-                                            {approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => (
-                                              <div
-                                                className={`run-surface-query-builder-trace-step is-${
-                                                  row.matchesSimulation
-                                                    ? "success"
-                                                    : row.changesCurrent
-                                                      ? "info"
-                                                      : "muted"
-                                                }`}
-                                                key={`final-approval-preview:${row.group.key}`}
-                                              >
-                                                <strong>{row.group.label}</strong>
-                                                <div className="run-surface-query-builder-trace-chip-list">
-                                                  <span className="run-surface-query-builder-trace-chip">
-                                                    {`Current · ${row.currentStatus} · ${row.currentBundleLabel}`}
-                                                  </span>
-                                                  <span className="run-surface-query-builder-trace-chip">
-                                                    {`Simulated · ${row.simulatedStatus} · ${row.simulatedBundleLabel}`}
-                                                  </span>
-                                                  <span className="run-surface-query-builder-trace-chip is-active">
-                                                    {`Draft · ${row.promotedBundle.label}`}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                          <div className="run-surface-query-builder-modal-actions">
-                                            <button
-                                              className="ghost-button"
-                                              onClick={() => setBundleCoordinationSimulationFinalSummaryOpen(false)}
-                                              type="button"
-                                            >
-                                              Back to approval
-                                            </button>
-                                            <button
-                                              className="ghost-button"
-                                              disabled={
-                                                !selectedRefTemplate
-                                                || !approvedSimulatedPredicateRefReplayPromotionSelections.length
-                                              }
-                                              onClick={() => {
-                                                if (!selectedRefTemplate || !approvedSimulatedPredicateRefReplayPromotionSelections.length) {
-                                                  return;
-                                                }
-                                                const appliedAt = new Date().toISOString();
-                                                const historyEntry: PredicateRefReplayApplyHistoryEntry = {
-                                                  appliedAt,
-                                                  approvedCount: approvedSimulatedPredicateRefReplayPromotionSummary.total,
-                                                  changedCurrentCount:
-                                                    approvedSimulatedPredicateRefReplayPromotionSummary.changesCurrentCount,
-                                                  id: `replay-apply:${selectedRefTemplate.id}:${appliedAt}`,
-                                                  matchesSimulationCount:
-                                                    approvedSimulatedPredicateRefReplayPromotionSummary.matchesSimulationCount,
-                                                  rollbackSnapshot: {
-                                                    draftBindingsByParameterKey: Object.fromEntries(
-                                                      approvedSimulatedPredicateRefReplayPromotionSelections.flatMap((row) =>
-                                                        row.group.parameters.map((parameter) => ([
-                                                          parameter.key,
-                                                          predicateRefDraftBindings[parameter.key] ?? null,
-                                                        ])),
-                                                      ),
-                                                    ),
-                                                    groupSelectionsBySelectionKey: Object.fromEntries(
-                                                      approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => {
-                                                        const selectionKey = `${selectedRefTemplate.id}:${row.group.key}`;
-                                                        return [
-                                                          selectionKey,
-                                                          predicateRefGroupBundleSelections[selectionKey] ?? null,
-                                                        ];
-                                                      }),
-                                                    ),
-                                                  },
-                                                  rows: approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
-                                                    changesCurrent: row.changesCurrent,
-                                                    currentBundleLabel: row.currentBundleLabel,
-                                                    currentStatus: row.currentStatus,
-                                                    groupKey: row.group.key,
-                                                    groupLabel: row.group.label,
-                                                    matchesSimulation: row.matchesSimulation,
-                                                    promotedBundleKey: row.promotedBundle.key,
-                                                    promotedBundleLabel: row.promotedBundle.label,
-                                                    simulatedBundleLabel: row.simulatedBundleLabel,
-                                                    simulatedStatus: row.simulatedStatus,
-                                                  })),
-                                                  sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
-                                                  sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
-                                                  templateId: selectedRefTemplate.id,
-                                                  templateLabel: selectedRefTemplate.key,
-                                                };
-                                                setPredicateRefReplayApplyHistory((current) => [
-                                                  historyEntry,
-                                                  ...current,
-                                                ].slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES));
-                                                appendPredicateRefReplayApplySyncAuditEntry({
-                                                  at: appliedAt,
-                                                  auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
-                                                  detail: `${predicateRefReplayApplyHistoryTabIdentity.label} applied ${historyEntry.approvedCount} approved replay rows.`,
-                                                  entryId: historyEntry.id,
-                                                  kind: "local_apply",
-                                                  sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
-                                                  sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
-                                                  templateId: historyEntry.templateId,
-                                                  templateLabel: historyEntry.templateLabel,
-                                                });
-                                                applyPredicateRefGroupPresetBundles(
-                                                  selectedRefTemplate.id,
-                                                  approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
-                                                    group: row.group,
-                                                    bundle: row.promotedBundle,
-                                                  })),
-                                                );
-                                                setBundleCoordinationSimulationFinalSummaryOpen(false);
-                                                setBundleCoordinationSimulationApprovalOpen(false);
-                                              }}
-                                              type="button"
-                                            >
-                                              Apply approved replay draft
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ) : null}
-                                    {selectedRefTemplate ? (
-                                      <div className="run-surface-query-builder-trace-panel is-nested">
-                                        <div className="run-surface-query-builder-card-head">
-                                          <strong>Replay apply history</strong>
-                                          <span>{`${selectedRefTemplateReplayApplyHistory.length} entries`}</span>
-                                        </div>
-                                        <div className="run-surface-query-builder-inline-grid">
-                                          <label className="run-surface-query-builder-control">
-                                            <span>Remote sync mode</span>
-                                            <select
-                                              value={predicateRefReplayApplySyncMode}
-                                              onChange={(event) =>
-                                                setPredicateRefReplayApplySyncMode(
-                                                  event.target.value as PredicateRefReplayApplySyncMode,
-                                                )}
-                                            >
-                                              <option value="live">Live merge</option>
-                                              <option value="audit_only">Audit only</option>
-                                              <option value="mute_remote">Mute remote</option>
-                                            </select>
-                                            <small>
-                                              {predicateRefReplayApplySyncMode === "live"
-                                                ? "Apply and restore events from other tabs merge into this tab."
-                                                : predicateRefReplayApplySyncMode === "audit_only"
-                                                  ? "Remote tab events are logged but do not change this tab history."
-                                              : "Remote tab replay history updates are ignored in this tab."}
-                                            </small>
-                                          </label>
-                                          <label className="run-surface-query-builder-control">
-                                            <span>Conflict policy</span>
-                                            <select
-                                              value={predicateRefReplayApplyConflictPolicy}
-                                              onChange={(event) =>
-                                                setPredicateRefReplayApplyConflictPolicy(
-                                                  event.target.value as PredicateRefReplayApplyConflictPolicy,
-                                                )}
-                                            >
-                                              <option value="require_review">Require review</option>
-                                              <option value="prefer_local">Prefer local</option>
-                                              <option value="prefer_remote">Prefer remote</option>
-                                            </select>
-                                            <small>
-                                              {predicateRefReplayApplyConflictPolicy === "require_review"
-                                                ? "Override collisions stay pending until you explicitly resolve them."
-                                                : predicateRefReplayApplyConflictPolicy === "prefer_local"
-                                                  ? "Conflicting remote overrides are logged but local history wins."
-                                                  : "Conflicting remote overrides replace local history automatically."}
-                                            </small>
-                                          </label>
-                                          <label className="run-surface-query-builder-control">
-                                            <span>Audit filter</span>
-                                            <select
-                                              value={predicateRefReplayApplySyncAuditFilter}
-                                              onChange={(event) =>
-                                                setPredicateRefReplayApplySyncAuditFilter(
-                                                  event.target.value as PredicateRefReplayApplySyncAuditFilter,
-                                                )}
-                                            >
-                                              <option value="all">All audit events</option>
-                                              <option value="local">Local only</option>
-                                              <option value="remote">Remote only</option>
-                                              <option value="apply">Apply only</option>
-                                              <option value="restore">Restore only</option>
-                                              <option value="conflict">Conflict only</option>
-                                            </select>
-                                            <small>
-                                              {visibleSelectedRefTemplateReplayApplySyncAuditTrail.length
-                                                ? `${visibleSelectedRefTemplateReplayApplySyncAuditTrail.length} audit events match the current filter.`
-                                                : "No audit events match the current filter."}
-                                            </small>
-                                          </label>
-                                        </div>
-                                        <div className="run-surface-query-builder-trace-chip-list">
-                                          <span className="run-surface-query-builder-trace-chip is-active">
-                                            {`Current tab · ${predicateRefReplayApplyHistoryTabIdentity.label}`}
-                                          </span>
-                                          <span className="run-surface-query-builder-trace-chip">
-                                            {selectedRefTemplateReplayApplySyncAuditTrail.length
-                                              ? `${selectedRefTemplateReplayApplySyncAuditTrail.length} sync audit events`
-                                              : "No sync audit events yet"}
-                                          </span>
-                                        </div>
-                                        <p className="run-note">
-                                          Each confirmed replay apply stores a rollback snapshot of the affected manual bundle
-                                          selections and draft bindings for this template.
-                                        </p>
-                                        {selectedRefTemplateReplayApplyConflicts.length ? (
-                                          <div className="run-surface-query-builder-trace-panel is-nested">
-                                            <div className="run-surface-query-builder-card-head">
-                                              <strong>Pending override collisions</strong>
-                                              <span>{`${selectedRefTemplateReplayApplyConflicts.length} pending`}</span>
-                                            </div>
-                                            <p className="run-note">
-                                              Remote replay history updates collided with a local override for the same entry id.
-                                              Resolve each collision to decide which version stays active in this tab.
-                                            </p>
-                                            <div className="run-surface-query-builder-trace-list">
-                                              {selectedRefTemplateReplayApplyConflictReviews.map((review) => (
-                                                <div
-                                                  className="run-surface-query-builder-trace-step is-warning"
-                                                  key={review.conflict.conflictId}
-                                                >
-                                                  <strong>{review.conflict.templateLabel}</strong>
-                                                  <p>
-                                                    {`Detected ${formatRelativeTimestampLabel(review.conflict.detectedAt)} from ${review.conflict.sourceTabLabel}.`}
-                                                  </p>
-                                                  <div className="run-surface-query-builder-trace-chip-list">
-                                                    <span className="run-surface-query-builder-trace-chip">
-                                                      {`Local · ${review.conflict.localEntry.approvedCount} rows · ${review.conflict.localEntry.sourceTabLabel ?? predicateRefReplayApplyHistoryTabIdentity.label}`}
-                                                    </span>
-                                                    <span className="run-surface-query-builder-trace-chip is-active">
-                                                      {`Remote · ${review.conflict.remoteEntry.approvedCount} rows · ${review.conflict.sourceTabLabel}`}
-                                                    </span>
-                                                    <span className="run-surface-query-builder-trace-chip">
-                                                      {`${review.totalDiffCount} differing fields`}
-                                                    </span>
-                                                  </div>
-                                                  <div className="run-surface-query-builder-trace-chip-list">
-                                                    {review.conflict.remoteEntry.rows.map((row) => (
-                                                      <span className="run-surface-query-builder-trace-chip" key={`${review.conflict.conflictId}:${row.groupKey}`}>
-                                                        {`${row.groupLabel}: ${row.promotedBundleLabel}`}
-                                                      </span>
-                                                    ))}
-                                                  </div>
-                                                  <div className="run-surface-query-builder-trace-panel is-nested">
-                                                    <div className="run-surface-query-builder-card-head">
-                                                      <strong>Field-level diff</strong>
-                                                      <span>{`${review.totalDiffCount} changed fields`}</span>
-                                                    </div>
-                                                    <div className="run-surface-query-builder-trace-chip-list">
-                                                      {review.summaryDiffs.length ? (
-                                                        <span className="run-surface-query-builder-trace-chip">
-                                                          {`${review.summaryDiffs.length} summary`}
-                                                        </span>
-                                                      ) : null}
-                                                      {review.rowDiffs.length ? (
-                                                        <span className="run-surface-query-builder-trace-chip">
-                                                          {`${review.rowDiffs.length} replay rows`}
-                                                        </span>
-                                                      ) : null}
-                                                      {review.selectionSnapshotDiffs.length ? (
-                                                        <span className="run-surface-query-builder-trace-chip">
-                                                          {`${review.selectionSnapshotDiffs.length} rollback groups`}
-                                                        </span>
-                                                      ) : null}
-                                                      {review.bindingSnapshotDiffs.length ? (
-                                                        <span className="run-surface-query-builder-trace-chip">
-                                                          {`${review.bindingSnapshotDiffs.length} draft bindings`}
-                                                        </span>
-                                                      ) : null}
-                                                    </div>
-                                                    {[
-                                                      {
-                                                        key: "summary",
-                                                        label: "Summary fields",
-                                                        items: review.summaryDiffs,
-                                                      },
-                                                      {
-                                                        key: "rows",
-                                                        label: "Replay rows",
-                                                        items: review.rowDiffs,
-                                                      },
-                                                      {
-                                                        key: "selection",
-                                                        label: "Rollback groups",
-                                                        items: review.selectionSnapshotDiffs,
-                                                      },
-                                                      {
-                                                        key: "binding",
-                                                        label: "Draft bindings",
-                                                        items: review.bindingSnapshotDiffs,
-                                                      },
-                                                    ].map((section) =>
-                                                      section.items.length ? (
-                                                        <div className="run-surface-query-builder-trace-panel is-nested" key={`${review.conflict.conflictId}:${section.key}`}>
-                                                          <div className="run-surface-query-builder-card-head">
-                                                            <strong>{section.label}</strong>
-                                                            <span>{`${section.items.length} changed`}</span>
-                                                          </div>
-                                                          <div className="run-surface-query-builder-trace-list">
-                                                            {section.items.map((item) => {
-                                                              const selectedSource = item.editable
-                                                                ? review.selectedSources[item.decisionKey] ?? "local"
-                                                                : null;
-                                                              const canTrace =
-                                                                item.relatedGroupKey
-                                                                && simulatedCoordinationGroups.some(
-                                                                  (group) => group.key === item.relatedGroupKey,
-                                                                );
-                                                              const isFocusedDecision =
-                                                                predicateRefReplayApplyConflictFocusedDecision?.conflictId
-                                                                  === review.conflict.conflictId
-                                                                && predicateRefReplayApplyConflictFocusedDecision?.decisionKey
-                                                                  === item.decisionKey;
-                                                              return (
-                                                                <div
-                                                                  className={`run-surface-query-builder-trace-step is-${
-                                                                    item.editable
-                                                                      ? selectedSource === "remote"
-                                                                        ? "warning"
-                                                                        : "info"
-                                                                      : "muted"
-                                                                  }`}
-                                                                  ref={(node) => {
-                                                                    predicateRefReplayApplyConflictRowRefs.current[
-                                                                      `${review.conflict.conflictId}:${item.decisionKey}`
-                                                                    ] = node;
-                                                                  }}
-                                                                  key={`${review.conflict.conflictId}:${section.key}:${item.key}`}
-                                                                  onClick={() =>
-                                                                    setPredicateRefReplayApplyConflictFocusedDecisionState(
-                                                                      review.conflict.conflictId,
-                                                                      item.decisionKey,
-                                                                    )}
-                                                                  onFocusCapture={() =>
-                                                                    setPredicateRefReplayApplyConflictFocusedDecisionState(
-                                                                      review.conflict.conflictId,
-                                                                      item.decisionKey,
-                                                                    )}
-                                                                  tabIndex={-1}
-                                                                >
-                                                                  <strong>{item.label}</strong>
-                                                                  <div className="run-surface-query-builder-trace-chip-list">
-                                                                    <span className={`run-surface-query-builder-trace-chip${
-                                                                      selectedSource === "local" ? " is-active" : ""
-                                                                    }`}>
-                                                                      {`Local · ${item.localValue}`}
-                                                                    </span>
-                                                                    <span className={`run-surface-query-builder-trace-chip${
-                                                                      selectedSource === "remote" ? " is-active" : ""
-                                                                    }`}>
-                                                                      {`Remote · ${item.remoteValue}`}
-                                                                    </span>
-                                                                    {!item.editable ? (
-                                                                      <span className="run-surface-query-builder-trace-chip">
-                                                                        Derived
-                                                                      </span>
-                                                                    ) : null}
-                                                                    {isFocusedDecision ? (
-                                                                      <span className="run-surface-query-builder-trace-chip is-active">
-                                                                        Linked from replay
-                                                                      </span>
-                                                                    ) : null}
-                                                                  </div>
-                                                                  <div className="run-surface-query-builder-actions">
-                                                                    {item.editable ? (
-                                                                      <>
-                                                                        <button
-                                                                          className={`ghost-button${selectedSource === "local" ? " is-active" : ""}`}
-                                                                          onClick={() => {
-                                                                            setPredicateRefReplayApplyConflictFocusedDecisionState(
-                                                                              review.conflict.conflictId,
-                                                                              item.decisionKey,
-                                                                            );
-                                                                            setPredicateRefReplayApplyConflictDraftSource(
-                                                                              review.conflict.conflictId,
-                                                                              item.decisionKey,
-                                                                              "local",
-                                                                            );
-                                                                          }}
-                                                                          type="button"
-                                                                        >
-                                                                          Keep local field
-                                                                        </button>
-                                                                        <button
-                                                                          className={`ghost-button${selectedSource === "remote" ? " is-active" : ""}`}
-                                                                          onClick={() => {
-                                                                            setPredicateRefReplayApplyConflictFocusedDecisionState(
-                                                                              review.conflict.conflictId,
-                                                                              item.decisionKey,
-                                                                            );
-                                                                            setPredicateRefReplayApplyConflictDraftSource(
-                                                                              review.conflict.conflictId,
-                                                                              item.decisionKey,
-                                                                              "remote",
-                                                                            );
-                                                                          }}
-                                                                          type="button"
-                                                                        >
-                                                                          Accept remote field
-                                                                        </button>
-                                                                      </>
-                                                                    ) : null}
-                                                                    {canTrace ? (
-                                                                        <button
-                                                                          className="ghost-button"
-                                                                          onClick={() =>
-                                                                            focusReplayApplyConflictSimulationTrace(
-                                                                              item.relatedGroupKey ?? "",
-                                                                              review.conflict.conflictId,
-                                                                            )}
-                                                                          type="button"
-                                                                        >
-                                                                          Trace in simulation
-                                                                        </button>
-                                                                    ) : null}
-                                                                  </div>
-                                                                  {!item.editable && section.key === "summary" ? (
-                                                                    <p className="run-note">
-                                                                      Derived summary counts follow the replay row selection that survives resolution.
-                                                                    </p>
-                                                                  ) : null}
-                                                                </div>
-                                                              );
-                                                            })}
-                                                          </div>
-                                                        </div>
-                                                      ) : null,
-                                                    )}
-                                                  </div>
-                                                  <div className="run-surface-query-builder-trace-panel is-nested">
-                                                    <div className="run-surface-query-builder-card-head">
-                                                      <strong>What-if review</strong>
-                                                      <span>Local, merged, and remote outcome</span>
-                                                    </div>
-                                                    <div className="run-surface-query-builder-trace-chip-list">
-                                                      <span className="run-surface-query-builder-trace-chip">
-                                                        {`${review.editableDiffCount} editable fields`}
-                                                      </span>
-                                                      <span className={`run-surface-query-builder-trace-chip${
-                                                        review.hasRemoteSelection ? " is-active" : ""
-                                                      }`}>
-                                                        {`${review.selectedRemoteCount} remote selections`}
-                                                      </span>
-                                                      <span className={`run-surface-query-builder-trace-chip${
-                                                        review.hasMixedSelection ? " is-active" : ""
-                                                      }`}>
-                                                        {review.hasMixedSelection ? "Partial merge staged" : "No partial merge staged"}
-                                                      </span>
-                                                    </div>
-                                                    <div className="run-surface-query-builder-trace-list">
-                                                      {[review.localPreview, review.mergedPreview, review.remotePreview].map((preview) => (
-                                                        <div
-                                                          className={`run-surface-query-builder-trace-step is-${
-                                                            preview.resolution === "local" ? "info" : "warning"
-                                                          }`}
-                                                          key={`${review.conflict.conflictId}:${preview.resolution}`}
-                                                        >
-                                                          <strong>{preview.title}</strong>
-                                                          <p>{preview.effect}</p>
-                                                          <div className="run-surface-query-builder-trace-chip-list">
-                                                            <span className="run-surface-query-builder-trace-chip">
-                                                              {`${preview.entry.approvedCount} approved rows`}
-                                                            </span>
-                                                            <span className="run-surface-query-builder-trace-chip">
-                                                              {`${preview.entry.changedCurrentCount} changed current`}
-                                                            </span>
-                                                            <span className="run-surface-query-builder-trace-chip">
-                                                              {`${preview.entry.matchesSimulationCount} matched simulated`}
-                                                            </span>
-                                                            <span className="run-surface-query-builder-trace-chip">
-                                                              {preview.snapshotSummary}
-                                                            </span>
-                                                            {preview.matchesLocal ? (
-                                                              <span className="run-surface-query-builder-trace-chip">
-                                                                Matches local
-                                                              </span>
-                                                            ) : null}
-                                                            {preview.matchesRemote ? (
-                                                              <span className="run-surface-query-builder-trace-chip">
-                                                                Matches remote
-                                                              </span>
-                                                            ) : null}
-                                                          </div>
-                                                          <div className="run-surface-query-builder-trace-chip-list">
-                                                            {preview.rowSummaries.length ? (
-                                                              preview.rowSummaries.map((summary, index) => (
-                                                                <span
-                                                                  className="run-surface-query-builder-trace-chip"
-                                                                  key={`${review.conflict.conflictId}:${preview.resolution}:row:${index}`}
-                                                                >
-                                                                  {summary}
-                                                                </span>
-                                                              ))
-                                                            ) : (
-                                                              <span className="run-surface-query-builder-trace-chip">
-                                                                No replay rows recorded
-                                                              </span>
-                                                            )}
-                                                          </div>
-                                                          <div className="run-surface-query-builder-actions">
-                                                            {preview.resolution === "merged" ? (
-                                                              <>
-                                                                <button
-                                                                  className={`ghost-button${
-                                                                    predicateRefReplayApplyConflictSimulationConflictId === review.conflict.conflictId
-                                                                      ? " is-active"
-                                                                      : ""
-                                                                  }`}
-                                                                  onClick={() => {
-                                                                    setPredicateRefReplayApplyConflictSimulationConflictId(
-                                                                      review.conflict.conflictId,
-                                                                    );
-                                                                    const firstGroupKey =
-                                                                      review.mergedEntry.rows[0]?.groupKey ?? "";
-                                                                    if (firstGroupKey) {
-                                                                      focusReplayApplyConflictSimulationTrace(
-                                                                        firstGroupKey,
-                                                                        review.conflict.conflictId,
-                                                                      );
-                                                                      return;
-                                                                    }
-                                                                    bundleCoordinationSimulationPanelRef.current?.scrollIntoView({
-                                                                      behavior: "smooth",
-                                                                      block: "start",
-                                                                    });
-                                                                  }}
-                                                                  type="button"
-                                                                >
-                                                                  {predicateRefReplayApplyConflictSimulationConflictId === review.conflict.conflictId
-                                                                    ? "Simulation override active"
-                                                                    : "Run reviewed merge in simulation"}
-                                                                </button>
-                                                                <button
-                                                                  className="ghost-button"
-                                                                  disabled={!review.hasRemoteSelection}
-                                                                  onClick={() =>
-                                                                    resolvePredicateRefReplayApplyConflict(
-                                                                      review.conflict,
-                                                                      "merged",
-                                                                      review.mergedEntry,
-                                                                    )}
-                                                                  type="button"
-                                                                >
-                                                                  Apply reviewed merge
-                                                                </button>
-                                                                <button
-                                                                  className="ghost-button"
-                                                                  disabled={!review.hasRemoteSelection}
-                                                                  onClick={() =>
-                                                                    resetPredicateRefReplayApplyConflictDraftSource(
-                                                                      review.conflict.conflictId,
-                                                                    )}
-                                                                  type="button"
-                                                                >
-                                                                  Reset merge draft
-                                                                </button>
-                                                              </>
-                                                            ) : (
-                                                              <button
-                                                                className="ghost-button"
-                                                                onClick={() =>
-                                                                  resolvePredicateRefReplayApplyConflict(
-                                                                    review.conflict,
-                                                                    preview.resolution,
-                                                                  )}
-                                                                type="button"
-                                                              >
-                                                                {preview.title}
-                                                              </button>
-                                                            )}
-                                                          </div>
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        ) : null}
-                                        {selectedRefTemplateReplayApplySyncAuditTrail.length ? (
-                                          <div className="run-surface-query-builder-trace-panel is-nested">
-                                            <div className="run-surface-query-builder-card-head">
-                                              <strong>Sync audit trail</strong>
-                                              <span>{`Session scoped · ${predicateRefReplayApplyHistoryTabIdentity.label}`}</span>
-                                            </div>
-                                            {visibleSelectedRefTemplateReplayApplySyncAuditTrail.length ? (
-                                              <div className="run-surface-query-builder-trace-list">
-                                                {visibleSelectedRefTemplateReplayApplySyncAuditTrail.map((auditEntry) => (
-                                                  <div
-                                                    className={`run-surface-query-builder-trace-step is-${
-                                                      auditEntry.kind.includes("restore") ? "warning" : "info"
-                                                    }`}
-                                                    key={auditEntry.auditId}
-                                                  >
-                                                    <strong>{auditEntry.templateLabel}</strong>
-                                                    <p>{auditEntry.detail}</p>
-                                                    <div className="run-surface-query-builder-trace-chip-list">
-                                                      <span className="run-surface-query-builder-trace-chip is-active">
-                                                        {auditEntry.kind.replaceAll("_", " ")}
-                                                      </span>
-                                                      <span className="run-surface-query-builder-trace-chip">
-                                                        {auditEntry.sourceTabLabel}
-                                                      </span>
-                                                      <span className="run-surface-query-builder-trace-chip">
-                                                        {formatRelativeTimestampLabel(auditEntry.at)}
-                                                      </span>
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            ) : (
-                                              <div className="run-surface-query-builder-trace-step is-muted">
-                                                <strong>No matching sync audit events</strong>
-                                                <p>
-                                                  {predicateRefReplayApplySyncMode === "mute_remote"
-                                                    ? "Remote sync is muted in this tab, so only local audit events can appear."
-                                                    : "Change the audit filter to inspect a different replay history sync slice."}
-                                                </p>
-                                              </div>
-                                            )}
-                                          </div>
-                                        ) : null}
-                                        {latestSelectedRefTemplateReplayApplyEntry ? (
-                                          <div className="run-surface-query-builder-actions">
-                                            <button
-                                              className="ghost-button"
-                                              onClick={() =>
-                                                restorePredicateRefReplayApplyHistoryEntry(
-                                                  latestSelectedRefTemplateReplayApplyEntry,
-                                                )}
-                                              type="button"
-                                            >
-                                              Roll back latest replay apply
-                                            </button>
-                                          </div>
-                                        ) : null}
-                                        <div className="run-surface-query-builder-trace-list">
-                                          {selectedRefTemplateReplayApplyHistory.map((entry) => (
-                                            <div
-                                              className={`run-surface-query-builder-trace-step is-${
-                                                entry.lastRestoredAt ? "muted" : "info"
-                                              }`}
-                                              key={entry.id}
-                                            >
-                                              <strong>{entry.templateLabel}</strong>
-                                              <p>
-                                                {`${entry.approvedCount} approved rows · ${entry.changedCurrentCount} changed current · ${entry.matchesSimulationCount} matched simulated · ${formatRelativeTimestampLabel(entry.appliedAt)}`}
-                                              </p>
-                                              <div className="run-surface-query-builder-trace-chip-list">
-                                                {entry.sourceTabLabel ? (
-                                                  <span className="run-surface-query-builder-trace-chip is-active">
-                                                    {`Applied by ${entry.sourceTabLabel}`}
-                                                  </span>
-                                                ) : null}
-                                                {entry.lastRestoredByTabLabel ? (
-                                                  <span className="run-surface-query-builder-trace-chip">
-                                                    {`Restored by ${entry.lastRestoredByTabLabel}`}
-                                                  </span>
-                                                ) : null}
-                                              </div>
-                                              <div className="run-surface-query-builder-trace-chip-list">
-                                                {entry.rows.map((row) => (
-                                                  <span
-                                                    className={`run-surface-query-builder-trace-chip${
-                                                      row.matchesSimulation ? " is-active" : ""
-                                                    }`}
-                                                    key={`${entry.id}:${row.groupKey}`}
-                                                  >
-                                                    {`${row.groupLabel}: ${row.currentBundleLabel} → ${row.promotedBundleLabel}`}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                              <div className="run-surface-query-builder-actions">
-                                                <button
-                                                  className="ghost-button"
-                                                  onClick={() => restorePredicateRefReplayApplyHistoryEntry(entry)}
-                                                  type="button"
-                                                >
-                                                  Restore snapshot
-                                                </button>
-                                              </div>
-                                              <p className="run-note">
-                                                {entry.lastRestoredAt
-                                                  ? `Last restored ${formatRelativeTimestampLabel(entry.lastRestoredAt)}${entry.lastRestoredByTabLabel ? ` by ${entry.lastRestoredByTabLabel}` : ""}.`
-                                                  : "Snapshot available for rollback."}
-                                              </p>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
                                     ) : null}
                                     <div className="run-surface-query-builder-trace-chip-list">
-                                      {simulatedCoordinationGroups.map((group) => {
-                                        const resolvedBundleKey =
-                                          activeSimulatedPredicateRefSolverReplayStep.resolvedSelectionsByGroupKey[group.key] ?? "";
-                                        const resolvedBundle =
-                                          getSortedTemplateGroupPresetBundles(group.presetBundles).find(
-                                            (bundle) => bundle.key === resolvedBundleKey,
-                                          ) ?? null;
-                                        return (
-                                          <span
-                                            className={`run-surface-query-builder-trace-chip${
-                                              activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey === group.key
-                                              || bundleCoordinationSimulationReplayGroupFilter === "all"
-                                              || bundleCoordinationSimulationReplayGroupFilter === group.key
-                                                ? " is-active"
-                                                : " is-muted"
-                                            }`}
-                                            key={`solver-replay:${group.key}`}
-                                          >
-                                            {`${group.label}: ${resolvedBundle?.label ?? "unresolved"}${
-                                              activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[group.key]?.length
-                                                ? ` · ${
-                                                    activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[group.key].length
-                                                  } reviewed picks`
-                                                : ""
-                                            }`}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                    {activeSimulatedPredicateRefSolverReplayFilteredEdge ? (
+                                  {simulatedCoordinationGroups.map((group) => {
+                                    const resolvedBundleKey =
+                                      activeSimulatedPredicateRefSolverReplayStep.resolvedSelectionsByGroupKey[group.key] ?? "";
+                                    const resolvedBundle =
+                                      getSortedTemplateGroupPresetBundles(group.presetBundles).find(
+                                        (bundle) => bundle.key === resolvedBundleKey,
+                                      ) ?? null;
+                                    return (
+                                      <span
+                                        className={`run-surface-query-builder-trace-chip${
+                                          activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey === group.key
+                                          || bundleCoordinationSimulationReplayGroupFilter === "all"
+                                          || bundleCoordinationSimulationReplayGroupFilter === group.key
+                                            ? " is-active"
+                                            : " is-muted"
+                                        }`}
+                                        key={`solver-replay:${group.key}`}
+                                      >
+                                        {`${group.label}: ${resolvedBundle?.label ?? "unresolved"}${
+                                          activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[group.key]?.length
+                                            ? ` · ${
+                                                activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[group.key].length
+                                              } reviewed picks`
+                                            : ""
+                                        }`}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                                {activeSimulatedPredicateRefSolverReplayFilteredEdge ? (
                                       <div className="run-surface-query-builder-trace-chip-list">
                                         <span className="run-surface-query-builder-trace-chip is-active">
                                           {`Source: ${activeSimulatedPredicateRefSolverReplayFilteredEdge.sourceGroupLabel} → ${activeSimulatedPredicateRefSolverReplayFilteredEdge.sourceBundleLabel}`}
