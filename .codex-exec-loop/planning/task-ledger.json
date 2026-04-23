@@ -1250,16 +1250,16 @@
       "id": "task-llm-sensitivity-provider-provenance-approval-queue-residual-summary-action-owner-follow-up",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Rebalance approval queue row-level review/action structure above the inner action leaves",
-      "description": "Now that `queue-action`, `commit-control`, `plan-gate`, and `commit-action` connect directly without pass-through leaf wrappers, audit the remaining approval-queue row/body owners around `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueActionSection.tsx`, `...ReviewStateSection.tsx`, and adjacent summary/action wrappers, then extract or flatten any still-mixed row-level review/action or summary/action ownership so the next pressure point stays outside the inner action leaves.",
-      "status": "ready",
+      "description": "Completed the approval-queue row/body rebalance by restoring `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSection.tsx` as the direct owner of plan iteration and `<tr>` row shell composition while reducing `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueActionSection.tsx` to a single-plan row-body composer over the existing review-state and mutation leaves, so queue-level row shells no longer mix with row-body collaborators.",
+      "status": "done",
       "base_priority": 83,
       "dynamic_priority_delta": 58,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T22:10:00+09:00",
+      "updated_at": "2026-04-24T22:25:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the thin-wrapper imbalance inside approval queue is resolved and explicitly points to the next pressure being the row-level review/action structure outside `queue-action`/`commit-action`, with other remaining summary/action owners as the adjacent cleanup surface.",
-      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task, the previous mutation/commit-control leaf rebalance finished in commit `a19425a`, and the latest reply directly names the row-level review/action structure outside the inner leaves as the next executable continuation."
+      "direction_relation_note": "The latest main-session reply confirms commit `f95da17` moved plan list iteration and `<tr>` ownership back into `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSection.tsx`, leaving `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueActionSection.tsx` to compose only row-level review-state and mutation bodies.",
+      "priority_reason": "Marked done because the queued row-level review/action rebalance landed, `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md` were updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `f95da17` was pushed to `origin/main`; the next decomposition pressure now moves outside this approval-queue row shell."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-approval-queue-filter-select-option-source-seventh-pass-split",
@@ -1281,15 +1281,15 @@
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split stitched registry editor/history ownership into editing and audit-history collaborators",
       "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryEditorHistorySection.tsx` further so registry editing and bulk-edit workflows separate cleanly from audit trail and revision history ownership while the stitched governance surface stays import-stable.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 94,
-      "dynamic_priority_delta": 24,
+      "dynamic_priority_delta": 49,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T18:17:00+09:00",
+      "updated_at": "2026-04-24T22:25:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply does not elevate `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryEditorHistorySection.tsx`; the current stitched-report pressure shifted to approval queue commit-action after the policy-catalog trigger-wiring split landed.",
-      "priority_reason": "Kept proposed because the editor/history collaborator is still a valid future split, but the latest reply gives a more direct next executable step in `RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionSection.tsx`, so this stays behind the approval-flow cleanup."
+      "direction_relation_note": "The latest main-session reply says the approval-queue row-shell imbalance is now resolved and explicitly shifts the next pressure point to large workspace surfaces outside approval queue, making `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryEditorHistorySection.tsx` the best-matching existing stitched-report follow-up.",
+      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task, the prior approval-queue row-shell cleanup finished in commit `f95da17`, and the latest reply points to other large stitched workspace surfaces ahead of more speculative approval-queue filter recombination."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-focused-readback-export-history-split",
