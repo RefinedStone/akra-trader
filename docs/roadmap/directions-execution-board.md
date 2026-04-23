@@ -233,12 +233,13 @@ Active move map:
    rebuilding the audit row inline; keep the audit-history revision-history and audit-event table
    shells split into dedicated table collaborators instead of leaving both table shells inline;
    keep the audit filter bar split between select and text-input collaborators instead of
-   rebuilding all audit filters in one block; keep the review approval-
-   queue table split between queue-table and queue-row collaborators, and keep the registry
-   policy-catalog table split between policy-catalog-table and policy-catalog-row collaborators
-   instead of rebuilding those table shells and row bodies inline; keep the review filter bars
-   split between queue-filter-state, queue-filter-policy, queue-filter-query, and policy-catalog-
-   search collaborators instead of rebuilding all review filters inline
+   rebuilding all audit filters in one block; keep review split between queue-surface and
+   policy-catalog-surface collaborators instead of rebuilding both review shells inline; keep the
+   review approval-queue table split between queue-table and queue-row collaborators, and keep the
+   registry policy-catalog table split between policy-catalog-table and policy-catalog-row
+   collaborators instead of rebuilding those table shells and row bodies inline; keep the review
+   filter bars split between queue-filter-state, queue-filter-policy, queue-filter-query, and
+   policy-catalog-search collaborators instead of rebuilding all review filters inline
 9. keep stitched registry editing split between draft, bulk-edit, and table collaborators, and
    keep draft split between identity-stage, default-policy-stage, action, and search
    collaborators instead of recombining registry drafting inputs, default policy staging,

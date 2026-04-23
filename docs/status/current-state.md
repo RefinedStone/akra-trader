@@ -167,6 +167,10 @@ It is not yet a finished live trading product:
   table shells now route through dedicated table collaborators instead of staying inline in audit-
   history, and the audit filter bar is now split between dedicated select and text-input
   collaborators instead of keeping all audit filters in one block
+- the stitched registry review layer now composes dedicated queue-surface and policy-catalog-
+  surface collaborators instead of keeping both review shells inline in one module; the queue
+  surface owns the queue summary/filter/loading shell above the queue table, and the policy-
+  catalog surface owns the catalog summary/search shell above the policy catalog table
 - the stitched registry review layer now routes the approval-queue table through dedicated queue-
   table and queue-row collaborators, and routes the registry policy-catalog table through
   dedicated policy-catalog-table and policy-catalog-row collaborators instead of keeping both
