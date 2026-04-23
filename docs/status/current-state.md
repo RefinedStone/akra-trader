@@ -146,6 +146,9 @@ It is not yet a finished live trading product:
 - the stitched report approval-policy layer now composes dedicated approval-queue and policy-
   catalog collaborators instead of keeping stitched governance queue review and policy catalog
   defaults inline in one module
+- the stitched report policy-catalog layer now composes dedicated review and selection
+  collaborators instead of keeping catalog review details and catalog action selection inline in one
+  module
 - the stitched report approval-queue layer now composes dedicated queue-state and action
   collaborators instead of keeping queue filters/loading state and per-plan action review inline in
   one module
