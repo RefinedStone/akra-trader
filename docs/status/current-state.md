@@ -1,6 +1,6 @@
 # Current State
 
-Canonical status snapshot for the repository as of April 22, 2026.
+Canonical status snapshot for the repository as of April 23, 2026.
 
 Use this document as the source of truth for what is actually implemented. Forward-looking planning
 lives under [Roadmap](../roadmap/README.md) and [Blueprint](../blueprint/README.md).
@@ -115,8 +115,9 @@ It is not yet a finished live trading product:
 - query-builder feature logic now lives under `apps/web/src/features/query-builder/*`
 - route smoke tests now cover `WorkspaceRouteContent` plus the dedicated workspace route shells
 - query-builder now separates a tiny entry module, a feature model module, a main component
-  module, and a replay-governance section module so parser/storage and replay governance are no
-  longer mixed into the feature entrypoint
+  module, a replay-governance section module, and a replay-intent flow hook so URL hydrate,
+  alias-resolution, share/export administration, and governance sync no longer sit inline with
+  the main authoring body
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body
@@ -181,8 +182,9 @@ It is not yet a finished live trading product:
   are still no saved cross-team dashboard collections above preset/view/report records yet
 - the control room now has route and shell boundaries, but `App.tsx` and the remaining workspace
   feature modules still own too much dense state and rendering logic
-- the query-builder feature, standalone surface catalogs, `application.py`, and the remaining
-  long-tail provider modules still need further decomposition by bounded flow
+- the query-builder feature is smaller on replay intent/governance work, but the remaining
+  authoring/simulation body, standalone surface catalogs, `application.py`, and the long-tail
+  provider modules still need further decomposition by bounded flow
 - `domain/models.py` now re-exports extracted provider-provenance records, but the remaining
   operator and guarded-live model families still need the same treatment
 - sandbox workers exist, but active-session-first views for recent decisions, lag interpretation,
