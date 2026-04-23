@@ -181,6 +181,9 @@ It is not yet a finished live trading product:
 - the stitched report approval-queue mutation layer now keeps the action-cell shell while
   composing dedicated mutation-action and mutation-commit-control leaf collaborators instead of
   mounting queue-action and commit-control flows directly in the row owner
+- the stitched report approval-queue queue-action leaf now composes dedicated dispatch and
+  status-view collaborators instead of keeping shared-queue dispatch and selected-state copy inline
+  in one leaf owner
 - the stitched report approval-queue commit-control layer now composes dedicated plan-gate and
   commit-action collaborators instead of keeping mutation gating and dispatch controls inline in one
   module

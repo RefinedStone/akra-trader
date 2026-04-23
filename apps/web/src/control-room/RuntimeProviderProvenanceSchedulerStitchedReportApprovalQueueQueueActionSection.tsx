@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionDispatchSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionDispatchSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionStatusViewSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionStatusViewSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionSection({
   model,
   plan,
@@ -6,19 +9,18 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQue
   model: any;
   plan: any;
 }) {
-  const {} = model;
-
   return (
-    <button
-      className="ghost-button"
-      onClick={() => {
-        reviewProviderProvenanceSchedulerStitchedReportGovernancePlanInSharedQueue(plan);
-      }}
-      type="button"
+    <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionDispatchSection
+      model={model}
+      plan={plan}
     >
-      {selectedProviderProvenanceSchedulerNarrativeGovernancePlanId === plan.plan_id
-        ? "Shared queue selected"
-        : "Review in shared queue"}
-    </button>
+      {({ onClick }: { onClick: () => void }) => (
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionStatusViewSection
+          model={model}
+          onClick={onClick}
+          plan={plan}
+        />
+      )}
+    </RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionDispatchSection>
   );
 }
