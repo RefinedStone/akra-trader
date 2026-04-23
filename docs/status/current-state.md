@@ -201,6 +201,9 @@ It is not yet a finished live trading product:
   and priority selector collaborators, and the reset-selection layer now composes dedicated policy-
   template and policy-catalog selector collaborators instead of keeping multiple selector bodies
   inline in each leaf owner
+- the stitched report approval queue query-input layer now composes dedicated search-input binding
+  and search-input field collaborators instead of keeping search filter update wiring and input
+  layout inline in one leaf owner
 - the stitched report saved-view layer now composes dedicated bulk-edit, revision-review, and
   audit collaborators instead of keeping selection governance, revision restore, and team audit
   flows inline in one module

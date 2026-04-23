@@ -1,21 +1,22 @@
 // @ts-nocheck
-export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueryInputSection({ model }: { model: any }) {
-  const {} = model;
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSearchInputBindingSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSearchInputBindingSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSearchInputFieldSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSearchInputFieldSection";
 
+export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueryInputSection({ model }: { model: any }) {
   return (
-    <label>
-      <span>Search</span>
-      <input
-        onChange={(event) =>
-          setProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter((current) => ({
-            ...current,
-            search: event.target.value,
-          }))
-        }
-        placeholder="plan, view, policy"
-        type="text"
-        value={providerProvenanceSchedulerStitchedReportGovernanceQueueFilter.search}
-      />
-    </label>
+    <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSearchInputBindingSection model={model}>
+      {({
+        onChange,
+        value,
+      }: {
+        onChange: (event: any) => void;
+        value: string;
+      }) => (
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSearchInputFieldSection
+          onChange={onChange}
+          value={value}
+        />
+      )}
+    </RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSearchInputBindingSection>
   );
 }
