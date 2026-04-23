@@ -228,7 +228,10 @@ Active move map:
    review, and row selection actions inline in one queue table module; keep the approval queue
    selected-plan-detail collaborator split between dedicated review and preview-detail
    collaborators instead of recombining plan summary review, approval actions, and preview diff
-   detail inline in one selected-plan module; keep the scheduler narrative
+   detail inline in one selected-plan module; keep the approval queue selected-plan-review
+   collaborator split between dedicated summary and approval-action collaborators instead of
+   recombining plan summary copy and approval controls inline in one selected-plan review module;
+   keep the scheduler narrative
    registry bulk-governance collaborator split between governance-bar and bulk-edit-stage
    collaborators instead of recombining selection-policy preview actions and advanced bulk edit
    staging inline in one governance module; keep the scheduler narrative registry table
