@@ -256,12 +256,13 @@ Active move map:
     cells in one module
 18. keep stitched report policy-catalog review ownership split between table-shell and row-detail
     collaborators instead of recombining table structure and row composition in one module
-19. keep stitched report approval-queue ownership balanced so the section retains outer
-    review/action body ownership while composing queue-state and action collaborators, instead of
-    routing table shell, empty-state branching, and per-plan review through one nested body wrapper
-20. keep stitched report approval-queue action ownership focused on review-state and mutation row
-    collaborators instead of recombining row-level review state and queue mutation controls with the
-    outer table shell and empty-state branching
+19. keep stitched report approval-queue ownership balanced so the section retains outer table
+    shell, empty-state branching, and per-plan row-shell ownership while composing queue-state and
+    action collaborators, instead of routing plan-list row structure through one nested body
+    wrapper
+20. keep stitched report approval-queue action ownership focused on review-state and mutation
+    collaborators for a single plan row instead of recombining row-level review state and queue
+    mutation controls with plan-list row mapping and `<tr>` shell ownership
 21. keep stitched report approval-queue review-state ownership split between plan-cell and
     preview-cell collaborators instead of recombining both row cells in one review-state owner
 22. keep stitched report approval-queue plan-cell ownership split between identity-summary,

@@ -3,8 +3,6 @@ import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueActionSect
 import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueStateSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueStateSection";
 
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSection({ model }: { model: any }) {
-  const {} = model;
-
   return (
     <div className="market-data-provenance-shared-history">
       <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueStateSection model={model} />
@@ -18,7 +16,14 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueSec
             </tr>
           </thead>
           <tbody>
-            <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueActionSection model={model} />
+            {providerProvenanceSchedulerStitchedReportGovernancePlans.map((plan) => (
+              <tr key={`provider-scheduler-stitched-governance-plan-${plan.plan_id}`}>
+                <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueActionSection
+                  model={model}
+                  plan={plan}
+                />
+              </tr>
+            ))}
           </tbody>
         </table>
       ) : !providerProvenanceSchedulerStitchedReportGovernancePlansLoading ? (
