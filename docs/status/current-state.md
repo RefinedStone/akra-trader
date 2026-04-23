@@ -159,6 +159,9 @@ It is not yet a finished live trading product:
   export-policy-summary, and export-policy-action collaborators instead of mixing routing draft
   controls, current policy summary, and escalation action triggers inline in one export-policy
   module
+- the scheduler export-policy-draft collaborator now composes dedicated draft-form and
+  draft-targets collaborators instead of mixing route and approval draft controls with custom
+  delivery target checkbox state inline in one export-policy-draft module
 - the scheduler export audit-history collaborator now composes dedicated audit-history-summary
   and audit-history-table collaborators instead of mixing selected export identity copy with
   audit loading, error, empty, and history table states inline in one audit-history module

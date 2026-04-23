@@ -238,6 +238,10 @@ Active move map:
    export-policy-draft, export-policy-summary, and export-policy-action collaborators instead of
    recombining routing draft controls, current policy summary, and escalation action triggers
    inline in one export-policy module; keep
+   `RuntimeProviderProvenanceSchedulerExportPolicyDraftSection` split between dedicated
+   draft-form and draft-targets collaborators instead of recombining route and approval draft
+   controls with custom delivery target checkbox state inline in one export-policy-draft module;
+   keep
    `RuntimeProviderProvenanceSchedulerExportAuditHistorySection` split between dedicated
    audit-history-summary and audit-history-table collaborators instead of recombining selected
    export identity copy with audit loading, error, empty, and history table states inline in one
