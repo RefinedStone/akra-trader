@@ -231,6 +231,9 @@ Active move map:
    exports-registry-summary and exports-registry-table collaborators instead of recombining
    shared export registry identity copy with loading, error, empty, and registry table states
    inline in one exports-registry module; keep
+   `RuntimeProviderProvenanceSchedulerExportsRegistryTableSection` split between dedicated
+   row-detail and row-action collaborators instead of recombining shared export review cells
+   with per-row export actions inline in one exports-registry-table module; keep
    `RuntimeProviderProvenanceSchedulerExportAuditHistorySection` split between dedicated
    audit-history-summary and audit-history-table collaborators instead of recombining selected
    export identity copy with audit loading, error, empty, and history table states inline in one

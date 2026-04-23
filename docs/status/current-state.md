@@ -152,6 +152,9 @@ It is not yet a finished live trading product:
 - the scheduler exports-registry collaborator now composes dedicated exports-registry-summary and
   exports-registry-table collaborators instead of mixing shared export registry identity copy
   with loading, error, empty, and registry table states inline in one exports-registry module
+- the scheduler exports-registry-table collaborator now composes dedicated row-detail and
+  row-action collaborators instead of mixing shared export review cells with per-row export
+  actions inline in one exports-registry-table module
 - the scheduler export audit-history collaborator now composes dedicated audit-history-summary
   and audit-history-table collaborators instead of mixing selected export identity copy with
   audit loading, error, empty, and history table states inline in one audit-history module
