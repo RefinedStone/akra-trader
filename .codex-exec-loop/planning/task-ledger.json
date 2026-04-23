@@ -709,17 +709,32 @@
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-report-bulk-limit-controls-subflow-split",
       "direction_id": "llm-sensitivity-decomposition",
-      "title": "Split stitched report bulk limit controls ownership into narrower staged limit collaborators",
-      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` further so staged numeric bulk-limit editing stops becoming the next stitched-report local pressure point while the new bulk-approval composer and preview collaborator stay import-stable.",
-      "status": "ready",
+      "title": "Split stitched report bulk limit controls ownership into slice-limit and history-limit collaborators",
+      "description": "Completed the stitched report bulk limit-controls split by reducing `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` to a thin composer and moving `window/result/occurrence` limit input ownership into `RuntimeProviderProvenanceSchedulerStitchedReportBulkSliceLimitControlsSection.tsx` while `history/drill-down` limit input ownership moved into `RuntimeProviderProvenanceSchedulerStitchedReportBulkHistoryLimitControlsSection.tsx`.",
+      "status": "done",
       "base_priority": 100,
       "dynamic_priority_delta": 46,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T23:59:40+09:00",
+      "updated_at": "2026-04-23T23:37:47+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` is now the next local pressure point after the bulk-approval-stage split landed in commit `2e8a076`, making it the clearest immediate executable follow-up inside the stitched-report scheduler lane.",
-      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task, the prior bulk-approval-stage head is now complete, and the latest reply directly identifies `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` as the next local pressure point."
+      "direction_relation_note": "The latest main-session reply confirms commit `690b0c2` pushed this split: `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` shrank from 84 lines to a 14-line composer that now delegates slice-limit ownership to `RuntimeProviderProvenanceSchedulerStitchedReportBulkSliceLimitControlsSection.tsx` and history-limit ownership to `RuntimeProviderProvenanceSchedulerStitchedReportBulkHistoryLimitControlsSection.tsx`.",
+      "priority_reason": "Marked done because the queued bulk limit-controls split landed, the status/docs board was updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `690b0c2` was pushed to `origin/main`; the next local pressure point now sits in `RuntimeProviderProvenanceSchedulerStitchedReportBulkSliceLimitControlsSection.tsx`."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-stitched-report-bulk-slice-limit-controls-subflow-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split stitched report bulk slice-limit controls ownership into narrower window/result/occurrence collaborators",
+      "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportBulkSliceLimitControlsSection.tsx` further so slice-scoped `window`, `result-limit`, and `occurrence-limit` editing stops becoming the next stitched-report local pressure point while the new bulk-limit-controls composer and history-limit collaborator stay import-stable.",
+      "status": "ready",
+      "base_priority": 101,
+      "dynamic_priority_delta": 47,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T23:37:47+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly says `RuntimeProviderProvenanceSchedulerStitchedReportBulkSliceLimitControlsSection.tsx` is now the next local pressure point after commit `690b0c2` split the old bulk limit-controls wrapper into slice-limit and history-limit collaborators, making this the clearest immediate executable follow-up inside the stitched-report scheduler lane.",
+      "priority_reason": "Promoted to the single `ready` queue head because the operator asked to continue one queued task, the prior `bulk-limit-controls` head is now complete, and the latest reply directly identifies `RuntimeProviderProvenanceSchedulerStitchedReportBulkSliceLimitControlsSection.tsx` as the next local pressure point."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-report-approval-policy-subflow-split",
@@ -728,13 +743,13 @@
       "description": "Decompose `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedReportApprovalPolicySection.tsx` further so stitched approval workflow handling separates cleanly from policy-catalog review ownership once the saved-view collaborator pressure has been reduced.",
       "status": "proposed",
       "base_priority": 95,
-      "dynamic_priority_delta": 29,
+      "dynamic_priority_delta": 30,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T23:59:40+09:00",
+      "updated_at": "2026-04-23T23:37:47+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says `RuntimeProviderProvenanceSchedulerStitchedReportApprovalPolicySection.tsx` still remains the larger stitched-report-views collaborator even after the bulk-approval-stage split, so it stays the broader downstream split candidate once the newly exposed bulk-limit-controls hotspot is reduced.",
-      "priority_reason": "Kept proposed because it remains the next larger stitched-report-views boundary, but the latest reply directly prioritizes `RuntimeProviderProvenanceSchedulerStitchedReportBulkLimitControlsSection.tsx` as the immediate next executable task after commit `2e8a076`."
+      "direction_relation_note": "The latest main-session reply says `RuntimeProviderProvenanceSchedulerStitchedReportApprovalPolicySection.tsx` still remains the larger stitched-report-views collaborator even after commit `690b0c2` split bulk limit-controls into slice-limit and history-limit collaborators, so it stays the broader downstream split candidate once the newly exposed slice-limit hotspot is reduced.",
+      "priority_reason": "Kept proposed because it remains the next larger stitched-report-views boundary, but the latest reply directly prioritizes `RuntimeProviderProvenanceSchedulerStitchedReportBulkSliceLimitControlsSection.tsx` as the immediate next executable task."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-editor-history-subflow-split",
