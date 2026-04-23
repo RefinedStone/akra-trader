@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionPerActionHandlersSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionPerActionHandlersSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionSharedDispatchPlumbingSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionSharedDispatchPlumbingSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionDispatchSection({
   model,
   catalog,
@@ -8,30 +11,28 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSel
   catalog: any;
   children: any;
 }) {
-  const {
-    applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog,
-    stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy,
-    openProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogInSharedSurface,
-  } = model;
-
-  const handleUseDefaults = () => {
-    applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
-  };
-
-  const handleStageQueue = () => {
-    applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
-    void stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy(catalog);
-  };
-
-  const handleOpenSharedCatalog = () => {
-    openProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogInSharedSurface(
-      catalog,
-    );
-  };
-
-  return children({
-    handleOpenSharedCatalog,
-    handleStageQueue,
-    handleUseDefaults,
-  });
+  return (
+    <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionSharedDispatchPlumbingSection
+      catalog={catalog}
+      model={model}
+    >
+      {({
+        applyCatalogDefaults,
+        openSharedCatalog,
+        stageCatalogHierarchy,
+      }: {
+        applyCatalogDefaults: () => void;
+        openSharedCatalog: () => void;
+        stageCatalogHierarchy: () => void;
+      }) => (
+        <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionPerActionHandlersSection
+          applyCatalogDefaults={applyCatalogDefaults}
+          openSharedCatalog={openSharedCatalog}
+          stageCatalogHierarchy={stageCatalogHierarchy}
+        >
+          {children}
+        </RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionPerActionHandlersSection>
+      )}
+    </RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionSharedDispatchPlumbingSection>
+  );
 }
