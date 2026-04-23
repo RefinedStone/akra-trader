@@ -158,6 +158,8 @@ It is not yet a finished live trading product:
 - the stitched report bulk limit-controls stage now composes dedicated slice-limit and
   history-limit collaborators instead of keeping slice sizing and history sizing inputs inline in
   one module
+- the stitched report bulk history-limit stage now composes dedicated history and drill-down
+  collaborators instead of keeping the two history sizing inputs inline in one module
 - the stitched report bulk slice-limit stage now composes dedicated window, result, and
   occurrence collaborators instead of keeping the three slice sizing inputs inline in one module
 - the stitched registry-lifecycle layer now composes dedicated review and editor-history
