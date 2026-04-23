@@ -155,6 +155,9 @@ It is not yet a finished live trading product:
 - the stitched report bulk approval stage now composes dedicated limit-controls and preview
   collaborators instead of keeping numeric limit inputs and staged bulk preview controls inline in
   one module
+- the stitched report bulk limit-controls stage now composes dedicated slice-limit and
+  history-limit collaborators instead of keeping slice sizing and history sizing inputs inline in
+  one module
 - the stitched registry-lifecycle layer now composes dedicated review and editor-history
   collaborators instead of keeping registry queue/catalog review, registry editing, audits, and
   revision history in one module
