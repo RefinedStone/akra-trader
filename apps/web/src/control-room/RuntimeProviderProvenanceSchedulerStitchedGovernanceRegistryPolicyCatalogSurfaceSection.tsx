@@ -1,5 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogEmptyStateSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogEmptyStateSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSearchSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSearchSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSummarySection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSummarySection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogTableSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogTableSection";
 
 export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSurfaceSection({
@@ -19,15 +21,9 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPoli
           when deeper hierarchy maintenance is needed.
         </p>
       </div>
-      <div className="provider-provenance-governance-summary">
-        <strong>
-          {providerProvenanceSchedulerStitchedReportGovernanceRegistryPolicyCatalogs.length} registry catalog(s)
-        </strong>
-        <span>
-          {providerProvenanceSchedulerStitchedReportGovernanceRegistryPolicyCatalogs.filter((entry) => entry.status === "active").length} active · {" "}
-          {providerProvenanceSchedulerStitchedReportGovernanceRegistryPolicyCatalogs.filter((entry) => entry.status === "deleted").length} deleted
-        </span>
-      </div>
+      <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSummarySection
+        model={model}
+      />
       <div className="filter-bar">
         <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogSearchSection
           model={model}
@@ -38,7 +34,9 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPoli
           model={model}
         />
       ) : (
-        <p className="empty-state">No stitched governance registry policy catalogs match the current search.</p>
+        <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryPolicyCatalogEmptyStateSection
+          model={model}
+        />
       )}
     </div>
   );
