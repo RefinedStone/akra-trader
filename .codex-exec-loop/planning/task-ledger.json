@@ -1445,31 +1445,31 @@
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-review-filter-bar-followup-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split stitched registry review filter bar ownership into narrower collaborators",
-      "description": "Inspect `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryReviewSection.tsx` and extract the remaining review filter bar so queue summary and loading/error/empty branching no longer share direct filter-control ownership with select/input rendering or option wiring.",
-      "status": "ready",
+      "description": "Completed the stitched-registry review filter bar split by leaving `RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryReviewSection.tsx` as a thin filter shell and moving approval-queue filter state, policy, query, and policy-catalog search ownership into dedicated collaborator sections.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 66,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T00:01:20+09:00",
+      "updated_at": "2026-04-25T00:06:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says the next remaining stitched-registry pressure sits in the `review` filter bar itself now that the largest inline table owner has been extracted into queue-table/row and policy-catalog table/row collaborators.",
-      "priority_reason": "Promoted to `ready` because the operator asked to continue one queued task, the prior non-audit table-shell/body follow-up finished in commit `e3fe097`, and the latest reply names the stitched-registry `review` filter bar as the most direct remaining continuation before table selection/header shell or bulk-edit leaf cleanup."
+      "direction_relation_note": "The latest main-session reply confirms this split landed in commit `025be4a`: the review section now keeps only the filter shell while approval-queue filter state/policy/query ownership moved into dedicated collaborator files and policy-catalog search moved into its own section.",
+      "priority_reason": "Marked `done` because the main session completed the stitched-registry review filter bar extraction, updated the status docs, passed typecheck/smoke/build validation, and pushed commit `025be4a` to `origin/main`."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-table-selection-header-shell-followup-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split stitched registry table selection and header-shell ownership into narrower collaborators",
       "description": "Inspect the stitched-registry queue and policy-catalog table collaborators under `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryReviewSection.tsx` and extract any remaining selection/header shell ownership so table shells stop mixing checkbox or header action wiring with row/table composition.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 90,
-      "dynamic_priority_delta": 63,
+      "dynamic_priority_delta": 68,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T00:01:21+09:00",
+      "updated_at": "2026-04-25T00:06:01+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply calls out the stitched-registry table `selection/header shell` as the next adjacent pressure point after the `review` filter bar, now that queue and policy-catalog body ownership has already been split into dedicated table and row collaborators.",
-      "priority_reason": "Kept as `proposed` because it is an executable immediate follow-up, but the latest reply prioritizes the remaining `review` filter bar first and the operator asked to continue only one queued task in this refresh."
+      "direction_relation_note": "The latest main-session reply says the stitched-registry `review` filter bar itself is now cleaned up and explicitly names the next pressure point as the table `selection/header shell`, with bulk-edit leaf cleanup behind it.",
+      "priority_reason": "Promoted to `ready` because the operator asked to continue one queued task, the previous review-filter-bar head finished in commit `025be4a`, and the latest reply directly identifies table selection/header shell ownership as the next executable continuation."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-stitched-registry-bulk-edit-leaf-action-state-followup-split",
@@ -1481,10 +1481,10 @@
       "dynamic_priority_delta": 57,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T00:01:22+09:00",
+      "updated_at": "2026-04-25T00:06:02+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply still calls out stitched-registry bulk-edit leaf action/state separation as an explicit remaining pressure point, but now places it behind the remaining `review` filter bar and table selection/header shell work after commit `e3fe097` removed the largest inline review table owner.",
-      "priority_reason": "Kept as `proposed` because it remains an executable alternate follow-up, but the operator asked to continue one queued task and the latest reply now prioritizes the stitched-registry `review` filter bar first, with table selection/header shell also ahead of this bulk-edit cleanup."
+      "direction_relation_note": "The latest main-session reply still calls out stitched-registry bulk-edit leaf action/state separation as an explicit remaining pressure point, but now places it after the newly prioritized table selection/header-shell cleanup once commit `025be4a` finished the review filter bar split.",
+      "priority_reason": "Kept as `proposed` because it remains an executable follow-up, but the operator asked to continue one queued task and the latest reply orders table selection/header shell ahead of this bulk-edit cleanup."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-focused-readback-export-history-split",
