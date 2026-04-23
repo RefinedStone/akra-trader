@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionStateSection } from "./RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionStateSection";
+import { RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSummarySection } from "./RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSummarySection";
+
 export function RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSection({
   model,
 }: {
@@ -9,19 +12,8 @@ export function RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSec
   return (
     <label>
       <span>Selection</span>
-      <button
-        className="ghost-button"
-        onClick={toggleAllProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogSelections}
-        type="button"
-      >
-        {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogIds.length
-          === providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.length
-          ? "Clear all"
-          : "Select all"}
-      </button>
-      <p className="run-lineage-symbol-copy">
-        {selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogEntries.length} catalog(s) selected
-      </p>
+      <RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionStateSection model={model} />
+      <RuntimeProviderProvenanceGovernancePolicyCatalogBulkSelectionSummarySection model={model} />
     </label>
   );
 }
