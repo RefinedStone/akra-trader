@@ -186,6 +186,9 @@ It is not yet a finished live trading product:
 - the governance-catalog-hierarchy bulk-selection-stage collaborator now composes dedicated bulk-
   selection-state and bulk-selection-action collaborators instead of mixing staged selection
   fields and bulk action triggers inline in one bulk staging owner
+- the governance-catalog-hierarchy bulk-patch-stage collaborator now composes dedicated bulk-
+  query-patch-stage and bulk-layout-patch-stage collaborators instead of mixing query and layout
+  patch ownership inline in one bulk patch owner
 - the governance-catalog-hierarchy table collaborator now composes dedicated row-detail and row-
   action collaborators instead of mixing captured-step review cells and row-level edit/version
   actions inline in one table owner
