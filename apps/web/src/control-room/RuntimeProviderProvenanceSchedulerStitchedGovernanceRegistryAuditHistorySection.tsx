@@ -1,4 +1,8 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditHistorySection({ model }: { model: any }) {
   const {} = model;
 
@@ -159,65 +163,18 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAudi
           <tbody>
             {selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory.history.map((entry) => (
               <tr key={`provider-scheduler-stitched-governance-registry-revision-${entry.revision_id}`}>
-                <td>
-                  <strong>{formatTimestamp(entry.recorded_at)}</strong>
-                  <p className="run-lineage-symbol-copy">
-                    {formatWorkflowToken(entry.action)} · {formatWorkflowToken(entry.status)}
-                  </p>
-                  <p className="run-lineage-symbol-copy">
-                    {entry.recorded_by_tab_label ?? entry.recorded_by_tab_id ?? "unknown tab"}
-                  </p>
-                </td>
-                <td>
-                  <strong>{entry.name}</strong>
-                  <p className="run-lineage-symbol-copy">{entry.description || "No description recorded."}</p>
-                  <p className="run-lineage-symbol-copy">
-                    {formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary(
-                      entry.queue_view,
-                    ) ?? "All stitched governance plans"}
-                  </p>
-                  <p className="run-lineage-symbol-copy">
-                    {entry.default_policy_template_name ?? "No default policy template"}
-                    {entry.default_policy_catalog_name
-                      ? ` · ${entry.default_policy_catalog_name}`
-                      : ""}
-                  </p>
-                </td>
-                <td>
-                  <div className="market-data-provenance-history-actions">
-                    <button
-                      className="ghost-button"
-                      onClick={() => {
-                        applyProviderProvenanceSchedulerStitchedReportGovernanceRegistry(
-                          {
-                            ...selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory.registry,
-                            name: entry.name,
-                            description: entry.description,
-                            queue_view: entry.queue_view,
-                            default_policy_template_id: entry.default_policy_template_id,
-                            default_policy_template_name: entry.default_policy_template_name,
-                            default_policy_catalog_id: entry.default_policy_catalog_id,
-                            default_policy_catalog_name: entry.default_policy_catalog_name,
-                          },
-                        );
-                      }}
-                      type="button"
-                    >
-                      Apply snapshot
-                    </button>
-                    <button
-                      className="ghost-button"
-                      onClick={() => {
-                        void restoreProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistoryRevision(
-                          entry,
-                        );
-                      }}
-                      type="button"
-                    >
-                      Restore revision
-                    </button>
-                  </div>
-                </td>
+                <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection
+                  entry={entry}
+                  model={model}
+                />
+                <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection
+                  entry={entry}
+                  model={model}
+                />
+                <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection
+                  entry={entry}
+                  model={model}
+                />
               </tr>
             ))}
           </tbody>

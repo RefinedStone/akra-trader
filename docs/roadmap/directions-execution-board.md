@@ -227,7 +227,8 @@ Active move map:
 8. keep stitched registry-lifecycle split between review ownership and editor-history ownership
    and keep editor-history split between editing and audit-history collaborators instead of
    recombining queue/catalog review, registry drafting, bulk edits, and history/audit maintenance
-   in one module
+   in one module; keep the audit-history revision table body split between recorded, snapshot, and
+   action cell collaborators instead of rebuilding the revision row inline
 9. keep stitched registry editing split between draft, bulk-edit, and table collaborators, and
    keep table split between listing, row-detail, row-action-cell, and revision-selection
    collaborators instead of recombining registry drafting, selection governance, bulk edit

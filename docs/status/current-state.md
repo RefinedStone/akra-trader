@@ -152,6 +152,9 @@ It is not yet a finished live trading product:
   policy-stage now owns governance-policy staging without duplicating that selector in the
   selection-action controls, and routes preview bulk-edit dispatch through a dedicated policy
   preview-action collaborator
+- the stitched registry audit-history layer now routes the revision history table body through
+  dedicated revision-recorded, revision-snapshot, and revision-action cell collaborators instead
+  of keeping the revision row body inline in one section module
 - the stitched registry table layer now composes dedicated listing and revision-selection
   collaborators, and now also routes each registry row body through dedicated row-detail and
   row-action-cell collaborators instead of keeping registry listing state, row details, and
