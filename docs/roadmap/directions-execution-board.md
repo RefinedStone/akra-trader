@@ -227,7 +227,10 @@ Active move map:
   version-row-detail and version-row-action collaborators instead of rebuilding revision review
   and restore controls inline; keep the governance-policy-template audit layer split between
   audit-filter and audit-table collaborators plus audit-summary, audit-template, and audit-actor
-  row cells instead of rebuilding filter controls and audit rows inline
+  row cells instead of rebuilding filter controls and audit rows inline; keep the governance-
+  policy-catalog layer split between bulk-edit, registry-table, and versions collaborators
+  instead of rebuilding bulk selection edits, catalog registry listing, and revision history
+  inline
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared

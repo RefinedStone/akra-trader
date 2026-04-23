@@ -162,6 +162,9 @@ It is not yet a finished live trading product:
   table collaborators, and the audit-table layer now routes rows through dedicated audit-summary,
   audit-template, and audit-actor cell collaborators instead of keeping filter controls and audit
   row bodies inline in one section module
+- the governance-policy-catalog collaborator now composes dedicated bulk-edit, registry-table, and
+  versions collaborators instead of mixing bulk selection edits, catalog registry listing, and
+  revision history inline in one section module
 - focused provider readback, persisted export history, and shared export registry flows now route
   through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
   longer carries that focused provider export body inline
