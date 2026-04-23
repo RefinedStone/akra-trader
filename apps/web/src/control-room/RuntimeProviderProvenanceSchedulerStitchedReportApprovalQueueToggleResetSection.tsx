@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection";
-import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetActionSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetActionSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetSelectionSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetSelectionSection";
 
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueToggleResetSection({ model }: { model: any }) {
   const {} = model;
@@ -8,7 +9,8 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueTog
   return (
     <>
       <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueFilterSelectSection model={model} />
-      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetApplySection model={model} />
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetSelectionSection model={model} />
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueResetActionSection model={model} />
     </>
   );
 }
