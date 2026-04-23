@@ -264,9 +264,9 @@ Active move map:
     outer table shell and empty-state branching
 21. keep stitched report approval-queue review-state ownership split between plan-cell and
     preview-cell collaborators instead of recombining both row cells in one review-state owner
-22. keep stitched report approval-queue mutation ownership split between queue-action and
-    commit-control collaborators instead of recombining shared-queue selection and
-    approve/apply/rollback controls in one module
+22. keep stitched report approval-queue mutation ownership focused on the action-cell shell while
+    composing mutation-action and mutation-commit-control leaf collaborators instead of mounting
+    queue-action and commit-control flows directly in the row owner
 23. keep stitched report approval-queue commit-control ownership split between plan-gate and
     commit-action collaborators instead of recombining mutation gating and dispatch controls in one
     module

@@ -178,9 +178,9 @@ It is not yet a finished live trading product:
   with row-level review state and queue mutation controls
 - the stitched report approval-queue review-state layer now composes dedicated plan-cell and
   preview-cell collaborators instead of keeping both row cells inline in one review-state owner
-- the stitched report approval-queue mutation layer now composes dedicated queue-action and
-  commit-control collaborators instead of keeping shared-queue selection and approve/apply/rollback
-  controls inline in one module
+- the stitched report approval-queue mutation layer now keeps the action-cell shell while
+  composing dedicated mutation-action and mutation-commit-control leaf collaborators instead of
+  mounting queue-action and commit-control flows directly in the row owner
 - the stitched report approval-queue commit-control layer now composes dedicated plan-gate and
   commit-action collaborators instead of keeping mutation gating and dispatch controls inline in one
   module

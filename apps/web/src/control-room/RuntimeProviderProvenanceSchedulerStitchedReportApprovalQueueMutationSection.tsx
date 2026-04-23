@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitControlSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitControlSection";
-import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMutationActionLeafSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMutationActionLeafSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMutationCommitControlLeafSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMutationCommitControlLeafSection";
 
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMutationSection({
   model,
@@ -14,11 +14,11 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMut
   return (
     <td>
       <div className="market-data-provenance-history-actions">
-        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueQueueActionSection
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMutationActionLeafSection
           model={model}
           plan={plan}
         />
-        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitControlSection
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueMutationCommitControlLeafSection
           model={model}
           plan={plan}
         />
