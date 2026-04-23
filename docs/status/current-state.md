@@ -134,6 +134,9 @@ It is not yet a finished live trading product:
 - the moderation policy-catalog layer now composes dedicated catalog-lifecycle,
   governance-policy, and meta-policy collaborators instead of keeping those three lifecycle
   surfaces inline in one section module
+- the moderation approval-queue layer now composes dedicated moderation-governance,
+  catalog-governance, and scheduler-moderation approval collaborators instead of keeping the three
+  queue flows inline in one section module
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body
