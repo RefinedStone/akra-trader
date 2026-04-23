@@ -1,13 +1,8 @@
 // @ts-nocheck
-import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActionCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActionCellSection";
-import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActorCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActorCellSection";
-import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditDetailCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditDetailCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditEventTableSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditEventTableSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterSelectSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterSelectSection";
 import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterTextInputSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditFilterTextInputSection";
-import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditWhenCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditWhenCellSection";
-import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection";
-import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection";
-import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionHistoryTableSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionHistoryTableSection";
 
 export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditHistorySection({ model }: { model: any }) {
   const {} = model;
@@ -39,38 +34,9 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAudi
           </p>
         ) : null}
         {providerProvenanceSchedulerStitchedReportGovernanceRegistryAudits.length ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {providerProvenanceSchedulerStitchedReportGovernanceRegistryAudits.map((entry) => (
-                <tr key={`provider-scheduler-stitched-governance-registry-audit-${entry.audit_id}`}>
-                  <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditWhenCellSection
-                    entry={entry}
-                    model={model}
-                  />
-                  <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActionCellSection
-                    entry={entry}
-                    model={model}
-                  />
-                  <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditActorCellSection
-                    entry={entry}
-                    model={model}
-                  />
-                  <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditDetailCellSection
-                    entry={entry}
-                    model={model}
-                  />
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAuditEventTableSection
+            model={model}
+          />
         ) : (
           !providerProvenanceSchedulerStitchedReportGovernanceRegistryAuditsLoading
             ? <p className="empty-state">No stitched governance registry audit events match the selected filters.</p>
@@ -86,33 +52,9 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryAudi
         </p>
       ) : null}
       {selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory ? (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Recorded</th>
-              <th>Snapshot</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory.history.map((entry) => (
-              <tr key={`provider-scheduler-stitched-governance-registry-revision-${entry.revision_id}`}>
-                <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionRecordedCellSection
-                  entry={entry}
-                  model={model}
-                />
-                <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSnapshotCellSection
-                  entry={entry}
-                  model={model}
-                />
-                <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionActionCellSection
-                  entry={entry}
-                  model={model}
-                />
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionHistoryTableSection
+          model={model}
+        />
       ) : null}
     </>
   );

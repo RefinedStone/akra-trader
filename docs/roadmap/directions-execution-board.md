@@ -230,8 +230,10 @@ Active move map:
    in one module; keep the audit-history revision table body split between recorded, snapshot, and
    action cell collaborators instead of rebuilding the revision row inline, and keep the audit-
    event table body split between when, action, actor, and detail cell collaborators instead of
-   rebuilding the audit row inline; keep the audit filter bar split between select and text-input
-   collaborators instead of rebuilding all audit filters in one block; keep the review approval-
+   rebuilding the audit row inline; keep the audit-history revision-history and audit-event table
+   shells split into dedicated table collaborators instead of leaving both table shells inline;
+   keep the audit filter bar split between select and text-input collaborators instead of
+   rebuilding all audit filters in one block; keep the review approval-
    queue table split between queue-table and queue-row collaborators, and keep the registry
    policy-catalog table split between policy-catalog-table and policy-catalog-row collaborators
    instead of rebuilding those table shells and row bodies inline; keep the review filter bars

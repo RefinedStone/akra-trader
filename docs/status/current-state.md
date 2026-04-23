@@ -163,8 +163,10 @@ It is not yet a finished live trading product:
   dedicated revision-recorded, revision-snapshot, and revision-action cell collaborators instead
   of keeping the revision row body inline in one section module, and now routes the audit-event
   table body through dedicated audit-when, audit-action, audit-actor, and audit-detail cell
-  collaborators instead of keeping the audit row inline; the audit filter bar is now split between
-  dedicated select and text-input collaborators instead of keeping all audit filters in one block
+  collaborators instead of keeping the audit row inline; the revision-history and audit-event
+  table shells now route through dedicated table collaborators instead of staying inline in audit-
+  history, and the audit filter bar is now split between dedicated select and text-input
+  collaborators instead of keeping all audit filters in one block
 - the stitched registry review layer now routes the approval-queue table through dedicated queue-
   table and queue-row collaborators, and routes the registry policy-catalog table through
   dedicated policy-catalog-table and policy-catalog-row collaborators instead of keeping both
