@@ -467,19 +467,34 @@
       "priority_reason": "Marked done because the main session completed the final residual `domain/models.py` benchmark/remediation split, validated it with `python -m py_compile` plus focused remediation regressions in `test_reference.py`, `test_application.py`, and `test_api.py`, and pushed commit `07d487f` to `origin/main`."
     },
     {
+      "id": "task-llm-sensitivity-query-builder-authoring-simulation-flow-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Extract query-builder authoring and simulation flows out of RunSurfaceCollectionQueryBuilderContent.tsx",
+      "description": "Continue the query-builder decomposition by moving the remaining authoring, simulation, and standalone-surface orchestration out of `apps/web/src/features/query-builder/RunSurfaceCollectionQueryBuilderContent.tsx` into feature-owned hooks/collaborators so the main component stops re-accumulating 11k-line replay and execution logic inline.",
+      "status": "ready",
+      "base_priority": 98,
+      "dynamic_priority_delta": 35,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-23T20:53:48+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply confirms replay intent/governance ownership already moved into `useQueryBuilderReplayIntentFlow.ts`, the directions execution board now says to keep moving query-builder replay/governance orchestration into feature-owned hooks, and `RunSurfaceCollectionQueryBuilderContent.tsx` still remains an 11k-line compatibility hotspot.",
+      "priority_reason": "Highest-priority next step because the operator explicitly wants line-count reduction and hexagonal evolution while ignoring current docker-compose breakage, and the just-finished replay/governance split creates a clear bounded follow-up inside the same oversized query-builder module."
+    },
+    {
       "id": "task-llm-sensitivity-app-provider-provenance-workspace-route-extraction",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Extract provider-provenance workspace route ownership out of App.tsx",
       "description": "Move the provider-provenance and search-moderation workspace state, dense JSX, and direct `controlRoomApi`/`controlRoomDefinitions` usage out of `apps/web/src/App.tsx` into a feature-owned route module so `App.tsx` stops owning that bounded flow directly.",
-      "status": "ready",
+      "status": "proposed",
       "base_priority": 97,
-      "dynamic_priority_delta": 33,
+      "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T00:23:01+09:00",
+      "updated_at": "2026-04-23T20:53:48+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The queue was re-opened because `llm-sensitivity-decomposition` still lists `App.tsx` and remaining feature consumers of the control-room barrels as primary pressure points, and the current file still directly owns a massive provider-provenance/search-moderation import surface.",
-      "priority_reason": "Highest-priority next step because `apps/web/src/App.tsx` remains the biggest frontend compatibility hotspot at 38k+ lines and still directly wires provider-provenance/search-moderation APIs, definitions, state, and JSX despite the direction calling for feature-owned modules instead of the top-level route entrypoint."
+      "direction_relation_note": "This stays in the lane because the direction still calls out compatibility barrels and route ownership cleanup, but the latest main-session reply and roadmap update moved the immediate pressure point to `RunSurfaceCollectionQueryBuilderContent.tsx` after replay intent/governance extraction landed.",
+      "priority_reason": "Kept as a near-term proposal because `App.tsx` route ownership still matters, but the just-validated query-builder split exposes a clearer immediate continuation path for reducing code volume without reopening the route shell again first."
     },
     {
       "id": "task-llm-sensitivity-control-room-provider-provenance-api-module-split",
