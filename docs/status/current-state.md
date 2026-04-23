@@ -176,6 +176,8 @@ It is not yet a finished live trading product:
 - the stitched report approval-queue action layer now composes dedicated review-state and mutation
   row collaborators instead of also carrying the outer table shell and empty-state branching inline
   with row-level review state and queue mutation controls
+- the stitched report approval-queue review-state layer now composes dedicated plan-cell and
+  preview-cell collaborators instead of keeping both row cells inline in one review-state owner
 - the stitched report approval-queue mutation layer now composes dedicated queue-action and
   commit-control collaborators instead of keeping shared-queue selection and approve/apply/rollback
   controls inline in one module
