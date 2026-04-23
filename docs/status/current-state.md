@@ -165,6 +165,9 @@ It is not yet a finished live trading product:
 - the governance-policy-catalog collaborator now composes dedicated bulk-edit, registry-table, and
   versions collaborators instead of mixing bulk selection edits, catalog registry listing, and
   revision history inline in one section module
+- the governance-policy-catalog registry-table collaborator now composes dedicated row-detail and
+  row-action collaborators instead of mixing catalog/default review cells and row actions inline
+  in one table owner
 - focused provider readback, persisted export history, and shared export registry flows now route
   through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
   longer carries that focused provider export body inline

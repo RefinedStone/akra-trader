@@ -230,7 +230,8 @@ Active move map:
   row cells instead of rebuilding filter controls and audit rows inline; keep the governance-
   policy-catalog layer split between bulk-edit, registry-table, and versions collaborators
   instead of rebuilding bulk selection edits, catalog registry listing, and revision history
-  inline
+  inline; keep the governance-policy-catalog registry-table layer split between row-detail and
+  row-action collaborators instead of recombining catalog/default review and row actions inline
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
