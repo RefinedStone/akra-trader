@@ -206,7 +206,10 @@ Active move map:
    provenance saved workspace cards owned by dedicated route collaborators instead of re-expanding
    runtime triage or `App.tsx`; keep the provider-provenance route model owned by a dedicated
    builder and threaded through focused-export/workspace collaborators instead of rebuilding that
-   workspace payload inline in `ControlRoomApp.tsx`; keep the Governance policy templates card split between a
+   workspace payload inline in `ControlRoomApp.tsx`; keep `RuntimeProviderProvenanceWorkspaceSection`
+   split between dedicated query-surface and workspace-consumers collaborators instead of
+   recombining cross-focus analytics query controls with cards, scheduler, analytics, and shared
+   audit mounts inline in one workspace module; keep the Governance policy templates card split between a
    dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
    hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
    giant governance surface inline in `RuntimeProviderProvenanceWorkspaceCards.tsx`; keep the
