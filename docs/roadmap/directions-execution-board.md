@@ -208,8 +208,11 @@ Active move map:
    dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
    hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
    giant governance surface inline in `RuntimeProviderProvenanceWorkspaceCards.tsx`, and keep the
-   hierarchy-step-template section split between draft, registry, versions, and audit
-   collaborators instead of rebuilding that cross-catalog governance surface inline in one module
+  hierarchy-step-template section split between draft, registry, versions, and audit
+  collaborators instead of rebuilding that cross-catalog governance surface inline in one module,
+  and keep the registry layer split between bulk-selection-stage, bulk-step-stage, and
+  registry-table collaborators instead of collapsing bulk staging and the registry table back
+  together
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
