@@ -126,6 +126,9 @@ It is not yet a finished live trading product:
   saved report, cross-focus query, scheduler workspace, analytics review, and shared registry audit
   flows, so runtime incident triage no longer carries that provider-provenance workspace body
   inline
+- `ControlRoomApp` now builds a dedicated `providerProvenanceRouteModel`, and the focused export
+  surface mounts `RuntimeProviderProvenanceWorkspaceSection` through that nested route payload
+  instead of keeping the provider-provenance route model owned inline in `ControlRoomApp`
 - the provider-provenance workspace cards layer now routes the governance policy templates surface
   through a dedicated card plus template-registry, policy-catalog, catalog-hierarchy,
   hierarchy-step-template, and policy-catalog-audit collaborators instead of one giant governance

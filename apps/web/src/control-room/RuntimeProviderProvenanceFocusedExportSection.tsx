@@ -51,7 +51,9 @@ export function RuntimeProviderProvenanceFocusedExportSection({ model }: { model
         <RuntimeProviderProvenanceFocusedReadbackSection model={model} />
         <RuntimeProviderProvenanceFocusedPersistedExportHistorySection model={model} />
         <RuntimeProviderProvenanceFocusedSharedExportRegistrySection model={model} />
-        <RuntimeProviderProvenanceWorkspaceSection model={model} />
+        <RuntimeProviderProvenanceWorkspaceSection
+          model={model.providerProvenanceRouteModel ?? model}
+        />
       </div>
     </div>
   );

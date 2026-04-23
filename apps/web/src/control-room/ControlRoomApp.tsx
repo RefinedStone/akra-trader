@@ -52,6 +52,7 @@ import {
 } from "../runSurfaceCapabilities";
 import { RunSurfaceCollectionQueryBuilder } from "../features/query-builder";
 import { ControlRoomRoutes } from "./ControlRoomRoutes";
+import { buildProviderProvenanceRouteModel } from "./buildProviderProvenanceRouteModel";
 import { useControlRoomComparisonHistoryState } from "./useControlRoomComparisonHistoryState";
 import { useControlRoomRuntimeDerivedState } from "./useControlRoomRuntimeDerivedState";
 import {
@@ -9677,5 +9678,10 @@ export default function App() {
     escalateGuardedLiveIncident,
   };
 
-  return <ControlRoomRoutes model={controlRoomRoutesModel} />;
+  const controlRoomRoutesModelWithProviderProvenanceRoute = {
+    ...controlRoomRoutesModel,
+    providerProvenanceRouteModel: buildProviderProvenanceRouteModel(controlRoomRoutesModel),
+  };
+
+  return <ControlRoomRoutes model={controlRoomRoutesModelWithProviderProvenanceRoute} />;
 }
