@@ -1,18 +1,11 @@
 // @ts-nocheck
-export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryTableSection({ model }: { model: any }) {
-  const {} = model;
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryListingSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryListingSection";
+import { RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSelectionSection } from "./RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSelectionSection";
 
+export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryTableSection({ model }: { model: any }) {
   return (
-    <>
-      {providerProvenanceSchedulerStitchedReportGovernanceRegistriesLoading ? (
-        <p className="empty-state">Loading stitched governance registries…</p>
-      ) : null}
-      {providerProvenanceSchedulerStitchedReportGovernanceRegistriesError ? (
-        <p className="market-data-workflow-feedback">
-          Stitched governance registries failed: {providerProvenanceSchedulerStitchedReportGovernanceRegistriesError}
-        </p>
-      ) : null}
-      {filteredProviderProvenanceSchedulerStitchedReportGovernanceRegistries.length ? (
+    <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryListingSection model={model}>
+      {(entries: any[]) => (
         <table className="data-table">
           <thead>
             <tr>
@@ -34,7 +27,7 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryTabl
             </tr>
           </thead>
           <tbody>
-            {filteredProviderProvenanceSchedulerStitchedReportGovernanceRegistries.map((entry) => (
+            {entries.map((entry) => (
               <tr key={`provider-scheduler-stitched-governance-registry-${entry.registry_id}`}>
                 <td className="provider-provenance-selection-cell">
                   <input
@@ -96,20 +89,10 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryTabl
                     >
                       Edit
                     </button>
-                    <button
-                      className="ghost-button"
-                      onClick={() => {
-                        void toggleProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory(
-                          entry.registry_id,
-                        );
-                      }}
-                      type="button"
-                    >
-                      {selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryId === entry.registry_id
-                        && selectedProviderProvenanceSchedulerStitchedReportGovernanceRegistryHistory
-                        ? "Hide versions"
-                        : "Versions"}
-                    </button>
+                    <RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryRevisionSelectionSection
+                      entry={entry}
+                      model={model}
+                    />
                     <button
                       className="ghost-button"
                       disabled={entry.status !== "active"}
@@ -128,11 +111,7 @@ export function RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryTabl
             ))}
           </tbody>
         </table>
-      ) : (
-        !providerProvenanceSchedulerStitchedReportGovernanceRegistriesLoading
-          ? <p className="empty-state">No stitched governance registries match the current search.</p>
-          : null
       )}
-    </>
+    </RuntimeProviderProvenanceSchedulerStitchedGovernanceRegistryListingSection>
   );
 }
