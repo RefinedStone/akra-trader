@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateLeafSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateLeafSection";
 
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitControlSection({
   model,
@@ -12,17 +12,17 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCom
 
   return (
     <>
-      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateSection
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateLeafSection
         model={model}
         mutation="approve"
         plan={plan}
       />
-      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateSection
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateLeafSection
         model={model}
         mutation="apply"
         plan={plan}
       />
-      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateSection
+      <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePlanGateLeafSection
         model={model}
         mutation="rollback"
         plan={plan}

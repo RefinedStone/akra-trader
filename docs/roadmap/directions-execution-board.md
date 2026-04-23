@@ -270,9 +270,9 @@ Active move map:
 23. keep stitched report approval-queue queue-action leaf ownership split between dispatch and
     status-view collaborators instead of recombining shared-queue dispatch and selected-state copy
     in one leaf owner
-24. keep stitched report approval-queue commit-control ownership split between plan-gate and
-    commit-action collaborators instead of recombining mutation gating and dispatch controls in one
-    module
+24. keep stitched report approval-queue commit-control subtree routed through plan-gate and
+    commit-action leaf collaborators instead of mounting those subtree entrypoints directly in the
+    parent owner
 25. keep stitched report approval-queue commit-action ownership split between dispatch-flow and
     mutation-trigger collaborators instead of recombining mutation dispatch branching and button
     rendering in one module

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionLeafSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionLeafSection";
 import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueEligibilityStateSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueEligibilityStateSection";
 import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueLabelPolicySection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueLabelPolicySection";
 
@@ -24,7 +24,7 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueuePla
           mutation={mutation}
         >
           {(label: string) => (
-            <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionSection
+            <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionLeafSection
               disabled={disabled}
               label={label}
               model={model}
