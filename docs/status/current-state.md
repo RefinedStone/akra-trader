@@ -161,6 +161,9 @@ It is not yet a finished live trading product:
 - the stitched report policy-catalog action-dispatch layer now composes dedicated per-action
   handlers and shared dispatch plumbing collaborators instead of keeping common catalog dispatch
   plumbing and action-specific handlers inline in one module
+- the stitched report policy-catalog trigger-wiring layer now composes dedicated button-layout and
+  callback-wiring collaborators instead of keeping button layout and callback binding inline in one
+  module
 - the stitched report policy-catalog review layer now composes dedicated default-body and
   catalog-state collaborators instead of keeping catalog state and default policy detail cells
   inline in one module

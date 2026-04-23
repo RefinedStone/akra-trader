@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionButtonLayoutSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionButtonLayoutSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionCallbackWiringSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionCallbackWiringSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionTriggerWiringSection({
   useDefaultsDisabled,
   stageQueueDisabled,
@@ -13,30 +16,28 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSel
   handleOpenSharedCatalog: () => void;
 }) {
   return (
-    <>
-      <button
-        className="ghost-button"
-        disabled={useDefaultsDisabled}
-        onClick={handleUseDefaults}
-        type="button"
-      >
-        Use defaults
-      </button>
-      <button
-        className="ghost-button"
-        disabled={stageQueueDisabled}
-        onClick={handleStageQueue}
-        type="button"
-      >
-        Stage queue
-      </button>
-      <button
-        className="ghost-button"
-        onClick={handleOpenSharedCatalog}
-        type="button"
-      >
-        Open shared catalog
-      </button>
-    </>
+    <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionCallbackWiringSection
+      handleOpenSharedCatalog={handleOpenSharedCatalog}
+      handleStageQueue={handleStageQueue}
+      handleUseDefaults={handleUseDefaults}
+    >
+      {({
+        onOpenSharedCatalogClick,
+        onStageQueueClick,
+        onUseDefaultsClick,
+      }: {
+        onOpenSharedCatalogClick: () => void;
+        onStageQueueClick: () => void;
+        onUseDefaultsClick: () => void;
+      }) => (
+        <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionButtonLayoutSection
+          onOpenSharedCatalogClick={onOpenSharedCatalogClick}
+          onStageQueueClick={onStageQueueClick}
+          onUseDefaultsClick={onUseDefaultsClick}
+          stageQueueDisabled={stageQueueDisabled}
+          useDefaultsDisabled={useDefaultsDisabled}
+        />
+      )}
+    </RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionCallbackWiringSection>
   );
 }
