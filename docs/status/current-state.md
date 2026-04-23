@@ -151,9 +151,11 @@ It is not yet a finished live trading product:
   keeping selection governance and bulk edit staging controls inline in one section module; the
   policy-stage now owns governance-policy staging without duplicating that selector in the
   selection-action controls, selection-actions now split between toggle-action and preview-actions
+  collaborators, metadata-stage now splits name affix staged-state from description staged-state
   collaborators, queue-stage now splits queue core state from query/sort staged-state
-  collaborators, and policy-stage routes preview bulk-edit dispatch through a dedicated policy
-  preview-action collaborator
+  collaborators, and policy-stage splits default-policy staged-state from governance-policy
+  staged-state while routing preview bulk-edit dispatch through a dedicated policy preview-action
+  collaborator
 - the stitched registry audit-history layer now routes the revision history table body through
   dedicated revision-recorded, revision-snapshot, and revision-action cell collaborators instead
   of keeping the revision row body inline in one section module, and now routes the audit-event

@@ -246,8 +246,10 @@ Active move map:
     metadata-stage, queue-stage, and policy-stage collaborators instead of recombining selection
     governance and bulk edit staging controls in one module; keep governance-policy selection in
     the policy-stage instead of duplicating it in selection-action controls; keep selection-actions
-    split between toggle-action and preview-actions collaborators, keep queue-stage split between
-    queue-core-state and queue-query staged-state collaborators, and keep preview bulk-edit
+    split between toggle-action and preview-actions collaborators, keep metadata-stage split
+    between name-affix and description staged-state collaborators, keep queue-stage split between
+    queue-core-state and queue-query staged-state collaborators, keep policy-stage split between
+    default-policy and governance-policy staged-state collaborators, and keep preview bulk-edit
     dispatch in a dedicated policy preview-action collaborator
 11. keep stitched report views split between saved-view lifecycle ownership and approval-policy
    ownership instead of recombining saved view administration, stitched approval queue, and policy
