@@ -141,6 +141,10 @@ It is not yet a finished live trading product:
 - `RuntimeProviderProvenanceSchedulerWorkspaceSection` now composes dedicated async-state and
   workspace-surface collaborators instead of mixing scheduler loading/error state with automation,
   moderation, stitched-governance, and exports mounts inline in one scheduler workspace module
+- the provider-provenance scheduler automation collaborator now composes dedicated overview,
+  daily-trends, drill-down, and recent-history collaborators instead of mixing automation
+  summary controls, daily trend tables, hourly drill-down review, and cycle history pagination
+  inline in one scheduler automation module
 - the provider-provenance workspace cards layer now routes the governance policy templates surface
   through a dedicated card plus template-registry, policy-catalog, catalog-hierarchy,
   hierarchy-step-template, and policy-catalog-audit collaborators instead of one giant governance

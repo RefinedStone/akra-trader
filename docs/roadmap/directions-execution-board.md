@@ -219,7 +219,10 @@ Active move map:
    keep `RuntimeProviderProvenanceSchedulerWorkspaceSection` split between dedicated async-state
    and workspace-surface collaborators instead of recombining scheduler loading/error state with
    automation, moderation, stitched-governance, and exports mounts inline in one scheduler
-   workspace module;
+   workspace module; keep `RuntimeProviderProvenanceSchedulerAutomationSection` split between
+   dedicated overview, daily-trends, drill-down, and recent-history collaborators instead of
+   recombining automation summary controls, daily trend tables, hourly drill-down review, and
+   cycle history pagination inline in one scheduler automation module;
    keep the Governance policy templates card split between a
    dedicated card wrapper and bounded template-registry, policy-catalog, catalog-hierarchy,
    hierarchy-step-template, and policy-catalog-audit collaborators instead of rebuilding that
