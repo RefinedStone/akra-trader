@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionDispatchFlowSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionDispatchFlowSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionMutationTriggerSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionMutationTriggerSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionSection({
   model,
   plan,
@@ -12,28 +15,19 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCom
   disabled: boolean;
   label: string;
 }) {
-  const {} = model;
-
-  const handleClick = () => {
-    if (mutation === "approve") {
-      void approveProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
-      return;
-    }
-    if (mutation === "apply") {
-      void applyProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
-      return;
-    }
-    void rollbackProviderProvenanceSchedulerNarrativeGovernancePlanEntry(plan);
-  };
-
   return (
-    <button
-      className="ghost-button"
-      disabled={disabled}
-      onClick={handleClick}
-      type="button"
+    <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionDispatchFlowSection
+      model={model}
+      mutation={mutation}
+      plan={plan}
     >
-      {label}
-    </button>
+      {({ handleClick }: { handleClick: () => void }) => (
+        <RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionMutationTriggerSection
+          disabled={disabled}
+          label={label}
+          onClick={handleClick}
+        />
+      )}
+    </RuntimeProviderProvenanceSchedulerStitchedReportApprovalQueueCommitActionDispatchFlowSection>
   );
 }
