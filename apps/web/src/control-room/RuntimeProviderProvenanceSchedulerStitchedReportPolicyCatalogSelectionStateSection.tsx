@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDerivedStateSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDerivedStateSection";
+import { RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionSection } from "./RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionSection";
+
 export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionStateSection({
   model,
   catalog,
@@ -6,42 +9,22 @@ export function RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSel
   model: any;
   catalog: any;
 }) {
-  const {} = model;
-
   return (
-    <>
-      <button
-        className="ghost-button"
-        disabled={catalog.status !== "active"}
-        onClick={() => {
-          applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
-        }}
-        type="button"
-      >
-        Use defaults
-      </button>
-      <button
-        className="ghost-button"
-        disabled={catalog.status !== "active" || !catalog.hierarchy_steps.length}
-        onClick={() => {
-          applyProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalog(catalog);
-          void stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy(catalog);
-        }}
-        type="button"
-      >
-        Stage queue
-      </button>
-      <button
-        className="ghost-button"
-        onClick={() => {
-          openProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogInSharedSurface(
-            catalog,
-          );
-        }}
-        type="button"
-      >
-        Open shared catalog
-      </button>
-    </>
+    <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDerivedStateSection catalog={catalog}>
+      {({
+        useDefaultsDisabled,
+        stageQueueDisabled,
+      }: {
+        useDefaultsDisabled: boolean;
+        stageQueueDisabled: boolean;
+      }) => (
+        <RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogSelectionActionSection
+          catalog={catalog}
+          model={model}
+          stageQueueDisabled={stageQueueDisabled}
+          useDefaultsDisabled={useDefaultsDisabled}
+        />
+      )}
+    </RuntimeProviderProvenanceSchedulerStitchedReportPolicyCatalogDerivedStateSection>
   );
 }
