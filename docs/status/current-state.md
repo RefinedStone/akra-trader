@@ -142,6 +142,12 @@ It is not yet a finished live trading product:
 - the scheduler narrative registry card now composes dedicated bulk-governance, registry-table,
   and revision-history collaborators instead of mixing bulk governance, registry rows, and
   registry revision history inline in one card body
+- the scheduler narrative registry bulk-governance collaborator now composes dedicated
+  governance-bar and bulk-edit-stage collaborators instead of mixing selection-policy preview
+  actions and advanced bulk edit staging inline in one governance module
+- the scheduler narrative registry table collaborator now composes dedicated table-view and
+  row-detail collaborators instead of mixing table shell, row review, and row actions inline in
+  one registry module
 - the scheduler narrative template bulk-governance collaborator now composes dedicated
   governance-bar and bulk-edit-stage collaborators instead of mixing selection-policy preview
   actions and advanced bulk edit staging inline in one governance module
