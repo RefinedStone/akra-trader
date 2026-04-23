@@ -211,15 +211,17 @@ Active move map:
 3. keep the provider-provenance scheduler workspace split by bounded sections such as automation,
    moderation, stitched governance, and shared exports instead of rebuilding one giant scheduler
    collaborator
-4. keep query-builder replay intent, replay review, replay promotion approval, expression
+4. keep scheduler moderation flows split between alert review and governance queue ownership
+   instead of recombining retrieval review, catalog governance, and approval queues in one module
+5. keep query-builder replay intent, replay review, replay promotion approval, expression
    authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
    feature-owned hooks and section collaborators instead of re-expanding the main component body;
    the next pressure points are the remaining large workspace modules plus backend compatibility
    files such as standalone surface catalogs and `application.py`
-5. keep `domain/models.py` import-compatible while model families move under `domain/model_types/*`
-6. keep shrinking `application.py` by moving pure comparison and serializer flows into
+6. keep `domain/models.py` import-compatible while model families move under `domain/model_types/*`
+7. keep shrinking `application.py` by moving pure comparison and serializer flows into
    `application_support/*`
-7. use route smoke tests as a floor before further `App.tsx` extraction
+8. use route smoke tests as a floor before further `App.tsx` extraction
 
 Exit evidence:
 
