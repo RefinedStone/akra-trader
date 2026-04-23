@@ -158,6 +158,10 @@ It is not yet a finished live trading product:
   dedicated versions-table collaborator, and the versions-table layer now composes dedicated
   version-row-detail and version-row-action collaborators instead of keeping revision review and
   restore actions inline in one section module
+- the governance-policy-template audit collaborator now composes dedicated audit-filter and audit-
+  table collaborators, and the audit-table layer now routes rows through dedicated audit-summary,
+  audit-template, and audit-actor cell collaborators instead of keeping filter controls and audit
+  row bodies inline in one section module
 - focused provider readback, persisted export history, and shared export registry flows now route
   through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
   longer carries that focused provider export body inline
