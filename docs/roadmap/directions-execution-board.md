@@ -227,6 +227,10 @@ Active move map:
    export-policy, and export-audit-history collaborators instead of recombining shared export
    registry rows, selected export routing policy controls, and audit trail rows inline in one
    scheduler exports module; keep
+   `RuntimeProviderProvenanceSchedulerExportsRegistrySection` split between dedicated
+   exports-registry-summary and exports-registry-table collaborators instead of recombining
+   shared export registry identity copy with loading, error, empty, and registry table states
+   inline in one exports-registry module; keep
    `RuntimeProviderProvenanceSchedulerExportAuditHistorySection` split between dedicated
    audit-history-summary and audit-history-table collaborators instead of recombining selected
    export identity copy with audit loading, error, empty, and history table states inline in one
