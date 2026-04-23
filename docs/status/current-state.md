@@ -129,6 +129,8 @@ It is not yet a finished live trading product:
 - focused provider readback, persisted export history, and shared export registry flows now route
   through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
   longer carries that focused provider export body inline
+- focused lineage history now routes through a dedicated provider-provenance collaborator, so
+  `RuntimeDataIncidentTriagePanel` no longer carries that lineage history body inline
 - the provider-provenance scheduler workspace now routes through dedicated automation, moderation,
   stitched-governance, and shared-export sections instead of one giant scheduler body
 - the scheduler moderation workspace now composes separate alert-review, moderation-governance,

@@ -209,7 +209,8 @@ Active move map:
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
    export history owned by dedicated provider-provenance collaborators instead of rebuilding that
-   export body inline in triage
+   export body inline in triage, and keep focused lineage history owned by a dedicated
+   provider-provenance collaborator instead of rebuilding that history body inline
 3. keep the provider-provenance scheduler workspace split by bounded sections such as automation,
    moderation, stitched governance, and shared exports instead of rebuilding one giant scheduler
    collaborator
