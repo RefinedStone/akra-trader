@@ -203,10 +203,11 @@ Active move map:
 
 1. keep `controlRoomApi.ts` and `controlRoomDefinitions.ts` as compatibility barrels while the
    real provider/query-builder families move under bounded submodules
-2. keep moving query-builder replay intent, replay review, replay promotion approval, expression
-   authoring, and coordination-simulation orchestration into feature-owned hooks and collaborators
-   instead of re-expanding the main component body; the remaining replay provenance/runtime-review
-   body is the next pressure point
+2. keep query-builder replay intent, replay review, replay promotion approval, expression
+   authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
+   feature-owned hooks and section collaborators instead of re-expanding the main component body;
+   the next pressure points are the remaining large workspace modules plus backend compatibility
+   files such as standalone surface catalogs and `application.py`
 3. keep `domain/models.py` import-compatible while model families move under `domain/model_types/*`
 4. keep shrinking `application.py` by moving pure comparison and serializer flows into
    `application_support/*`
