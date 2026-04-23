@@ -2060,16 +2060,31 @@
       "id": "task-llm-sensitivity-provider-provenance-scheduler-narrative-registry-card-internal-boundary-split",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Split Scheduler narrative registry card by bulk governance, registry table, and revision history ownership",
-      "description": "Now that `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerNarrativeRegistryCard.tsx` exists as the new workspace-mounted wrapper, decompose its remaining giant body so draft/search shell ownership stays local while bulk governance, registry listing/table, and revision history move into dedicated collaborator sections.",
-      "status": "ready",
+      "description": "Completed the first scheduler narrative registry card decomposition by leaving `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerNarrativeRegistryCard.tsx` with draft header/filter ownership only while bulk governance, registry listing/table, and revision history now live in `RuntimeProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceSection.tsx`, `RuntimeProviderProvenanceSchedulerNarrativeRegistryTableSection.tsx`, and `RuntimeProviderProvenanceSchedulerNarrativeRegistryRevisionHistorySection.tsx`.",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 47,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T09:40:00+09:00",
+      "updated_at": "2026-04-25T10:05:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says the new `RuntimeProviderProvenanceSchedulerNarrativeRegistryCard.tsx` is the remaining local pressure point and directly names `bulk governance`, `registry table`, and `revision history` as the next internal boundaries to extract.",
-      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the previous queue head finished in commit `17d2bd7`, and the latest reply gives a concrete numbered-next-style continuation inside the newly created registry card before moving on to `Approval queue`."
+      "direction_relation_note": "The latest main-session reply confirms `RuntimeProviderProvenanceSchedulerNarrativeRegistryCard.tsx` now owns only the draft header/filter while the bulk-governance, registry-table, and revision-history bodies moved into dedicated collaborators, which closes the queued first-pass internal-boundary split.",
+      "priority_reason": "Marked `done` because the queued registry-card decomposition landed, `docs/status/current-state.md` and `docs/roadmap/directions-execution-board.md` were updated, `cd apps/web && npm run typecheck`, `cd apps/web && npm test -- src/routes/WorkspaceRoutes.smoke.test.tsx`, and `cd apps/web && npm run build` all passed, and commit `97eb097` was pushed to `origin/main`; the remaining local pressure now sits in `RuntimeProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceSection.tsx` and `RuntimeProviderProvenanceSchedulerNarrativeRegistryTableSection.tsx`."
+    },
+    {
+      "id": "task-llm-sensitivity-provider-provenance-scheduler-narrative-registry-governance-table-subflow-split",
+      "direction_id": "llm-sensitivity-decomposition",
+      "title": "Split Scheduler narrative registry bulk-governance and table ownership into narrower collaborators",
+      "description": "Now that `apps/web/src/control-room/RuntimeProviderProvenanceSchedulerNarrativeRegistryCard.tsx` is only a shell over dedicated sections, revisit `RuntimeProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceSection.tsx` and `RuntimeProviderProvenanceSchedulerNarrativeRegistryTableSection.tsx` so bulk-governance staging/selection concerns and registry table listing/async-state concerns stop accumulating inside two still-heavy lane owners.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 48,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-25T10:05:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly says the next local pressure points inside the scheduler narrative registry lane are `RuntimeProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceSection.tsx` and `RuntimeProviderProvenanceSchedulerNarrativeRegistryTableSection.tsx`, while revision history is no longer named as the immediate hotspot.",
+      "priority_reason": "Promoted to `ready` because the operator asked to continue with one queued task, the previous queue head finished in commit `97eb097`, and the latest reply gives a direct next-step continuation inside the registry lane before broadening back out to the still-inline `Approval queue` card."
     },
     {
       "id": "task-llm-sensitivity-provider-provenance-scheduler-approval-queue-card-selection",
@@ -2081,10 +2096,10 @@
       "dynamic_priority_delta": 42,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-25T09:40:00+09:00",
+      "updated_at": "2026-04-25T10:05:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says `Approval queue` is still the remaining large inline workspace card, but it now sits behind the new `RuntimeProviderProvenanceSchedulerNarrativeRegistryCard.tsx` internal-boundary split rather than behind the already-finished outer registry-card extraction.",
-      "priority_reason": "Kept `proposed` because the latest reply still identifies `Approval queue` as the following major workspace-card continuation, but it directly prioritizes the new registry-card internals first."
+      "direction_relation_note": "The latest main-session reply still says `Approval queue` is the remaining large inline workspace card at the workspace level, but it also narrows the immediate execution path to the new scheduler narrative registry bulk-governance and table lane before leaving the registry surface.",
+      "priority_reason": "Kept `proposed` because `Approval queue` remains the next broad workspace-card continuation, but the latest reply directly prioritizes the registry lane's `BulkGovernanceSection` and `TableSection` as the immediate executable follow-up after commit `97eb097`."
     },
     {
       "id": "task-llm-sensitivity-control-room-app-provider-provenance-route-model-ownership-split",
