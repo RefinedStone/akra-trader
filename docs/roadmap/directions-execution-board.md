@@ -264,59 +264,62 @@ Active move map:
     outer table shell and empty-state branching
 21. keep stitched report approval-queue review-state ownership split between plan-cell and
     preview-cell collaborators instead of recombining both row cells in one review-state owner
-22. keep stitched report approval-queue mutation ownership focused on the action-cell shell while
+22. keep stitched report approval-queue plan-cell ownership split between identity-summary,
+    origin-summary, and approval-summary leaf collaborators instead of recombining plan metadata
+    copy in one cell owner
+23. keep stitched report approval-queue mutation ownership focused on the action-cell shell while
     composing mutation-action and mutation-commit-control leaf collaborators instead of mounting
     queue-action and commit-control flows directly in the row owner
-23. keep stitched report approval-queue queue-action leaf ownership split between dispatch and
+24. keep stitched report approval-queue queue-action leaf ownership split between dispatch and
     status-view collaborators instead of recombining shared-queue dispatch and selected-state copy
     in one leaf owner
-24. keep stitched report approval-queue commit-control subtree routed through plan-gate and
+25. keep stitched report approval-queue commit-control subtree routed through plan-gate and
     commit-action leaf collaborators instead of mounting those subtree entrypoints directly in the
     parent owner
-25. keep stitched report approval-queue commit-action ownership split between dispatch-flow and
+26. keep stitched report approval-queue commit-action ownership split between dispatch-flow and
     mutation-trigger collaborators instead of recombining mutation dispatch branching and button
     rendering in one module
-26. keep stitched report approval-queue plan-gate ownership split between eligibility-state and
+27. keep stitched report approval-queue plan-gate ownership split between eligibility-state and
     label-policy collaborators instead of recombining mutation eligibility checks and button-label
     policy in one module
-27. keep stitched report approval queue-state ownership balanced between summary, filter-state, and
+28. keep stitched report approval queue-state ownership balanced between summary, filter-state, and
     async-state collaborators instead of pushing queue async readout down into the filter ownership
     layer
-28. keep stitched report approval queue filter-state ownership directly above query-input and
+29. keep stitched report approval queue filter-state ownership directly above query-input and
     toggle-reset collaborators instead of routing queue filters through a separate filter-bar
     wrapper while mixing in async queue state
-29. keep stitched report approval queue toggle-reset ownership directly above filter-select,
+30. keep stitched report approval queue toggle-reset ownership directly above filter-select,
     reset-selection, and reset-action collaborators instead of routing template/catalog/sort
     controls through a separate reset-apply wrapper
-30. keep stitched report approval queue filter-select ownership split between queue-state, lane,
+31. keep stitched report approval queue filter-select ownership split between queue-state, lane,
     and priority selector collaborators, and keep reset-selection ownership split between policy-
     template and policy-catalog selector collaborators instead of recombining multiple selector
     bodies in each leaf owner
-31. keep stitched report approval queue query-input ownership split between search-input binding and
+32. keep stitched report approval queue query-input ownership split between search-input binding and
     search-input field collaborators instead of recombining search filter update wiring and input
     layout in one leaf owner
-32. keep stitched report saved-view lifecycle split between bulk-edit, revision-review, and audit
+33. keep stitched report saved-view lifecycle split between bulk-edit, revision-review, and audit
     collaborators instead of recombining selection governance, revision restore, and audit review
     in one module
-33. keep stitched report bulk-edit ownership split between selection-governance, filter-stage,
+34. keep stitched report bulk-edit ownership split between selection-governance, filter-stage,
     and limit-policy-stage collaborators instead of recombining bulk selection, staged filter
     edits, and staged approval controls in one module
-34. keep stitched report bulk limit/policy stage ownership split between approval and policy
+35. keep stitched report bulk limit/policy stage ownership split between approval and policy
     collaborators instead of recombining numeric approval staging and policy template selection in
     one module
-35. keep stitched report bulk approval stage ownership split between limit-controls and preview
+36. keep stitched report bulk approval stage ownership split between limit-controls and preview
     collaborators instead of recombining numeric limit inputs and staged bulk preview controls in
     one module
-36. keep stitched report bulk preview ownership split between preview-state and approval-trigger
+37. keep stitched report bulk preview ownership split between preview-state and approval-trigger
     collaborators instead of recombining button label state and the approval trigger in one module
-37. keep stitched report bulk limit-controls ownership split between slice-limit and
+38. keep stitched report bulk limit-controls ownership split between slice-limit and
     history-limit collaborators instead of recombining slice sizing and history sizing inputs in
     one module
-38. keep stitched report bulk slice-limit ownership split between window, result, and occurrence
+39. keep stitched report bulk slice-limit ownership split between window, result, and occurrence
     collaborators instead of recombining the three slice sizing inputs in one module
-39. keep stitched report bulk history-limit ownership split between history and drill-down
+40. keep stitched report bulk history-limit ownership split between history and drill-down
     collaborators instead of recombining the two history sizing inputs in one module
-40. keep query-builder replay intent, replay review, replay promotion approval, expression
+41. keep query-builder replay intent, replay review, replay promotion approval, expression
     authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
     feature-owned hooks and section collaborators instead of re-expanding the main component body;
     the next pressure points are the remaining large workspace modules plus backend compatibility

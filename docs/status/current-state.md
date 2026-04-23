@@ -178,6 +178,9 @@ It is not yet a finished live trading product:
   with row-level review state and queue mutation controls
 - the stitched report approval-queue review-state layer now composes dedicated plan-cell and
   preview-cell collaborators instead of keeping both row cells inline in one review-state owner
+- the stitched report approval-queue plan-cell layer now composes dedicated identity-summary,
+  origin-summary, and approval-summary leaf collaborators instead of keeping plan metadata copy
+  inline in one cell owner
 - the stitched report approval-queue mutation layer now keeps the action-cell shell while
   composing dedicated mutation-action and mutation-commit-control leaf collaborators instead of
   mounting queue-action and commit-control flows directly in the row owner
