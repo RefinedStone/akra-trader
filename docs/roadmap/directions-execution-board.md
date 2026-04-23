@@ -234,7 +234,10 @@ Active move map:
   row-action collaborators instead of recombining catalog/default review and row actions inline;
   keep the governance-policy-catalog versions layer split between a versions-table collaborator
   plus version-row-detail and version-row-action collaborators instead of rebuilding revision
-  review and restore controls inline
+  review and restore controls inline; treat governance-policy-catalog bulk-edit as the next
+  bounded split target by separating selection summary/toggle controls, staged metadata/default-
+  template edits, and bulk delete/restore/update actions instead of keeping them inline in one
+  filter-bar owner
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared

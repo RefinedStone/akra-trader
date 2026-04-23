@@ -172,6 +172,9 @@ It is not yet a finished live trading product:
   dedicated versions-table collaborator, and the versions-table layer now composes dedicated
   version-row-detail and version-row-action collaborators instead of keeping revision review and
   restore actions inline in one section module
+- re-evaluation shows the governance-policy-catalog bulk-edit collaborator is the next bounded
+  split target because it still mixes selection summary/toggle controls, staged metadata and
+  default-template edits, and bulk delete/restore/update actions inside one filter-bar owner
 - focused provider readback, persisted export history, and shared export registry flows now route
   through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
   longer carries that focused provider export body inline
