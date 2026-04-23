@@ -231,104 +231,107 @@ Active move map:
 9. keep stitched registry editing split between draft, bulk-edit, and table collaborators instead
    of recombining registry drafting, selection governance, bulk edit staging, and registry listing
    in one module
-9. keep stitched report views split between saved-view lifecycle ownership and approval-policy
+10. keep stitched registry bulk-edit split between selection-summary, selection-actions,
+    metadata-stage, queue-stage, and policy-stage collaborators instead of recombining selection
+    governance and bulk edit staging controls in one module
+11. keep stitched report views split between saved-view lifecycle ownership and approval-policy
    ownership instead of recombining saved view administration, stitched approval queue, and policy
    catalog review in one module
-10. keep stitched report approval-policy ownership split between approval-queue and policy-catalog
+12. keep stitched report approval-policy ownership split between approval-queue and policy-catalog
     collaborators instead of recombining stitched governance queue review and policy catalog
     defaults in one module
-11. keep stitched report policy-catalog ownership split between review and selection
+13. keep stitched report policy-catalog ownership split between review and selection
     collaborators instead of recombining catalog review details and catalog action selection in one
     module
-12. keep stitched report policy-catalog selection ownership split between action-cell and
+14. keep stitched report policy-catalog selection ownership split between action-cell and
     selection-state collaborators instead of recombining the action cell wrapper and button state
     in one module
-13. keep stitched report policy-catalog selection-state ownership split between derived-state and
+15. keep stitched report policy-catalog selection-state ownership split between derived-state and
     selection-action collaborators instead of recombining button enablement checks and catalog-
     selection dispatch in one module
-14. keep stitched report policy-catalog selection-action ownership split between action-dispatch
+16. keep stitched report policy-catalog selection-action ownership split between action-dispatch
     and trigger-wiring collaborators instead of recombining catalog action dispatch and button
     wiring in one module
-15. keep stitched report policy-catalog action-dispatch ownership split between per-action
+17. keep stitched report policy-catalog action-dispatch ownership split between per-action
     handlers and shared dispatch plumbing collaborators instead of recombining common catalog
     dispatch plumbing and action-specific handlers in one module
-16. keep stitched report policy-catalog trigger-wiring ownership split between button-layout and
+18. keep stitched report policy-catalog trigger-wiring ownership split between button-layout and
     callback-wiring collaborators instead of recombining button layout and callback binding in one
     module
-17. keep stitched report policy-catalog review ownership split between default-body and
+19. keep stitched report policy-catalog review ownership split between default-body and
     catalog-state collaborators instead of recombining catalog state and default policy detail
     cells in one module
-18. keep stitched report policy-catalog review ownership split between table-shell and row-detail
+20. keep stitched report policy-catalog review ownership split between table-shell and row-detail
     collaborators instead of recombining table structure and row composition in one module
-19. keep stitched report approval-queue ownership balanced so the section retains outer table
+21. keep stitched report approval-queue ownership balanced so the section retains outer table
     shell, empty-state branching, and per-plan row-shell ownership while composing queue-state and
     action collaborators, instead of routing plan-list row structure through one nested body
     wrapper
-20. keep stitched report approval-queue action ownership focused on review-state and mutation
+22. keep stitched report approval-queue action ownership focused on review-state and mutation
     collaborators for a single plan row instead of recombining row-level review state and queue
     mutation controls with plan-list row mapping and `<tr>` shell ownership
-21. keep stitched report approval-queue review-state ownership split between plan-cell and
+23. keep stitched report approval-queue review-state ownership split between plan-cell and
     preview-cell collaborators instead of recombining both row cells in one review-state owner
-22. keep stitched report approval-queue plan-cell ownership split between identity-summary,
+24. keep stitched report approval-queue plan-cell ownership split between identity-summary,
     origin-summary, and approval-summary leaf collaborators instead of recombining plan metadata
     copy in one cell owner
-23. keep stitched report approval-queue preview-cell ownership split between preview-headline,
+25. keep stitched report approval-queue preview-cell ownership split between preview-headline,
     rollback-summary, and preview-count leaf collaborators instead of recombining preview-state
     copy in one cell owner
-24. keep stitched report approval-queue mutation ownership focused on the action-cell shell while
+26. keep stitched report approval-queue mutation ownership focused on the action-cell shell while
     directly composing queue-action and commit-control collaborators instead of routing those row
     actions through extra mutation leaf wrappers
-25. keep stitched report approval-queue queue-action leaf ownership split between dispatch and
+27. keep stitched report approval-queue queue-action leaf ownership split between dispatch and
     status-view collaborators instead of recombining shared-queue dispatch and selected-state copy
     in one leaf owner
-26. keep stitched report approval-queue commit-control ownership directly composing per-mutation
+28. keep stitched report approval-queue commit-control ownership directly composing per-mutation
     plan-gate collaborators, and keep plan-gate directly mounting commit-action once
     eligibility-state and label-policy resolve, instead of routing subtree entrypoints through
     extra passthrough leaf wrappers
-27. keep stitched report approval-queue commit-action ownership split between dispatch-flow and
+29. keep stitched report approval-queue commit-action ownership split between dispatch-flow and
     mutation-trigger collaborators instead of recombining mutation dispatch branching and button
     rendering in one module
-28. keep stitched report approval-queue plan-gate ownership split between eligibility-state and
+30. keep stitched report approval-queue plan-gate ownership split between eligibility-state and
     label-policy collaborators instead of recombining mutation eligibility checks and button-label
     policy in one module
-29. keep stitched report approval queue-state ownership balanced between summary, filter-state, and
+31. keep stitched report approval queue-state ownership balanced between summary, filter-state, and
     async-state collaborators instead of pushing queue async readout down into the filter ownership
     layer
-30. keep stitched report approval queue filter-state ownership directly above query-input and
+32. keep stitched report approval queue filter-state ownership directly above query-input and
     toggle-reset collaborators instead of routing queue filters through a separate filter-bar
     wrapper while mixing in async queue state
-31. keep stitched report approval queue toggle-reset ownership directly above filter-select,
+33. keep stitched report approval queue toggle-reset ownership directly above filter-select,
     reset-selection, and reset-action collaborators instead of routing template/catalog/sort
     controls through a separate reset-apply wrapper
-32. keep stitched report approval queue filter-select ownership split between queue-state, lane,
+34. keep stitched report approval queue filter-select ownership split between queue-state, lane,
     and priority selector collaborators, and keep reset-selection ownership split between policy-
     template and policy-catalog selector collaborators instead of recombining multiple selector
     bodies in each leaf owner
-33. keep stitched report approval queue query-input ownership split between search-input binding and
+35. keep stitched report approval queue query-input ownership split between search-input binding and
     search-input field collaborators instead of recombining search filter update wiring and input
     layout in one leaf owner
-34. keep stitched report saved-view lifecycle split between bulk-edit, revision-review, and audit
+36. keep stitched report saved-view lifecycle split between bulk-edit, revision-review, and audit
     collaborators instead of recombining selection governance, revision restore, and audit review
     in one module
-35. keep stitched report bulk-edit ownership split between selection-governance, filter-stage,
+37. keep stitched report bulk-edit ownership split between selection-governance, filter-stage,
     and limit-policy-stage collaborators instead of recombining bulk selection, staged filter
     edits, and staged approval controls in one module
-36. keep stitched report bulk limit/policy stage ownership split between approval and policy
+38. keep stitched report bulk limit/policy stage ownership split between approval and policy
     collaborators instead of recombining numeric approval staging and policy template selection in
     one module
-37. keep stitched report bulk approval stage ownership split between limit-controls and preview
+39. keep stitched report bulk approval stage ownership split between limit-controls and preview
     collaborators instead of recombining numeric limit inputs and staged bulk preview controls in
     one module
-38. keep stitched report bulk preview ownership split between preview-state and approval-trigger
+40. keep stitched report bulk preview ownership split between preview-state and approval-trigger
     collaborators instead of recombining button label state and the approval trigger in one module
-39. keep stitched report bulk limit-controls ownership split between slice-limit and
+41. keep stitched report bulk limit-controls ownership split between slice-limit and
     history-limit collaborators instead of recombining slice sizing and history sizing inputs in
     one module
-40. keep stitched report bulk slice-limit ownership split between window, result, and occurrence
+42. keep stitched report bulk slice-limit ownership split between window, result, and occurrence
     collaborators instead of recombining the three slice sizing inputs in one module
-41. keep stitched report bulk history-limit ownership split between history and drill-down
+43. keep stitched report bulk history-limit ownership split between history and drill-down
     collaborators instead of recombining the two history sizing inputs in one module
-42. keep query-builder replay intent, replay review, replay promotion approval, expression
+44. keep query-builder replay intent, replay review, replay promotion approval, expression
     authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
     feature-owned hooks and section collaborators instead of re-expanding the main component body;
     the next pressure points are the remaining large workspace modules plus backend compatibility
