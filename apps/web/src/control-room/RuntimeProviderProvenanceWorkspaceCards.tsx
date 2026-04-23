@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { RuntimeProviderProvenanceScheduledReportsCard } from "./RuntimeProviderProvenanceScheduledReportsCard";
+
 export function RuntimeProviderProvenanceWorkspaceCards({ model }: { model: any }) {
   const {} = model;
 
@@ -2938,6 +2940,7 @@ export function RuntimeProviderProvenanceWorkspaceCards({ model }: { model: any 
                                     <p className="empty-state">No shared dashboard views saved yet.</p>
                                   )}
                                 </div>
+                                <RuntimeProviderProvenanceScheduledReportsCard model={model} />
                                 <div className="provider-provenance-workspace-card">
                                   <div className="market-data-provenance-history-head">
                                     <strong>Scheduler narrative templates</strong>

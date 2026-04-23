@@ -122,6 +122,9 @@ It is not yet a finished live trading product:
   authoring, replay apply conflict review, replay promotion approval, replay provenance review,
   runtime-candidate drill-through, and the solver-heavy coordination path no longer sit inline with
   the main component body
+- provider-provenance workspace cards now own the saved report and report-audit card flow, so
+  runtime incident triage no longer carries that workspace card body inline beside the analytics
+  grid
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body

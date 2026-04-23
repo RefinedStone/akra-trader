@@ -202,7 +202,9 @@ Why now:
 Active move map:
 
 1. keep `controlRoomApi.ts` and `controlRoomDefinitions.ts` as compatibility barrels while the
-   real provider/query-builder families move under bounded submodules
+   real provider/query-builder families move under bounded submodules, and keep provider-
+   provenance saved workspace cards owned by dedicated route collaborators instead of re-expanding
+   runtime triage or `App.tsx`
 2. keep query-builder replay intent, replay review, replay promotion approval, expression
    authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
    feature-owned hooks and section collaborators instead of re-expanding the main component body;
