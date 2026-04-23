@@ -154,6 +154,10 @@ It is not yet a finished live trading product:
 - the governance-policy-template registry-table collaborator now composes dedicated row-detail and
   row-action collaborators instead of mixing template/scope review cells and row actions inline in
   one table owner
+- the governance-policy-template versions collaborator now routes revision history through a
+  dedicated versions-table collaborator, and the versions-table layer now composes dedicated
+  version-row-detail and version-row-action collaborators instead of keeping revision review and
+  restore actions inline in one section module
 - focused provider readback, persisted export history, and shared export registry flows now route
   through dedicated provider-provenance collaborators, so `RuntimeDataIncidentTriagePanel` no
   longer carries that focused provider export body inline

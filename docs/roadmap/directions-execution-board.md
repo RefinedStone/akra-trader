@@ -222,7 +222,10 @@ Active move map:
   registry-table, versions, and audit collaborators instead of rebuilding template editing,
   catalog bundling, registry listing, revision history, and audit review inline in one module;
   keep the governance-policy-template registry-table layer split between row-detail and row-action
-  collaborators instead of recombining template/scope review and row actions inline
+  collaborators instead of recombining template/scope review and row actions inline; keep the
+  governance-policy-template versions layer split between a versions-table collaborator plus
+  version-row-detail and version-row-action collaborators instead of rebuilding revision review
+  and restore controls inline
 2. keep runtime provider-provenance workspace ownership in dedicated workspace section modules
    instead of sliding cross-focus query, scheduler review, analytics, or shared-audit bodies back
    into `RuntimeDataIncidentTriagePanel.tsx`; keep focused provider readback plus persisted/shared
