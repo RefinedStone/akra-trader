@@ -170,12 +170,12 @@ It is not yet a finished live trading product:
 - the stitched report policy-catalog review layer now also composes dedicated table-shell and
   row-detail collaborators instead of keeping table structure and row composition inline in one
   module
-- the stitched report approval-queue layer now composes dedicated queue-state and action
-  collaborators instead of keeping queue filters/loading state and per-plan action review inline in
-  one module
+- the stitched report approval-queue layer now keeps outer review/action body ownership while
+  composing dedicated queue-state and action collaborators instead of routing table shell, empty-
+  state branching, and per-plan review through one nested body wrapper
 - the stitched report approval-queue action layer now composes dedicated review-state and mutation
-  collaborators instead of keeping plan review state cells and queue mutation controls inline in
-  one module
+  row collaborators instead of also carrying the outer table shell and empty-state branching inline
+  with row-level review state and queue mutation controls
 - the stitched report approval-queue mutation layer now composes dedicated queue-action and
   commit-control collaborators instead of keeping shared-queue selection and approve/apply/rollback
   controls inline in one module
