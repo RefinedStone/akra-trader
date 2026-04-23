@@ -164,6 +164,9 @@ It is not yet a finished live trading product:
 - the stitched report approval-queue mutation layer now composes dedicated queue-action and
   commit-control collaborators instead of keeping shared-queue selection and approve/apply/rollback
   controls inline in one module
+- the stitched report approval-queue commit-control layer now composes dedicated plan-gate and
+  commit-action collaborators instead of keeping mutation gating and dispatch controls inline in one
+  module
 - the stitched report approval queue-state layer now composes dedicated summary and filter-state
   collaborators instead of keeping queue summary context and filter/loading state inline in one
   module
