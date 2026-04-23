@@ -223,7 +223,10 @@ Active move map:
    `RuntimeProviderProvenanceWorkspaceCards.tsx`, and keep that approval queue card split between
    dedicated batch-actions, filter-bar, plans-table, and selected-plan-detail collaborators
    instead of recombining queue action staging, filter controls, queue rows, and selected-plan
-   review inline in one card body; keep the scheduler narrative
+   review inline in one card body; keep the approval queue plans-table collaborator split between
+   dedicated table-view and row-detail collaborators instead of recombining table shell, row
+   review, and row selection actions inline in one queue table module; keep the scheduler
+   narrative
    registry bulk-governance collaborator split between governance-bar and bulk-edit-stage
    collaborators instead of recombining selection-policy preview actions and advanced bulk edit
    staging inline in one governance module; keep the scheduler narrative registry table

@@ -148,6 +148,9 @@ It is not yet a finished live trading product:
 - the approval queue card now composes dedicated batch-actions, filter-bar, plans-table, and
   selected-plan-detail collaborators instead of mixing queue action staging, filter controls,
   queue rows, and selected-plan review inline in one card body
+- the approval queue plans-table collaborator now composes dedicated table-view and row-detail
+  collaborators instead of mixing table shell, row review, and row selection actions inline in
+  one queue table module
 - the scheduler narrative registry bulk-governance collaborator now composes dedicated
   governance-bar and bulk-edit-stage collaborators instead of mixing selection-policy preview
   actions and advanced bulk edit staging inline in one governance module
