@@ -215,7 +215,10 @@ Active move map:
    and keep moderation-governance split between policy-catalog ownership and approval-queue
    ownership instead of recombining retrieval review, catalog governance, and approval queues in
    one module
-5. keep query-builder replay intent, replay review, replay promotion approval, expression
+5. keep the moderation policy-catalog layer split between catalog lifecycle, governance-policy
+   lifecycle, and meta-policy defaults instead of rebuilding one large catalog/governance editor
+   module
+6. keep query-builder replay intent, replay review, replay promotion approval, expression
    authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
    feature-owned hooks and section collaborators instead of re-expanding the main component body;
    the next pressure points are the remaining large workspace modules plus backend compatibility

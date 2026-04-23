@@ -131,6 +131,9 @@ It is not yet a finished live trading product:
 - the scheduler moderation workspace now composes separate alert-review, moderation-governance,
   and alert-timeline sections, and the moderation-governance layer further splits policy-catalog
   ownership from approval-queue ownership instead of recombining those flows in one module
+- the moderation policy-catalog layer now composes dedicated catalog-lifecycle,
+  governance-policy, and meta-policy collaborators instead of keeping those three lifecycle
+  surfaces inline in one section module
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body
