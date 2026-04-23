@@ -221,7 +221,10 @@ Active move map:
 6. keep the moderation approval-queue layer split between moderation-governance, catalog-
    governance, and scheduler moderation execution queues instead of rebuilding one large approval
    queue module
-7. keep query-builder replay intent, replay review, replay promotion approval, expression
+7. keep stitched-governance split between stitched report view ownership and registry lifecycle
+   ownership instead of recombining saved views, queue slices, and registry maintenance in one
+   module
+8. keep query-builder replay intent, replay review, replay promotion approval, expression
    authoring, coordination-simulation orchestration, and replay provenance/runtime-review flows in
    feature-owned hooks and section collaborators instead of re-expanding the main component body;
    the next pressure points are the remaining large workspace modules plus backend compatibility

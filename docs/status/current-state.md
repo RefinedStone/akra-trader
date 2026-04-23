@@ -137,6 +137,9 @@ It is not yet a finished live trading product:
 - the moderation approval-queue layer now composes dedicated moderation-governance,
   catalog-governance, and scheduler-moderation approval collaborators instead of keeping the three
   queue flows inline in one section module
+- the stitched-governance layer now composes a stitched-report-views collaborator and a registry-
+  lifecycle collaborator instead of keeping saved views, stitched approval slices, and registry
+  lifecycle surfaces inline in one module
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body
