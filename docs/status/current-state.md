@@ -143,6 +143,9 @@ It is not yet a finished live trading product:
 - the stitched report views layer now composes dedicated saved-view and approval-policy
   collaborators instead of keeping saved-view lifecycle, stitched approval queue, and policy
   catalogs inline in one module
+- the stitched report saved-view layer now composes dedicated bulk-edit, revision-review, and
+  audit collaborators instead of keeping selection governance, revision restore, and team audit
+  flows inline in one module
 - the stitched registry-lifecycle layer now composes dedicated review and editor-history
   collaborators instead of keeping registry queue/catalog review, registry editing, audits, and
   revision history in one module
