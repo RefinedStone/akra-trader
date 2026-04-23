@@ -212,8 +212,11 @@ Active move map:
    rebuilding template drafting, bulk governance, registry listing, and revision history inline
    in `RuntimeProviderProvenanceWorkspaceCards.tsx`, and keep that scheduler narrative templates
    card split between dedicated bulk-governance, registry-table, and revision-history
-   collaborators instead of recombining those flows inline in one card body, and keep the
-   hierarchy-step-template section split between draft, registry, versions, and audit
+   collaborators instead of recombining those flows inline in one card body; keep the scheduler
+   narrative template bulk-governance collaborator split between governance-bar and
+   bulk-edit-stage collaborators instead of recombining selection-policy preview actions and
+   advanced bulk edit staging inline in one governance module, and keep the hierarchy-step-
+   template section split between draft, registry, versions, and audit
    collaborators instead of rebuilding that cross-catalog governance surface inline in one module,
   and keep the registry layer split between bulk-selection-stage, bulk-step-stage, and
   registry-table collaborators instead of collapsing bulk staging and the registry table back
