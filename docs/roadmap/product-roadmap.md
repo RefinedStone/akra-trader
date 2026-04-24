@@ -40,7 +40,7 @@ The main product gaps are no longer "does the feature exist" but rather:
 
 ### Still missing
 
-- product-native enforcement of operator lineage retention, drill evidence, and escalation policy
+- product-native drill evidence and escalation workflow integration for operator lineage policy
 - durable custom strategy registration and promotion lifecycle
 - normalized experiment summaries, artifact retrieval, and export posture
 - clearer benchmark-pack and promotion review workflow

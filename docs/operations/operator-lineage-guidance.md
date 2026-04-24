@@ -6,8 +6,9 @@ Purpose: define how an operator should interpret dataset-boundary claims, rerun 
 categories, lineage-history records, and ingestion-job history before using a run for comparison,
 promotion, or runtime safety decisions.
 
-This runbook defines the operational policy. It does not by itself add automated retention
-enforcement or an external evidence store.
+This runbook defines the operational policy. The product now enforces the baseline lineage-history
+and ingestion-job TTL floors through the market-data lineage evidence retention control; it does
+not yet provide a product-native drill evidence export store.
 
 ## When To Run
 
@@ -23,6 +24,7 @@ enforcement or an external evidence store.
 - run lineage summaries on run detail payloads
 - market-data lineage history query surface
 - market-data ingestion-job history query surface
+- market-data lineage evidence retention prune control
 - control-room data incident triage and focused market-data workflow panels
 - comparison and rerun surfaces that expose validation category and summary
 
@@ -80,8 +82,9 @@ The minimum retention policy for lineage review is:
 | exported drill evidence pack | 180 days |
 | guarded-live-affecting lineage evidence | 1 year, or the live audit retention period if longer |
 
-Until automated TTL enforcement exists for every lineage surface, manual cleanup must preserve the
-minimum evidence above. Do not prune the only record that explains why a run was accepted, blocked,
+The product TTL control clamps requested retention windows up to these floors before pruning
+lineage-history or ingestion-job records. Manual cleanup outside that control must preserve the
+same minimum evidence. Do not prune the only record that explains why a run was accepted, blocked,
 or escalated.
 
 ## Escalation Rules

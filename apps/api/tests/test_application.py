@@ -4550,6 +4550,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "market_data_status",
     "market_data_lineage_history",
     "market_data_ingestion_job_history",
+    "market_data_lineage_evidence_retention_prune",
     "operator_visibility",
     "operator_provider_provenance_export_job_create",
     "operator_provider_provenance_export_job_list",
@@ -4723,6 +4724,10 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["market_data_ingestion_job_history"].filter_param_specs[-1].key == "last_error"
   assert bindings_by_key["market_data_ingestion_job_history"].sort_field_specs[0].key == "started_at"
   assert bindings_by_key["market_data_ingestion_job_history"].sort_field_specs[-1].key == "fetched_candle_count"
+  assert bindings_by_key["market_data_lineage_evidence_retention_prune"].methods == ("POST",)
+  assert bindings_by_key["market_data_lineage_evidence_retention_prune"].request_payload_kind == (
+    "market_data_lineage_evidence_retention_prune"
+  )
   assert bindings_by_key["operator_visibility"].route_path == "/operator/visibility"
   assert bindings_by_key["operator_provider_provenance_export_job_create"].methods == ("POST",)
   assert (

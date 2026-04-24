@@ -193,6 +193,16 @@ class ReplayLinkAliasAuditExportJobPruneRequest(BaseModel):
   created_before: datetime | None = None
 
 
+class MarketDataLineageEvidenceRetentionPruneRequest(BaseModel):
+  dry_run: bool = False
+  lineage_history_days: int | None = Field(default=None, ge=1)
+  lineage_issue_history_days: int | None = Field(default=None, ge=1)
+  ingestion_job_days: int | None = Field(default=None, ge=1)
+  ingestion_issue_job_days: int | None = Field(default=None, ge=1)
+  protected_history_ids: list[str] = Field(default_factory=list)
+  protected_job_ids: list[str] = Field(default_factory=list)
+
+
 class OperatorProviderProvenanceExportJobCreateRequest(BaseModel):
   content: str
   requested_by_tab_id: str | None = None
@@ -1061,6 +1071,7 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_audit_prune": (ReplayLinkAliasAuditPruneRequest, {}),
   "replay_link_audit_export_job_create": (ReplayLinkAliasAuditExportJobCreateRequest, {}),
   "replay_link_audit_export_job_prune": (ReplayLinkAliasAuditExportJobPruneRequest, {}),
+  "market_data_lineage_evidence_retention_prune": (MarketDataLineageEvidenceRetentionPruneRequest, {}),
   "operator_provider_provenance_export_job_create": (OperatorProviderProvenanceExportJobCreateRequest, {}),
   "operator_provider_provenance_export_job_policy": (OperatorProviderProvenanceExportJobPolicyRequest, {}),
   "operator_provider_provenance_export_job_approval": (OperatorProviderProvenanceExportJobApprovalRequest, {}),

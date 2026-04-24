@@ -58,6 +58,16 @@ class MarketDataPort(Protocol):
     limit: int | None = None,
   ) -> tuple[MarketDataIngestionJobRecord, ...]: ...
 
+  def delete_market_data_lineage_history_records(
+    self,
+    history_ids: tuple[str, ...],
+  ) -> int: ...
+
+  def delete_market_data_ingestion_jobs(
+    self,
+    job_ids: tuple[str, ...],
+  ) -> int: ...
+
   def remediate(
     self,
     *,

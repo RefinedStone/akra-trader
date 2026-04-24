@@ -234,6 +234,32 @@ class StatusOverrideSeededMarketDataAdapter(SeededMarketDataAdapter):
       filtered = filtered[:limit]
     return tuple(filtered)
 
+  def delete_market_data_lineage_history_records(
+    self,
+    history_ids: tuple[str, ...],
+  ) -> int:
+    history_id_set = set(history_ids)
+    before_count = len(self._lineage_history)
+    self._lineage_history = tuple(
+      record
+      for record in self._lineage_history
+      if record.history_id not in history_id_set
+    )
+    return before_count - len(self._lineage_history)
+
+  def delete_market_data_ingestion_jobs(
+    self,
+    job_ids: tuple[str, ...],
+  ) -> int:
+    job_id_set = set(job_ids)
+    before_count = len(self._ingestion_jobs)
+    self._ingestion_jobs = tuple(
+      record
+      for record in self._ingestion_jobs
+      if record.job_id not in job_id_set
+    )
+    return before_count - len(self._ingestion_jobs)
+
   def remediate(
     self,
     *,
@@ -430,6 +456,10 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "duration_ms",
     "last_error",
     "sort",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["prune_market_data_lineage_evidence_retention"].endpoint).parameters) == (
+    "request",
     "app",
   )
   assert tuple(inspect.signature(routes["create_replay_link_alias"].endpoint).parameters) == ("request", "app")
@@ -3559,6 +3589,115 @@ def test_market_data_ingestion_jobs_endpoint_filters_failed_jobs(tmp_path: Path)
   assert payload[0]["status"] == "failed"
   assert payload[0]["lineage_history_id"] == "lineage-2"
   assert payload[0]["last_error"] == "upstream fetch failed"
+
+
+def test_market_data_lineage_evidence_retention_prune_enforces_policy_floors(tmp_path: Path) -> None:
+  current_time = datetime(2025, 7, 1, 0, 0, tzinfo=UTC)
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    app._clock = lambda: current_time
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    market_data.set_lineage_history(
+      (
+        MarketDataLineageHistoryRecord(
+          history_id="lineage-normal-old",
+          source_job_id="job-normal-old",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          recorded_at=datetime(2025, 3, 1, 0, 0, tzinfo=UTC),
+          sync_status="synced",
+          validation_claim="checkpoint_window",
+        ),
+        MarketDataLineageHistoryRecord(
+          history_id="lineage-issue-retained",
+          source_job_id="job-issue-retained",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          recorded_at=datetime(2025, 3, 15, 0, 0, tzinfo=UTC),
+          sync_status="error",
+          validation_claim="checkpoint_window",
+          failure_count_24h=1,
+          last_error="upstream fetch failed",
+          issues=("last_sync_failed",),
+        ),
+      )
+    )
+    market_data.set_ingestion_jobs(
+      (
+        MarketDataIngestionJobRecord(
+          job_id="job-normal-old",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          operation="sync_recent",
+          status="succeeded",
+          started_at=datetime(2025, 5, 1, 0, 0, tzinfo=UTC),
+          finished_at=datetime(2025, 5, 1, 0, 1, tzinfo=UTC),
+          duration_ms=1000,
+          lineage_history_id="lineage-normal-old",
+        ),
+        MarketDataIngestionJobRecord(
+          job_id="job-issue-retained",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          operation="sync_recent",
+          status="failed",
+          started_at=datetime(2025, 5, 1, 0, 0, tzinfo=UTC),
+          finished_at=datetime(2025, 5, 1, 0, 1, tzinfo=UTC),
+          duration_ms=1000,
+          lineage_history_id="lineage-issue-retained",
+          last_error="upstream fetch failed",
+        ),
+      )
+    )
+    app._market_data = market_data
+
+    dry_run_response = client.post(
+      "/api/market-data/lineage-evidence/retention/prune",
+      json={
+        "dry_run": True,
+        "lineage_history_days": 1,
+        "lineage_issue_history_days": 1,
+        "ingestion_job_days": 1,
+        "ingestion_issue_job_days": 1,
+      },
+    )
+    prune_response = client.post(
+      "/api/market-data/lineage-evidence/retention/prune",
+      json={
+        "lineage_history_days": 1,
+        "lineage_issue_history_days": 1,
+        "ingestion_job_days": 1,
+        "ingestion_issue_job_days": 1,
+      },
+    )
+
+  assert dry_run_response.status_code == 200
+  dry_run_payload = dry_run_response.json()
+  assert dry_run_payload["dry_run"] is True
+  assert dry_run_payload["policy"]["lineage_history_days"] == 90
+  assert dry_run_payload["policy"]["lineage_issue_history_days"] == 180
+  assert dry_run_payload["policy"]["ingestion_job_days"] == 30
+  assert dry_run_payload["policy"]["ingestion_issue_job_days"] == 90
+  assert dry_run_payload["eligible_lineage_history_ids"] == ["lineage-normal-old"]
+  assert dry_run_payload["eligible_ingestion_job_ids"] == ["job-normal-old"]
+  assert dry_run_payload["deleted_lineage_history_count"] == 0
+  assert dry_run_payload["deleted_ingestion_job_count"] == 0
+
+  assert prune_response.status_code == 200
+  prune_payload = prune_response.json()
+  assert prune_payload["dry_run"] is False
+  assert prune_payload["deleted_lineage_history_count"] == 1
+  assert prune_payload["deleted_ingestion_job_count"] == 1
+  assert prune_payload["retained_lineage_history_floor_ids"] == ["lineage-issue-retained"]
+  assert prune_payload["retained_ingestion_job_floor_ids"] == ["job-issue-retained"]
 
 
 def test_operator_visibility_endpoint_reports_stale_runtime_alerts(tmp_path: Path) -> None:

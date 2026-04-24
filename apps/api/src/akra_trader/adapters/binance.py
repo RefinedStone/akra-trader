@@ -21,6 +21,7 @@ from sqlalchemy import Table
 from sqlalchemy import Text
 from sqlalchemy import and_
 from sqlalchemy import create_engine
+from sqlalchemy import delete
 from sqlalchemy import func
 from sqlalchemy import insert
 from sqlalchemy import inspect
@@ -390,6 +391,38 @@ class CcxtMarketDataAdapter(MarketDataPort):
     with self._engine.connect() as connection:
       rows = connection.execute(statement).mappings().all()
     return tuple(self._row_to_ingestion_job_record(row) for row in rows)
+
+  def delete_market_data_lineage_history_records(
+    self,
+    history_ids: tuple[str, ...],
+  ) -> int:
+    if not history_ids:
+      return 0
+    statement = delete(market_lineage_history).where(
+      and_(
+        market_lineage_history.c.venue == self._venue,
+        market_lineage_history.c.history_id.in_(history_ids),
+      )
+    )
+    with self._engine.begin() as connection:
+      result = connection.execute(statement)
+    return int(result.rowcount or 0)
+
+  def delete_market_data_ingestion_jobs(
+    self,
+    job_ids: tuple[str, ...],
+  ) -> int:
+    if not job_ids:
+      return 0
+    statement = delete(market_ingestion_jobs).where(
+      and_(
+        market_ingestion_jobs.c.venue == self._venue,
+        market_ingestion_jobs.c.job_id.in_(job_ids),
+      )
+    )
+    with self._engine.begin() as connection:
+      result = connection.execute(statement)
+    return int(result.rowcount or 0)
 
   def sync_tracked(self, timeframe: str) -> None:
     for symbol in self._tracked_symbols:

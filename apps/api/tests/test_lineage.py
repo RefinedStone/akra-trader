@@ -6,11 +6,15 @@ from datetime import datetime
 import pytest
 
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import MarketDataLineageHistoryRecord
+from akra_trader.domain.models import MarketDataIngestionJobRecord
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
 from akra_trader.lineage import assess_rerun_validation
+from akra_trader.lineage import build_operator_lineage_evidence_retention_policy
+from akra_trader.lineage import build_operator_lineage_evidence_retention_result
 from akra_trader.lineage import build_operator_lineage_summary
 from akra_trader.lineage import build_dataset_boundary_contract
 
@@ -280,3 +284,87 @@ def test_build_operator_lineage_summary_marks_window_only_boundary_as_drift_awar
   assert summary.status == "review"
   assert summary.posture == "drift-aware"
   assert summary.category == "window_only"
+
+
+def test_operator_lineage_retention_policy_clamps_requested_days_to_floors() -> None:
+  policy = build_operator_lineage_evidence_retention_policy(
+    lineage_history_days=10,
+    lineage_issue_history_days=30,
+    ingestion_job_days=5,
+    ingestion_issue_job_days=10,
+  )
+
+  assert policy.lineage_history_days == 90
+  assert policy.lineage_issue_history_days == 180
+  assert policy.ingestion_job_days == 30
+  assert policy.ingestion_issue_job_days == 90
+
+
+def test_operator_lineage_retention_result_keeps_floor_protected_evidence() -> None:
+  current_time = datetime(2025, 7, 1, 0, 0, tzinfo=UTC)
+  policy = build_operator_lineage_evidence_retention_policy()
+  old_normal_lineage = MarketDataLineageHistoryRecord(
+    history_id="lineage-normal-old",
+    source_job_id="job-normal-old",
+    provider="binance",
+    venue="binance",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    recorded_at=datetime(2025, 3, 1, 0, 0, tzinfo=UTC),
+    sync_status="synced",
+    validation_claim="checkpoint_window",
+  )
+  retained_issue_lineage = MarketDataLineageHistoryRecord(
+    history_id="lineage-issue-retained",
+    source_job_id="job-issue-retained",
+    provider="binance",
+    venue="binance",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    recorded_at=datetime(2025, 3, 15, 0, 0, tzinfo=UTC),
+    sync_status="error",
+    validation_claim="checkpoint_window",
+    failure_count_24h=1,
+    last_error="upstream fetch failed",
+    issues=("last_sync_failed",),
+  )
+  old_succeeded_job = MarketDataIngestionJobRecord(
+    job_id="job-normal-old",
+    provider="binance",
+    venue="binance",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    operation="sync_recent",
+    status="succeeded",
+    started_at=datetime(2025, 5, 1, 0, 0, tzinfo=UTC),
+    finished_at=datetime(2025, 5, 1, 0, 1, tzinfo=UTC),
+    duration_ms=1000,
+    lineage_history_id="lineage-normal-old",
+  )
+  retained_failed_job = MarketDataIngestionJobRecord(
+    job_id="job-issue-retained",
+    provider="binance",
+    venue="binance",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    operation="sync_recent",
+    status="failed",
+    started_at=datetime(2025, 5, 1, 0, 0, tzinfo=UTC),
+    finished_at=datetime(2025, 5, 1, 0, 1, tzinfo=UTC),
+    duration_ms=1000,
+    lineage_history_id="lineage-issue-retained",
+    last_error="upstream fetch failed",
+  )
+
+  result = build_operator_lineage_evidence_retention_result(
+    lineage_history=[old_normal_lineage, retained_issue_lineage],
+    ingestion_jobs=[old_succeeded_job, retained_failed_job],
+    current_time=current_time,
+    policy=policy,
+    dry_run=True,
+  )
+
+  assert result.eligible_lineage_history_ids == ("lineage-normal-old",)
+  assert result.eligible_ingestion_job_ids == ("job-normal-old",)
+  assert result.retained_lineage_history_floor_ids == ("lineage-issue-retained",)
+  assert result.retained_ingestion_job_floor_ids == ("job-issue-retained",)

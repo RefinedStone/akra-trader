@@ -235,6 +235,32 @@ class StatusOverrideSeededMarketDataAdapter(MutableSeededMarketDataAdapter):
       filtered = filtered[:limit]
     return tuple(filtered)
 
+  def delete_market_data_lineage_history_records(
+    self,
+    history_ids: tuple[str, ...],
+  ) -> int:
+    history_id_set = set(history_ids)
+    before_count = len(self._lineage_history)
+    self._lineage_history = tuple(
+      record
+      for record in self._lineage_history
+      if record.history_id not in history_id_set
+    )
+    return before_count - len(self._lineage_history)
+
+  def delete_market_data_ingestion_jobs(
+    self,
+    job_ids: tuple[str, ...],
+  ) -> int:
+    job_id_set = set(job_ids)
+    before_count = len(self._ingestion_jobs)
+    self._ingestion_jobs = tuple(
+      record
+      for record in self._ingestion_jobs
+      if record.job_id not in job_id_set
+    )
+    return before_count - len(self._ingestion_jobs)
+
   def remediate(
     self,
     *,
@@ -540,5 +566,4 @@ class AlwaysBuyStrategy(Strategy):
       rationale="always_buy",
       context=context,
     )
-
 

@@ -35,8 +35,8 @@ Completed baseline now in place:
 Status:
 
 - materially complete
-- remaining work is now product enforcement for the documented operator lineage retention,
-  escalation, and drill-evidence policy on top of the deterministic baseline
+- remaining work is now drill-evidence export and escalation workflow integration on top of the
+  documented and TTL-enforced operator lineage retention policy
 
 Target window:
 
@@ -49,8 +49,9 @@ Primary outcomes:
 
 Detailed work:
 
-- enforce the documented lineage mismatch interpretation and escalation rules in product workflows
-- preserve retention and drill evidence for lineage-history and ingestion-job review
+- integrate the documented lineage mismatch interpretation and escalation rules into product
+  workflows
+- preserve drill evidence for lineage-history and ingestion-job review
 - keep product language tight around exact-match claims versus drift-aware replay paths
 
 Acceptance criteria:
@@ -68,6 +69,8 @@ Completed baseline now in place:
 - ingestion-job history plus normalized lineage query surfaces
 - focused runtime triage against the selected instrument's lineage history
 - operator lineage guidance with retention floors, escalation rules, and drill validation evidence
+- product TTL controls that clamp requested lineage-history and ingestion-job pruning to operator
+  retention floors
 
 ## Wave 2: Durable Strategy Registry And Experiment OS Completion
 

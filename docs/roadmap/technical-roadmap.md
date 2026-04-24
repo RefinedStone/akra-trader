@@ -39,10 +39,9 @@ creation.
 
 ### Remaining work
 
-- product-native enforcement of documented operator-facing lineage interpretation and action
+- product-native integration of documented operator-facing lineage interpretation and action
   guidance when rerun guarantees cannot be made
-- automated retention, drill evidence, and escalation support for lineage-history and ingestion-job
-  review paths
+- drill evidence export and escalation support for lineage-history and ingestion-job review paths
 - tighter integration between data-boundary health and runtime/operator runbooks
 
 ## Track B: Experiment OS And Persistence

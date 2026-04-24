@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import replace
 import hashlib
 import json
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import DatasetBoundaryContract
+from akra_trader.domain.models import MarketDataIngestionJobRecord
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import MarketDataLineageHistoryRecord
+from akra_trader.domain.models import OperatorLineageEvidenceRetentionPolicy
+from akra_trader.domain.models import OperatorLineageEvidenceRetentionResult
 from akra_trader.domain.models import RunRecord
 
 
@@ -30,6 +36,9 @@ class OperatorLineageSummary:
   validation_claim: str | None = None
   boundary_id: str | None = None
   blocking: bool = False
+
+
+OPERATOR_LINEAGE_RETENTION_FLOORS = OperatorLineageEvidenceRetentionPolicy()
 
 
 def build_dataset_boundary_contract(*, lineage: MarketDataLineage | None) -> DatasetBoundaryContract | None:
@@ -136,6 +145,116 @@ def serialize_operator_lineage_summary(
   }
 
 
+def build_operator_lineage_evidence_retention_policy(
+  *,
+  lineage_history_days: int | None = None,
+  lineage_issue_history_days: int | None = None,
+  ingestion_job_days: int | None = None,
+  ingestion_issue_job_days: int | None = None,
+) -> OperatorLineageEvidenceRetentionPolicy:
+  floors = OPERATOR_LINEAGE_RETENTION_FLOORS
+  return OperatorLineageEvidenceRetentionPolicy(
+    lineage_history_days=max(
+      lineage_history_days or floors.lineage_history_days,
+      floors.lineage_history_days,
+    ),
+    lineage_issue_history_days=max(
+      lineage_issue_history_days or floors.lineage_issue_history_days,
+      floors.lineage_issue_history_days,
+    ),
+    ingestion_job_days=max(
+      ingestion_job_days or floors.ingestion_job_days,
+      floors.ingestion_job_days,
+    ),
+    ingestion_issue_job_days=max(
+      ingestion_issue_job_days or floors.ingestion_issue_job_days,
+      floors.ingestion_issue_job_days,
+    ),
+  )
+
+
+def build_operator_lineage_evidence_retention_result(
+  *,
+  lineage_history: list[MarketDataLineageHistoryRecord],
+  ingestion_jobs: list[MarketDataIngestionJobRecord],
+  current_time: datetime,
+  policy: OperatorLineageEvidenceRetentionPolicy,
+  dry_run: bool,
+  protected_history_ids: tuple[str, ...] = (),
+  protected_job_ids: tuple[str, ...] = (),
+) -> OperatorLineageEvidenceRetentionResult:
+  retained_job_lineage_history_ids: set[str] = set()
+  protected_job_id_set = set(protected_job_ids)
+  eligible_job_ids: list[str] = []
+  retained_job_ids: list[str] = []
+  for job in ingestion_jobs:
+    cutoff = _operator_lineage_ingestion_job_cutoff(
+      current_time=current_time,
+      policy=policy,
+      job=job,
+    )
+    if job.job_id in protected_job_id_set:
+      retained_job_ids.append(job.job_id)
+      if job.lineage_history_id:
+        retained_job_lineage_history_ids.add(job.lineage_history_id)
+      continue
+    if _operator_lineage_recorded_at(job.finished_at) <= cutoff:
+      eligible_job_ids.append(job.job_id)
+    else:
+      retained_job_ids.append(job.job_id)
+      if job.lineage_history_id:
+        retained_job_lineage_history_ids.add(job.lineage_history_id)
+
+  protected_history_id_set = set(protected_history_ids)
+  eligible_history_ids: list[str] = []
+  retained_history_ids: list[str] = []
+  for record in lineage_history:
+    cutoff = _operator_lineage_history_cutoff(
+      current_time=current_time,
+      policy=policy,
+      record=record,
+    )
+    if (
+      record.history_id in protected_history_id_set
+      or record.history_id in retained_job_lineage_history_ids
+    ):
+      retained_history_ids.append(record.history_id)
+      continue
+    if _operator_lineage_recorded_at(record.recorded_at) <= cutoff:
+      eligible_history_ids.append(record.history_id)
+    else:
+      retained_history_ids.append(record.history_id)
+
+  return OperatorLineageEvidenceRetentionResult(
+    policy=policy,
+    current_time=current_time,
+    dry_run=dry_run,
+    lineage_history_cutoff_at=current_time - timedelta(days=policy.lineage_history_days),
+    lineage_issue_history_cutoff_at=current_time - timedelta(days=policy.lineage_issue_history_days),
+    ingestion_job_cutoff_at=current_time - timedelta(days=policy.ingestion_job_days),
+    ingestion_issue_job_cutoff_at=current_time - timedelta(days=policy.ingestion_issue_job_days),
+    eligible_lineage_history_ids=tuple(eligible_history_ids),
+    eligible_ingestion_job_ids=tuple(eligible_job_ids),
+    retained_lineage_history_floor_ids=tuple(retained_history_ids),
+    retained_ingestion_job_floor_ids=tuple(retained_job_ids),
+    protected_lineage_history_ids=tuple(protected_history_ids),
+    protected_ingestion_job_ids=tuple(protected_job_ids),
+  )
+
+
+def apply_operator_lineage_evidence_retention_deletion_counts(
+  result: OperatorLineageEvidenceRetentionResult,
+  *,
+  deleted_lineage_history_count: int,
+  deleted_ingestion_job_count: int,
+) -> OperatorLineageEvidenceRetentionResult:
+  return replace(
+    result,
+    deleted_lineage_history_count=deleted_lineage_history_count,
+    deleted_ingestion_job_count=deleted_ingestion_job_count,
+  )
+
+
 def build_candle_dataset_identity(
   *,
   provider: str,
@@ -163,6 +282,54 @@ def build_candle_dataset_identity(
     ],
   }
   return f"candles-v1:{_build_digest(payload)}"
+
+
+def _operator_lineage_history_cutoff(
+  *,
+  current_time: datetime,
+  policy: OperatorLineageEvidenceRetentionPolicy,
+  record: MarketDataLineageHistoryRecord,
+) -> datetime:
+  days = (
+    policy.lineage_issue_history_days
+    if _is_operator_lineage_issue_history_record(record)
+    else policy.lineage_history_days
+  )
+  return current_time - timedelta(days=days)
+
+
+def _operator_lineage_ingestion_job_cutoff(
+  *,
+  current_time: datetime,
+  policy: OperatorLineageEvidenceRetentionPolicy,
+  job: MarketDataIngestionJobRecord,
+) -> datetime:
+  days = (
+    policy.ingestion_issue_job_days
+    if _is_operator_lineage_issue_ingestion_job(job)
+    else policy.ingestion_job_days
+  )
+  return current_time - timedelta(days=days)
+
+
+def _is_operator_lineage_issue_history_record(record: MarketDataLineageHistoryRecord) -> bool:
+  return (
+    record.sync_status != "synced"
+    or record.failure_count_24h > 0
+    or record.gap_window_count > 0
+    or record.last_error is not None
+    or bool(record.issues)
+  )
+
+
+def _is_operator_lineage_issue_ingestion_job(job: MarketDataIngestionJobRecord) -> bool:
+  return job.status != "succeeded" or job.last_error is not None
+
+
+def _operator_lineage_recorded_at(value: datetime) -> datetime:
+  if value.tzinfo is None:
+    return value.replace(tzinfo=UTC)
+  return value.astimezone(UTC)
 
 
 def build_aggregate_dataset_identity(

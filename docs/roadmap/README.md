@@ -20,8 +20,8 @@ What is already materially present:
 
 What still defines the roadmap:
 
-- product enforcement for operator lineage retention, drill evidence, and escalation on top of the
-  documented deterministic research baseline
+- product-native drill evidence and escalation workflow integration on top of documented and
+  TTL-enforced operator lineage retention
 - durable strategy registry and promotion workflow
 - normalized experiment query, artifact, and export posture
 - control-room productization and operator workflow clarity

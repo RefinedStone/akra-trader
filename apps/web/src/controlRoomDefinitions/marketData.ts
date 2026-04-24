@@ -94,6 +94,32 @@ export type MarketDataIngestionJobRecord = {
   last_error?: string | null;
 };
 
+export type OperatorLineageEvidenceRetentionPolicy = {
+  policy_key: string;
+  lineage_history_days: number;
+  lineage_issue_history_days: number;
+  ingestion_job_days: number;
+  ingestion_issue_job_days: number;
+};
+
+export type OperatorLineageEvidenceRetentionResult = {
+  policy: OperatorLineageEvidenceRetentionPolicy;
+  current_time: string;
+  dry_run: boolean;
+  lineage_history_cutoff_at: string;
+  lineage_issue_history_cutoff_at: string;
+  ingestion_job_cutoff_at: string;
+  ingestion_issue_job_cutoff_at: string;
+  eligible_lineage_history_ids: string[];
+  eligible_ingestion_job_ids: string[];
+  retained_lineage_history_floor_ids: string[];
+  retained_ingestion_job_floor_ids: string[];
+  protected_lineage_history_ids: string[];
+  protected_ingestion_job_ids: string[];
+  deleted_lineage_history_count: number;
+  deleted_ingestion_job_count: number;
+};
+
 export type MarketDataProvenanceExportSort =
   | "newest"
   | "oldest"

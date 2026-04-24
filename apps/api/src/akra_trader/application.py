@@ -34,6 +34,9 @@ from akra_trader.application_flows.strategy_catalog import _normalize_experiment
 from akra_trader.application_flows.strategy_catalog import serialize_preset
 from akra_trader.application_flows.strategy_catalog import serialize_preset_revision
 from akra_trader.application_flows.strategy_catalog import serialize_strategy
+from akra_trader.lineage import apply_operator_lineage_evidence_retention_deletion_counts
+from akra_trader.lineage import build_operator_lineage_evidence_retention_policy
+from akra_trader.lineage import build_operator_lineage_evidence_retention_result
 from akra_trader.adapters.provider_provenance_search import (
   EmbeddedProviderProvenanceSchedulerSearchServiceClient,
 )
@@ -1501,6 +1504,60 @@ class TradingApplication(
         status=status,
         limit=limit,
       )
+    )
+
+  def prune_operator_lineage_evidence_retention(
+    self,
+    *,
+    dry_run: bool = False,
+    lineage_history_days: int | None = None,
+    lineage_issue_history_days: int | None = None,
+    ingestion_job_days: int | None = None,
+    ingestion_issue_job_days: int | None = None,
+    protected_history_ids: tuple[str, ...] = (),
+    protected_job_ids: tuple[str, ...] = (),
+  ):
+    current_time = self._clock()
+    policy = build_operator_lineage_evidence_retention_policy(
+      lineage_history_days=lineage_history_days,
+      lineage_issue_history_days=lineage_issue_history_days,
+      ingestion_job_days=ingestion_job_days,
+      ingestion_issue_job_days=ingestion_issue_job_days,
+    )
+    result = build_operator_lineage_evidence_retention_result(
+      lineage_history=self.list_market_data_lineage_history(),
+      ingestion_jobs=self.list_market_data_ingestion_jobs(),
+      current_time=current_time,
+      policy=policy,
+      dry_run=dry_run,
+      protected_history_ids=protected_history_ids,
+      protected_job_ids=protected_job_ids,
+    )
+    deleted_lineage_history_count = 0
+    deleted_ingestion_job_count = 0
+    if not dry_run:
+      if result.eligible_ingestion_job_ids:
+        delete_ingestion_jobs = getattr(
+          self._market_data,
+          "delete_market_data_ingestion_jobs",
+          None,
+        )
+        if not callable(delete_ingestion_jobs):
+          raise RuntimeError("Market-data adapter does not support ingestion-job TTL deletion.")
+        deleted_ingestion_job_count = int(delete_ingestion_jobs(result.eligible_ingestion_job_ids))
+      if result.eligible_lineage_history_ids:
+        delete_lineage_history = getattr(
+          self._market_data,
+          "delete_market_data_lineage_history_records",
+          None,
+        )
+        if not callable(delete_lineage_history):
+          raise RuntimeError("Market-data adapter does not support lineage-history TTL deletion.")
+        deleted_lineage_history_count = int(delete_lineage_history(result.eligible_lineage_history_ids))
+    return apply_operator_lineage_evidence_retention_deletion_counts(
+      result,
+      deleted_lineage_history_count=deleted_lineage_history_count,
+      deleted_ingestion_job_count=deleted_ingestion_job_count,
     )
 
   def get_operator_visibility(self) -> OperatorVisibility:

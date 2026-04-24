@@ -443,6 +443,18 @@ def execute_standalone_surface_binding(
         binding=binding,
       )
     ]
+  if binding.binding_kind == "market_data_lineage_evidence_retention_prune":
+    return asdict(
+      app.prune_operator_lineage_evidence_retention(
+        dry_run=resolved_payload.get("dry_run", False),
+        lineage_history_days=resolved_payload.get("lineage_history_days"),
+        lineage_issue_history_days=resolved_payload.get("lineage_issue_history_days"),
+        ingestion_job_days=resolved_payload.get("ingestion_job_days"),
+        ingestion_issue_job_days=resolved_payload.get("ingestion_issue_job_days"),
+        protected_history_ids=tuple(resolved_payload.get("protected_history_ids") or ()),
+        protected_job_ids=tuple(resolved_payload.get("protected_job_ids") or ()),
+      )
+    )
   if binding.binding_kind == "operator_visibility":
     return asdict(app.get_operator_visibility())
   if binding.binding_kind == "operator_provider_provenance_export_job_create":

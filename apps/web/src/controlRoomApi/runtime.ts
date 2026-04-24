@@ -1,4 +1,8 @@
-import type { MarketDataIngestionJobRecord, MarketDataLineageHistoryRecord } from "../controlRoomDefinitions";
+import type {
+  MarketDataIngestionJobRecord,
+  MarketDataLineageHistoryRecord,
+  OperatorLineageEvidenceRetentionResult,
+} from "../controlRoomDefinitions";
 import { fetchJson } from "./base";
 
 export async function listMarketDataLineageHistory(params: {
@@ -53,4 +57,22 @@ export async function listMarketDataIngestionJobs(params: {
   }
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<MarketDataIngestionJobRecord[]>(`/market-data/ingestion-jobs${suffix}`);
+}
+
+export async function pruneMarketDataLineageEvidenceRetention(payload: {
+  dry_run?: boolean;
+  lineage_history_days?: number | null;
+  lineage_issue_history_days?: number | null;
+  ingestion_job_days?: number | null;
+  ingestion_issue_job_days?: number | null;
+  protected_history_ids?: string[];
+  protected_job_ids?: string[];
+} = {}) {
+  return fetchJson<OperatorLineageEvidenceRetentionResult>(
+    "/market-data/lineage-evidence/retention/prune",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
 }

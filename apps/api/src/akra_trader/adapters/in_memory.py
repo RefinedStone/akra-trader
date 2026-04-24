@@ -228,6 +228,20 @@ class SeededMarketDataAdapter(MarketDataPort):
     del timeframe, symbol, operation, status, limit
     return ()
 
+  def delete_market_data_lineage_history_records(
+    self,
+    history_ids: tuple[str, ...],
+  ) -> int:
+    del history_ids
+    return 0
+
+  def delete_market_data_ingestion_jobs(
+    self,
+    job_ids: tuple[str, ...],
+  ) -> int:
+    del job_ids
+    return 0
+
   def describe_lineage(
     self,
     *,

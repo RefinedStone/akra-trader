@@ -86,3 +86,29 @@ class MarketDataIngestionJobRecord:
   requested_end_at: datetime | None = None
   requested_limit: int | None = None
   last_error: str | None = None
+
+@dataclass(frozen=True)
+class OperatorLineageEvidenceRetentionPolicy:
+  policy_key: str = "operator_lineage_evidence.v1"
+  lineage_history_days: int = 90
+  lineage_issue_history_days: int = 180
+  ingestion_job_days: int = 30
+  ingestion_issue_job_days: int = 90
+
+@dataclass(frozen=True)
+class OperatorLineageEvidenceRetentionResult:
+  policy: OperatorLineageEvidenceRetentionPolicy
+  current_time: datetime
+  dry_run: bool
+  lineage_history_cutoff_at: datetime
+  lineage_issue_history_cutoff_at: datetime
+  ingestion_job_cutoff_at: datetime
+  ingestion_issue_job_cutoff_at: datetime
+  eligible_lineage_history_ids: tuple[str, ...] = ()
+  eligible_ingestion_job_ids: tuple[str, ...] = ()
+  retained_lineage_history_floor_ids: tuple[str, ...] = ()
+  retained_ingestion_job_floor_ids: tuple[str, ...] = ()
+  protected_lineage_history_ids: tuple[str, ...] = ()
+  protected_ingestion_job_ids: tuple[str, ...] = ()
+  deleted_lineage_history_count: int = 0
+  deleted_ingestion_job_count: int = 0
