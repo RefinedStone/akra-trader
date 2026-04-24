@@ -34,6 +34,7 @@ from akra_trader.application import StandaloneSurfaceRuntimeBinding
 from akra_trader.application import StandaloneSurfaceFilterExpressionNode
 from akra_trader.application import StandaloneSurfaceCollectionPathSpec
 from akra_trader.bootstrap import Container
+from akra_trader.domain.models import RunSurfaceCapabilities
 
 
 class StrategyRegistrationRequest(BaseModel):
@@ -2137,6 +2138,12 @@ def create_router(container: Container) -> APIRouter:
   def get_app() -> TradingApplication:
     return container.app
 
+  def get_route_run_surface_capabilities() -> RunSurfaceCapabilities:
+    get_capabilities = getattr(get_app(), "get_run_surface_capabilities", None)
+    if callable(get_capabilities):
+      return get_capabilities()
+    return RunSurfaceCapabilities()
+
   def dispatch_standalone_binding(
     *,
     binding: StandaloneSurfaceRuntimeBinding,
@@ -2285,7 +2292,7 @@ def create_router(container: Container) -> APIRouter:
       return_annotation=Any,
     )
     return handle_surface
-  for binding in list_standalone_surface_runtime_bindings(get_app().get_run_surface_capabilities()):
+  for binding in list_standalone_surface_runtime_bindings(get_route_run_surface_capabilities()):
     router.add_api_route(
       binding.route_path,
       build_standalone_surface_route_handler(binding),

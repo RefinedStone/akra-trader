@@ -505,6 +505,12 @@ from akra_trader.application_support.runtime_queries import StandaloneSurfaceFil
 from akra_trader.application_support.runtime_queries import StandaloneSurfaceRuntimeBinding
 from akra_trader.application_support.runtime_queries import StandaloneSurfaceSortTerm
 from akra_trader.application_support.run_surfaces import serialize_run
+from akra_trader.application_support.standalone_route_guards import (
+  require_operator_alert_external_sync_token as require_operator_alert_external_sync_token_support,
+)
+from akra_trader.application_support.standalone_route_guards import (
+  require_replay_alias_audit_admin_token as require_replay_alias_audit_admin_token_support,
+)
 from akra_trader.application_support.standalone_surfaces import execute_standalone_surface_binding
 from akra_trader.application_support.standalone_surfaces import get_run_subresource_contract
 from akra_trader.application_support.standalone_surfaces import get_run_subresource_runtime_binding
@@ -1057,6 +1063,25 @@ class TradingApplication(
 
   def get_run_surface_capabilities(self) -> RunSurfaceCapabilities:
     return RunSurfaceCapabilities()
+
+  def require_replay_alias_audit_admin_token(
+    self,
+    token: str | None,
+    *,
+    scope: str,
+  ) -> None:
+    require_replay_alias_audit_admin_token_support(
+      token,
+      scope=scope,
+      read_token=self._replay_alias_audit_admin_read_token,
+      write_token=self._replay_alias_audit_admin_write_token,
+    )
+
+  def require_operator_alert_external_sync_token(self, token: str | None) -> None:
+    require_operator_alert_external_sync_token_support(
+      token,
+      expected_token=self._operator_alert_external_sync_token,
+    )
 
 
 
