@@ -2555,16 +2555,52 @@
       "id": "task-data-trust-lineage-posture-runtime-promotion-enforcement",
       "direction_id": "data-trust-and-lineage",
       "title": "Deep-link lineage drill evidence packs into promotion and escalation workflows",
-      "description": "Connect the newly exported lineage drill evidence pack to promotion, escalation, and runtime/posture decision flows so unresolved, stale, or out-of-policy evidence blocks advancement through product-native workflow checks instead of remaining a standalone export artifact.",
-      "status": "ready",
+      "description": "Completed the deep-link baseline by persisting focused lineage drill evidence pack identifiers, retention expiry, and summaries on preset promotion lifecycle events and guarded-live escalations, generating the focused evidence pack before Control Room promotion/escalation actions, and surfacing the linked evidence through audit detail, API/backend types, tests, and roadmap/runtime documentation.",
+      "status": "done",
       "base_priority": 78,
       "dynamic_priority_delta": 20,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T13:14:00+09:00",
+      "updated_at": "2026-04-24T13:24:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply says the export work is done and explicitly leaves 'deeper promotion/escalation workflow' linkage as the remaining gap, so this existing runtime/promotion enforcement task now becomes the concrete next executable successor rather than a deferred candidate.",
-      "priority_reason": "Promoted to `ready` because builtin next-task needs one executable queue head after commit `5c15440`, and the latest main-session reply directly identifies promotion/escalation linkage as the next follow-up with no extra operator decision needed."
+      "direction_relation_note": "The latest main-session reply confirms commit `ab2aeff` finished the promotion/escalation deep-link baseline across backend, API, web, tests, and docs, and explicitly says the remaining work now shifts to a first-class promotion-review artifact model plus provider-owned escalation automation.",
+      "priority_reason": "Marked `done` because the main session completed, validated, committed, and pushed the deep-link enforcement baseline with `python -m compileall`, targeted pytest coverage, a broader `160 passed` backend pytest bundle, `npm --prefix apps/web run typecheck`, and `git diff --check` / `git diff --cached --check` all passing."
+    },
+    {
+      "id": "task-data-trust-lineage-promotion-review-artifact-model-productization",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Promote lineage evidence links into a first-class promotion review artifact model",
+      "description": "Replace the deep-link-only baseline with a first-class promotion review artifact model that persists focused lineage evidence, review summary, retention/ownership metadata, and queryable lifecycle state across preset promotion flows so promotion decisions can reuse, inspect, and enforce lineage review artifacts without depending on ad hoc workflow payload fields.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 21,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-24T13:25:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "The latest main-session reply explicitly names a 'first-class promotion-review artifact model' as the next remaining productization step after commit `ab2aeff`, making it the clearest immediate successor to the completed deep-link baseline.",
+      "priority_reason": "Promoted to `ready` because builtin next-task still needs one executable queue head, and this follow-up is concrete, directly requested by the latest main-session reply, and can proceed without further operator triage."
+    },
+    {
+      "id": "task-data-trust-lineage-provider-owned-escalation-automation-productization",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Productize provider-owned lineage escalation automation on top of review artifacts",
+      "description": "Build provider-owned guarded-live escalation automation that consumes promotion review artifacts and lineage posture outcomes to draft or trigger escalations, preserve provider-specific audit ownership, and reduce reliance on manual Control Room orchestration for repeatable lineage enforcement.",
+      "status": "blocked",
+      "base_priority": 79,
+      "dynamic_priority_delta": 19,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-24T13:25:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-data-trust-lineage-promotion-review-artifact-model-productization"
+      ],
+      "blocked_by": [
+        "task-data-trust-lineage-promotion-review-artifact-model-productization"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly leaves provider-owned escalation automation as the other remaining productization follow-up after the deep-link baseline, but the automation surface will be more stable once the promotion review artifact model exists.",
+      "priority_reason": "Set to `blocked` because the work is concrete and should stay in the executable queue, but implementing provider-owned escalation automation before the review artifact model is productized would likely duplicate or churn the evidence contract it needs to consume."
     },
     {
       "id": "task-llm-sensitivity-application-residual-bounded-flow-decomposition",
