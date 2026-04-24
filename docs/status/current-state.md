@@ -49,8 +49,10 @@ It is not yet a finished live trading product:
   `application_support/runtime_queries.py`
 - standalone surface binding catalogs split across bounded
   `application_support/standalone_surface_catalog*` modules
-- standalone surface execution, query-discovery serialization, and run-subresource binding helpers
-  moved into `application_support/standalone_surfaces.py`
+- standalone surface execution and query-discovery serialization split into
+  `application_support/standalone_surface_consumer.py` and
+  `application_support/standalone_surface_composer.py`, with `standalone_surfaces.py`
+  kept as the compatibility surface
 - run-subresource response serialization moved into
   `application_support/run_subresources.py`
 - durable run storage through `SqlAlchemyRunRepository`
