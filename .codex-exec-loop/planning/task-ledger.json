@@ -2511,15 +2511,15 @@
       "direction_id": "data-trust-and-lineage",
       "title": "Define operator lineage guidance, retention policy, and drill validation pack",
       "description": "Turn the data-trust lane's documented immediate gaps into an executable operator-facing pack covering lineage action guidance, escalation rules, lineage-history and ingestion-job retention expectations, and data-boundary incident drill validation.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 78,
-      "dynamic_priority_delta": 14,
+      "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-23T00:23:01+09:00",
+      "updated_at": "2026-04-24T12:25:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The `data-trust-and-lineage` detail doc still lists operator-facing lineage action guidance, retention policy, and drill/runbook validation as immediate gaps, but the ledger had no follow-up task representing that work.",
-      "priority_reason": "Left proposed because the operator request for this turn was to re-evaluate the empty queue and choose the most immediate executable head; the frontend decomposition hotspot is clearer for immediate execution, while this data-trust pack remains a valid next proposal under the active direction."
+      "direction_relation_note": "The `data-trust-and-lineage` detail doc still lists operator-facing lineage action guidance, retention policy, and drill/runbook validation as immediate gaps, and after the standalone surface backend split completed with no same-scope follow-up remaining, this pack is the clearest executable queue continuation that does not depend on picking another decomposition target first.",
+      "priority_reason": "Promoted to `ready` because the previous queue head finished in commit `ba50b47` with no remaining work in that scope, builtin next-task still needs one executable successor, and this operator-facing pack is already concretely defined while the remaining LLM-sensitivity proposals are either optional cleanup or still require target-selection judgment."
     },
     {
       "id": "task-llm-sensitivity-application-residual-bounded-flow-decomposition",
@@ -2600,16 +2600,16 @@
       "id": "task-llm-sensitivity-standalone-surfaces-consumer-composer-decomposition",
       "direction_id": "llm-sensitivity-decomposition",
       "title": "Decompose standalone_surfaces.py into bounded consumer and composer modules",
-      "description": "Break the still-massive `apps/api/src/akra_trader/application_support/standalone_surfaces.py` compatibility surface into narrower owner modules so route/query consumer wiring, serializer shims, and standalone surface composition stop accumulating in a single 2k+ line file while keeping the public standalone route surface import-stable.",
-      "status": "ready",
+      "description": "Completed the standalone surface compatibility split by moving standalone execution and response serialization into `application_support/standalone_surface_consumer.py`, query-discovery and shared-contract composition into `application_support/standalone_surface_composer.py`, and leaving `standalone_surfaces.py` with compatibility routing plus runtime-binding ownership only.",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 19,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T11:25:00+09:00",
+      "updated_at": "2026-04-24T12:25:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "With the standalone surface catalog family now split and no remaining work left inside that scope, the next clearly bounded executable backend continuation is the 2298-line `standalone_surfaces.py` consumer/composer surface that still imports the new catalog family and retains broad serializer/query ownership in one compatibility file.",
-      "priority_reason": "Promoted to `ready` because builtin next-task needs a new executable head after commit `95cf4a4`, this follow-up is concretely identified by the current codebase rather than requiring operator choice, and the remaining open alternatives are either explicitly optional cleanup or still need target selection."
+      "direction_relation_note": "The latest main-session reply confirms commit `ba50b47` finished this decomposition by splitting consumer and composer ownership into dedicated modules, keeping `standalone_surfaces.py` as the compatibility surface, updating `docs/status/current-state.md`, and explicitly stating there is no remaining work left within this task's scope.",
+      "priority_reason": "Marked `done` because the main session completed, validated, committed, and pushed the split: `compileall`, compatibility smoke checks, focused application/API pytest runs, and the full `apps/api/tests` suite all passed, so this queue head must advance to a different executable task instead of repeating the same backend surface."
     },
     {
       "id": "task-llm-sensitivity-long-tail-provider-module-decomposition",
