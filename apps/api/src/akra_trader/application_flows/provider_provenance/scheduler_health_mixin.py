@@ -17,6 +17,12 @@ from typing import Mapping
 from akra_trader.domain.models import *  # noqa: F403
 
 
+def _serialize_stitched_scheduler_narrative_json_value(value: Any) -> str:
+  if isinstance(value, datetime):
+    return value.isoformat()
+  raise TypeError(f"Object of type {value.__class__.__name__} is not JSON serializable")
+
+
 class ProviderProvenanceSchedulerHealthMixin:
   def _provider_provenance_scheduler_warning_lag_seconds(self) -> int:
     return max(self._provider_provenance_report_scheduler_interval_seconds * 2, 120)
@@ -4213,7 +4219,12 @@ class ProviderProvenanceSchedulerHealthMixin:
         "analytics": analytics_payload,
         "stitched_occurrence_report": stitched_report_payload,
       }
-      content = json.dumps(payload, indent=2, sort_keys=True)
+      content = json.dumps(
+        payload,
+        default=_serialize_stitched_scheduler_narrative_json_value,
+        indent=2,
+        sort_keys=True,
+      )
       category_label = normalized_category or "all"
       return {
         "content": content,
@@ -4411,4 +4422,3 @@ class ProviderProvenanceSchedulerHealthMixin:
       "record_count": history_payload["returned"],
       "total_count": history_payload["total"],
     }
-
