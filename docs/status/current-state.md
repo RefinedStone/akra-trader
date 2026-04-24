@@ -51,6 +51,8 @@ It is not yet a finished live trading product:
   `application_support/standalone_surface_catalog.py`
 - standalone surface execution, query-discovery serialization, and run-subresource binding helpers
   moved into `application_support/standalone_surfaces.py`
+- run-subresource response serialization moved into
+  `application_support/run_subresources.py`
 - durable run storage through `SqlAlchemyRunRepository`
 - repo-local SQLite defaults with configurable Postgres support
 - native backtest execution with persisted config, metrics, orders, fills, positions, notes, equity,

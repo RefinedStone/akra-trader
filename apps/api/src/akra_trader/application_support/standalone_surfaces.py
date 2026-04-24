@@ -22,6 +22,12 @@ from akra_trader.application_support.runtime_queries import StandaloneSurfaceCol
 from akra_trader.application_support.runtime_queries import StandaloneSurfaceCollectionPathSpec
 from akra_trader.application_support.runtime_queries import StandaloneSurfaceFilterParamSpec
 from akra_trader.application_support.runtime_queries import StandaloneSurfaceRuntimeBinding
+from akra_trader.application_support.run_subresources import _serialize_run_metrics_subresource_body
+from akra_trader.application_support.run_subresources import _serialize_run_orders_subresource_body
+from akra_trader.application_support.run_subresources import (
+  _serialize_run_positions_subresource_body,
+)
+from akra_trader.application_support.run_subresources import serialize_run_subresource_response
 from akra_trader.application_support.run_surfaces import serialize_run
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
@@ -35,18 +41,6 @@ def _application_module():
 
 def _application_symbol(name: str):
   return getattr(_application_module(), name)
-
-
-def _serialize_run_orders_subresource_body(*args, **kwargs):
-  return _application_symbol('_serialize_run_orders_subresource_body')(*args, **kwargs)
-
-
-def _serialize_run_positions_subresource_body(*args, **kwargs):
-  return _application_symbol('_serialize_run_positions_subresource_body')(*args, **kwargs)
-
-
-def _serialize_run_metrics_subresource_body(*args, **kwargs):
-  return _application_symbol('_serialize_run_metrics_subresource_body')(*args, **kwargs)
 
 
 def serialize_preset(*args, **kwargs):
@@ -275,10 +269,6 @@ def serialize_strategy(*args, **kwargs):
 
 def serialize_run_comparison(*args, **kwargs):
   return _application_symbol('serialize_run_comparison')(*args, **kwargs)
-
-
-def serialize_run_subresource_response(*args, **kwargs):
-  return _application_symbol('serialize_run_subresource_response')(*args, **kwargs)
 
 
 def serialize_run_surface_capabilities(*args, **kwargs):
