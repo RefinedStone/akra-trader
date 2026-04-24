@@ -129,6 +129,9 @@ It is not yet a finished live trading product:
 - `ControlRoomApp` now builds a dedicated `providerProvenanceRouteModel`, and the focused export
   surface mounts `RuntimeProviderProvenanceWorkspaceSection` through that nested route payload
   instead of keeping the provider-provenance route model owned inline in `ControlRoomApp`
+- `ControlRoomApp` now delegates research, runtime, and live run-history route panel assembly to
+  `buildControlRoomRunHistoryWorkspacePanels`, so non-provider-provenance route payload wiring no
+  longer sits inline with the main component body
 - `RuntimeProviderProvenanceWorkspaceSection` now composes dedicated query-surface and workspace-
   consumers collaborators instead of mixing cross-focus analytics query controls with workspace
   cards, scheduler workspace, analytics workspace, and shared registry audit mounts inline
