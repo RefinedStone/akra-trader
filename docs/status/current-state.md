@@ -47,8 +47,8 @@ It is not yet a finished live trading product:
 - run-surface enforcement and run serialization helpers moved into `application_support/run_surfaces.py`
 - standalone surface/runtime query types plus filter/sort helpers moved into
   `application_support/runtime_queries.py`
-- standalone surface binding catalogs moved into
-  `application_support/standalone_surface_catalog.py`
+- standalone surface binding catalogs split across bounded
+  `application_support/standalone_surface_catalog*` modules
 - standalone surface execution, query-discovery serialization, and run-subresource binding helpers
   moved into `application_support/standalone_surfaces.py`
 - run-subresource response serialization moved into
