@@ -6,7 +6,11 @@ export function RuntimeProviderProvenanceSchedulerNarrativeRegistryTableSection(
 }: {
   model: any;
 }) {
-  const {} = model;
+  const {
+    providerProvenanceSchedulerNarrativeRegistryEntries,
+    providerProvenanceSchedulerNarrativeRegistryEntriesError,
+    providerProvenanceSchedulerNarrativeRegistryEntriesLoading,
+  } = model;
 
   if (providerProvenanceSchedulerNarrativeRegistryEntriesLoading) {
     return <p className="empty-state">Loading scheduler narrative registry…</p>;

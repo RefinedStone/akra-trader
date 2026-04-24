@@ -1,12 +1,19 @@
 // @ts-nocheck
 import { RuntimeProviderProvenanceSchedulerNarrativeRegistryRowDetailSection } from "./RuntimeProviderProvenanceSchedulerNarrativeRegistryRowDetailSection";
+import { RuntimeProviderProvenanceSchedulerNarrativeRegistryRowActionSection } from "./RuntimeProviderProvenanceSchedulerNarrativeRegistryRowActionSection";
 
 export function RuntimeProviderProvenanceSchedulerNarrativeRegistryTableViewSection({
   model,
 }: {
   model: any;
 }) {
-  const {} = model;
+  const {
+    providerProvenanceSchedulerNarrativeRegistryEntries,
+    selectedProviderProvenanceSchedulerNarrativeRegistryIds,
+    selectedProviderProvenanceSchedulerNarrativeRegistryIdSet,
+    toggleAllProviderProvenanceSchedulerNarrativeRegistrySelections,
+    toggleProviderProvenanceSchedulerNarrativeRegistrySelection,
+  } = model;
 
   return (
     <table className="data-table">
@@ -41,61 +48,8 @@ export function RuntimeProviderProvenanceSchedulerNarrativeRegistryTableViewSect
                 type="checkbox"
               />
             </td>
-            <RuntimeProviderProvenanceSchedulerNarrativeRegistryRowDetailSection entry={entry} />
-            <td>
-              <div className="market-data-provenance-history-actions">
-                <button
-                  className="ghost-button"
-                  disabled={entry.status !== "active"}
-                  onClick={() => {
-                    setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
-                      ...current,
-                      template_id: entry.template_id ?? "",
-                    }));
-                    void applyProviderProvenanceWorkspaceQuery(entry, {
-                      includeLayout: true,
-                      feedbackLabel: `Narrative registry ${entry.name}`,
-                    });
-                  }}
-                  type="button"
-                >
-                  Apply
-                </button>
-                <button
-                  className="ghost-button"
-                  disabled={providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
-                  onClick={() => {
-                    void editProviderProvenanceSchedulerNarrativeRegistryEntry(entry);
-                  }}
-                  type="button"
-                >
-                  Edit
-                </button>
-                <button
-                  className="ghost-button"
-                  disabled={entry.status !== "active" || providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
-                  onClick={() => {
-                    void removeProviderProvenanceSchedulerNarrativeRegistry(entry);
-                  }}
-                  type="button"
-                >
-                  Delete
-                </button>
-                <button
-                  className="ghost-button"
-                  disabled={providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
-                  onClick={() => {
-                    void toggleProviderProvenanceSchedulerNarrativeRegistryHistory(entry.registry_id);
-                  }}
-                  type="button"
-                >
-                  {selectedProviderProvenanceSchedulerNarrativeRegistryId === entry.registry_id
-                    && selectedProviderProvenanceSchedulerNarrativeRegistryHistory
-                    ? "Hide versions"
-                    : "Versions"}
-                </button>
-              </div>
-            </td>
+            <RuntimeProviderProvenanceSchedulerNarrativeRegistryRowDetailSection entry={entry} model={model} />
+            <RuntimeProviderProvenanceSchedulerNarrativeRegistryRowActionSection entry={entry} model={model} />
           </tr>
         ))}
       </tbody>
