@@ -224,6 +224,9 @@ def escalate_guarded_live_incident(
   event_id: str,
   actor: str,
   reason: str,
+  lineage_evidence_pack_id: str | None = None,
+  lineage_evidence_retention_expires_at: datetime | None = None,
+  lineage_evidence_summary: str | None = None,
 ) -> GuardedLiveStatus:
   current_time = app._clock()
   state, _ = app._refresh_guarded_live_alert_state(current_time=current_time)
@@ -242,6 +245,9 @@ def escalate_guarded_live_incident(
     actor=actor,
     reason=reason,
     trigger="manual_operator_escalation",
+    lineage_evidence_pack_id=lineage_evidence_pack_id,
+    lineage_evidence_retention_expires_at=lineage_evidence_retention_expires_at,
+    lineage_evidence_summary=lineage_evidence_summary,
   )
   incident_events = app._replace_incident_event(
     incident_events=state.incident_events,
@@ -260,4 +266,3 @@ def escalate_guarded_live_incident(
     )
   )
   return app.get_guarded_live_status()
-

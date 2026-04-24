@@ -27,6 +27,9 @@ exports product-native drill evidence packs from the same lineage and ingestion 
 - market-data lineage evidence retention prune control
 - market-data lineage drill evidence pack export
 - control-room data incident triage and focused market-data workflow panels
+- preset promotion actions that can store lineage drill evidence pack IDs, retention expiry, and
+  summary posture on the lifecycle event
+- guarded-live incident escalation actions that can store the same pack link on the incident record
 - comparison and rerun surfaces that expose validation category and summary
 
 ## Lineage Postures
@@ -87,6 +90,17 @@ The product TTL control clamps requested retention windows up to these floors be
 lineage-history or ingestion-job records. Manual cleanup outside that control must preserve the
 same minimum evidence. Do not prune the only record that explains why a run was accepted, blocked,
 or escalated.
+
+## Workflow Links
+
+When a promotion or guarded-live escalation depends on lineage evidence, generate the product-native
+drill evidence pack from the focused market-data workflow before completing the action. The control
+room stores the pack ID, retention expiry, and summary posture on promoted preset lifecycle events
+and escalated guarded-live incidents so later reviews can open the same evidence trail without
+reconstructing it from raw lineage tables.
+
+If the product cannot resolve an affected symbol and timeframe for a drill evidence pack, complete
+the operator action only when the reason text explains why the evidence link is missing.
 
 ## Escalation Rules
 

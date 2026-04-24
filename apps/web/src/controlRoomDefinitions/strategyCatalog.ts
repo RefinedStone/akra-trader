@@ -90,6 +90,9 @@ export type ExperimentPreset = {
       occurred_at: string;
       from_stage?: string | null;
       to_stage: string;
+      lineage_evidence_pack_id?: string | null;
+      lineage_evidence_retention_expires_at?: string | null;
+      lineage_evidence_summary?: string | null;
     }[];
   };
   revisions: ExperimentPresetRevision[];

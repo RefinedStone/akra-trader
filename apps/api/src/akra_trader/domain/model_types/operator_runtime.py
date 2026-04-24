@@ -1573,6 +1573,9 @@ class OperatorIncidentEvent:
   last_escalated_at: datetime | None = None
   last_escalated_by: str | None = None
   escalation_reason: str | None = None
+  lineage_evidence_pack_id: str | None = None
+  lineage_evidence_retention_expires_at: datetime | None = None
+  lineage_evidence_summary: str | None = None
   next_escalation_at: datetime | None = None
   external_provider: str | None = None
   external_reference: str | None = None

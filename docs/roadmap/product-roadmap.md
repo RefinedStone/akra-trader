@@ -40,7 +40,8 @@ The main product gaps are no longer "does the feature exist" but rather:
 
 ### Still missing
 
-- escalation workflow integration for operator lineage policy and exported drill evidence packs
+- first-class promotion-review artifacts and provider-owned escalation automation on top of the
+  baseline lineage drill evidence workflow links
 - durable custom strategy registration and promotion lifecycle
 - normalized experiment summaries, artifact retrieval, and export posture
 - clearer benchmark-pack and promotion review workflow

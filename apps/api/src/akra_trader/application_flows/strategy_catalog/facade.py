@@ -142,6 +142,9 @@ class StrategyCatalogFlow:
     action: str,
     actor: str = "operator",
     reason: str = "manual_preset_lifecycle_action",
+    lineage_evidence_pack_id: str | None = None,
+    lineage_evidence_retention_expires_at: datetime | None = None,
+    lineage_evidence_summary: str | None = None,
   ) -> ExperimentPreset:
     return commands.apply_preset_lifecycle_action(
       self,
@@ -149,6 +152,9 @@ class StrategyCatalogFlow:
       action=action,
       actor=actor,
       reason=reason,
+      lineage_evidence_pack_id=lineage_evidence_pack_id,
+      lineage_evidence_retention_expires_at=lineage_evidence_retention_expires_at,
+      lineage_evidence_summary=lineage_evidence_summary,
     )
 
   def validate_preset_strategy(self, *, strategy_id: str | None) -> None:

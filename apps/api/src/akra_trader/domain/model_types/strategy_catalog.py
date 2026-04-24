@@ -113,6 +113,9 @@ class ExperimentPreset:
     occurred_at: datetime
     from_stage: str | None = None
     to_stage: str = "draft"
+    lineage_evidence_pack_id: str | None = None
+    lineage_evidence_retention_expires_at: datetime | None = None
+    lineage_evidence_summary: str | None = None
 
   @dataclass(frozen=True)
   class Lifecycle:

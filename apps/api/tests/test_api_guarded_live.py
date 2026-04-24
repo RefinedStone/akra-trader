@@ -428,7 +428,13 @@ def test_guarded_live_incident_endpoints_acknowledge_and_escalate(tmp_path: Path
 
     escalated = client.post(
       f"/api/guarded-live/incidents/{incident['event_id']}/escalate",
-      json={"actor": "operator", "reason": "manager_page"},
+      json={
+        "actor": "operator",
+        "reason": "manager_page",
+        "lineage_evidence_pack_id": "operator-lineage-drill-pack:incident",
+        "lineage_evidence_retention_expires_at": "2025-12-28T00:00:00Z",
+        "lineage_evidence_summary": "unresolved / escalated; 1 lineage snapshot(s); 1 ingestion job(s)",
+      },
     )
     assert escalated.status_code == 200
     escalated_incident = next(
@@ -439,6 +445,12 @@ def test_guarded_live_incident_endpoints_acknowledge_and_escalate(tmp_path: Path
     assert escalated_incident["escalation_level"] == 1
     assert escalated_incident["last_escalated_by"] == "operator"
     assert escalated_incident["escalation_reason"] == "manager_page"
+    assert escalated_incident["lineage_evidence_pack_id"] == "operator-lineage-drill-pack:incident"
+    assert escalated_incident["lineage_evidence_retention_expires_at"] == "2025-12-28T00:00:00Z"
+    assert (
+      escalated_incident["lineage_evidence_summary"]
+      == "unresolved / escalated; 1 lineage snapshot(s); 1 ingestion job(s)"
+    )
     escalation_delivery = next(
       record
       for record in escalated.json()["delivery_history"]
@@ -2645,5 +2657,4 @@ def test_operator_visibility_endpoint_splits_depth_ladder_and_candle_sequence_in
     assert "binance kline open 2025-01-03T19:26:00+00:00 is not aligned to the 5m timeframe boundary." in candle_sequence_incident["detail"]
     assert "binance kline close 2025-01-03T19:29:00+00:00 does not match the expected 5m boundary close 2025-01-03T19:31:00+00:00." in candle_sequence_incident["detail"]
     assert "binance closed kline event arrived at 2025-01-03T19:28:00+00:00 before the candle close 2025-01-03T19:29:00+00:00." in candle_sequence_incident["detail"]
-
 

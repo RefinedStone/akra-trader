@@ -199,4 +199,9 @@ def _build_preset_revision(
 def _serialize_preset_lifecycle_event(event: ExperimentPreset.LifecycleEvent) -> dict[str, Any]:
   payload = asdict(event)
   payload["occurred_at"] = event.occurred_at.isoformat()
+  payload["lineage_evidence_retention_expires_at"] = (
+    event.lineage_evidence_retention_expires_at.isoformat()
+    if event.lineage_evidence_retention_expires_at is not None
+    else None
+  )
   return payload

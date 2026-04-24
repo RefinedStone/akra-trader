@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import replace
+from datetime import datetime
 from typing import Any
 from typing import Iterable
 
@@ -298,6 +299,9 @@ def apply_preset_lifecycle_action(
   action: str,
   actor: str = "operator",
   reason: str = "manual_preset_lifecycle_action",
+  lineage_evidence_pack_id: str | None = None,
+  lineage_evidence_retention_expires_at: datetime | None = None,
+  lineage_evidence_summary: str | None = None,
 ) -> ExperimentPreset:
   normalized_preset_id = _normalize_experiment_identifier(preset_id)
   if normalized_preset_id is None:
@@ -331,6 +335,17 @@ def apply_preset_lifecycle_action(
           occurred_at=current_time,
           from_stage=current_stage,
           to_stage=target_stage,
+          lineage_evidence_pack_id=(
+            lineage_evidence_pack_id.strip()
+            if isinstance(lineage_evidence_pack_id, str) and lineage_evidence_pack_id.strip()
+            else None
+          ),
+          lineage_evidence_retention_expires_at=lineage_evidence_retention_expires_at,
+          lineage_evidence_summary=(
+            lineage_evidence_summary.strip()
+            if isinstance(lineage_evidence_summary, str) and lineage_evidence_summary.strip()
+            else None
+          ),
         ),
       ),
     ),

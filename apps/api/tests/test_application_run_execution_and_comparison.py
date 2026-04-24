@@ -345,6 +345,9 @@ def test_preset_lifecycle_actions_are_durable(tmp_path: Path) -> None:
     action="promote",
     actor="operator",
     reason="benchmark_candidate_ready",
+    lineage_evidence_pack_id="operator-lineage-drill-pack:promotion",
+    lineage_evidence_retention_expires_at=datetime(2025, 12, 28, tzinfo=UTC),
+    lineage_evidence_summary="exact-match / accepted; 1 lineage snapshot(s); 1 ingestion job(s)",
   )
   archived = app.apply_preset_lifecycle_action(
     preset_id="core_5m",
@@ -361,6 +364,12 @@ def test_preset_lifecycle_actions_are_durable(tmp_path: Path) -> None:
   reloaded = build_preset_catalog(tmp_path).get_preset("core_5m")
 
   assert promoted.lifecycle.stage == "benchmark_candidate"
+  assert promoted.lifecycle.history[-1].lineage_evidence_pack_id == "operator-lineage-drill-pack:promotion"
+  assert promoted.lifecycle.history[-1].lineage_evidence_retention_expires_at == datetime(2025, 12, 28, tzinfo=UTC)
+  assert (
+    promoted.lifecycle.history[-1].lineage_evidence_summary
+    == "exact-match / accepted; 1 lineage snapshot(s); 1 ingestion job(s)"
+  )
   assert archived.lifecycle.stage == "archived"
   assert restored.lifecycle.stage == "draft"
   assert reloaded is not None
@@ -372,6 +381,17 @@ def test_preset_lifecycle_actions_are_durable(tmp_path: Path) -> None:
     "archive",
     "restore",
   ]
+  assert reloaded.lifecycle.history[1].lineage_evidence_pack_id == "operator-lineage-drill-pack:promotion"
+  assert reloaded.lifecycle.history[1].lineage_evidence_retention_expires_at == datetime(
+    2025,
+    12,
+    28,
+    tzinfo=UTC,
+  )
+  assert (
+    reloaded.lifecycle.history[1].lineage_evidence_summary
+    == "exact-match / accepted; 1 lineage snapshot(s); 1 ingestion job(s)"
+  )
 
 def test_preset_update_creates_durable_revision_entries(tmp_path: Path) -> None:
   presets = build_preset_catalog(tmp_path)

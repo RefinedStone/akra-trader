@@ -41,7 +41,8 @@ creation.
 
 - product-native integration of documented operator-facing lineage interpretation and action
   guidance when rerun guarantees cannot be made
-- escalation support for exported lineage-history and ingestion-job drill evidence packs
+- first-class promotion-review and provider escalation artifacts that build on baseline
+  lineage-history and ingestion-job drill evidence pack links
 - tighter integration between data-boundary health and runtime/operator runbooks
 
 ## Track B: Experiment OS And Persistence

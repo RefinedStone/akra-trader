@@ -51,7 +51,8 @@ What is still not complete:
 - secret rotation and credential-governance procedures
 - venue-specific live drills beyond the current guarded-live baseline
 - evidence that every runbook step is fully represented by product UX without fallback shell work
-- escalation workflow linkages for lineage drill evidence packs
+- first-class promotion-review artifacts and provider-owned escalation automation for linked
+  lineage drill evidence packs
 
 ## Related Docs
 

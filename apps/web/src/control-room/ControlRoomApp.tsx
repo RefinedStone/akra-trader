@@ -385,6 +385,7 @@ import type {
   MarketDataStatus,
   OperatorAlertMarketContextProvenance,
   OperatorAlertPrimaryFocus,
+  OperatorLineageDrillEvidencePack,
   OperatorVisibility,
   PendingTouchGapWindowSweepState,
   PresetDraftConflict,
@@ -8132,6 +8133,77 @@ export default function App() {
     }
   }
 
+  function resolveLineageEvidenceFinalPosture(validationClaim?: string | null) {
+    if (validationClaim === "exact_dataset" || validationClaim === "checkpoint_window") {
+      return "exact-match";
+    }
+    return validationClaim ? "drift-aware" : "unresolved";
+  }
+
+  function buildLineageEvidencePackLinkSummary(pack: OperatorLineageDrillEvidencePack) {
+    return [
+      `${pack.final_posture} / ${pack.operator_decision}`,
+      `${pack.lineage_history_count} lineage snapshot(s)`,
+      `${pack.ingestion_job_count} ingestion job(s)`,
+    ].join("; ");
+  }
+
+  async function createFocusedLineageEvidencePackForWorkflow({
+    scenarioKey,
+    scenarioLabel,
+    operatorDecision,
+    finalPosture,
+    incidentId = null,
+    venue,
+    symbol,
+    timeframe,
+    syncStatus,
+    validationClaim,
+  }: {
+    scenarioKey: string;
+    scenarioLabel: string;
+    operatorDecision: string;
+    finalPosture: string;
+    incidentId?: string | null;
+    venue?: string | null;
+    symbol?: string | null;
+    timeframe?: string | null;
+    syncStatus?: string | null;
+    validationClaim?: string | null;
+  }) {
+    const resolvedSymbol = symbol ?? (
+      activeMarketInstrument ? resolveMarketDataSymbol(activeMarketInstrument.instrument_id) : null
+    );
+    const resolvedTimeframe = timeframe ?? activeMarketInstrument?.timeframe ?? null;
+    if (!resolvedSymbol || !resolvedTimeframe) {
+      return null;
+    }
+    const pack = await exportMarketDataLineageDrillEvidencePack({
+      format: "json",
+      scenario_key: scenarioKey,
+      scenario_label: scenarioLabel,
+      incident_id: incidentId,
+      operator_decision: operatorDecision,
+      final_posture: finalPosture,
+      venue: venue ?? marketStatus?.venue ?? null,
+      symbol: resolvedSymbol,
+      timeframe: resolvedTimeframe,
+      sync_status: syncStatus ?? activeMarketInstrument?.sync_status ?? null,
+      validation_claim: validationClaim ?? null,
+      generated_by: comparisonHistoryTabIdentity.label,
+      lineage_history_limit: 100,
+      ingestion_job_limit: 100,
+    });
+    return {
+      pack,
+      link: {
+        lineage_evidence_pack_id: pack.pack_id,
+        lineage_evidence_retention_expires_at: pack.retention_expires_at,
+        lineage_evidence_summary: buildLineageEvidencePackLinkSummary(pack),
+      },
+    };
+  }
+
   async function copyFocusedMarketWorkflowExport() {
     if (!activeMarketInstrument || !focusedMarketWorkflowExportPayload || !focusedMarketWorkflowSummary) {
       setMarketDataWorkflowExportFeedback("Select a triage focus before exporting provider provenance.");
@@ -8145,31 +8217,25 @@ export default function App() {
       const exportedAt = new Date().toISOString();
       const symbol = resolveMarketDataSymbol(activeMarketInstrument.instrument_id);
       const latestClaim = focusedMarketWorkflowSummary.latestLineage?.validation_claim;
-      const finalPosture =
-        latestClaim === "exact_dataset" || latestClaim === "checkpoint_window"
-          ? "exact-match"
-          : latestClaim
-            ? "drift-aware"
-            : "unresolved";
-      const lineageEvidencePack = await exportMarketDataLineageDrillEvidencePack({
-        format: "json",
-        scenario_key: "focused_market_data_triage",
-        scenario_label: "Focused market-data triage",
-        operator_decision: focusedMarketWorkflowSummary.failedJobCount ? "reviewed" : "accepted",
-        final_posture: finalPosture,
+      const lineageEvidence = await createFocusedLineageEvidencePackForWorkflow({
+        scenarioKey: "focused_market_data_triage",
+        scenarioLabel: "Focused market-data triage",
+        operatorDecision: focusedMarketWorkflowSummary.failedJobCount ? "reviewed" : "accepted",
+        finalPosture: resolveLineageEvidenceFinalPosture(latestClaim),
         venue: focusedMarketWorkflowExportPayload.focus.venue,
         symbol,
         timeframe: activeMarketInstrument.timeframe,
-        sync_status: activeMarketInstrument.sync_status,
-        validation_claim: latestClaim ?? null,
-        generated_by: comparisonHistoryTabIdentity.label,
-        lineage_history_limit: 100,
-        ingestion_job_limit: 100,
+        syncStatus: activeMarketInstrument.sync_status,
+        validationClaim: latestClaim ?? null,
       });
+      if (!lineageEvidence) {
+        setMarketDataWorkflowExportFeedback("Select a triage focus before exporting lineage evidence.");
+        return;
+      }
       const content = JSON.stringify(
         {
           exported_at: exportedAt,
-          lineage_drill_evidence_pack: lineageEvidencePack,
+          lineage_drill_evidence_pack: lineageEvidence.pack,
           ...focusedMarketWorkflowExportPayload,
         },
         null,
@@ -8211,11 +8277,11 @@ export default function App() {
         ].slice(0, 12));
         setSharedProviderProvenanceExportsError(null);
         setMarketDataWorkflowExportFeedback(
-          `Copied lineage drill pack ${shortenIdentifier(lineageEvidencePack.pack_id, 10)} for ${focusedMarketWorkflowSummary.focusLabel} and added shared registry entry ${shortenIdentifier(sharedEntry.job_id, 10)}.`,
+          `Copied lineage drill pack ${shortenIdentifier(lineageEvidence.pack.pack_id, 10)} for ${focusedMarketWorkflowSummary.focusLabel} and added shared registry entry ${shortenIdentifier(sharedEntry.job_id, 10)}.`,
         );
       } catch (error) {
         setMarketDataWorkflowExportFeedback(
-          `Copied lineage drill pack ${shortenIdentifier(lineageEvidencePack.pack_id, 10)} for ${focusedMarketWorkflowSummary.focusLabel}, but shared registry save failed: ${(error as Error).message}`,
+          `Copied lineage drill pack ${shortenIdentifier(lineageEvidence.pack.pack_id, 10)} for ${focusedMarketWorkflowSummary.focusLabel}, but shared registry save failed: ${(error as Error).message}`,
         );
       }
     } catch {
@@ -8374,15 +8440,33 @@ export default function App() {
   async function applyPresetLifecycleAction(presetId: string, action: "promote" | "archive" | "restore") {
     setStatusText(`Applying preset lifecycle action ${action} to ${presetId}...`);
     try {
+      const latestClaim = focusedMarketWorkflowSummary?.latestLineage?.validation_claim;
+      const lineageEvidence = action === "promote"
+        ? await createFocusedLineageEvidencePackForWorkflow({
+            scenarioKey: "preset_promotion_review",
+            scenarioLabel: "Preset promotion review",
+            operatorDecision: "accepted",
+            finalPosture: resolveLineageEvidenceFinalPosture(latestClaim),
+            validationClaim: latestClaim ?? null,
+          })
+        : null;
       await fetchJson<ExperimentPreset>(`/presets/${encodeURIComponent(presetId)}/lifecycle`, {
         method: "POST",
         body: JSON.stringify({
           action,
           actor: "operator",
           reason: `preset_${action}`,
+          ...(lineageEvidence?.link ?? {}),
         }),
       });
       await loadAll();
+      if (lineageEvidence) {
+        setStatusText(
+          `Preset ${presetId} ${action} linked to lineage drill pack ${shortenIdentifier(lineageEvidence.pack.pack_id, 10)}.`,
+        );
+      } else {
+        setStatusText(`Preset ${presetId} ${action} applied.`);
+      }
     } catch (error) {
       setStatusText(`Preset lifecycle action failed: ${(error as Error).message}`);
     }
@@ -8754,12 +8838,39 @@ export default function App() {
     const reason = resolveGuardedLiveReason("incident_escalated");
     setStatusText(`Escalating guarded-live incident ${eventId}...`);
     try {
+      const incident =
+        operatorVisibility?.incident_events.find((event) => event.event_id === eventId)
+        ?? guardedLive?.incident_events.find((event) => event.event_id === eventId);
+      const incidentSymbol =
+        incident?.symbol
+        ?? incident?.primary_focus?.symbol
+        ?? incident?.symbols?.[0]
+        ?? null;
+      const incidentTimeframe = incident?.timeframe ?? incident?.primary_focus?.timeframe ?? null;
+      const lineageEvidence = await createFocusedLineageEvidencePackForWorkflow({
+        scenarioKey: "guarded_live_incident_escalation",
+        scenarioLabel: "Guarded-live incident escalation",
+        incidentId: eventId,
+        operatorDecision: "escalated",
+        finalPosture: "unresolved",
+        symbol: incidentSymbol,
+        timeframe: incidentTimeframe,
+        validationClaim: null,
+      });
       await fetchJson<GuardedLiveStatus>(`/guarded-live/incidents/${encodeURIComponent(eventId)}/escalate`, {
         method: "POST",
-        body: JSON.stringify({ actor: "operator", reason }),
+        body: JSON.stringify({
+          actor: "operator",
+          reason,
+          ...(lineageEvidence?.link ?? {}),
+        }),
       });
       await loadAll();
-      setStatusText(`Guarded-live incident ${eventId} escalated.`);
+      setStatusText(
+        lineageEvidence
+          ? `Guarded-live incident ${eventId} escalated with lineage drill pack ${shortenIdentifier(lineageEvidence.pack.pack_id, 10)}.`
+          : `Guarded-live incident ${eventId} escalated.`,
+      );
     } catch (error) {
       setStatusText(`Incident escalation failed: ${(error as Error).message}`);
     }

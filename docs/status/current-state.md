@@ -554,13 +554,16 @@ It is not yet a finished live trading product:
 - market-data lineage drill evidence export now creates product-native evidence packs with
   operator decision metadata, captured lineage and ingestion records, rendered content, and the
   180-day pack retention horizon
+- preset promotion and guarded-live incident escalation actions now deep-link product-native
+  lineage drill evidence packs by storing the pack ID, retention expiry, and summary posture on the
+  durable workflow record
 
 ## Partial Or Fragile Areas
 
 - data-boundary contracts, rerun validation categories, lineage mismatch summaries, normalized
   lineage or ingestion history surfaces, operator guidance, and product TTL floor enforcement are
-  in place, but drill evidence packs still need deeper links into promotion and escalation
-  workflows
+  in place; drill evidence packs now have baseline promotion and escalation links, but broader
+  promotion-review artifacts and provider-owned escalation automation are still shallow
 - custom strategy registration exists, but registration metadata is still process-local rather than a
   durable strategy registry
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
@@ -601,8 +604,8 @@ It is not yet a finished live trading product:
 
 1. Finish Batch 1 by delivering durable strategy lifecycle, normalized experiment summaries, and
    artifact/export registry paths.
-2. Productize operator-facing lineage health by linking exported drill evidence and lineage posture
-   more directly into runtime, escalation, and promotion workflows.
+2. Productize operator-facing lineage health beyond the baseline drill-evidence links by making
+   promotion-review artifacts and provider escalation ownership first-class.
 3. Productize the control room around active-session operations, clearer operator workflows, and
    decomposed UI surfaces.
 4. Complete guarded-live safety around fuller venue lifecycle handling, validated drills, and

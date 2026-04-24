@@ -1673,6 +1673,11 @@ def execute_standalone_surface_binding(
       action=resolved_payload["action"],
       actor=resolved_payload.get("actor", "operator"),
       reason=resolved_payload.get("reason", "manual_preset_lifecycle_action"),
+      lineage_evidence_pack_id=resolved_payload.get("lineage_evidence_pack_id"),
+      lineage_evidence_retention_expires_at=resolved_payload.get(
+        "lineage_evidence_retention_expires_at"
+      ),
+      lineage_evidence_summary=resolved_payload.get("lineage_evidence_summary"),
     )
     return serialize_preset(preset)
   if binding.binding_kind == "strategy_catalog_register":
@@ -1864,6 +1869,11 @@ def execute_standalone_surface_binding(
         event_id=resolved_path_params["event_id"],
         actor=resolved_payload["actor"],
         reason=resolved_payload["reason"],
+        lineage_evidence_pack_id=resolved_payload.get("lineage_evidence_pack_id"),
+        lineage_evidence_retention_expires_at=resolved_payload.get(
+          "lineage_evidence_retention_expires_at"
+        ),
+        lineage_evidence_summary=resolved_payload.get("lineage_evidence_summary"),
       )
     )
   if binding.binding_kind == "guarded_live_resume":

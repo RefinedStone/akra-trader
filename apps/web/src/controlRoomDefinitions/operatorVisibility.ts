@@ -77,6 +77,9 @@ export type OperatorVisibility = {
     last_escalated_at?: string | null;
     last_escalated_by?: string | null;
     escalation_reason?: string | null;
+    lineage_evidence_pack_id?: string | null;
+    lineage_evidence_retention_expires_at?: string | null;
+    lineage_evidence_summary?: string | null;
     next_escalation_at?: string | null;
     external_provider?: string | null;
     external_reference?: string | null;
@@ -1102,6 +1105,9 @@ export type GuardedLiveStatus = {
     last_escalated_at?: string | null;
     last_escalated_by?: string | null;
     escalation_reason?: string | null;
+    lineage_evidence_pack_id?: string | null;
+    lineage_evidence_retention_expires_at?: string | null;
+    lineage_evidence_summary?: string | null;
     next_escalation_at?: string | null;
     external_provider?: string | null;
     external_reference?: string | null;

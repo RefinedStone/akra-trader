@@ -259,6 +259,9 @@ def _escalate_incident_event(
   actor: str,
   reason: str,
   trigger: str,
+  lineage_evidence_pack_id: str | None = None,
+  lineage_evidence_retention_expires_at: datetime | None = None,
+  lineage_evidence_summary: str | None = None,
 ) -> tuple[OperatorIncidentEvent, tuple[OperatorIncidentDelivery, ...], OperatorAuditEvent]:
   escalation_targets = incident.escalation_targets or incident.delivery_targets
   if not escalation_targets:
@@ -287,6 +290,21 @@ def _escalate_incident_event(
     last_escalated_at=current_time,
     last_escalated_by=actor,
     escalation_reason=reason,
+    lineage_evidence_pack_id=(
+      lineage_evidence_pack_id.strip()
+      if isinstance(lineage_evidence_pack_id, str) and lineage_evidence_pack_id.strip()
+      else incident.lineage_evidence_pack_id
+    ),
+    lineage_evidence_retention_expires_at=(
+      lineage_evidence_retention_expires_at
+      if lineage_evidence_retention_expires_at is not None
+      else incident.lineage_evidence_retention_expires_at
+    ),
+    lineage_evidence_summary=(
+      lineage_evidence_summary.strip()
+      if isinstance(lineage_evidence_summary, str) and lineage_evidence_summary.strip()
+      else incident.lineage_evidence_summary
+    ),
     next_escalation_at=next_escalation_at,
   )
   escalation_deliveries = app._operator_alert_delivery.deliver(
@@ -317,6 +335,7 @@ def _escalate_incident_event(
     detail=(
       f"Trigger: {trigger}. Reason: {reason}. Escalation level {next_level} "
       f"sent via {', '.join(escalation_targets)}. "
+      f"{_format_lineage_evidence_pack_audit_detail(updated_incident)}"
       f"Provider workflow: {updated_incident.provider_workflow_state}."
     ),
     run_id=incident.run_id,
@@ -325,3 +344,21 @@ def _escalate_incident_event(
   )
   return updated_incident, updated_delivery_history, audit_event
 
+
+def _format_lineage_evidence_pack_audit_detail(incident: OperatorIncidentEvent) -> str:
+  if not incident.lineage_evidence_pack_id:
+    return ""
+  retention = (
+    incident.lineage_evidence_retention_expires_at.isoformat()
+    if incident.lineage_evidence_retention_expires_at is not None
+    else "unknown"
+  )
+  summary = (
+    f" Summary: {incident.lineage_evidence_summary}."
+    if incident.lineage_evidence_summary
+    else ""
+  )
+  return (
+    f"Lineage evidence pack {incident.lineage_evidence_pack_id} "
+    f"retained until {retention}.{summary} "
+  )

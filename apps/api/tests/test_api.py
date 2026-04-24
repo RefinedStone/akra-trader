@@ -2864,7 +2864,14 @@ def test_preset_lifecycle_action_endpoint_updates_stage(tmp_path: Path) -> None:
 
   promoted = client.post(
     "/api/presets/core_5m/lifecycle",
-    json={"action": "promote", "actor": "operator", "reason": "benchmark_candidate_ready"},
+    json={
+      "action": "promote",
+      "actor": "operator",
+      "reason": "benchmark_candidate_ready",
+      "lineage_evidence_pack_id": "operator-lineage-drill-pack:promotion",
+      "lineage_evidence_retention_expires_at": "2025-12-28T00:00:00Z",
+      "lineage_evidence_summary": "exact-match / accepted; 1 lineage snapshot(s); 1 ingestion job(s)",
+    },
   )
   archived = client.post(
     "/api/presets/core_5m/lifecycle",
@@ -2873,6 +2880,13 @@ def test_preset_lifecycle_action_endpoint_updates_stage(tmp_path: Path) -> None:
 
   assert promoted.status_code == 200
   assert promoted.json()["lifecycle"]["stage"] == "benchmark_candidate"
+  promoted_event = promoted.json()["lifecycle"]["history"][-1]
+  assert promoted_event["lineage_evidence_pack_id"] == "operator-lineage-drill-pack:promotion"
+  assert promoted_event["lineage_evidence_retention_expires_at"] == "2025-12-28T00:00:00+00:00"
+  assert (
+    promoted_event["lineage_evidence_summary"]
+    == "exact-match / accepted; 1 lineage snapshot(s); 1 ingestion job(s)"
+  )
   assert archived.status_code == 200
   assert archived.json()["lifecycle"]["stage"] == "archived"
   assert [event["action"] for event in archived.json()["lifecycle"]["history"]] == [

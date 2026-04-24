@@ -968,12 +968,18 @@ class TradingApplication(
     action: str,
     actor: str = "operator",
     reason: str = "manual_preset_lifecycle_action",
+    lineage_evidence_pack_id: str | None = None,
+    lineage_evidence_retention_expires_at: datetime | None = None,
+    lineage_evidence_summary: str | None = None,
   ) -> ExperimentPreset:
     return self._strategy_catalog_flow.apply_preset_lifecycle_action(
       preset_id=preset_id,
       action=action,
       actor=actor,
       reason=reason,
+      lineage_evidence_pack_id=lineage_evidence_pack_id,
+      lineage_evidence_retention_expires_at=lineage_evidence_retention_expires_at,
+      lineage_evidence_summary=lineage_evidence_summary,
     )
 
   def _get_preset_or_raise(self, preset_id: str) -> ExperimentPreset:
@@ -4915,6 +4921,9 @@ class TradingApplication(
     actor: str,
     reason: str,
     trigger: str,
+    lineage_evidence_pack_id: str | None = None,
+    lineage_evidence_retention_expires_at: datetime | None = None,
+    lineage_evidence_summary: str | None = None,
   ) -> tuple[OperatorIncidentEvent, tuple[OperatorIncidentDelivery, ...], OperatorAuditEvent]:
     return guarded_live_incident_workflow_orchestration_support._escalate_incident_event(
       self,
@@ -4924,6 +4933,9 @@ class TradingApplication(
       actor=actor,
       reason=reason,
       trigger=trigger,
+      lineage_evidence_pack_id=lineage_evidence_pack_id,
+      lineage_evidence_retention_expires_at=lineage_evidence_retention_expires_at,
+      lineage_evidence_summary=lineage_evidence_summary,
     )
 
   def _resolve_incident_escalation_backoff_seconds(self, escalation_level: int) -> int:

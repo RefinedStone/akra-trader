@@ -35,8 +35,8 @@ Completed baseline now in place:
 Status:
 
 - materially complete
-- remaining work is now drill-evidence export and escalation workflow integration on top of the
-  documented and TTL-enforced operator lineage retention policy
+- remaining work is now deeper promotion-review artifact modeling and provider-owned escalation
+  automation on top of the documented, TTL-enforced, and workflow-linked lineage evidence baseline
 
 Target window:
 
@@ -51,7 +51,8 @@ Detailed work:
 
 - integrate the documented lineage mismatch interpretation and escalation rules into product
   workflows
-- link exported drill evidence packs into promotion and escalation workflows
+- extend exported drill evidence pack links beyond baseline promotion and escalation records into
+  first-class review and provider ownership artifacts
 - keep product language tight around exact-match claims versus drift-aware replay paths
 
 Acceptance criteria:
@@ -72,6 +73,8 @@ Completed baseline now in place:
 - product TTL controls that clamp requested lineage-history and ingestion-job pruning to operator
   retention floors
 - product-native drill evidence pack export for lineage-history and ingestion-job review
+- promotion lifecycle events and guarded-live incident escalations now store drill evidence pack
+  ID, retention expiry, and summary posture links
 
 ## Wave 2: Durable Strategy Registry And Experiment OS Completion
 

@@ -58,6 +58,9 @@ class ExperimentPresetLifecycleActionRequest(BaseModel):
   action: str
   actor: str = "operator"
   reason: str = "manual_preset_lifecycle_action"
+  lineage_evidence_pack_id: str | None = None
+  lineage_evidence_retention_expires_at: datetime | None = None
+  lineage_evidence_summary: str | None = None
 
 
 class ExperimentPresetUpdateRequest(BaseModel):
@@ -124,6 +127,9 @@ class LiveRunRequest(BaseModel):
 class GuardedLiveActionRequest(BaseModel):
   actor: str = "operator"
   reason: str = "manual_operator_action"
+  lineage_evidence_pack_id: str | None = None
+  lineage_evidence_retention_expires_at: datetime | None = None
+  lineage_evidence_summary: str | None = None
 
 
 class GuardedLiveOrderReplaceRequest(GuardedLiveActionRequest):
