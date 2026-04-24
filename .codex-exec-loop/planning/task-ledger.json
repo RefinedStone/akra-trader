@@ -2525,31 +2525,31 @@
       "id": "task-data-trust-lineage-retention-ttl-enforcement",
       "direction_id": "data-trust-and-lineage",
       "title": "Enforce operator lineage evidence retention floors with product TTL controls",
-      "description": "Implement product-side TTL enforcement and operator-visible expiry handling for lineage-history, ingestion-job review, and drill-evidence records so the documented retention floors in the new operator lineage guidance stop depending on manual cleanup discipline alone.",
-      "status": "ready",
+      "description": "Completed the lineage retention enforcement pass by adding operator lineage retention floor policy/results models, clamping lineage-history and ingestion-job TTL pruning to product floors, exposing `/api/market-data/lineage-evidence/retention/prune`, and wiring Binance plus seeded/test adapters through the TTL delete path so operator evidence retention no longer depends on manual cleanup discipline.",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 19,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T12:45:00+09:00",
+      "updated_at": "2026-04-24T13:10:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply explicitly says the documentation task is complete and names automatic TTL enforcement as the first remaining product follow-up; the roadmap and current-state docs already call retention enforcement the next missing piece on top of the documented lineage policy.",
-      "priority_reason": "Promoted to `ready` because builtin next-task needs one executable successor, the previous queue head is now complete, and automatic TTL enforcement is the first concrete follow-up listed by the main session before evidence export or broader runtime/promotion gating."
+      "direction_relation_note": "The latest main-session reply confirms commit `a089fec` pushed the TTL-floor enforcement across API, adapters, web types, and roadmap/status surfaces, and explicitly says the remaining gaps moved to product-native drill evidence export plus tighter runtime/promotion posture wiring.",
+      "priority_reason": "Marked `done` because the queued retention-floor enforcement landed, `compileall`, `git diff --check`, `git diff --cached --check`, `npm --prefix apps/web run typecheck`, and the full API suite (`504 passed, 3 warnings`) all passed, and the result was committed and pushed to `main`."
     },
     {
       "id": "task-data-trust-lineage-drill-evidence-export-productization",
       "direction_id": "data-trust-and-lineage",
       "title": "Add product-native export for operator lineage drill evidence packs",
       "description": "Build a product-native evidence export path that packages lineage posture, ingestion review artifacts, escalation context, and drill validation records into operator-ready drill packs instead of relying on manual runbook assembly.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 77,
       "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T12:46:00+09:00",
+      "updated_at": "2026-04-24T13:11:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply lists product-native drill evidence export as a remaining product task after the guidance pack completed, and the roadmap/runbook surfaces already frame evidence-pack export as an explicit missing enforcement layer.",
-      "priority_reason": "Kept `proposed` because the follow-up is concrete but builtin next-task only needs one immediate executable successor, and automatic TTL enforcement should land first so exported evidence packs inherit enforced retention semantics instead of another manual policy surface."
+      "direction_relation_note": "The latest main-session reply says TTL floor enforcement is complete and explicitly leaves product-native drill evidence export as the first remaining work item, with roadmap/status already updated to 'TTL floor enforcement complete, drill evidence export remaining'.",
+      "priority_reason": "Promoted to `ready` because builtin next-task needs one executable successor, the prior queue head is now complete, and drill evidence export is the first concrete follow-up the main session listed after landing retention-floor enforcement."
     },
     {
       "id": "task-data-trust-lineage-posture-runtime-promotion-enforcement",
@@ -2561,10 +2561,10 @@
       "dynamic_priority_delta": 17,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-24T12:47:00+09:00",
+      "updated_at": "2026-04-24T13:12:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "The latest main-session reply identifies runtime/promotion workflow enforcement as the remaining policy-to-product gap after the operator guidance pack, and `docs/status/current-state.md` already calls for linking lineage posture more directly into runtime and promotion paths.",
-      "priority_reason": "Kept `proposed` because it is executable but broader than the immediate TTL control pass, and the main session listed it after retention enforcement and evidence export rather than as the single next queue head."
+      "direction_relation_note": "The latest main-session reply still identifies runtime/promotion workflow enforcement as a remaining policy-to-product gap, but it now frames that work as the second follow-up after drill evidence export rather than the immediate next queue head.",
+      "priority_reason": "Kept `proposed` because it remains executable but broader than the export pass, and the latest main-session reply explicitly orders it after product-native drill evidence export."
     },
     {
       "id": "task-llm-sensitivity-application-residual-bounded-flow-decomposition",
