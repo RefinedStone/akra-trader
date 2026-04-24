@@ -15,9 +15,9 @@ export function RuntimeProviderProvenanceFocusedExportSection({ model }: { model
           <div className="market-data-provenance-copy">
             <strong>Filtered provider readback incidents</strong>
             <p>
-              Export the incidents whose selected market context came back from a provider-native
-              field path. Filters stay local to this browser, while copied exports also land in
-              the shared registry.
+              Export a product lineage drill pack with the focused lineage, ingestion, and
+              provider-readback evidence. Filters stay local to this browser, while copied
+              exports also land in the shared registry.
             </p>
           </div>
           <div className="run-filter-workbench-actions">
@@ -28,7 +28,7 @@ export function RuntimeProviderProvenanceFocusedExportSection({ model }: { model
               }}
               type="button"
             >
-              Copy filtered export
+              Copy drill pack
             </button>
             <button
               className="ghost-button"

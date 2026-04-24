@@ -20,8 +20,8 @@ What is already materially present:
 
 What still defines the roadmap:
 
-- product-native drill evidence and escalation workflow integration on top of documented and
-  TTL-enforced operator lineage retention
+- escalation workflow integration on top of documented lineage guidance, TTL-enforced retention,
+  and product-native drill evidence exports
 - durable strategy registry and promotion workflow
 - normalized experiment query, artifact, and export posture
 - control-room productization and operator workflow clarity

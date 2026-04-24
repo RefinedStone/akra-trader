@@ -203,6 +203,31 @@ class MarketDataLineageEvidenceRetentionPruneRequest(BaseModel):
   protected_job_ids: list[str] = Field(default_factory=list)
 
 
+class MarketDataLineageDrillEvidencePackExportRequest(BaseModel):
+  format: str = "json"
+  scenario_key: str | None = None
+  scenario_label: str | None = None
+  incident_id: str | None = None
+  operator_decision: str = "reviewed"
+  final_posture: str = "unresolved"
+  venue: str | None = None
+  symbol: str | None = None
+  timeframe: str | None = None
+  sync_status: str | None = None
+  validation_claim: str | None = None
+  operation: str | None = None
+  status: str | None = None
+  source_run_id: str | None = None
+  rerun_id: str | None = None
+  dataset_identity: str | None = None
+  sync_checkpoint_id: str | None = None
+  rerun_boundary_id: str | None = None
+  rerun_validation_category: str | None = None
+  generated_by: str = "operator"
+  lineage_history_limit: int = Field(default=100, ge=1, le=500)
+  ingestion_job_limit: int = Field(default=100, ge=1, le=500)
+
+
 class OperatorProviderProvenanceExportJobCreateRequest(BaseModel):
   content: str
   requested_by_tab_id: str | None = None
@@ -1072,6 +1097,10 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_audit_export_job_create": (ReplayLinkAliasAuditExportJobCreateRequest, {}),
   "replay_link_audit_export_job_prune": (ReplayLinkAliasAuditExportJobPruneRequest, {}),
   "market_data_lineage_evidence_retention_prune": (MarketDataLineageEvidenceRetentionPruneRequest, {}),
+  "market_data_lineage_drill_evidence_pack_export": (
+    MarketDataLineageDrillEvidencePackExportRequest,
+    {},
+  ),
   "operator_provider_provenance_export_job_create": (OperatorProviderProvenanceExportJobCreateRequest, {}),
   "operator_provider_provenance_export_job_policy": (OperatorProviderProvenanceExportJobPolicyRequest, {}),
   "operator_provider_provenance_export_job_approval": (OperatorProviderProvenanceExportJobApprovalRequest, {}),

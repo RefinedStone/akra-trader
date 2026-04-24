@@ -125,6 +125,7 @@ import {
   listProviderProvenanceSchedulerStitchedReportGovernancePlans,
   rollbackProviderProvenanceSchedulerStitchedReportGovernancePlan,
   rollbackProviderProvenanceSchedulerNarrativeGovernancePlan,
+  exportMarketDataLineageDrillEvidencePack,
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
   listProviderProvenanceExportJobs,
@@ -8142,9 +8143,33 @@ export default function App() {
     }
     try {
       const exportedAt = new Date().toISOString();
+      const symbol = resolveMarketDataSymbol(activeMarketInstrument.instrument_id);
+      const latestClaim = focusedMarketWorkflowSummary.latestLineage?.validation_claim;
+      const finalPosture =
+        latestClaim === "exact_dataset" || latestClaim === "checkpoint_window"
+          ? "exact-match"
+          : latestClaim
+            ? "drift-aware"
+            : "unresolved";
+      const lineageEvidencePack = await exportMarketDataLineageDrillEvidencePack({
+        format: "json",
+        scenario_key: "focused_market_data_triage",
+        scenario_label: "Focused market-data triage",
+        operator_decision: focusedMarketWorkflowSummary.failedJobCount ? "reviewed" : "accepted",
+        final_posture: finalPosture,
+        venue: focusedMarketWorkflowExportPayload.focus.venue,
+        symbol,
+        timeframe: activeMarketInstrument.timeframe,
+        sync_status: activeMarketInstrument.sync_status,
+        validation_claim: latestClaim ?? null,
+        generated_by: comparisonHistoryTabIdentity.label,
+        lineage_history_limit: 100,
+        ingestion_job_limit: 100,
+      });
       const content = JSON.stringify(
         {
           exported_at: exportedAt,
+          lineage_drill_evidence_pack: lineageEvidencePack,
           ...focusedMarketWorkflowExportPayload,
         },
         null,
@@ -8158,7 +8183,7 @@ export default function App() {
         exported_at: exportedAt,
         focus_key: buildMarketDataInstrumentFocusKey(activeMarketInstrument),
         focus_label: focusedMarketWorkflowSummary.focusLabel,
-        symbol: resolveMarketDataSymbol(activeMarketInstrument.instrument_id),
+        symbol,
         timeframe: activeMarketInstrument.timeframe,
         provider: focusedMarketWorkflowExportPayload.focus.provider,
         venue: focusedMarketWorkflowExportPayload.focus.venue,
@@ -8186,15 +8211,15 @@ export default function App() {
         ].slice(0, 12));
         setSharedProviderProvenanceExportsError(null);
         setMarketDataWorkflowExportFeedback(
-          `Copied filtered triage export for ${focusedMarketWorkflowSummary.focusLabel} and added shared registry entry ${shortenIdentifier(sharedEntry.job_id, 10)}.`,
+          `Copied lineage drill pack ${shortenIdentifier(lineageEvidencePack.pack_id, 10)} for ${focusedMarketWorkflowSummary.focusLabel} and added shared registry entry ${shortenIdentifier(sharedEntry.job_id, 10)}.`,
         );
       } catch (error) {
         setMarketDataWorkflowExportFeedback(
-          `Copied filtered triage export for ${focusedMarketWorkflowSummary.focusLabel}, but shared registry save failed: ${(error as Error).message}`,
+          `Copied lineage drill pack ${shortenIdentifier(lineageEvidencePack.pack_id, 10)} for ${focusedMarketWorkflowSummary.focusLabel}, but shared registry save failed: ${(error as Error).message}`,
         );
       }
     } catch {
-      setMarketDataWorkflowExportFeedback("Clipboard copy failed for the triage export.");
+      setMarketDataWorkflowExportFeedback("Lineage drill evidence export failed for the triage focus.");
     }
   }
 

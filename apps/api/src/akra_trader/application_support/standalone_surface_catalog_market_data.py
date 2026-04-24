@@ -556,9 +556,20 @@ def build_market_data_runtime_bindings() -> tuple[StandaloneSurfaceRuntimeBindin
     methods=("POST",),
     request_payload_kind="market_data_lineage_evidence_retention_prune",
   )
+  market_data_lineage_drill_evidence_pack_export_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="market_data_lineage_drill_evidence_pack_export",
+    route_path="/market-data/lineage-evidence/drill-packs/export",
+    route_name="export_market_data_lineage_drill_evidence_pack",
+    response_title="Export market data lineage drill evidence pack",
+    scope="app",
+    binding_kind="market_data_lineage_drill_evidence_pack_export",
+    methods=("POST",),
+    request_payload_kind="market_data_lineage_drill_evidence_pack_export",
+  )
   return (
     market_data_status_binding,
     market_data_lineage_history_binding,
     market_data_ingestion_job_history_binding,
     market_data_lineage_evidence_retention_prune_binding,
+    market_data_lineage_drill_evidence_pack_export_binding,
   )

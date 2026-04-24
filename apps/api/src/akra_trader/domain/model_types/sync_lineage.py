@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import field
 from datetime import datetime
 
 @dataclass(frozen=True)
@@ -112,3 +113,34 @@ class OperatorLineageEvidenceRetentionResult:
   protected_ingestion_job_ids: tuple[str, ...] = ()
   deleted_lineage_history_count: int = 0
   deleted_ingestion_job_count: int = 0
+
+@dataclass(frozen=True)
+class OperatorLineageDrillEvidencePack:
+  pack_id: str
+  generated_at: datetime
+  generated_by: str
+  retention_policy: OperatorLineageEvidenceRetentionPolicy
+  retention_expires_at: datetime
+  export_format: str
+  scenario_key: str | None = None
+  scenario_label: str | None = None
+  incident_id: str | None = None
+  operator_decision: str = "reviewed"
+  final_posture: str = "unresolved"
+  venue: str | None = None
+  symbols: tuple[str, ...] = ()
+  timeframe: str | None = None
+  source_run_id: str | None = None
+  rerun_id: str | None = None
+  dataset_identity: str | None = None
+  sync_checkpoint_id: str | None = None
+  rerun_boundary_id: str | None = None
+  validation_claim: str | None = None
+  rerun_validation_category: str | None = None
+  lineage_history_filters: dict[str, object] = field(default_factory=dict)
+  ingestion_job_filters: dict[str, object] = field(default_factory=dict)
+  lineage_history_count: int = 0
+  ingestion_job_count: int = 0
+  lineage_history: tuple[MarketDataLineageHistoryRecord, ...] = ()
+  ingestion_jobs: tuple[MarketDataIngestionJobRecord, ...] = ()
+  content: str = ""

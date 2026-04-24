@@ -40,7 +40,7 @@ The main product gaps are no longer "does the feature exist" but rather:
 
 ### Still missing
 
-- product-native drill evidence and escalation workflow integration for operator lineage policy
+- escalation workflow integration for operator lineage policy and exported drill evidence packs
 - durable custom strategy registration and promotion lifecycle
 - normalized experiment summaries, artifact retrieval, and export posture
 - clearer benchmark-pack and promotion review workflow
@@ -118,7 +118,8 @@ features.
 
 The next meaningful product checkpoint should satisfy these conditions:
 
-- lineage review is defended by explicit operator guidance and retention policy
+- lineage review is defended by explicit operator guidance, retention policy, and product-native
+  drill evidence exports
 - experiment lifecycle is durable enough for promotion decisions
 - active sandbox operation is clearer than replay preview semantics
 - guarded-live readiness is explained by product gates, not hidden implementation detail

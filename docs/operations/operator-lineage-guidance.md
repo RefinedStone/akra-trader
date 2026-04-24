@@ -7,8 +7,8 @@ categories, lineage-history records, and ingestion-job history before using a ru
 promotion, or runtime safety decisions.
 
 This runbook defines the operational policy. The product now enforces the baseline lineage-history
-and ingestion-job TTL floors through the market-data lineage evidence retention control; it does
-not yet provide a product-native drill evidence export store.
+and ingestion-job TTL floors through the market-data lineage evidence retention control, and it
+exports product-native drill evidence packs from the same lineage and ingestion evidence.
 
 ## When To Run
 
@@ -25,6 +25,7 @@ not yet provide a product-native drill evidence export store.
 - market-data lineage history query surface
 - market-data ingestion-job history query surface
 - market-data lineage evidence retention prune control
+- market-data lineage drill evidence pack export
 - control-room data incident triage and focused market-data workflow panels
 - comparison and rerun surfaces that expose validation category and summary
 
@@ -168,6 +169,7 @@ Record the following in the drill or incident closeout:
 - validation claim and rerun validation category
 - lineage-history query filters used
 - ingestion-job query filters used
+- product export pack ID and retention expiration, when generated
 - final posture: exact-match, drift-aware, or unresolved
 - operator decision: accepted, reviewed, blocked, or escalated
 - linked incident, export, or delivery artifact, when present

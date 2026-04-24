@@ -4551,6 +4551,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "market_data_lineage_history",
     "market_data_ingestion_job_history",
     "market_data_lineage_evidence_retention_prune",
+    "market_data_lineage_drill_evidence_pack_export",
     "operator_visibility",
     "operator_provider_provenance_export_job_create",
     "operator_provider_provenance_export_job_list",
@@ -4727,6 +4728,13 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["market_data_lineage_evidence_retention_prune"].methods == ("POST",)
   assert bindings_by_key["market_data_lineage_evidence_retention_prune"].request_payload_kind == (
     "market_data_lineage_evidence_retention_prune"
+  )
+  assert bindings_by_key["market_data_lineage_drill_evidence_pack_export"].route_path == (
+    "/market-data/lineage-evidence/drill-packs/export"
+  )
+  assert bindings_by_key["market_data_lineage_drill_evidence_pack_export"].methods == ("POST",)
+  assert bindings_by_key["market_data_lineage_drill_evidence_pack_export"].request_payload_kind == (
+    "market_data_lineage_drill_evidence_pack_export"
   )
   assert bindings_by_key["operator_visibility"].route_path == "/operator/visibility"
   assert bindings_by_key["operator_provider_provenance_export_job_create"].methods == ("POST",)

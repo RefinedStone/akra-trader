@@ -462,6 +462,10 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "request",
     "app",
   )
+  assert tuple(inspect.signature(routes["export_market_data_lineage_drill_evidence_pack"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_replay_link_alias"].endpoint).parameters) == ("request", "app")
   assert tuple(inspect.signature(routes["resolve_replay_link_alias"].endpoint).parameters) == (
     "alias_token",
@@ -3698,6 +3702,134 @@ def test_market_data_lineage_evidence_retention_prune_enforces_policy_floors(tmp
   assert prune_payload["deleted_ingestion_job_count"] == 1
   assert prune_payload["retained_lineage_history_floor_ids"] == ["lineage-issue-retained"]
   assert prune_payload["retained_ingestion_job_floor_ids"] == ["job-issue-retained"]
+
+
+def test_market_data_lineage_drill_evidence_pack_export_returns_product_native_pack(
+  tmp_path: Path,
+) -> None:
+  current_time = datetime(2025, 7, 1, 0, 0, tzinfo=UTC)
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    app._clock = lambda: current_time
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    market_data.set_lineage_history(
+      (
+        MarketDataLineageHistoryRecord(
+          history_id="lineage-incident-1",
+          source_job_id="job-incident-1",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          recorded_at=datetime(2025, 6, 30, 23, 55, tzinfo=UTC),
+          sync_status="error",
+          validation_claim="checkpoint_window",
+          checkpoint_id="checkpoint-v1:incident",
+          dataset_boundary=DatasetBoundaryContract(
+            provider="binance",
+            venue="binance",
+            symbols=("BTC/USDT",),
+            timeframe="5m",
+            validation_claim="checkpoint_window",
+            sync_checkpoint_id="checkpoint-v1:incident",
+          ),
+          failure_count_24h=1,
+          last_error="upstream fetch failed",
+          issues=("last_sync_failed",),
+        ),
+      )
+    )
+    market_data.set_ingestion_jobs(
+      (
+        MarketDataIngestionJobRecord(
+          job_id="job-incident-1",
+          provider="binance",
+          venue="binance",
+          symbol="BTC/USDT",
+          timeframe="5m",
+          operation="sync_recent",
+          status="failed",
+          started_at=datetime(2025, 6, 30, 23, 54, tzinfo=UTC),
+          finished_at=datetime(2025, 6, 30, 23, 55, tzinfo=UTC),
+          duration_ms=1000,
+          validation_claim="checkpoint_window",
+          checkpoint_id="checkpoint-v1:incident",
+          lineage_history_id="lineage-incident-1",
+          last_error="upstream fetch failed",
+        ),
+      )
+    )
+    app._market_data = market_data
+
+    response = client.post(
+      "/api/market-data/lineage-evidence/drill-packs/export",
+      json={
+        "format": "markdown",
+        "scenario_key": "scenario_e",
+        "scenario_label": "Ingestion incident closeout",
+        "incident_id": "incident-market-data-1",
+        "operator_decision": "escalated",
+        "final_posture": "drift-aware",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "sync_status": "error",
+        "status": "failed",
+        "source_run_id": "run-source-1",
+        "rerun_id": "run-rerun-1",
+        "rerun_boundary_id": "rerun-v1:incident",
+        "rerun_validation_category": "checkpoint_match",
+        "generated_by": "operator-a",
+      },
+    )
+    json_response = client.post(
+      "/api/market-data/lineage-evidence/drill-packs/export",
+      json={
+        "scenario_key": "scenario_e",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "sync_status": "error",
+        "status": "failed",
+      },
+    )
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["pack_id"].startswith("operator-lineage-drill-pack:")
+  assert payload["generated_at"] == "2025-07-01T00:00:00Z"
+  assert payload["generated_by"] == "operator-a"
+  assert payload["export_format"] == "markdown"
+  assert payload["retention_policy"]["lineage_issue_history_days"] == 180
+  assert payload["retention_expires_at"] == "2025-12-28T00:00:00Z"
+  assert payload["scenario_key"] == "scenario_e"
+  assert payload["scenario_label"] == "Ingestion incident closeout"
+  assert payload["incident_id"] == "incident-market-data-1"
+  assert payload["operator_decision"] == "escalated"
+  assert payload["final_posture"] == "drift-aware"
+  assert payload["venue"] == "binance"
+  assert payload["symbols"] == ["BTC/USDT"]
+  assert payload["timeframe"] == "5m"
+  assert payload["source_run_id"] == "run-source-1"
+  assert payload["rerun_id"] == "run-rerun-1"
+  assert payload["sync_checkpoint_id"] == "checkpoint-v1:incident"
+  assert payload["rerun_boundary_id"] == "rerun-v1:incident"
+  assert payload["validation_claim"] == "checkpoint_window"
+  assert payload["rerun_validation_category"] == "checkpoint_match"
+  assert payload["lineage_history_filters"]["sync_status"] == "error"
+  assert payload["ingestion_job_filters"]["status"] == "failed"
+  assert payload["lineage_history_count"] == 1
+  assert payload["ingestion_job_count"] == 1
+  assert payload["lineage_history"][0]["history_id"] == "lineage-incident-1"
+  assert payload["ingestion_jobs"][0]["job_id"] == "job-incident-1"
+  assert "Ingestion incident closeout" in payload["content"]
+  assert "lineage-incident-1" in payload["content"]
+  assert "job-incident-1" in payload["content"]
+  assert json_response.status_code == 200
+  json_payload = json_response.json()
+  assert json_payload["export_format"] == "json"
+  content_payload = json.loads(json_payload["content"])
+  assert content_payload["lineage_history_count"] == 1
+  assert content_payload["ingestion_job_count"] == 1
+  assert content_payload["lineage_history"][0]["history_id"] == "lineage-incident-1"
 
 
 def test_operator_visibility_endpoint_reports_stale_runtime_alerts(tmp_path: Path) -> None:

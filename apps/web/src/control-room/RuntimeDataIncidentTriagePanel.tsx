@@ -69,12 +69,12 @@ export function RuntimeDataIncidentTriagePanel({ model }: { model: any }) {
                             }}
                             type="button"
                           >
-                            Copy filtered export
+                            Copy drill pack
                           </button>
                           <span className="market-data-workflow-export-copy">
                             {focusedMarketProviderProvenanceCount
-                              ? `${filteredFocusedMarketProviderProvenanceEvents.length} filtered result(s) from ${focusedMarketProviderProvenanceCount} linked provider-provenance incident(s).`
-                              : "No linked incident currently exposes provider market-context provenance."}
+                              ? `${filteredFocusedMarketProviderProvenanceEvents.length} filtered provider result(s) and lineage evidence will be packed.`
+                              : "Lineage and ingestion evidence will be packed for this focus."}
                           </span>
                         </div>
                       ) : null}

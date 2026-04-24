@@ -1,6 +1,7 @@
 import type {
   MarketDataIngestionJobRecord,
   MarketDataLineageHistoryRecord,
+  OperatorLineageDrillEvidencePack,
   OperatorLineageEvidenceRetentionResult,
 } from "../controlRoomDefinitions";
 import { fetchJson } from "./base";
@@ -70,6 +71,39 @@ export async function pruneMarketDataLineageEvidenceRetention(payload: {
 } = {}) {
   return fetchJson<OperatorLineageEvidenceRetentionResult>(
     "/market-data/lineage-evidence/retention/prune",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function exportMarketDataLineageDrillEvidencePack(payload: {
+  format?: "json" | "markdown" | string;
+  scenario_key?: string | null;
+  scenario_label?: string | null;
+  incident_id?: string | null;
+  operator_decision?: string;
+  final_posture?: string;
+  venue?: string | null;
+  symbol?: string | null;
+  timeframe?: string | null;
+  sync_status?: string | null;
+  validation_claim?: string | null;
+  operation?: string | null;
+  status?: string | null;
+  source_run_id?: string | null;
+  rerun_id?: string | null;
+  dataset_identity?: string | null;
+  sync_checkpoint_id?: string | null;
+  rerun_boundary_id?: string | null;
+  rerun_validation_category?: string | null;
+  generated_by?: string;
+  lineage_history_limit?: number;
+  ingestion_job_limit?: number;
+} = {}) {
+  return fetchJson<OperatorLineageDrillEvidencePack>(
+    "/market-data/lineage-evidence/drill-packs/export",
     {
       method: "POST",
       body: JSON.stringify(payload),

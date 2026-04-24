@@ -51,7 +51,7 @@ Detailed work:
 
 - integrate the documented lineage mismatch interpretation and escalation rules into product
   workflows
-- preserve drill evidence for lineage-history and ingestion-job review
+- link exported drill evidence packs into promotion and escalation workflows
 - keep product language tight around exact-match claims versus drift-aware replay paths
 
 Acceptance criteria:
@@ -71,6 +71,7 @@ Completed baseline now in place:
 - operator lineage guidance with retention floors, escalation rules, and drill validation evidence
 - product TTL controls that clamp requested lineage-history and ingestion-job pruning to operator
   retention floors
+- product-native drill evidence pack export for lineage-history and ingestion-job review
 
 ## Wave 2: Durable Strategy Registry And Experiment OS Completion
 

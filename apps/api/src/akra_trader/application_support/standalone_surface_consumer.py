@@ -455,6 +455,33 @@ def execute_standalone_surface_binding(
         protected_job_ids=tuple(resolved_payload.get("protected_job_ids") or ()),
       )
     )
+  if binding.binding_kind == "market_data_lineage_drill_evidence_pack_export":
+    return asdict(
+      app.export_operator_lineage_drill_evidence_pack(
+        scenario_key=resolved_payload.get("scenario_key"),
+        scenario_label=resolved_payload.get("scenario_label"),
+        incident_id=resolved_payload.get("incident_id"),
+        operator_decision=resolved_payload.get("operator_decision", "reviewed"),
+        final_posture=resolved_payload.get("final_posture", "unresolved"),
+        venue=resolved_payload.get("venue"),
+        symbol=resolved_payload.get("symbol"),
+        timeframe=resolved_payload.get("timeframe"),
+        sync_status=resolved_payload.get("sync_status"),
+        validation_claim=resolved_payload.get("validation_claim"),
+        operation=resolved_payload.get("operation"),
+        status=resolved_payload.get("status"),
+        source_run_id=resolved_payload.get("source_run_id"),
+        rerun_id=resolved_payload.get("rerun_id"),
+        dataset_identity=resolved_payload.get("dataset_identity"),
+        sync_checkpoint_id=resolved_payload.get("sync_checkpoint_id"),
+        rerun_boundary_id=resolved_payload.get("rerun_boundary_id"),
+        rerun_validation_category=resolved_payload.get("rerun_validation_category"),
+        generated_by=resolved_payload.get("generated_by", "operator"),
+        export_format=resolved_payload.get("format", "json"),
+        lineage_history_limit=resolved_payload.get("lineage_history_limit"),
+        ingestion_job_limit=resolved_payload.get("ingestion_job_limit"),
+      )
+    )
   if binding.binding_kind == "operator_visibility":
     return asdict(app.get_operator_visibility())
   if binding.binding_kind == "operator_provider_provenance_export_job_create":

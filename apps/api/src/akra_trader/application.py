@@ -35,6 +35,7 @@ from akra_trader.application_flows.strategy_catalog import serialize_preset
 from akra_trader.application_flows.strategy_catalog import serialize_preset_revision
 from akra_trader.application_flows.strategy_catalog import serialize_strategy
 from akra_trader.lineage import apply_operator_lineage_evidence_retention_deletion_counts
+from akra_trader.lineage import build_operator_lineage_drill_evidence_pack
 from akra_trader.lineage import build_operator_lineage_evidence_retention_policy
 from akra_trader.lineage import build_operator_lineage_evidence_retention_result
 from akra_trader.adapters.provider_provenance_search import (
@@ -1558,6 +1559,74 @@ class TradingApplication(
       result,
       deleted_lineage_history_count=deleted_lineage_history_count,
       deleted_ingestion_job_count=deleted_ingestion_job_count,
+    )
+
+  def export_operator_lineage_drill_evidence_pack(
+    self,
+    *,
+    scenario_key: str | None = None,
+    scenario_label: str | None = None,
+    incident_id: str | None = None,
+    operator_decision: str = "reviewed",
+    final_posture: str = "unresolved",
+    venue: str | None = None,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    sync_status: str | None = None,
+    validation_claim: str | None = None,
+    operation: str | None = None,
+    status: str | None = None,
+    source_run_id: str | None = None,
+    rerun_id: str | None = None,
+    dataset_identity: str | None = None,
+    sync_checkpoint_id: str | None = None,
+    rerun_boundary_id: str | None = None,
+    rerun_validation_category: str | None = None,
+    generated_by: str = "operator",
+    export_format: str = "json",
+    lineage_history_limit: int | None = 100,
+    ingestion_job_limit: int | None = 100,
+  ):
+    current_time = self._clock()
+    return build_operator_lineage_drill_evidence_pack(
+      lineage_history=self.list_market_data_lineage_history(
+        timeframe=timeframe,
+        symbol=symbol,
+        sync_status=sync_status,
+        validation_claim=validation_claim,
+        limit=lineage_history_limit,
+      ),
+      ingestion_jobs=self.list_market_data_ingestion_jobs(
+        timeframe=timeframe,
+        symbol=symbol,
+        operation=operation,
+        status=status,
+        limit=ingestion_job_limit,
+      ),
+      generated_at=current_time,
+      pack_id=f"operator-lineage-drill-pack:{uuid4()}",
+      generated_by=generated_by,
+      export_format=export_format,
+      scenario_key=scenario_key,
+      scenario_label=scenario_label,
+      incident_id=incident_id,
+      operator_decision=operator_decision,
+      final_posture=final_posture,
+      venue=venue,
+      symbol=symbol,
+      timeframe=timeframe,
+      source_run_id=source_run_id,
+      rerun_id=rerun_id,
+      dataset_identity=dataset_identity,
+      sync_checkpoint_id=sync_checkpoint_id,
+      rerun_boundary_id=rerun_boundary_id,
+      validation_claim=validation_claim,
+      rerun_validation_category=rerun_validation_category,
+      sync_status=sync_status,
+      operation=operation,
+      status=status,
+      lineage_history_limit=lineage_history_limit,
+      ingestion_job_limit=ingestion_job_limit,
     )
 
   def get_operator_visibility(self) -> OperatorVisibility:

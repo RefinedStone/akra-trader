@@ -120,6 +120,37 @@ export type OperatorLineageEvidenceRetentionResult = {
   deleted_ingestion_job_count: number;
 };
 
+export type OperatorLineageDrillEvidencePack = {
+  pack_id: string;
+  generated_at: string;
+  generated_by: string;
+  retention_policy: OperatorLineageEvidenceRetentionPolicy;
+  retention_expires_at: string;
+  export_format: string;
+  scenario_key?: string | null;
+  scenario_label?: string | null;
+  incident_id?: string | null;
+  operator_decision: string;
+  final_posture: string;
+  venue?: string | null;
+  symbols: string[];
+  timeframe?: string | null;
+  source_run_id?: string | null;
+  rerun_id?: string | null;
+  dataset_identity?: string | null;
+  sync_checkpoint_id?: string | null;
+  rerun_boundary_id?: string | null;
+  validation_claim?: string | null;
+  rerun_validation_category?: string | null;
+  lineage_history_filters: Record<string, unknown>;
+  ingestion_job_filters: Record<string, unknown>;
+  lineage_history_count: number;
+  ingestion_job_count: number;
+  lineage_history: MarketDataLineageHistoryRecord[];
+  ingestion_jobs: MarketDataIngestionJobRecord[];
+  content: string;
+};
+
 export type MarketDataProvenanceExportSort =
   | "newest"
   | "oldest"
