@@ -1,4 +1,4 @@
-import type { OperatorAlertEntry } from "../controlRoomDefinitions";
+import type { OperatorAlertEntry } from "./operatorVisibility";
 
 export type ProviderProvenanceSchedulerHealthSnapshot = {
   generated_at: string;

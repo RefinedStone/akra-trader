@@ -139,6 +139,10 @@ It is not yet a finished live trading product:
   stitched-report, narrative asset, narrative governance, and scheduled-report type families now
   live behind narrower `controlRoomDefinitions` modules while the existing provider-provenance
   definitions barrel keeps the public type surface stable
+- the top-level `controlRoomDefinitions` compatibility barrel now re-exports bounded definition
+  surfaces for core constants, strategy catalogs, replay links, run-surface contracts, comparison
+  links, market-data provenance, operator visibility, UI sync state, run-history filters, and
+  tooltip tuning instead of owning those declarations inline
 - `ControlRoomApp` now delegates research, runtime, and live run-history route panel assembly to
   `buildControlRoomRunHistoryWorkspacePanels`, so non-provider-provenance route payload wiring no
   longer sits inline with the main component body
