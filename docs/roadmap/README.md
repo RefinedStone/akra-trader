@@ -20,8 +20,8 @@ What is already materially present:
 
 What still defines the roadmap:
 
-- operator-facing lineage guidance, retention, and escalation on top of the deterministic research
-  baseline
+- product enforcement for operator lineage retention, drill evidence, and escalation on top of the
+  documented deterministic research baseline
 - durable strategy registry and promotion workflow
 - normalized experiment query, artifact, and export posture
 - control-room productization and operator workflow clarity

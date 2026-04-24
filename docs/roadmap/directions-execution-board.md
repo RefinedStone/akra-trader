@@ -47,7 +47,8 @@ Why first:
 
 Unfinished work:
 
-1. deepen operator-facing lineage mismatch guidance plus retention and escalation policy
+1. enforce documented operator lineage retention, drill evidence, and escalation policy in product
+   workflows
 2. move custom strategy registration into a durable registry with lifecycle and promotion state
 3. wire durable strategy lifecycle and promotion records into query filters
 4. add normalized experiment summary, artifact registry, and export registry paths
@@ -57,7 +58,8 @@ Exit evidence:
 
 - `Gate 1: Research OS Gate` can pass
 - repeated identical runs can defend one stable dataset boundary and mismatch posture
-- lineage-health review paths have explicit operator guidance plus retention/escalation rules
+- lineage-health review paths have explicit operator guidance plus product enforcement for
+  retention and escalation rules
 - strategy registrations survive restart and remain queryable in control-room filters
 - common experiment queries no longer depend on payload-heavy scans for normal usage
 
@@ -175,7 +177,7 @@ These are the highest-value slices that can start now without violating the gate
 2. strategy lifecycle and promotion records wired into query filters
 3. experiment summary, artifact, and export registry model
 4. benchmark-pack and promotion-review artifact model
-5. lineage-health action guidance with retention and escalation rules
+5. lineage-health retention enforcement and drill evidence export
 
 These should follow immediately after the queue above:
 

@@ -204,6 +204,7 @@ unclear dataset lineage.
   operator guidance
 - comparison and lineage-oriented research surfaces
 - incident and operator-event history
+- operator lineage guidance for dataset-boundary action rules, retention floors, and drill evidence
 
 ## Triage
 
@@ -227,6 +228,8 @@ unclear dataset lineage.
 2. Rerun or compare only after the dataset boundary is explicit again.
 3. If freshness recovers but lineage is still ambiguous, keep the incident open.
 4. Record whether the final posture is exact-match, drift-aware, or unresolved.
+5. Preserve lineage-history and ingestion-job evidence according to the operator lineage retention
+   policy before pruning or closing related exports.
 
 ## Escalate If
 
@@ -234,6 +237,8 @@ unclear dataset lineage.
 - gap windows grow while active execution remains exposed
 - rerun validation cannot explain whether a result is matched or drifted
 - the operator cannot explain which dataset identity or checkpoint a decision relied on
+- the required lineage or ingestion evidence would fall below the retention floor for a promotion,
+  incident, or guarded-live-affecting decision
 
 ## Closeout Record
 
@@ -244,9 +249,12 @@ Record at minimum:
 - active sessions impacted
 - whether stop or hold actions were taken
 - the final lineage posture used to reopen work
+- the retained lineage-history and ingestion-job filters or export artifact used as closeout
+  evidence
 
 ## Related Runbooks
 
 - [Daily Operations Checklist](daily-operations-checklist.md)
+- [Operator Lineage Guidance](operator-lineage-guidance.md)
 - [Sandbox Runtime Incident](sandbox-runtime-incident.md)
 - [Release And Docs Checklist](release-and-docs-checklist.md)

@@ -23,6 +23,8 @@ sandbox, paper, or guarded-live flows.
 3. Review stale heartbeat, worker-failure, and incident signals.
 4. Review the most recent benchmark comparison or rerun evidence for any strategy you plan to act on.
 5. Confirm whether any session should remain running, be held, be rerun, or be stopped before new work begins.
+6. Confirm any lineage evidence needed for today's promotion, benchmark, or incident review is still
+   inside the retention window.
 
 ## Before Launching A New Run
 
@@ -30,6 +32,8 @@ sandbox, paper, or guarded-live flows.
 2. Confirm whether the launch is research, sandbox, paper, or guarded-live. Do not blur those lanes.
 3. Confirm stop conditions are understood for the strategy and mode you are about to run.
 4. For guarded-live, confirm reconciliation readiness and kill-switch posture before launch.
+5. If the launch relies on prior rerun evidence, confirm the final lineage posture is exact-match
+   or explicitly accepted as drift-aware research.
 
 ## During Active Operation
 
@@ -54,6 +58,7 @@ sandbox, paper, or guarded-live flows.
 ## Related Runbooks
 
 - [Data Incident Response](data-incident-response.md)
+- [Operator Lineage Guidance](operator-lineage-guidance.md)
 - [Sandbox Runtime Incident](sandbox-runtime-incident.md)
 - [Guarded-Live Reconciliation Drill](guarded-live-reconciliation-drill.md)
 - [Kill-Switch Procedure](kill-switch-procedure.md)

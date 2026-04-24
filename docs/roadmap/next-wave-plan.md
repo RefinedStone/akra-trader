@@ -35,8 +35,8 @@ Completed baseline now in place:
 Status:
 
 - materially complete
-- remaining work is now operator-facing lineage guidance, retention, and escalation policy on top
-  of the deterministic baseline
+- remaining work is now product enforcement for the documented operator lineage retention,
+  escalation, and drill-evidence policy on top of the deterministic baseline
 
 Target window:
 
@@ -49,9 +49,9 @@ Primary outcomes:
 
 Detailed work:
 
-- bind lineage mismatch interpretation to explicit operator guidance and escalation rules
-- add retention and drill expectations for lineage-history and ingestion-job review
-- tighten product language around exact-match claims versus drift-aware replay paths
+- enforce the documented lineage mismatch interpretation and escalation rules in product workflows
+- preserve retention and drill evidence for lineage-history and ingestion-job review
+- keep product language tight around exact-match claims versus drift-aware replay paths
 
 Acceptance criteria:
 
@@ -67,6 +67,7 @@ Completed baseline now in place:
 - lineage mismatch taxonomy and operator-visible summaries
 - ingestion-job history plus normalized lineage query surfaces
 - focused runtime triage against the selected instrument's lineage history
+- operator lineage guidance with retention floors, escalation rules, and drill validation evidence
 
 ## Wave 2: Durable Strategy Registry And Experiment OS Completion
 

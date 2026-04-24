@@ -1,6 +1,6 @@
 # Runbooks Overview
 
-Updated for the repository state as of April 22, 2026.
+Updated for the repository state as of April 24, 2026.
 
 This folder is the entry point for day-2 operator discipline. The current repository has many
 runtime and guarded-live features, but its runbook coverage is still incomplete. This document
@@ -12,6 +12,7 @@ defines the minimum set that should exist as the platform matures.
 | --- | --- | --- |
 | [Daily operations checklist](daily-operations-checklist.md) | What to inspect before and after normal use | baseline implemented |
 | [Data incident response](data-incident-response.md) | Stale sync, repeated failures, gap escalation | baseline implemented |
+| [Operator lineage guidance](operator-lineage-guidance.md) | Dataset-boundary action guidance, retention policy, and drill validation evidence | baseline implemented |
 | [Sandbox runtime incident](sandbox-runtime-incident.md) | Worker failure, heartbeat loss, unexplained drift | baseline implemented |
 | [Guarded-live reconciliation drill](guarded-live-reconciliation-drill.md) | How to verify venue state and respond to mismatches | baseline implemented |
 | [Kill-switch procedure](kill-switch-procedure.md) | When and how to engage, verify, and release emergency stop | baseline implemented |
@@ -41,6 +42,7 @@ What this baseline is good enough for:
 - single-operator daily inspection
 - first-pass incident triage
 - guarded-live reconciliation and stop discipline
+- lineage posture interpretation, evidence retention, and drill validation
 - release-time documentation alignment
 
 What is still not complete:
@@ -49,6 +51,7 @@ What is still not complete:
 - secret rotation and credential-governance procedures
 - venue-specific live drills beyond the current guarded-live baseline
 - evidence that every runbook step is fully represented by product UX without fallback shell work
+- automated TTL enforcement and product-native evidence-pack export for lineage drills
 
 ## Related Docs
 

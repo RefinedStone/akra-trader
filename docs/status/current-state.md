@@ -546,12 +546,15 @@ It is not yet a finished live trading product:
   and planning docs whenever operator-visible capability changes
 - operations documentation now links operator checks and escalation rules back to product-visible
   runtime and guarded-live surfaces
+- operator lineage guidance now defines dataset-boundary action rules, retention floors,
+  escalation triggers, and a drill validation evidence pack for lineage-history and ingestion-job
+  review
 
 ## Partial Or Fragile Areas
 
-- data-boundary contracts, rerun validation categories, lineage mismatch summaries, and
-  normalized lineage or ingestion history surfaces are in place, but richer operator action
-  guidance, retention, escalation, and drill coverage on top of those surfaces are still thin
+- data-boundary contracts, rerun validation categories, lineage mismatch summaries, normalized
+  lineage or ingestion history surfaces, and operator guidance are in place, but automated
+  retention enforcement and product-native drill evidence export are still incomplete
 - custom strategy registration exists, but registration metadata is still process-local rather than a
   durable strategy registry
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
@@ -592,8 +595,8 @@ It is not yet a finished live trading product:
 
 1. Finish Batch 1 by delivering durable strategy lifecycle, normalized experiment summaries, and
    artifact/export registry paths.
-2. Tighten operator-facing lineage health with clearer action guidance, retention, and escalation
-   rules on top of the deterministic data baseline.
+2. Productize operator-facing lineage health by enforcing retention, preserving drill evidence,
+   and linking lineage posture more directly into runtime and promotion workflows.
 3. Productize the control room around active-session operations, clearer operator workflows, and
    decomposed UI surfaces.
 4. Complete guarded-live safety around fuller venue lifecycle handling, validated drills, and

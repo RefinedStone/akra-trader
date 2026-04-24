@@ -44,6 +44,7 @@ If a change exposes a workflow the docs cannot explain:
 - [Runbooks Overview](runbooks-overview.md)
 - [Daily Operations Checklist](daily-operations-checklist.md)
 - [Data Incident Response](data-incident-response.md)
+- [Operator Lineage Guidance](operator-lineage-guidance.md)
 - [Sandbox Runtime Incident](sandbox-runtime-incident.md)
 - [Guarded-Live Reconciliation Drill](guarded-live-reconciliation-drill.md)
 - [Kill-Switch Procedure](kill-switch-procedure.md)
