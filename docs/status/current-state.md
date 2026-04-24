@@ -132,6 +132,9 @@ It is not yet a finished live trading product:
 - provider-provenance export-job and scheduled-report API clients now live behind dedicated
   `controlRoomApi` family modules instead of keeping those endpoint families inline in the broad
   provider-provenance client module
+- the remaining scheduler health, scheduler search, stitched-report, narrative asset, and
+  narrative governance provider-provenance API families now live behind narrower `controlRoomApi`
+  modules instead of the broad provider-provenance client module
 - `ControlRoomApp` now delegates research, runtime, and live run-history route panel assembly to
   `buildControlRoomRunHistoryWorkspacePanels`, so non-provider-provenance route payload wiring no
   longer sits inline with the main component body
