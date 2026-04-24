@@ -6,7 +6,7 @@ export function RuntimeProviderProvenanceSchedulerNarrativeTemplateRegistryTable
 }: {
   model: any;
 }) {
-  const {} = model;
+  const { providerProvenanceSchedulerNarrativeTemplates } = model;
 
   return providerProvenanceSchedulerNarrativeTemplates.length ? (
     <RuntimeProviderProvenanceSchedulerNarrativeTemplateRegistryTableViewSection model={model} />

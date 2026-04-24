@@ -1,9 +1,16 @@
 // @ts-nocheck
 export function RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionActionSection({
   entry,
+  model,
 }: {
   entry: any;
+  model: any;
 }) {
+  const {
+    applyProviderProvenanceWorkspaceQuery,
+    restoreProviderProvenanceSchedulerNarrativeTemplateHistoryRevision,
+  } = model;
+
   return (
     <td>
       <div className="market-data-provenance-history-actions">

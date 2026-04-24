@@ -1,9 +1,13 @@
 // @ts-nocheck
 export function RuntimeProviderProvenanceSchedulerNarrativeTemplateRegistryRowDetailSection({
   entry,
+  model,
 }: {
   entry: any;
+  model: any;
 }) {
+  const { formatTimestamp, formatWorkflowToken } = model;
+
   return (
     <>
       <td>

@@ -6,7 +6,12 @@ export function RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionHisto
 }: {
   model: any;
 }) {
-  const {} = model;
+  const {
+    providerProvenanceSchedulerNarrativeTemplateHistoryError,
+    providerProvenanceSchedulerNarrativeTemplateHistoryLoading,
+    selectedProviderProvenanceSchedulerNarrativeTemplateHistory,
+    selectedProviderProvenanceSchedulerNarrativeTemplateId,
+  } = model;
 
   return selectedProviderProvenanceSchedulerNarrativeTemplateId ? (
     <div className="market-data-provenance-shared-history">

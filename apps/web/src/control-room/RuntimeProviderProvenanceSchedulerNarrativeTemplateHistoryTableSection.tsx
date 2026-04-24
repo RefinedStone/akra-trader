@@ -6,7 +6,11 @@ export function RuntimeProviderProvenanceSchedulerNarrativeTemplateHistoryTableS
 }: {
   model: any;
 }) {
-  const {} = model;
+  const {
+    formatTimestamp,
+    formatWorkflowToken,
+    selectedProviderProvenanceSchedulerNarrativeTemplateHistory,
+  } = model;
 
   return (
     <table className="data-table">
@@ -31,7 +35,7 @@ export function RuntimeProviderProvenanceSchedulerNarrativeTemplateHistoryTableS
               <p className="run-lineage-symbol-copy">{entry.filter_summary}</p>
               <p className="run-lineage-symbol-copy">{entry.reason}</p>
             </td>
-            <RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionActionSection entry={entry} />
+            <RuntimeProviderProvenanceSchedulerNarrativeTemplateRevisionActionSection entry={entry} model={model} />
           </tr>
         ))}
       </tbody>

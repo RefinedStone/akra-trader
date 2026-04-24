@@ -7,7 +7,7 @@ export function RuntimeProviderProvenanceSchedulerNarrativeTemplateBulkGovernanc
 }: {
   model: any;
 }) {
-  const {} = model;
+  const { providerProvenanceSchedulerNarrativeTemplates } = model;
 
   return providerProvenanceSchedulerNarrativeTemplates.length ? (
     <>

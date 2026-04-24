@@ -6,7 +6,21 @@ export function RuntimeProviderProvenanceSchedulerNarrativeTemplateRegistryTable
 }: {
   model: any;
 }) {
-  const {} = model;
+  const {
+    applyProviderProvenanceWorkspaceQuery,
+    editProviderProvenanceSchedulerNarrativeTemplate,
+    providerProvenanceSchedulerNarrativeTemplateBulkAction,
+    providerProvenanceSchedulerNarrativeTemplates,
+    removeProviderProvenanceSchedulerNarrativeTemplate,
+    selectedProviderProvenanceSchedulerNarrativeTemplateHistory,
+    selectedProviderProvenanceSchedulerNarrativeTemplateId,
+    selectedProviderProvenanceSchedulerNarrativeTemplateIds,
+    selectedProviderProvenanceSchedulerNarrativeTemplateIdSet,
+    setProviderProvenanceSchedulerNarrativeRegistryDraft,
+    toggleAllProviderProvenanceSchedulerNarrativeTemplateSelections,
+    toggleProviderProvenanceSchedulerNarrativeTemplateHistory,
+    toggleProviderProvenanceSchedulerNarrativeTemplateSelection,
+  } = model;
 
   return (
     <table className="data-table">
@@ -41,7 +55,7 @@ export function RuntimeProviderProvenanceSchedulerNarrativeTemplateRegistryTable
                 type="checkbox"
               />
             </td>
-            <RuntimeProviderProvenanceSchedulerNarrativeTemplateRegistryRowDetailSection entry={entry} />
+            <RuntimeProviderProvenanceSchedulerNarrativeTemplateRegistryRowDetailSection entry={entry} model={model} />
             <td>
               <div className="market-data-provenance-history-actions">
                 <button

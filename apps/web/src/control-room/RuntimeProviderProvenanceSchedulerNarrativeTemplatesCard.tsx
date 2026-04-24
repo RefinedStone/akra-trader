@@ -8,7 +8,15 @@ export function RuntimeProviderProvenanceSchedulerNarrativeTemplatesCard({
 }: {
   model: any;
 }) {
-  const {} = model;
+  const {
+    editingProviderProvenanceSchedulerNarrativeTemplateId,
+    providerProvenanceSchedulerNarrativeTemplateDraft,
+    providerProvenanceSchedulerNarrativeTemplatesError,
+    providerProvenanceSchedulerNarrativeTemplatesLoading,
+    resetProviderProvenanceSchedulerNarrativeTemplateDraft,
+    saveCurrentProviderProvenanceSchedulerNarrativeTemplate,
+    setProviderProvenanceSchedulerNarrativeTemplateDraft,
+  } = model;
 
   return (
     <div className="provider-provenance-workspace-card">
