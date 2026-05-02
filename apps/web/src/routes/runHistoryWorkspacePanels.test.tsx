@@ -50,15 +50,15 @@ describe("buildRunHistoryWorkspacePanels", () => {
     });
 
     expect(calls.map(({ surfaceKey, title }) => `${surfaceKey}:${title}`)).toEqual([
-      "backtest:Recent backtests",
-      "sandbox:Sandbox runs",
-      "paper:Paper runs",
-      "live:Guarded live runs",
+      "backtest:최근 Backtest",
+      "sandbox:Sandbox Run",
+      "paper:Paper Run",
+      "live:Guarded Live Run",
     ]);
-    expect(panels.research.runsPanel).toBe("backtest:Recent backtests");
-    expect(panels.runtime.sandboxRunsPanel).toBe("sandbox:Sandbox runs");
-    expect(panels.runtime.paperRunsPanel).toBe("paper:Paper runs");
-    expect(panels.live.runsPanel).toBe("live:Guarded live runs");
+    expect(panels.research.runsPanel).toBe("backtest:최근 Backtest");
+    expect(panels.runtime.sandboxRunsPanel).toBe("sandbox:Sandbox Run");
+    expect(panels.runtime.paperRunsPanel).toBe("paper:Paper Run");
+    expect(panels.live.runsPanel).toBe("live:Guarded Live Run");
   });
 
   it("preserves caller-supplied titles and handlers", () => {

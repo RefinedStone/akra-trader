@@ -15,7 +15,6 @@ export function ControlRoomRoutes({ model }: { model: any }) {
     statusText,
     workspaceDescriptors,
     WorkspaceRouteContent,
-    RunSurfaceCapabilityDiscoveryPanel,
     runSurfaceCapabilities,
     StrategyColumn,
     strategyGroups,
@@ -680,8 +679,6 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                   </button>
                 </div>
 
-                <RunSurfaceCapabilityDiscoveryPanel capabilities={runSurfaceCapabilities} />
-
                 <div className="strategy-columns">
                   <StrategyColumn
                     title="Native"
@@ -709,7 +706,7 @@ export function ControlRoomRoutes({ model }: { model: any }) {
             launchPanel: (
               <section className="panel">
                 <p className="kicker">Backtest</p>
-                <h2>Launch a run</h2>
+                <h2>Run 실행</h2>
                 <RunForm
                   form={backtestForm}
                   setForm={setBacktestForm}
@@ -721,8 +718,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
             ),
             presetPanel: (
               <section className="panel panel-wide">
-                <p className="kicker">Experiment OS</p>
-                <h2>Scenario presets</h2>
+                <p className="kicker">실험 운영</p>
+                <h2>시나리오 Preset</h2>
                 <PresetCatalogPanel
                   form={presetForm}
                   presets={presets}
@@ -742,8 +739,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
             ),
             referencePanel: (
               <section className="panel panel-wide">
-                <p className="kicker">Reference lane</p>
-                <h2>Third-party references</h2>
+                <p className="kicker">Reference 관리</p>
+                <h2>외부 Reference</h2>
                 <ReferenceCatalog references={references} />
               </section>
             ),

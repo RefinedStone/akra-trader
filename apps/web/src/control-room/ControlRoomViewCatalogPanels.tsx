@@ -6,7 +6,7 @@ import { loadExpandedGapRows, loadExpandedGapWindowSelections, defaultControlRoo
 import { normalizeComparisonHistoryPanelUiState, normalizeComparisonHistorySyncAuditFilter, normalizeComparisonHistoryPanelSyncState, normalizeComparisonHistoryPanelState, normalizeComparisonHistoryPanelEntry, normalizeComparisonHistorySyncAuditEntry, normalizeComparisonHistorySyncConflictReview, normalizeComparisonHistorySyncConflictSelectedSources, normalizeComparisonHistorySyncPreferenceReview, normalizeComparisonHistorySyncWorkspaceReview, normalizeComparisonHistorySyncPreferenceState, normalizeComparisonHistorySyncWorkspaceState, normalizeComparisonHistorySyncPreferenceSelectedSources, normalizeComparisonHistorySyncWorkspaceSelectedSources, limitComparisonHistorySyncAuditEntries, appendComparisonHistorySyncAuditEntries, isSameComparisonHistoryPanelState, isSameComparisonHistoryPanelSyncState, isSameComparisonHistoryPanelEntry, getComparisonHistoryPanelEntryChangedFields, formatComparisonHistorySyncConflictScoreLinkValue, formatComparisonHistorySyncConflictRunSelectionValue, formatComparisonHistorySyncConflictFieldValue, hasComparisonHistorySyncConflictFieldDifference, buildDefaultComparisonHistorySyncConflictSelectedSources, buildComparisonHistorySyncConflictReview, buildComparisonHistorySyncConflictReviewGroups, summarizeComparisonHistoryPanelEntryConflict, formatComparisonHistorySyncConflictResolutionSummary, resolveComparisonHistorySyncConflictReviewEntry, applyResolvedComparisonHistoryPanelEntry, summarizeComparisonHistorySyncPreferenceChanges, buildComparisonHistorySyncPreferenceState, formatComparisonHistorySyncPreferenceFieldValue, hasComparisonHistorySyncPreferenceFieldDifference, buildDefaultComparisonHistorySyncPreferenceSelectedSources, buildComparisonHistorySyncPreferenceReview, buildComparisonHistorySyncPreferenceReviewRows, formatComparisonHistorySyncPreferenceResolutionSummary, resolveComparisonHistorySyncPreferenceReview } from "./ControlRoomViewComparisonNormalize";
 import { listComparisonHistoryExpandedGapRowKeys, listComparisonHistoryExpandedGapRowDiffKeys, buildComparisonHistoryExpandedGapRowSelectionKey, parseComparisonHistoryExpandedGapRowSelectionKey, buildComparisonHistoryExpandedGapWindowSelectionKey, parseComparisonHistoryExpandedGapWindowSelectionKey, listComparisonHistoryExpandedGapWindowDiffKeys, isSameComparisonHistoryExpandedGapRows, isSameExpandedGapWindowSelections, formatComparisonHistoryExpandedGapRowKey, formatComparisonHistoryExpandedGapRowsValue, formatComparisonHistoryExpandedGapRowsDiffValue, formatComparisonHistorySyncWorkspaceSelectionKeyLabel, rankComparisonHistorySyncWorkspaceSelectionKey, ComparisonHistorySyncWorkspaceSemanticRanking, listComparisonHistorySyncWorkspaceDiffSelectionKeys, resolveComparisonHistorySyncWorkspaceFieldSource, listComparisonHistorySyncWorkspaceConflictSelectionKeys, scoreComparisonHistorySyncWorkspaceCandidateSource, sortComparisonHistorySyncWorkspaceSemanticSignals, rankComparisonHistorySyncWorkspaceFieldSemantics, buildComparisonHistorySyncWorkspaceRecommendedSources, summarizeComparisonHistorySyncWorkspaceChanges, buildComparisonHistorySyncWorkspaceState, formatComparisonHistorySyncWorkspaceFieldValue, hasComparisonHistorySyncWorkspaceFieldDifference, buildDefaultComparisonHistorySyncWorkspaceSelectedSources, buildComparisonHistorySyncWorkspaceReview, buildComparisonHistorySyncWorkspaceReviewRows, buildComparisonHistorySyncWorkspaceRecommendationOverview, formatComparisonHistorySyncWorkspaceResolutionSummary, resolveComparisonHistorySyncWorkspaceReview, buildComparisonHistorySyncAuditEntries } from "./ControlRoomViewComparisonWorkspace";
 import { loadLegacyExpandedGapRows, filterExpandedGapRows, normalizeControlRoomComparisonSelection, isSameComparisonSelection, formatComparisonHistoryPanelEntryMeta, matchesComparisonHistoryPanelEntry, formatComparisonHistorySyncAuditKindLabel, buildComparisonHistoryStepDescriptor, resolveComparisonHistoryRunLabel, normalizeComparisonRunIdList, normalizeComparisonIntent, normalizeComparisonScoreSection, normalizeComparisonScoreLinkSource, normalizeComparisonScoreLinkSubFocusKey, normalizeComparisonScoreLinkExpandedState, normalizeComparisonScoreLinkTooltipKey, normalizeComparisonScoreLinkArtifactLineDetailView, normalizeComparisonScoreLinkArtifactLineMicroView, normalizeComparisonScoreLinkArtifactLineNotePage, normalizeComparisonScoreLinkArtifactLineDetailHoverKey, normalizeComparisonScoreLinkArtifactLineScrubStep, normalizeComparisonScoreLinkArtifactHoverKey, normalizeComparisonScoreLinkTarget, isControlRoomUiStateV1, isControlRoomUiStateV2, isControlRoomUiStateV3, isControlRoomUiStateV4, buildRunsPath, buildRunComparisonPath, normalizeRunHistoryFilter, normalizeRunHistoryPresetFilter, getStrategyVersionOptions, pickLatestBenchmarkRun } from "./ControlRoomViewRunFilters";
-import { RunListBoundarySurfaceContract, RunListBoundaryGroupContract, RunSurfaceCapabilityDiscoveryPanel, Metric, formatMetric, formatLineagePosture, formatLineageIndicator, formatComparisonScoreValue } from "./ControlRoomViewCapabilities";
+import { RunListBoundarySurfaceContract, RunListBoundaryGroupContract, Metric, formatMetric, formatLineagePosture, formatLineageIndicator, formatComparisonScoreValue } from "./ControlRoomViewCapabilities";
 import { buildComparisonScoreHighlights, buildComparisonScoreDetailRows, formatComparisonScoreHighlight, formatComparisonScoreComponentLabel, formatComparisonScoreLinkSourceLabel, encodeComparisonScoreLinkToken, decodeComparisonScoreLinkToken, buildComparisonProvenanceLineSubFocusKey, buildComparisonRunCardLineSubFocusKey, buildComparisonRunListLineSubFocusKey, buildComparisonRunListOrderPreviewSubFocusKey, buildComparisonRunListDataSymbolSubFocusKey, buildComparisonProvenanceArtifactSubFocusKey, buildComparisonProvenanceArtifactSectionSubFocusKey, buildComparisonProvenanceArtifactSummaryHoverKey, buildComparisonProvenanceArtifactSectionLineHoverKey, buildComparisonProvenanceArtifactLineDetailHoverKey, buildComparisonMetricTooltipKey, formatComparisonScoreLinkSubFocusLabel, formatComparisonScoreLinkTooltipLabel, formatComparisonScoreLinkArtifactHoverLabel, formatComparisonScoreLinkArtifactLineDetailViewLabel, formatComparisonScoreLinkArtifactLineMicroViewLabel, formatComparisonScoreLinkArtifactLineDetailHoverLabel, formatComparisonScoreComponentDetail, buildComparisonScoreComponentDetails, formatComparisonScoreComponentRawValue, formatComparisonScoreSignedValue, getComparisonScoreLinkedRunRole, isSameComparisonScoreLinkTarget, isSameComparisonScoreLinkSurface, resolveComparisonScoreDrillBackTarget, isComparisonScoreLinkMatch, formatEditableNumber } from "./ControlRoomViewComparisonLinks";
 import { formatFixedNumber, buildLiveOrderDraftKey, formatComparisonMetric, formatComparisonDelta, formatComparisonNarrativeLabel, formatComparisonIntentLabel, formatComparisonIntentLegend, formatComparisonIntentTooltip, formatComparisonCueTooltip, buildComparisonCellTooltip, getComparisonIntentClassName, formatLaneLabel, formatVersionLineage, extractDefaultParameters, formatParameterMap, formatParameterValue, summarizeRunNotes } from "./ControlRoomViewFormatting";
 
@@ -108,6 +108,17 @@ export function StrategyColumn({
   );
 }
 
+const referenceSummaryLabels: Record<string, string> = {
+  ccxt: "거래소 market-data와 execution adapter의 직접 의존 후보입니다.",
+  "nautilus-trader": "Architecture와 execution-engine 검토용 Reference입니다. Sidecar 또는 의존성 기준이 명확해질 때까지 core 밖에서 관리합니다.",
+  "nostalgia-for-infinity": "Upstream Freqtrade runtime으로 실행하는 reference strategy lane입니다.",
+  yfinance: "비 crypto research lane을 위한 stock-market data adapter 후보입니다.",
+};
+
+function formatReferenceSummary(reference: ReferenceSource) {
+  return referenceSummaryLabels[reference.reference_id] ?? reference.summary;
+}
+
 export function ReferenceCatalog({ references }: { references: ReferenceSource[] }) {
   return references.length ? (
     <div className="run-list">
@@ -121,15 +132,15 @@ export function ReferenceCatalog({ references }: { references: ReferenceSource[]
             <div className="run-status completed">{reference.integration_mode}</div>
           </div>
           <div className="run-metrics">
-            <Metric label="License" value={reference.license} />
+            <Metric label="라이선스" value={reference.license} />
             <Metric label="Runtime" value={reference.runtime ?? "n/a"} />
           </div>
-          <p className="run-note">{reference.summary}</p>
+          <p className="run-note">{formatReferenceSummary(reference)}</p>
         </article>
       ))}
     </div>
   ) : (
-    <p className="empty-state">No references registered.</p>
+    <p className="empty-state">등록된 Reference가 없습니다.</p>
   );
 }
 
@@ -328,10 +339,9 @@ export function PresetCatalogPanel({
 
   return (
     <>
-      <RunSurfaceCapabilityDiscoveryPanel capabilities={runSurfaceCapabilities} compact />
       <form className="run-form" onSubmit={onSubmit}>
         <label>
-          Name
+          이름
           <input
             placeholder="Core 5m"
             value={form.name}
@@ -353,7 +363,7 @@ export function PresetCatalogPanel({
             value={form.strategy_id}
             onChange={(event) => setForm((current) => ({ ...current, strategy_id: event.target.value }))}
           >
-            <option value="">Any strategy</option>
+            <option value="">Strategy 전체</option>
             {strategies.map((strategy) => (
               <option key={strategy.strategy_id} value={strategy.strategy_id}>
                 {strategy.name}
@@ -380,7 +390,7 @@ export function PresetCatalogPanel({
           />
         </label>
         <label>
-          Tags
+          태그
           <input
             placeholder="baseline, momentum"
             value={form.tags_text}
@@ -388,9 +398,9 @@ export function PresetCatalogPanel({
           />
         </label>
         <label>
-          Description
+          설명
           <input
-            placeholder="Reusable backtest baseline"
+            placeholder="재사용 가능한 backtest 기준"
             value={form.description}
             onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
           />
@@ -408,20 +418,19 @@ export function PresetCatalogPanel({
         </label>
         {presetParameterDefaultsEnabled && selectedStrategyDefaultParametersJson ? (
           <p className="run-note">
-            Empty parameter bundles auto-hydrate from the selected strategy schema contract.
+            비어 있는 parameter 묶음은 선택한 Strategy schema contract에서 자동 보강됩니다.
           </p>
         ) : null}
         {isEditing ? (
           <p className="run-note">
-            Editing {editingPresetId}. Preset IDs are immutable, so this form updates the current bundle and records a
-            new revision.
+            {editingPresetId} 수정 중입니다. Preset ID는 유지되고 현재 묶음만 갱신되며 새 revision이 기록됩니다.
           </p>
         ) : null}
         <div className="run-actions">
-          <button type="submit">{isEditing ? "Save revision" : "Save preset"}</button>
+          <button type="submit">{isEditing ? "Revision 저장" : "Preset 저장"}</button>
           {isEditing ? (
             <button className="ghost-button" onClick={onResetEditor} type="button">
-              New preset
+              새 Preset
             </button>
           ) : null}
         </div>
@@ -741,7 +750,7 @@ export function PresetCatalogPanel({
                             })}
                           </div>
                         ) : (
-                          <p className="empty-state">No revisions match the current filter.</p>
+                          <p className="empty-state">현재 필터에 맞는 revision이 없습니다.</p>
                         )}
                       </>
                     ) : null}
@@ -752,7 +761,7 @@ export function PresetCatalogPanel({
           ))}
         </div>
       ) : (
-        <p className="empty-state">No durable presets saved yet.</p>
+        <p className="empty-state">저장된 durable Preset이 아직 없습니다.</p>
       )}
     </>
   );
@@ -809,7 +818,7 @@ export function RunForm({
         />
       </label>
       <label>
-        Initial cash
+        초기 현금
         <input
           type="number"
           value={form.initial_cash}
@@ -817,7 +826,7 @@ export function RunForm({
         />
       </label>
       <label>
-        Fee rate
+        수수료율
         <input
           type="number"
           step="0.0001"
@@ -839,7 +848,7 @@ export function RunForm({
           value={form.preset_id}
           onChange={(event) => setForm((current) => ({ ...current, preset_id: event.target.value }))}
         >
-          <option value="">No preset</option>
+          <option value="">Preset 없음</option>
           {availablePresets.map((preset) => (
             <option key={preset.preset_id} value={preset.preset_id}>
               {preset.name} ({preset.preset_id})
@@ -858,7 +867,7 @@ export function RunForm({
         />
       </label>
       <label>
-        Tags
+        태그
         <input
           placeholder="baseline, momentum"
           value={form.tags_text}
@@ -867,11 +876,11 @@ export function RunForm({
       </label>
       {selectedPreset ? (
         <div className="run-note">
-          Preset stage: {formatPresetLifecycleStage(selectedPreset.lifecycle.stage)}. Parameters:{" "}
+          Preset 단계: {formatPresetLifecycleStage(selectedPreset.lifecycle.stage)}. Parameters:{" "}
           {formatParameterMap(selectedPreset.parameters)}.
         </div>
       ) : null}
-      <button type="submit">Submit</button>
+      <button type="submit">실행</button>
     </form>
   );
 }
