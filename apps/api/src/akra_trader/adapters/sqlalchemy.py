@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from akra_trader.adapters.sqlalchemy_schema import *  # noqa: F403
+from akra_trader.adapters.sqlalchemy_schema import _build_engine
 from akra_trader.adapters.sqlalchemy_run_repository_core import SqlAlchemyRunRepositoryCoreMixin
 from akra_trader.adapters.sqlalchemy_run_repository_replay_intent import SqlAlchemyRunRepositoryReplayIntentMixin
 from akra_trader.adapters.sqlalchemy_run_repository_provider_exports import SqlAlchemyRunRepositoryProviderExportsMixin

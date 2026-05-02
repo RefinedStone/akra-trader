@@ -17,7 +17,7 @@ from . import commands
 from . import queries
 
 
-@dataclass(slots=True)
+@dataclass
 class StrategyCatalogFlow:
   strategies: StrategyCatalogPort
   references: ReferenceCatalogPort

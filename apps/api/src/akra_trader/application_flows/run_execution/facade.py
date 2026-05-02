@@ -15,7 +15,7 @@ from . import reruns
 from . import support
 
 
-@dataclass(slots=True)
+@dataclass
 class RunExecutionFlow:
   app: Any
 

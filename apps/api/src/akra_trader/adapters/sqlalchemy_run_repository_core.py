@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from akra_trader.adapters.sqlalchemy_schema import *  # noqa: F403
+from akra_trader.adapters.sqlalchemy_schema import _COMPACT_SQL_TABLE_NAMES
+from akra_trader.adapters.sqlalchemy_schema import _build_engine
+from akra_trader.adapters.sqlalchemy_schema import _quote_identifier
 
 class SqlAlchemyRunRepositoryCoreMixin:
   def __init__(self, database_url: str) -> None:
@@ -102,3 +105,129 @@ class SqlAlchemyRunRepositoryCoreMixin:
     if status in self._terminal_statuses:
       run.ended_at = datetime.now(UTC)
     return self.save_run(run)
+
+  def _build_row(self, run: RunRecord) -> dict:
+    payload = self._adapter.dump_python(run, mode="json")
+    return {
+      "run_id": run.config.run_id,
+      "mode": run.config.mode.value,
+      "status": run.status.value,
+      "strategy_id": run.config.strategy_id,
+      "strategy_version": run.config.strategy_version,
+      "rerun_boundary_id": run.provenance.rerun_boundary_id,
+      "dataset_identity": (
+        run.provenance.market_data.dataset_identity
+        if run.provenance.market_data is not None
+        else None
+      ),
+      "preset_id": run.provenance.experiment.preset_id,
+      "benchmark_family": run.provenance.experiment.benchmark_family,
+      "started_at": run.started_at.isoformat(),
+      "ended_at": run.ended_at.isoformat() if run.ended_at is not None else None,
+      "payload": payload,
+    }
+
+  def _ensure_schema(self, *, prepare_only: bool = False) -> None:
+    with self._engine.begin() as connection:
+      self._best_effort_migrate_compact_identifiers(connection)
+      inspector = inspect(connection)
+      existing_tables = set(inspector.get_table_names())
+      if run_records.name in existing_tables:
+        existing_columns = {
+          column["name"]
+          for column in inspector.get_columns(run_records.name)
+        }
+        missing_columns = {
+          "strategy_id": "TEXT",
+          "strategy_version": "TEXT",
+          "rerun_boundary_id": "TEXT",
+          "dataset_identity": "TEXT",
+          "preset_id": "TEXT",
+          "benchmark_family": "TEXT",
+        }
+        for column_name, column_type in missing_columns.items():
+          if column_name in existing_columns:
+            continue
+          connection.exec_driver_sql(
+            f"ALTER TABLE {_quote_identifier(run_records.name)} "
+            f"ADD COLUMN {_quote_identifier(column_name)} {column_type}"
+          )
+      if prepare_only:
+        return
+      inspector = inspect(connection)
+      existing_tables = set(inspector.get_table_names())
+      for table in metadata.sorted_tables:
+        if table.name not in existing_tables:
+          continue
+        existing_indexes = {
+          index["name"]
+          for index in inspector.get_indexes(table.name)
+        }
+        for index in table.indexes:
+          if not index.name or index.name in existing_indexes:
+            continue
+          column_names = [column.name for column in index.columns]
+          if not column_names:
+            continue
+          quoted_columns = ", ".join(_quote_identifier(column_name) for column_name in column_names)
+          connection.exec_driver_sql(
+            f"CREATE INDEX IF NOT EXISTS {_quote_identifier(index.name)} "
+            f"ON {_quote_identifier(table.name)} ({quoted_columns})"
+          )
+
+  def _best_effort_migrate_compact_identifiers(self, connection) -> None:
+    if connection.dialect.name != "sqlite":
+      return
+    inspector = inspect(connection)
+    existing_tables = set(inspector.get_table_names())
+    for legacy_table_name, compact_table_name in _COMPACT_SQL_TABLE_NAMES.items():
+      if legacy_table_name not in existing_tables:
+        continue
+      if compact_table_name in existing_tables:
+        legacy_columns = [
+          column["name"]
+          for column in inspect(connection).get_columns(legacy_table_name)
+        ]
+        compact_columns = {
+          column["name"]
+          for column in inspect(connection).get_columns(compact_table_name)
+        }
+        shared_columns = [
+          column_name
+          for column_name in legacy_columns
+          if column_name in compact_columns
+        ]
+        if shared_columns:
+          quoted_columns = ", ".join(_quote_identifier(column_name) for column_name in shared_columns)
+          connection.exec_driver_sql(
+            f"INSERT OR IGNORE INTO {_quote_identifier(compact_table_name)} ({quoted_columns}) "
+            f"SELECT {quoted_columns} FROM {_quote_identifier(legacy_table_name)}"
+          )
+        connection.exec_driver_sql(f"DROP TABLE {_quote_identifier(legacy_table_name)}")
+      else:
+        connection.exec_driver_sql(
+          f"ALTER TABLE {_quote_identifier(legacy_table_name)} "
+          f"RENAME TO {_quote_identifier(compact_table_name)}"
+        )
+      existing_tables.discard(legacy_table_name)
+      existing_tables.add(compact_table_name)
+    existing_indexes = {
+      row[0]
+      for row in connection.exec_driver_sql(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name IS NOT NULL"
+      ).fetchall()
+      if row[0]
+    }
+    for legacy_table_name, compact_table_name in _COMPACT_SQL_TABLE_NAMES.items():
+      compact_table = metadata.tables.get(compact_table_name)
+      if compact_table is None:
+        continue
+      for index in compact_table.indexes:
+        legacy_column_names = [column.name for column in index.columns]
+        if not legacy_column_names:
+          continue
+        legacy_index_name = f"ix_{legacy_table_name}_{'_'.join(legacy_column_names)}"
+        if legacy_index_name in existing_indexes:
+          connection.exec_driver_sql(
+            f"DROP INDEX IF EXISTS {_quote_identifier(legacy_index_name)}"
+          )

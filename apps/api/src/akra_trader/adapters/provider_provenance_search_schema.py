@@ -292,3 +292,12 @@ def _normalize_service_auth_token(value: str | None) -> str | None:
     return None
   normalized = value.strip()
   return normalized or None
+
+
+__all__ = [
+  name
+  for name in globals()
+  if name in {"metadata", "_build_engine", "_normalize_service_auth_token"}
+  or name.startswith("_SchedulerSearch")
+  or name.startswith("provider_provenance_scheduler_search_")
+]
