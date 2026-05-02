@@ -183,7 +183,5 @@ export {
   resolveMarketDataInstrumentLink,
   getAlertLinkPriority,
   compareAlertLinkPriority,
-  resolveAutoLinkedMarketInstrument,
-  formatParameterMap,
-  formatParameterValue
+  resolveAutoLinkedMarketInstrument
 };
