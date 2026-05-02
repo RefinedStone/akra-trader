@@ -29,3 +29,6 @@ export function WorkspaceRouteContent({
   }
   return <LiveWorkspaceRoute {...routes.live} />;
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const WorkspaceRoutePanels = undefined;

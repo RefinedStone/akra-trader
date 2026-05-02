@@ -117,3 +117,6 @@ export type QueryBuilderReplayGovernanceSectionProps = {
     ) => RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditFieldKey[];
   };
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const QueryBuilderReplayGovernanceSectionProps = undefined;

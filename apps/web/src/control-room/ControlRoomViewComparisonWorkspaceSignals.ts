@@ -540,3 +540,6 @@ export function summarizeComparisonHistorySyncWorkspaceChanges(state: {
   }
   return changes;
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const ComparisonHistorySyncWorkspaceSemanticRanking = undefined;

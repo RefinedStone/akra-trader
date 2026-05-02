@@ -173,3 +173,18 @@ export type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobPruneP
   deleted_job_ids?: string[];
   mode: "expired" | "matched" | string;
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const RunSurfaceCollectionQueryBuilderReplayIntentSnapshot = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkAliasRecordPayload = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditEntry = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditListPayload = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditPrunePayload = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobListPayload = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobDownloadPayload = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryEntry = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryPayload = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobPrunePayload = undefined;

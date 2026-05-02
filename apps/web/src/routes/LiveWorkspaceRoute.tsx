@@ -19,3 +19,6 @@ export function LiveWorkspaceRoute({
     </div>
   );
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const LiveWorkspaceRouteProps = undefined;

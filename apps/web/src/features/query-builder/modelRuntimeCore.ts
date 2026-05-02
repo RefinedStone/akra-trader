@@ -694,3 +694,18 @@ export function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTex
   visit(value);
   return Array.from(collected);
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const HydratedRunSurfaceCollectionQueryBuilderState = undefined;
+export const RunSurfaceCollectionQueryBuilderClauseState = undefined;
+export const RunSurfaceCollectionQueryBuilderPredicateRefState = undefined;
+export const RunSurfaceCollectionQueryBuilderGroupState = undefined;
+export const RunSurfaceCollectionQueryBuilderChildState = undefined;
+export const RunSurfaceCollectionQueryBuilderPredicateState = undefined;
+export const RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState = undefined;
+export const RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState = undefined;
+export const RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleDependencyState = undefined;
+export const RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState = undefined;
+export const RunSurfaceCollectionQueryBuilderPredicateTemplateState = undefined;
+export const RunSurfaceCollectionQueryRuntimePathToken = undefined;
+export const RunSurfaceCollectionQueryRuntimeCollectionItem = undefined;

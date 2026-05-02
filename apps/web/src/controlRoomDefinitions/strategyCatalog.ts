@@ -150,3 +150,16 @@ export type PresetDraftConflict = {
   hasInvalidParameters: boolean;
   summary: string;
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ParameterSchema = undefined;
+export const Strategy = undefined;
+export const ReferenceSource = undefined;
+export const ExperimentPresetRevision = undefined;
+export const ExperimentPreset = undefined;
+export const PresetRevisionFilterState = undefined;
+export const PresetStructuredDiffRow = undefined;
+export const PresetStructuredDiffGroup = undefined;
+export const PresetStructuredDiffDeltaValue = undefined;
+export const PresetRevisionDiff = undefined;
+export const PresetDraftConflict = undefined;

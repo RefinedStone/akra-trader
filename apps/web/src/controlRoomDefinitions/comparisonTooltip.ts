@@ -337,3 +337,21 @@ export const COMPARISON_TOOLTIP_TUNING_GROUPS: Record<
     order: 2,
   },
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ComparisonTooltipTargetProps = undefined;
+export const ComparisonTooltipInteractionOptions = undefined;
+export const ComparisonTooltipTuning = undefined;
+export const ComparisonTooltipTuningPresetStateV1 = undefined;
+export const ComparisonTooltipTuningSinglePresetShareV1 = undefined;
+export const ComparisonTooltipPresetImportConflictPolicy = undefined;
+export const ComparisonTooltipPresetImportResolution = undefined;
+export const ComparisonTooltipPendingPresetImportConflict = undefined;
+export const ComparisonTooltipPresetConflictPreviewRow = undefined;
+export const ComparisonTooltipPresetConflictPreviewGroup = undefined;
+export const ComparisonTooltipConflictSessionUiState = undefined;
+export const ComparisonTooltipConflictUiStateV1 = undefined;
+export const ComparisonTooltipConflictSessionSummary = undefined;
+export const ComparisonTooltipConflictSessionSummarySession = undefined;
+export const ComparisonTooltipTuningShareImport = undefined;
+export const ComparisonTooltipLayout = undefined;

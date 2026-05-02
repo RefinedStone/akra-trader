@@ -59,3 +59,11 @@ export type ProviderProvenanceScheduledReportRunDuePayload = {
   executed_count: number;
   items: ProviderProvenanceScheduledReportRunResult[];
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ProviderProvenanceScheduledReportEntry = undefined;
+export const ProviderProvenanceScheduledReportListPayload = undefined;
+export const ProviderProvenanceScheduledReportAuditRecord = undefined;
+export const ProviderProvenanceScheduledReportHistoryPayload = undefined;
+export const ProviderProvenanceScheduledReportRunResult = undefined;
+export const ProviderProvenanceScheduledReportRunDuePayload = undefined;

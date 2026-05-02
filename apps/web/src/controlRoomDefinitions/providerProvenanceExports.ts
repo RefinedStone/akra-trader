@@ -238,3 +238,16 @@ export type ProviderProvenanceExportAnalyticsPayload = {
   time_series: ProviderProvenanceExportTimeSeriesPayload;
   recent_exports: ProviderProvenanceExportJobEntry[];
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ProviderProvenanceExportJobEntry = undefined;
+export const ProviderProvenanceExportJobAuditRecord = undefined;
+export const ProviderProvenanceExportJobListPayload = undefined;
+export const ProviderProvenanceExportJobHistoryPayload = undefined;
+export const ProviderProvenanceExportJobEscalationResult = undefined;
+export const ProviderProvenanceExportJobPolicyResult = undefined;
+export const ProviderProvenanceExportAnalyticsRollupEntry = undefined;
+export const ProviderProvenanceExportDriftSeriesEntry = undefined;
+export const ProviderProvenanceExportBurnUpSeriesEntry = undefined;
+export const ProviderProvenanceExportTimeSeriesPayload = undefined;
+export const ProviderProvenanceExportAnalyticsPayload = undefined;

@@ -185,3 +185,15 @@ export type MarketDataProvenanceExportStateV1 = {
   active_filter: MarketDataProvenanceExportFilterState;
   history: MarketDataProvenanceExportHistoryEntry[];
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const MarketDataStatus = undefined;
+export const MarketDataLineageHistoryRecord = undefined;
+export const MarketDataIngestionJobRecord = undefined;
+export const OperatorLineageEvidenceRetentionPolicy = undefined;
+export const OperatorLineageEvidenceRetentionResult = undefined;
+export const OperatorLineageDrillEvidencePack = undefined;
+export const MarketDataProvenanceExportSort = undefined;
+export const MarketDataProvenanceExportFilterState = undefined;
+export const MarketDataProvenanceExportHistoryEntry = undefined;
+export const MarketDataProvenanceExportStateV1 = undefined;

@@ -734,3 +734,13 @@ export type RunSurfaceCollectionQueryRuntimeCandidateTrace = {
   sampleTruncated: boolean;
   sampleValues: RunSurfaceCollectionQueryRuntimeCandidateSample[];
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const RunSurfaceCollectionQueryBuilderApplyPayload = undefined;
+export const RunSurfaceCollectionQueryRuntimeCandidateSample = undefined;
+export const RunSurfaceCollectionQueryRuntimeCandidateContextSelection = undefined;
+export const RunSurfaceCollectionQueryRuntimeCandidateArtifactSelection = undefined;
+export const RunSurfaceCollectionQueryBuilderClauseDiffItem = undefined;
+export const RunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItem = undefined;
+export const RunSurfaceCollectionQueryRuntimeQuantifierOutcome = undefined;
+export const RunSurfaceCollectionQueryRuntimeCandidateTrace = undefined;

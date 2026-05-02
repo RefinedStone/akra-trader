@@ -525,3 +525,24 @@ export function buildProviderProvenanceSchedulerAlertWorkflowReason(
     ? `${category}_${suffix}`
     : `${category}_alert_workflow`;
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const ProviderProvenanceAnalyticsScope = undefined;
+export const ProviderProvenanceSchedulerOccurrenceNarrativeFacet = undefined;
+export const ProviderProvenanceAnalyticsQueryState = undefined;
+export const ProviderProvenanceSchedulerSearchDashboardFilterState = undefined;
+export const ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft = undefined;
+export const ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilterState = undefined;
+export const ProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft = undefined;
+export const ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft = undefined;
+export const ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditFilterState = undefined;
+export const ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyBulkDraft = undefined;
+export const ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyDraft = undefined;
+export const ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaQueueFilterState = undefined;
+export const ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaStageDraft = undefined;
+export const ProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilterState = undefined;
+export const ProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft = undefined;
+export const ProviderProvenanceSchedulerSearchModerationQueueFilterState = undefined;
+export const ProviderProvenanceSchedulerSearchModerationStageDraft = undefined;
+export const ProviderProvenanceSchedulerExportPolicyDraft = undefined;
+export const OperatorVisibilityAlertEntry = undefined;

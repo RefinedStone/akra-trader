@@ -383,3 +383,46 @@ export const COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS: Array<{
   { fieldKey: "comparisonSelection.scoreLink", label: "Focused score component" },
   { fieldKey: "expandedGapRows", label: "Expanded gap windows" },
 ];
+
+// Runtime placeholders for generated barrel compatibility.
+export const ComparisonHistorySyncWorkspaceSemanticSignal = undefined;
+export const ExpandedGapWindowSelections = undefined;
+export const GapWindowDragSelectionState = undefined;
+export const PendingTouchGapWindowSweepState = undefined;
+export const TouchGapWindowHoldProgressState = undefined;
+export const TouchGapWindowActivationFeedbackState = undefined;
+export const ControlRoomUiStateV1 = undefined;
+export const ControlRoomComparisonSelectionState = undefined;
+export const ComparisonHistoryStepDescriptor = undefined;
+export const ComparisonHistoryBrowserState = undefined;
+export const ComparisonHistoryPanelEntry = undefined;
+export const ComparisonHistoryTabIdentity = undefined;
+export const ComparisonHistoryPanelSyncState = undefined;
+export const ComparisonHistorySyncAuditKind = undefined;
+export const ComparisonHistorySyncConflictFieldSource = undefined;
+export const ComparisonHistorySyncConflictFieldKey = undefined;
+export const ComparisonHistorySyncWorkspaceFieldKey = undefined;
+export const ComparisonHistorySyncWorkspaceReviewSelectionKey = undefined;
+export const ComparisonHistorySyncWorkspaceSignalDetailSubviewKey = undefined;
+export const ComparisonHistorySyncWorkspaceSignalDetailNestedKey = undefined;
+export const ComparisonHistorySyncWorkspaceSignalMicroViewKey = undefined;
+export const ComparisonHistorySyncWorkspaceSignalMicroInteractionKey = undefined;
+export const ComparisonHistorySyncAuditFilter = undefined;
+export const ComparisonHistorySyncPreferenceFieldKey = undefined;
+export const ComparisonHistorySyncConflictReview = undefined;
+export const ComparisonHistorySyncPreferenceState = undefined;
+export const ComparisonHistorySyncPreferenceReview = undefined;
+export const ComparisonHistorySyncWorkspaceState = undefined;
+export const ComparisonHistorySyncWorkspaceReview = undefined;
+export const ComparisonHistorySyncAuditEntry = undefined;
+export const ComparisonHistorySyncAuditTrailState = undefined;
+export const ComparisonHistoryPanelState = undefined;
+export const ControlRoomComparisonHistoryPanelUiState = undefined;
+export const ComparisonHistorySyncConflictReviewRow = undefined;
+export const ComparisonHistorySyncConflictReviewGroup = undefined;
+export const ComparisonHistorySyncPreferenceReviewRow = undefined;
+export const ComparisonHistorySyncWorkspaceReviewRow = undefined;
+export const ComparisonHistorySyncWorkspaceRecommendationOverview = undefined;
+export const ControlRoomUiStateV2 = undefined;
+export const ControlRoomUiStateV3 = undefined;
+export const ControlRoomUiStateV4 = undefined;

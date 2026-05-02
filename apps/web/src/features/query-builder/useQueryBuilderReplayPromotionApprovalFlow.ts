@@ -464,3 +464,8 @@ export function useQueryBuilderReplayPromotionApprovalFlow({
     visibleSimulatedPredicateRefReplayApprovalRows,
   };
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const QueryBuilderReplayPromotionConflict = undefined;
+export const QueryBuilderReplayPromotionPreviewRow = undefined;
+export const QueryBuilderReplayPromotionSummary = undefined;

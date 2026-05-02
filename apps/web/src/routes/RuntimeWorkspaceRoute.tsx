@@ -25,3 +25,6 @@ export function RuntimeWorkspaceRoute({
     </div>
   );
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const RuntimeWorkspaceRouteProps = undefined;

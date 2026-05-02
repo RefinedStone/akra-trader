@@ -442,3 +442,6 @@ service_phase: string; last_transition_at?: string | null;
     };
   };
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const OperatorIncidentEventEntry = undefined;

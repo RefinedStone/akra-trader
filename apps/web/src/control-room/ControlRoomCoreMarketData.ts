@@ -389,3 +389,11 @@ export function normalizeProviderProvenanceDashboardLayoutState(
       : {}),
   };
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const LinkedMarketInstrumentContext = undefined;
+export const MarketDataLinkableAlertRecord = undefined;
+export const MarketDataIncidentHistoryEntry = undefined;
+export const ProviderRecoveryMarketContextSummary = undefined;
+export const MarketDataProviderProvenanceEventRecord = undefined;
+export const MarketDataPrimaryFocusSelection = undefined;

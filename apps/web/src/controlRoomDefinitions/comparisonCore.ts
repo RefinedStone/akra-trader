@@ -70,3 +70,15 @@ export type ComparisonScoreDrillBackOptions = {
   artifactHoverKey?: string | null;
   historyMode?: ComparisonHistoryWriteMode;
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ComparisonIntent = undefined;
+export const ComparisonCueKind = undefined;
+export const ComparisonScoreSection = undefined;
+export const ProvenanceArtifactLineDetailView = undefined;
+export const ProvenanceArtifactLineMicroView = undefined;
+export const ComparisonScoreLinkTarget = undefined;
+export const ComparisonScoreLinkedRunRole = undefined;
+export const ComparisonScoreLinkSource = undefined;
+export const ComparisonHistoryWriteMode = undefined;
+export const ComparisonScoreDrillBackOptions = undefined;

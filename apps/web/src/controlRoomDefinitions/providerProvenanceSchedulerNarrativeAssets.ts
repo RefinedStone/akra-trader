@@ -119,3 +119,15 @@ export type ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload = {
   registry: ProviderProvenanceSchedulerNarrativeRegistryEntry;
   history: ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry[];
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ProviderProvenanceSchedulerNarrativeTemplateEntry = undefined;
+export const ProviderProvenanceSchedulerNarrativeTemplateListPayload = undefined;
+export const ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry = undefined;
+export const ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload = undefined;
+export const ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult = undefined;
+export const ProviderProvenanceSchedulerNarrativeBulkGovernanceResult = undefined;
+export const ProviderProvenanceSchedulerNarrativeRegistryEntry = undefined;
+export const ProviderProvenanceSchedulerNarrativeRegistryListPayload = undefined;
+export const ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry = undefined;
+export const ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload = undefined;

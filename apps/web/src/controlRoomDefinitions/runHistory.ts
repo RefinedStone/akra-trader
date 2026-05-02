@@ -25,3 +25,9 @@ export type SavedRunHistoryFilterPresetStateV1 = {
   version: 1;
   filters: SavedRunHistoryFilterPreset[];
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const RunHistoryFilter = undefined;
+export const RunHistorySurfaceKey = undefined;
+export const SavedRunHistoryFilterPreset = undefined;
+export const SavedRunHistoryFilterPresetStateV1 = undefined;

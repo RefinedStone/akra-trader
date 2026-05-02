@@ -618,3 +618,11 @@ active_runtime_alert_count: number; running_sandbox_count: number; running_paper
 };
 
 export type { OperatorIncidentEventEntry } from "./operatorIncidentEvents";
+
+// Runtime placeholders for generated barrel compatibility.
+export const OperatorAlertMarketContextFieldProvenance = undefined;
+export const OperatorAlertMarketContextProvenance = undefined;
+export const OperatorAlertPrimaryFocus = undefined;
+export const OperatorAlertEntry = undefined;
+export const OperatorVisibility = undefined;
+export const GuardedLiveStatus = undefined;

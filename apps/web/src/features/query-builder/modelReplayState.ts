@@ -586,3 +586,40 @@ export function persistRunSurfaceCollectionQueryBuilderReplayApplySyncGovernance
     return;
   }
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const PredicateRefReplayApplyHistoryRow = undefined;
+export const PredicateRefReplayApplyHistoryEntry = undefined;
+export const PredicateRefReplayApplyHistoryTabIdentity = undefined;
+export const PredicateRefReplayApplySyncMode = undefined;
+export const PredicateRefReplayApplySyncAuditFilter = undefined;
+export const PredicateRefReplayApplyConflictPolicy = undefined;
+export const PredicateRefReplayApplyConflictEntry = undefined;
+export const PredicateRefReplayApplyConflictDiffItem = undefined;
+export const PredicateRefReplayApplyConflictResolutionPreview = undefined;
+export const PredicateRefReplayApplyConflictReview = undefined;
+export const PredicateRefReplayApplyConflictDraftReview = undefined;
+export const PredicateRefReplayApplySyncAuditEntry = undefined;
+export const PredicateRefReplayApplySyncAuditTrailState = undefined;
+export const PredicateRefReplayApplySyncGovernanceState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayIntentState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayIntentStorageState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayIntentBrowserState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkShareMode = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkAliasState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkAuditState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditFieldKey = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditEntry = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernancePayload = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceChangeSource = undefined;
+export const RunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictEntry = undefined;
+export const PredicateRefReplayApplyConflictState = undefined;
+export const HydratedRunSurfaceCollectionQueryBuilderExpressionState = undefined;
+export const RunSurfaceCollectionQueryBuilderEditorTarget = undefined;

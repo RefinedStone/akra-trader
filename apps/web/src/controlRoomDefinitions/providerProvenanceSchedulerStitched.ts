@@ -155,3 +155,17 @@ export type ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditList
   items: ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord[];
   total: number;
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ProviderProvenanceSchedulerStitchedReportViewEntry = undefined;
+export const ProviderProvenanceSchedulerStitchedReportViewListPayload = undefined;
+export const ProviderProvenanceSchedulerStitchedReportViewRevisionEntry = undefined;
+export const ProviderProvenanceSchedulerStitchedReportViewRevisionListPayload = undefined;
+export const ProviderProvenanceSchedulerStitchedReportViewAuditRecord = undefined;
+export const ProviderProvenanceSchedulerStitchedReportViewAuditListPayload = undefined;
+export const ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry = undefined;
+export const ProviderProvenanceSchedulerStitchedReportGovernanceRegistryListPayload = undefined;
+export const ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionEntry = undefined;
+export const ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionListPayload = undefined;
+export const ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord = undefined;
+export const ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditListPayload = undefined;

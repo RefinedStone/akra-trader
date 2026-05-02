@@ -231,3 +231,12 @@ export function buildRunHistoryWorkspacePanels({
     },
   };
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const RunSectionComparisonControls = undefined;
+export const RunSectionRerunAction = undefined;
+export const LiveOrderReplacementDraft = undefined;
+export const RunOrderControls = undefined;
+export const RunHistoryWorkspaceSectionProps = undefined;
+export const BuildRunHistoryWorkspacePanelsInput = undefined;
+export const RunHistoryWorkspacePanels = undefined;

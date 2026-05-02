@@ -13,3 +13,6 @@ export function OverviewWorkspaceRoute({
     </div>
   );
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const OverviewWorkspaceRouteProps = undefined;

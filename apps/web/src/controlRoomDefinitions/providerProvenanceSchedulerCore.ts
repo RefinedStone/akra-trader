@@ -355,3 +355,14 @@ export type ProviderProvenanceSchedulerHealthExportPayload = {
   record_count: number;
   total_count: number;
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ProviderProvenanceSchedulerHealthSnapshot = undefined;
+export const ProviderProvenanceSchedulerHealthHistoryEntry = undefined;
+export const ProviderProvenanceSchedulerHealthHistoryPayload = undefined;
+export const ProviderProvenanceSchedulerAlertHistoryPayload = undefined;
+export const ProviderProvenanceSchedulerHealthStatusSeriesEntry = undefined;
+export const ProviderProvenanceSchedulerLagTrendSeriesEntry = undefined;
+export const ProviderProvenanceSchedulerHealthTimeSeriesPayload = undefined;
+export const ProviderProvenanceSchedulerHealthAnalyticsPayload = undefined;
+export const ProviderProvenanceSchedulerHealthExportPayload = undefined;

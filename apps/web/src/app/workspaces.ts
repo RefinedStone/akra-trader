@@ -108,3 +108,6 @@ export function workspaceFromPathname(pathname: string): ControlWorkspaceId {
   }
   return "overview";
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const ControlWorkspaceId = undefined;

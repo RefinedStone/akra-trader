@@ -362,3 +362,7 @@ export function formatLineageIndicator(value?: string | null) {
 export function formatComparisonScoreValue(value: number) {
   return value.toFixed(2).replace(/\.?0+$/, "");
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const RunListBoundarySurfaceContract = undefined;
+export const RunListBoundaryGroupContract = undefined;

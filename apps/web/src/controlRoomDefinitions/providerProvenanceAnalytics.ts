@@ -90,3 +90,13 @@ export type ProviderProvenanceDashboardViewListPayload = {
   items: ProviderProvenanceDashboardViewEntry[];
   total: number;
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const ProviderProvenanceAnalyticsWorkspaceQuery = undefined;
+export const ProviderProvenanceDashboardLayout = undefined;
+export const ProviderProvenanceSchedulerNarrativeGovernanceQueueView = undefined;
+export const ProviderProvenanceWorkspaceFocus = undefined;
+export const ProviderProvenanceAnalyticsPresetEntry = undefined;
+export const ProviderProvenanceAnalyticsPresetListPayload = undefined;
+export const ProviderProvenanceDashboardViewEntry = undefined;
+export const ProviderProvenanceDashboardViewListPayload = undefined;

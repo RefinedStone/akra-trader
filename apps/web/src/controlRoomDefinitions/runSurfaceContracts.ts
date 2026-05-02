@@ -555,3 +555,34 @@ export type RunSurfaceCollectionQueryExpressionAuthoring = {
     quantifierField: string;
   };
 };
+
+// Runtime placeholders for generated barrel compatibility.
+export const RunListBoundaryGroupKey = undefined;
+export const RunListBoundarySurfaceId = undefined;
+export const RunListBoundaryEligibility = undefined;
+export const BenchmarkArtifact = undefined;
+export const RunListBoundaryContract = undefined;
+export const RunSurfaceEnforcementState = undefined;
+export const RunActionAvailabilityEntry = undefined;
+export const DatasetBoundaryContract = undefined;
+export const OperatorLineageSummary = undefined;
+export const Run = undefined;
+export const RunComparison = undefined;
+export const RunSurfaceCapabilities = undefined;
+export const RunSurfaceSharedContract = undefined;
+export const RunSurfaceCapabilityPolicy = undefined;
+export const RunSurfaceCapabilityEnforcement = undefined;
+export const RunSurfaceCapabilitySurfaceRule = undefined;
+export const RunSurfaceCapabilityFamilyKey = undefined;
+export const RunSurfaceCapabilitySurfaceKey = undefined;
+export const RunSurfaceCapabilityFamily = undefined;
+export const RunSurfaceCapabilityFamilyContract = undefined;
+export const RunSurfaceCapabilitySchemaContract = undefined;
+export const RunSurfaceSubresourceContract = undefined;
+export const RunSurfaceCollectionQueryContract = undefined;
+export const RunSurfaceCollectionQueryParameterDomain = undefined;
+export const RunSurfaceCollectionQueryParameter = undefined;
+export const RunSurfaceCollectionQueryElementField = undefined;
+export const RunSurfaceCollectionQuerySchema = undefined;
+export const RunSurfaceCollectionQueryParameterDomainDescriptor = undefined;
+export const RunSurfaceCollectionQueryExpressionAuthoring = undefined;

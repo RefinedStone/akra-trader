@@ -22,3 +22,6 @@ export function ResearchWorkspaceRoute({
     </div>
   );
 }
+
+// Runtime placeholders for generated barrel compatibility.
+export const ResearchWorkspaceRouteProps = undefined;
