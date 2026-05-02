@@ -434,9 +434,35 @@ select {
   color: var(--text);
 }
 
+.market-chart-indicator-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.market-chart-indicator-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.market-chart-indicator-bar input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--cyan);
+}
+
 .market-chart-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -466,6 +492,42 @@ select {
 
 .market-chart-overlay.is-error {
   color: #fecaca;
+}
+
+.market-chart-order-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.market-chart-order-block {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.market-chart-order-block.is-bullish {
+  border-color: rgba(13, 138, 82, 0.2);
+  background: rgba(13, 138, 82, 0.05);
+}
+
+.market-chart-order-block.is-bearish {
+  border-color: rgba(221, 60, 68, 0.2);
+  background: rgba(221, 60, 68, 0.05);
+}
+
+.market-chart-order-block span,
+.market-chart-order-block small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.market-chart-order-block strong {
+  color: var(--text);
+  font-size: 0.95rem;
 }
 
 .market-chart-footer {
