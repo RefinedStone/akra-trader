@@ -1,0 +1,10 @@
+from __future__ import annotations
+
+from fastapi import APIRouter
+
+from akra_trader.api_provider_provenance_routes_exports import register_provider_provenance_export_and_search_routes
+from akra_trader.api_provider_provenance_routes_governance import register_provider_provenance_governance_routes
+
+def register_provider_provenance_explicit_routes(router: APIRouter, get_app) -> None:
+  register_provider_provenance_export_and_search_routes(router, get_app)
+  register_provider_provenance_governance_routes(router, get_app)
