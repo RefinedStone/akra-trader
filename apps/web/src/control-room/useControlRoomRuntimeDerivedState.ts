@@ -951,13 +951,9 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       guardedLiveSummary?.blockerCount,
       marketStatus?.instruments.length,
       operatorSummary?.criticalCount,
-      paperRuns.length,
-      sandboxRuns.length,
-      strategies.length,
-      strategyGroups.native.length,
-      strategyGroups.reference.length,
-      totalTrackedRunCount,
-      liveRuns.length,
+      paperRuns.length, sandboxRuns.length,
+      strategies.length, strategyGroups.native.length, strategyGroups.reference.length,
+      totalTrackedRunCount, liveRuns.length,
     ],
   );
 
@@ -980,14 +976,8 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       backtests.length,
       guardedLive?.kill_switch.state,
       guardedLiveSummary?.blockerCount,
-      liveRuns.length,
-      marketStatus?.instruments.length,
-      operatorSummary?.alertCount,
-      paperRuns.length,
-      presets.length,
-      references.length,
-      sandboxRuns.length,
-      strategies.length,
+      liveRuns.length, marketStatus?.instruments.length, operatorSummary?.alertCount,
+      paperRuns.length, presets.length, references.length, sandboxRuns.length, strategies.length,
       totalTrackedRunCount,
     ],
   );
@@ -995,8 +985,6 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
   const activeWorkspaceDescriptor =
     workspaceDescriptors.find((workspace) => workspace.id === activeWorkspace)
     ?? workspaceDescriptors[0];
-
-
   return {
     activeMarketInstrument, focusedMarketWorkflowExportPayload, focusedMarketWorkflowSummary, filteredFocusedMarketProviderProvenanceEvents, focusedMarketProviderProvenanceCount, activeWorkspaceDescriptor,
     controlStripMetrics, workspaceDescriptors, strategyGroups, failureSummary, backfillSummary, operatorSummary,
