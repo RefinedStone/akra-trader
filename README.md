@@ -55,6 +55,12 @@ API default: `http://localhost:8000`
 
 Web default: `http://localhost:5173`
 
+Docker Compose host ports:
+
+- API: `http://localhost:18000`
+- Web: `http://localhost:15173`
+- Postgres: `localhost:15432`
+
 ## Tests
 
 ```bash

@@ -11,7 +11,7 @@ services:
       timeout: 5s
       retries: 10
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -19,6 +19,7 @@ services:
     image: python:3.12-slim
     working_dir: /workspace/apps/api
     environment:
+      AKRA_TRADER_CORS_ORIGIN: http://localhost:15173
       AKRA_TRADER_RUNS_DATABASE_URL: postgresql+psycopg://akra:akra@postgres:5432/akra_trader
     command: >
       bash -lc "python -m venv .venv &&
@@ -28,7 +29,7 @@ services:
       - .:/workspace
       - api_venv:/workspace/apps/api/.venv
     ports:
-      - "8000:8000"
+      - "18000:8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health').read()\""]
       interval: 5s
@@ -46,12 +47,12 @@ services:
       bash -lc "npm install &&
       npm run dev -- --host 0.0.0.0 --port 5173"
     environment:
-      VITE_API_BASE_URL: http://localhost:8000/api
+      VITE_API_BASE_URL: http://localhost:18000/api
     volumes:
       - .:/workspace
       - web_node_modules:/workspace/apps/web/node_modules
     ports:
-      - "5173:5173"
+      - "15173:5173"
     depends_on:
       api:
         condition: service_healthy
