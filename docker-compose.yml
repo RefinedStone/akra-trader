@@ -19,6 +19,7 @@ services:
     environment:
       AKRA_TRADER_CORS_ORIGIN: http://localhost:47613
       AKRA_TRADER_RUNS_DATABASE_URL: postgresql+psycopg://akra:akra@postgres:5432/akra_trader
+      AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_SERVICE_URL: memory://local
     command: >
       bash -lc "python -m venv .venv &&
       .venv/bin/python -m pip install -e '.[dev]' &&
