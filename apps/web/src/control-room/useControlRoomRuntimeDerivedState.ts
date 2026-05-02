@@ -919,27 +919,27 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
   const controlStripMetrics = useMemo<ControlStripMetric[]>(
     () => [
       {
-        label: "Strategy catalog",
+        label: "Strategy Catalog",
         value: `${strategies.length}`,
-        detail: `${strategyGroups.native.length} native · ${strategyGroups.reference.length} reference`,
+        detail: `native ${strategyGroups.native.length}개 · reference ${strategyGroups.reference.length}개`,
         tone: "research",
       },
       {
-        label: "Tracked runs",
+        label: "Run 현황",
         value: `${totalTrackedRunCount}`,
-        detail: `${backtests.length} backtests · ${sandboxRuns.length + paperRuns.length + liveRuns.length} runtime sessions`,
+        detail: `Backtest ${backtests.length}개 · Runtime ${sandboxRuns.length + paperRuns.length + liveRuns.length}개`,
         tone: "runtime",
       },
       {
-        label: "Data health",
+        label: "데이터 상태",
         value: formatCompletion(backfillSummary?.completionRatio ?? null),
-        detail: `${marketStatus?.instruments.length ?? 0} instruments · ${failureSummary?.failureCount24h ?? 0} failures / 24h`,
+        detail: `instrument ${marketStatus?.instruments.length ?? 0}개 · 24h failure ${failureSummary?.failureCount24h ?? 0}개`,
         tone: (failureSummary?.failureCount24h ?? 0) > 0 ? "warning" : "runtime",
       },
       {
-        label: "Guarded live",
+        label: "Guarded Live",
         value: guardedLive?.kill_switch.state ?? "n/a",
-        detail: `${guardedLiveSummary?.blockerCount ?? 0} blockers · ${operatorSummary?.criticalCount ?? 0} critical alerts`,
+        detail: `blocker ${guardedLiveSummary?.blockerCount ?? 0}개 · critical alert ${operatorSummary?.criticalCount ?? 0}개`,
         tone: "live",
       },
     ],

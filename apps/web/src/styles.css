@@ -71,9 +71,9 @@ select {
 .eyebrow,
 .kicker {
   margin: 0 0 10px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Noto Sans KR", "Roboto", sans-serif;
   font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--cyan);
 }
@@ -250,9 +250,9 @@ select {
 
 .workspace-tab-kicker {
   color: var(--cyan);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Noto Sans KR", "Roboto", sans-serif;
   font-size: 0.64rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 

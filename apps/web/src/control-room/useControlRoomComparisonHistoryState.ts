@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const noop = () => undefined;
 const fallbackValueCache = new Map<string, unknown>();
@@ -44,6 +44,45 @@ function fallbackComparisonHistoryStateValue(name: string) {
   if (name.endsWith("Loading") || name.startsWith("is") || name.startsWith("should")) {
     return false;
   }
+  if (name.endsWith("SearchQuery") || name.endsWith("Reason")) {
+    return "";
+  }
+  if (name === "comparisonIntent") {
+    return "benchmark_validation";
+  }
+  if (name.endsWith("Step")) {
+    fallbackValue = {
+      label: "비교 준비",
+      summary: "비교할 실행 결과를 선택하세요.",
+    };
+    fallbackValueCache.set(name, fallbackValue);
+    return fallbackValue;
+  }
+  if (name.endsWith("TabIdentity")) {
+    fallbackValue = {
+      tabId: "local",
+      label: "Local",
+    };
+    fallbackValueCache.set(name, fallbackValue);
+    return fallbackValue;
+  }
+  if (name.endsWith("AuditFilter")) {
+    return "all";
+  }
+  if (name.endsWith("RunFilter")) {
+    fallbackValue = {
+      strategy_id: "__all__",
+      strategy_version: "__all__",
+      preset_id: "",
+      benchmark_family: "",
+      tag: "",
+      dataset_identity: "",
+      filter_expr: "",
+      collection_query_label: "",
+    };
+    fallbackValueCache.set(name, fallbackValue);
+    return fallbackValue;
+  }
   if (
     name.endsWith("Entries")
     || name.endsWith("History")
@@ -56,6 +95,7 @@ function fallbackComparisonHistoryStateValue(name: string) {
     || name.endsWith("Rows")
     || name.endsWith("Items")
     || name.endsWith("Options")
+    || name.endsWith("Trail")
     || name.includes("Timeline")
     || name.includes("Clusters")
   ) {
@@ -112,6 +152,91 @@ export function useControlRoomComparisonHistoryState({ model }: { model: any }):
     buildComparisonHistorySyncWorkspaceRecommendedSources, resolveComparisonHistorySyncWorkspaceReview, formatComparisonHistorySyncWorkspaceResolutionSummary, marketStatus, pruneExpandedGapRows, filterExpandedGapRows,
     pruneExpandedGapWindowSelections, filterExpandedGapWindowSelections, isSameComparisonSelection, isSameComparisonHistoryExpandedGapRows, isSameExpandedGapWindowSelections, instrumentGapRowKey,
   } = model;
+
+  const loadAll = useCallback(async () => {
+    const currentModel = modelRef.current;
+    const loadJson = currentModel.fetchJson;
+    if (typeof loadJson !== "function") {
+      return;
+    }
+
+    const safeFetchJson = async (path: string, fallbackValue: unknown) => {
+      try {
+        return await loadJson(path);
+      } catch {
+        return fallbackValue;
+      }
+    };
+
+    currentModel.setStatusText?.("데이터 동기화 중...");
+    const [
+      strategyPayload,
+      referencePayload,
+      presetPayload,
+      backtestPayload,
+      sandboxPayload,
+      paperPayload,
+      livePayload,
+      marketStatusPayload,
+      operatorVisibilityPayload,
+      guardedLivePayload,
+    ] = await Promise.all([
+      safeFetchJson("/strategies", []),
+      safeFetchJson("/references", []),
+      safeFetchJson("/presets", []),
+      safeFetchJson(currentModel.buildRunsPath?.("backtest", currentModel.backtestRunFilter) ?? "/runs?mode=backtest", []),
+      safeFetchJson(currentModel.buildRunsPath?.("sandbox", currentModel.sandboxRunFilter) ?? "/runs?mode=sandbox", []),
+      safeFetchJson(currentModel.buildRunsPath?.("paper", currentModel.paperRunFilter) ?? "/runs?mode=paper", []),
+      safeFetchJson(currentModel.buildRunsPath?.("live", currentModel.liveRunFilter) ?? "/runs?mode=live", []),
+      safeFetchJson("/market-data/status", null),
+      safeFetchJson("/operator/visibility", null),
+      safeFetchJson("/guarded-live", null),
+    ]);
+
+    currentModel.setStrategies?.(Array.isArray(strategyPayload) ? strategyPayload : []);
+    currentModel.setReferences?.(Array.isArray(referencePayload) ? referencePayload : []);
+    currentModel.setPresets?.(Array.isArray(presetPayload) ? presetPayload : []);
+    currentModel.setBacktests?.(Array.isArray(backtestPayload) ? backtestPayload : []);
+    currentModel.setSandboxRuns?.(Array.isArray(sandboxPayload) ? sandboxPayload : []);
+    currentModel.setPaperRuns?.(Array.isArray(paperPayload) ? paperPayload : []);
+    currentModel.setLiveRuns?.(Array.isArray(livePayload) ? livePayload : []);
+    currentModel.setMarketStatus?.(marketStatusPayload);
+    currentModel.setOperatorVisibility?.(operatorVisibilityPayload);
+    currentModel.setGuardedLive?.(guardedLivePayload);
+
+    const firstStrategy = Array.isArray(strategyPayload) ? strategyPayload[0] : null;
+    if (firstStrategy?.strategy_id) {
+      for (const setterName of ["setBacktestForm", "setSandboxForm", "setLiveForm"]) {
+        currentModel[setterName]?.((form: any) => (
+          form?.strategy_id
+            ? form
+            : {
+                ...form,
+                strategy_id: firstStrategy.strategy_id,
+                timeframe: form?.timeframe || "5m",
+              }
+        ));
+      }
+    }
+
+    const totalRuns =
+      (Array.isArray(backtestPayload) ? backtestPayload.length : 0)
+      + (Array.isArray(sandboxPayload) ? sandboxPayload.length : 0)
+      + (Array.isArray(paperPayload) ? paperPayload.length : 0)
+      + (Array.isArray(livePayload) ? livePayload.length : 0);
+    currentModel.setStatusText?.(
+      `동기화 완료: Strategy ${Array.isArray(strategyPayload) ? strategyPayload.length : 0}개, Run ${totalRuns}개`,
+    );
+  }, []);
+
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
+
+  modelRef.current = {
+    ...model,
+    loadAll,
+  };
 
   if (!proxyRef.current) {
     proxyRef.current = new Proxy({}, {

@@ -109,6 +109,13 @@ from akra_trader.domain.models import (
   OperatorIncidentZohoDeskRecoveryPhaseGraph,
   OperatorIncidentZohoDeskRecoveryState,
 )
+from akra_trader.application_support.provider_recovery_family_secondary_d import (
+  _normalize_freshdesk_alert_phase,
+  _resolve_freshdesk_escalation_phase,
+  _resolve_freshdesk_ownership_phase,
+  _resolve_freshdesk_priority_phase,
+  _resolve_freshdesk_workflow_phase,
+)
 
 __all__ = (
   "_normalize_intercom_alert_phase",

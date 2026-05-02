@@ -48,45 +48,45 @@ export function buildControlWorkspaceDescriptors(
   return [
     {
       id: "overview",
-      kicker: "Mission control",
+      kicker: "운영 현황",
       label: "Overview",
       description:
-        "Start here to assess control posture, then move into the lane that needs action. This surface stays intentionally short and decision-oriented.",
-      summary: `${input.totalTrackedRunCount} tracked runs · ${input.strategiesCount} strategies · ${input.alertCount} active alerts`,
-      sections: ["Control posture", "Workspace routing", "Catalog health"],
+        "전체 상태를 먼저 확인한 뒤 필요한 workspace로 이동합니다. 판단에 필요한 지표만 짧게 보여줍니다.",
+      summary: `Run ${input.totalTrackedRunCount}개 · Strategy ${input.strategiesCount}개 · 활성 alert ${input.alertCount}개`,
+      sections: ["운영 상태", "Workspace 이동", "Catalog 상태"],
     },
     {
       id: "research",
-      kicker: "Backtests and presets",
+      kicker: "Backtest와 Preset",
       label: "Research",
       description:
-        "Use this lane for experiment design, preset management, reference review, and benchmark comparison without runtime noise.",
-      summary: `${input.backtestsCount} backtests · ${input.presetsCount} presets · ${input.referencesCount} references`,
-      sections: ["Launch a run", "Scenario presets", "Third-party references", "Recent backtests"],
+        "실험 설계, Preset 관리, reference 검토, benchmark 비교를 운영 소음 없이 처리합니다.",
+      summary: `Backtest ${input.backtestsCount}개 · Preset ${input.presetsCount}개 · reference ${input.referencesCount}개`,
+      sections: ["Run 실행", "Scenario Preset", "외부 reference", "최근 Backtest"],
     },
     {
       id: "runtime",
-      kicker: "Sandbox and paper",
+      kicker: "Sandbox와 Paper",
       label: "Runtime Ops",
       description:
-        "Monitor data freshness, sandbox and paper execution, and operator incident pressure in one operational workspace.",
-      summary: `${input.sandboxRunsCount} sandbox · ${input.paperRunsCount} paper · ${input.instrumentsCount} instruments`,
+        "데이터 최신성, Sandbox/Paper 실행, 운영 alert를 한 workspace에서 확인합니다.",
+      summary: `Sandbox ${input.sandboxRunsCount}개 · Paper ${input.paperRunsCount}개 · instrument ${input.instrumentsCount}개`,
       sections: [
-        "Start sandbox worker",
-        "Market data status",
-        "Runtime alerts and audit",
-        "Sandbox runs",
-        "Paper runs",
+        "Sandbox worker 시작",
+        "Market data 상태",
+        "Runtime alert와 audit",
+        "Sandbox Run",
+        "Paper Run",
       ],
     },
     {
       id: "live",
-      kicker: "Guarded execution",
+      kicker: "Guarded 실행",
       label: "Guarded Live",
       description:
-        "Reserve this workspace for live ownership, reconciliation, recovery, and manual order intervention. Nothing exploratory belongs here.",
-      summary: `Kill switch ${input.killSwitchState} · ${input.blockerCount} blockers · ${input.liveRunsCount} live runs`,
-      sections: ["Start live worker", "Kill switch and reconciliation", "Guarded live runs"],
+        "Live ownership, reconciliation, recovery, 수동 주문 개입만 다룹니다. 실험성 작업은 분리합니다.",
+      summary: `Kill switch ${input.killSwitchState} · blocker ${input.blockerCount}개 · Live Run ${input.liveRunsCount}개`,
+      sections: ["Live worker 시작", "Kill switch와 reconciliation", "Guarded Live Run"],
     },
   ];
 }

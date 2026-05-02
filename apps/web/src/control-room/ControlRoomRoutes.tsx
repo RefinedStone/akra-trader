@@ -672,11 +672,11 @@ export function ControlRoomRoutes({ model }: { model: any }) {
               <section className="panel panel-wide">
                 <div className="section-heading">
                   <div>
-                    <p className="kicker">Strategy catalog</p>
-                    <h2>Runtime tiers</h2>
+                    <p className="kicker">Strategy Catalog</p>
+                    <h2>Runtime 구분</h2>
                   </div>
                   <button className="ghost-button" onClick={() => void loadAll()}>
-                    Refresh
+                    새로고침
                   </button>
                 </div>
 
@@ -770,8 +770,8 @@ marketDataPanel: <ControlRoomMarketDataPanel model={model} />,
           live: {
             launchPanel: (
               <section className="panel">
-                <p className="kicker">Guarded live</p>
-                <h2>Start live worker</h2>
+                <p className="kicker">Guarded Live</p>
+                <h2>Live worker 시작</h2>
                 <RunForm
                   form={liveForm}
                   setForm={setLiveForm}

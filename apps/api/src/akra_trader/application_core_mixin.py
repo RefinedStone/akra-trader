@@ -93,6 +93,9 @@ class TradingApplicationCoreMixin:
     self._guarded_live_market_data_timeframes = tuple(
       dict.fromkeys(market_data_sync_timeframes or ("5m",))
     )
+    self._guarded_live_market_data_backfill_completion_floor = 0.95
+    self._guarded_live_market_data_contiguous_completion_floor = 0.95
+    self._guarded_live_market_data_failure_burst_threshold = 3
     self._sandbox_worker_heartbeat_interval_seconds = sandbox_worker_heartbeat_interval_seconds
     self._sandbox_worker_heartbeat_timeout_seconds = sandbox_worker_heartbeat_timeout_seconds
     self._guarded_live_worker_heartbeat_interval_seconds = (

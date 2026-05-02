@@ -28,23 +28,22 @@ export function WorkspaceShell({
     <div className="shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">Akra Trader / Hexagonal Control Room</p>
-          <h1>One control room, split into research, runtime ops, and guarded live workspaces.</h1>
+          <p className="eyebrow">Akra Trader / 운영 Control Room</p>
+          <h1>Research, Runtime Ops, Guarded Live를 한 화면에서 관리합니다.</h1>
           <p className="hero-copy">
-            The backend already exposes research, runtime, and guarded-live surfaces. The frontend
-            now routes operators through focused lanes instead of one endless dashboard scroll.
+            필요한 작업 영역만 빠르게 확인하고, 실험·운영·실행 제어를 분리해서 처리합니다.
           </p>
         </div>
         <aside className="hero-panel">
           <span className="status-indicator" />
           <strong>{statusText}</strong>
           <p>API base: {apiBase}</p>
-          <p>Active workspace: {activeWorkspaceDescriptor.label}</p>
+          <p>현재 workspace: {activeWorkspaceDescriptor.label}</p>
         </aside>
       </header>
 
       <main className="workspace-shell">
-        <section className="control-strip" aria-label="System metrics">
+        <section className="control-strip" aria-label="시스템 지표">
           {controlStripMetrics.map((metric) => (
             <article
               className={`control-metric-card ${metric.tone ? `is-${metric.tone}` : ""}`.trim()}
@@ -80,7 +79,7 @@ export function WorkspaceShell({
               <h2>{activeWorkspaceDescriptor.label}</h2>
             </div>
             <button className="ghost-button" onClick={onRefresh} type="button">
-              Refresh data
+              데이터 새로고침
             </button>
           </div>
           <div className="workspace-intro-grid">
