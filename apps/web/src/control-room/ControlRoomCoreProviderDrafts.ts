@@ -1,0 +1,480 @@
+// @ts-nocheck
+
+import { CSSProperties, FormEvent, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, forwardRef, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION, AKRA_TOUCH_FEEDBACK_EVENT_NAME, AkraTouchFeedbackDetail, AkraTouchFeedbackEnvelope, triggerAkraTouchFeedbackBridge, WorkspaceShell, buildControlWorkspaceDescriptors, ControlWorkspaceDescriptor, ControlStripMetric, useWorkspaceRoute, WorkspaceRouteContent, buildRunHistoryWorkspacePanels, LiveOrderReplacementDraft, RunHistoryWorkspaceSectionProps, RunOrderControls, getRunListBoundaryContractSnapshot, getRunListBoundarySurfaceLabel, getRunSurfaceCapabilityFamily, getRunSurfaceCapabilityFamilyOrder, getRunSurfaceCapabilityGroupOrder, getRunSurfaceCapabilitySchemaContract, getRunSurfaceCollectionQueryContracts, getRunSurfaceSharedContracts, getRunSurfaceSubresourceContracts, RunListComparisonBoundaryNote, shouldEnableReferenceProvenanceSemantics, shouldEnableRunListMetricDrillBack, shouldEnableRunSnapshotSemantics, shouldEnableStrategyCatalogSchemaHints, shouldHydratePresetParameterDefaults, shouldRenderOrderActionBoundaryNote, shouldRenderWorkflowControlBoundaryNote, RunSurfaceCollectionQueryBuilder, formatComparisonTooltipTuningDelta, formatComparisonTooltipTuningValue, formatRelativeTimestampLabel, RunSection, RunSurfaceCollectionQueryBuilderApplyPayload, RunSurfaceCollectionQueryRuntimeCandidateContextSelection, RunSurfaceCollectionQueryRuntimeCandidateSample, applyProviderProvenanceSchedulerStitchedReportGovernancePlan, applyProviderProvenanceSchedulerNarrativeGovernancePlan, approveProviderProvenanceSchedulerStitchedReportGovernancePlan, approveProviderProvenanceSchedulerNarrativeGovernancePlan, createProviderProvenanceAnalyticsPreset, createProviderProvenanceDashboardView, createProviderProvenanceExportJob, createProviderProvenanceSchedulerStitchedReportGovernanceRegistry, createProviderProvenanceSchedulerStitchedReportGovernancePlan, createProviderProvenanceSchedulerStitchedReportView, createProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog, captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy, createProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate, createProviderProvenanceSchedulerNarrativeGovernancePlan, createProviderProvenanceSchedulerNarrativeRegistryEntry, createProviderProvenanceSchedulerNarrativeTemplate, createProviderProvenanceScheduledReport, approveProviderProvenanceExportJob, applyProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate, deleteProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog, deleteProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate, deleteProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate, deleteProviderProvenanceSchedulerNarrativeRegistryEntry, deleteProviderProvenanceSchedulerStitchedReportView, deleteProviderProvenanceSchedulerNarrativeTemplate, createProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate, createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias, createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob, downloadProviderProvenanceExportJob, downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob, escalateProviderProvenanceExportJob, exportProviderProvenanceSchedulerHealth, exportProviderProvenanceSchedulerStitchedNarrativeReport, reconstructProviderProvenanceSchedulerHealthExport, exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits, fetchJson, getProviderProvenanceExportAnalytics, getProviderProvenanceExportJobHistory, getProviderProvenanceSchedulerHealthAnalytics, getProviderProvenanceScheduledReportHistory, getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory, listProviderProvenanceAnalyticsPresets, listProviderProvenanceDashboardViews, listProviderProvenanceSchedulerStitchedReportViews, listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAudits, listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates, listProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisions, listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAudits, listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogs, listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions, listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAudits, listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates, listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisions, listProviderProvenanceSchedulerNarrativeGovernancePlans, listProviderProvenanceSchedulerNarrativeRegistryEntries, listProviderProvenanceSchedulerNarrativeRegistryRevisions, listProviderProvenanceSchedulerNarrativeTemplates, listProviderProvenanceSchedulerNarrativeTemplateRevisions, listProviderProvenanceSchedulerStitchedReportGovernancePolicyCatalogs, listProviderProvenanceSchedulerStitchedReportGovernancePolicyTemplates, listProviderProvenanceSchedulerStitchedReportGovernancePlans, rollbackProviderProvenanceSchedulerStitchedReportGovernancePlan, rollbackProviderProvenanceSchedulerNarrativeGovernancePlan, listMarketDataIngestionJobs, listMarketDataLineageHistory, listProviderProvenanceExportJobs, listProviderProvenanceSchedulerAlertHistory, listProviderProvenanceSchedulerHealthHistory, listProviderProvenanceSchedulerStitchedReportGovernanceRegistries, listProviderProvenanceSchedulerStitchedReportGovernanceRegistryAudits, listProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisions, listProviderProvenanceSchedulerStitchedReportViewAudits, listProviderProvenanceSchedulerStitchedReportViewRevisions, getProviderProvenanceSchedulerSearchDashboard, bulkGovernProviderProvenanceSchedulerSearchModerationPolicyCatalogs, bulkGovernProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicies, createProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicy, createProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicy, listProviderProvenanceSchedulerSearchModerationPolicyCatalogs, listProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicies, listProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlans, listProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAudits, listProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicies, listProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisions, listProviderProvenanceSchedulerSearchModerationCatalogGovernancePlans, listProviderProvenanceSchedulerSearchModerationPolicyCatalogAudits, listProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisions, listProviderProvenanceSchedulerSearchModerationPlans, listProviderProvenanceScheduledReports, listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs, listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits, approveProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan, approveProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlan, approveProviderProvenanceSchedulerSearchModerationPlan, applyProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan, applyProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlan, applyProviderProvenanceSchedulerSearchModerationPlan, createProviderProvenanceSchedulerSearchModerationPolicyCatalog, deleteProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicy, deleteProviderProvenanceSchedulerSearchModerationPolicyCatalog, moderateProviderProvenanceSchedulerSearchFeedbackBatch, moderateProviderProvenanceSchedulerSearchFeedback, pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs, pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits, recordProviderProvenanceSchedulerSearchFeedback, resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias, restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepRevision, restoreProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevision, restoreProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevision, restoreProviderProvenanceSchedulerSearchModerationPolicyCatalogRevision, restoreProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevision, restoreProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevision, restoreProviderProvenanceSchedulerNarrativeRegistryRevision, restoreProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevision, restoreProviderProvenanceSchedulerStitchedReportViewRevision, restoreProviderProvenanceSchedulerNarrativeTemplateRevision, revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias, runProviderProvenanceSchedulerNarrativeGovernancePlanBatchAction, runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkGovernance, runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance, runProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkGovernance, stageProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlan, stageProviderProvenanceSchedulerSearchModerationCatalogGovernancePlan, stageProviderProvenanceSchedulerSearchModerationPlan, updateProviderProvenanceSchedulerSearchModerationPolicyCatalog, updateProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicy, stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplates, stageProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate, stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog, runDueProviderProvenanceScheduledReports, runProviderProvenanceScheduledReport, updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStep, updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog, updateProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate, updateProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate, updateProviderProvenanceSchedulerNarrativeRegistryEntry, updateProviderProvenanceSchedulerStitchedReportGovernanceRegistry, updateProviderProvenanceSchedulerStitchedReportView, updateProviderProvenanceSchedulerNarrativeTemplate, updateProviderProvenanceExportJobPolicy, deleteProviderProvenanceSchedulerStitchedReportGovernanceRegistry, ALL_FILTER_VALUE, apiBase, COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM, COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM, COMPARISON_FOCUS_ARTIFACT_LINE_EXPANDED_SEARCH_PARAM, COMPARISON_FOCUS_ARTIFACT_LINE_HOVER_SEARCH_PARAM, COMPARISON_FOCUS_ARTIFACT_LINE_MICRO_VIEW_SEARCH_PARAM, COMPARISON_FOCUS_ARTIFACT_LINE_NOTE_PAGE_SEARCH_PARAM, COMPARISON_FOCUS_ARTIFACT_LINE_SCRUB_SEARCH_PARAM, COMPARISON_FOCUS_ARTIFACT_LINE_VIEW_SEARCH_PARAM, COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM, COMPARISON_FOCUS_DETAIL_SEARCH_PARAM, COMPARISON_FOCUS_EXPANDED_SEARCH_PARAM, COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM, COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM, COMPARISON_FOCUS_SECTION_SEARCH_PARAM, COMPARISON_FOCUS_SOURCE_SEARCH_PARAM, COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM, COMPARISON_HISTORY_BROWSER_STATE_KEY, COMPARISON_HISTORY_BROWSER_STATE_VERSION, COMPARISON_HISTORY_SYNC_AUDIT_SESSION_KEY, COMPARISON_HISTORY_SYNC_AUDIT_SESSION_VERSION, COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS, COMPARISON_HISTORY_SYNC_PREFERENCE_FIELD_DEFINITIONS, COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS, COMPARISON_HISTORY_TAB_ID_SESSION_KEY, COMPARISON_INTENT_SEARCH_PARAM, COMPARISON_RUN_ID_SEARCH_PARAM, COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_KEY, COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION, COMPARISON_TOOLTIP_TUNING_GROUPS, COMPARISON_TOOLTIP_TUNING_LABELS, COMPARISON_TOOLTIP_TUNING_SHARE_PARAM, COMPARISON_TOOLTIP_TUNING_STORAGE_KEY, COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION, COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD, CONTROL_ROOM_UI_STATE_STORAGE_KEY, CONTROL_ROOM_UI_STATE_VERSION, DEFAULT_COMPARISON_TOOLTIP_PRESET_IMPORT_CONFLICT_POLICY, DEFAULT_COMPARISON_TOOLTIP_TUNING, DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE, LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY, MARKET_DATA_PROVENANCE_EXPORT_STORAGE_KEY, MARKET_DATA_PROVENANCE_EXPORT_STORAGE_VERSION, MAX_COMPARISON_HISTORY_PANEL_ENTRIES, MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES, MAX_COMPARISON_RUNS, MAX_MARKET_DATA_PROVENANCE_EXPORT_HISTORY_ENTRIES, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICT_ENTRIES, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_ENTRIES, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_ENTRIES, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_ENTRIES, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_AUDIT_ENTRIES, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_CONFLICT_ENTRIES, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_REVIEWED_CONFLICT_KEYS, MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES, MAX_VISIBLE_GAP_WINDOWS, PRESET_PROFILE_AGGRESSIVENESS_RANKS, PRESET_PROFILE_CONFIDENCE_RANKS, PRESET_PROFILE_SPEED_RANKS, PRESET_TIMEFRAME_UNIT_TO_MINUTES, REPLAY_INTENT_ACTION_FILTER_SEARCH_PARAM, REPLAY_INTENT_ALIAS_SEARCH_PARAM, REPLAY_INTENT_EDGE_FILTER_SEARCH_PARAM, REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM, REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM, REPLAY_INTENT_PREVIEW_GROUP_SEARCH_PARAM, REPLAY_INTENT_PREVIEW_TRACE_SEARCH_PARAM, REPLAY_INTENT_SCOPE_SEARCH_PARAM, REPLAY_INTENT_SEARCH_PARAM, REPLAY_INTENT_STEP_SEARCH_PARAM, REPLAY_INTENT_TEMPLATE_SEARCH_PARAM, RUN_HISTORY_SAVED_FILTER_STORAGE_KEY_PREFIX, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICTS_SESSION_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICTS_SESSION_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_GOVERNANCE_SESSION_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_GOVERNANCE_SESSION_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_TAB_ID_SESSION_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_BROWSER_STATE_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_STORAGE_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_STORAGE_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_STORAGE_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_STORAGE_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_AUDIT_STORAGE_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_AUDIT_STORAGE_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_PAYLOAD_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SESSION_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SESSION_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_KEY, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_VERSION, RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_SIGNING_SECRET_STORAGE_KEY, SHOW_COMPARISON_TOOLTIP_TUNING_PANEL, TOUCH_GAP_WINDOW_SWEEP_HOLD_MS, TOUCH_GAP_WINDOW_SWEEP_MOVE_TOLERANCE_PX, BenchmarkArtifact, ParameterSchema, ComparisonCueKind, ComparisonHistoryBrowserState, ComparisonHistoryPanelEntry, ComparisonHistoryPanelState, ComparisonHistoryPanelSyncState, ComparisonHistoryStepDescriptor, ComparisonHistorySyncAuditEntry, ComparisonHistorySyncAuditFilter, ComparisonHistorySyncAuditKind, ComparisonHistorySyncAuditTrailState, ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource, ComparisonHistorySyncConflictReview, ComparisonHistorySyncConflictReviewGroup, ComparisonHistorySyncPreferenceFieldKey, ComparisonHistorySyncPreferenceReview, ComparisonHistorySyncPreferenceReviewRow, ComparisonHistorySyncPreferenceState, ComparisonHistorySyncWorkspaceRecommendationOverview, ComparisonHistorySyncWorkspaceReview, ComparisonHistorySyncWorkspaceReviewRow, ComparisonHistorySyncWorkspaceReviewSelectionKey, ComparisonHistorySyncWorkspaceSemanticSignal, ComparisonHistorySyncWorkspaceSignalDetailNestedKey, ComparisonHistorySyncWorkspaceSignalDetailSubviewKey, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey, ComparisonHistorySyncWorkspaceSignalMicroViewKey, ComparisonHistorySyncWorkspaceState, ComparisonHistoryTabIdentity, ComparisonHistoryWriteMode, ComparisonIntent, ComparisonScoreDrillBackOptions, ComparisonScoreLinkedRunRole, ComparisonScoreLinkSource, ComparisonScoreLinkTarget, ComparisonScoreSection, ComparisonTooltipConflictSessionSummary, ComparisonTooltipConflictSessionSummarySession, ComparisonTooltipConflictSessionUiState, ComparisonTooltipConflictUiStateV1, ComparisonTooltipInteractionOptions, ComparisonTooltipLayout, ComparisonTooltipPendingPresetImportConflict, ComparisonTooltipPresetConflictPreviewGroup, ComparisonTooltipPresetConflictPreviewRow, ComparisonTooltipPresetImportConflictPolicy, ComparisonTooltipPresetImportResolution, ComparisonTooltipTargetProps, ComparisonTooltipTuning, ComparisonTooltipTuningPresetStateV1, ComparisonTooltipTuningShareImport, ComparisonTooltipTuningSinglePresetShareV1, ControlRoomComparisonHistoryPanelUiState, ControlRoomComparisonSelectionState, ControlRoomUiStateV1, ControlRoomUiStateV2, ControlRoomUiStateV3, ControlRoomUiStateV4, ExpandedGapWindowSelections, ExperimentPreset, ExperimentPresetRevision, GapWindowDragSelectionState, GuardedLiveStatus, MarketDataIngestionJobRecord, MarketDataProvenanceExportFilterState, MarketDataProvenanceExportHistoryEntry, MarketDataProvenanceExportSort, MarketDataProvenanceExportStateV1, MarketDataLineageHistoryRecord, MarketDataStatus, OperatorAlertMarketContextProvenance, OperatorAlertPrimaryFocus, OperatorVisibility, PendingTouchGapWindowSweepState, PresetDraftConflict, PresetRevisionDiff, PresetRevisionFilterState, PresetStructuredDiffDeltaValue, PresetStructuredDiffGroup, PresetStructuredDiffRow, ProviderProvenanceAnalyticsPresetEntry, ProviderProvenanceDashboardLayout, ProviderProvenanceDashboardViewEntry, ProviderProvenanceExportAnalyticsPayload, ProviderProvenanceExportJobEntry, ProviderProvenanceExportJobEscalationResult, ProviderProvenanceExportJobHistoryPayload, ProviderProvenanceExportJobPolicyResult, ProviderProvenanceSchedulerAlertHistoryPayload, ProviderProvenanceSchedulerHealthExportPayload, ProviderProvenanceSchedulerHealthAnalyticsPayload, ProviderProvenanceSchedulerHealthHistoryPayload, ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPlanListPayload, ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyListPayload, ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditRecord, ProviderProvenanceSchedulerSearchModerationCatalogGovernancePlanListPayload, ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditListPayload, ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyListPayload, ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyRevisionListPayload, ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditRecord, ProviderProvenanceSchedulerSearchModerationPlanListPayload, ProviderProvenanceSchedulerSearchModerationPolicyCatalogRevisionListPayload, ProviderProvenanceSchedulerSearchModerationPolicyCatalogListPayload, ProviderProvenanceSchedulerSearchFeedbackBatchModerationResult, ProviderProvenanceSchedulerSearchDashboardPayload, ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditRecord, ProviderProvenanceSchedulerStitchedReportGovernanceRegistryEntry, ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionEntry, ProviderProvenanceSchedulerStitchedReportGovernanceRegistryRevisionListPayload, ProviderProvenanceSchedulerStitchedReportViewAuditRecord, ProviderProvenanceSchedulerStitchedReportViewEntry, ProviderProvenanceSchedulerStitchedReportViewRevisionEntry, ProviderProvenanceSchedulerStitchedReportViewRevisionListPayload, ProviderProvenanceSchedulerNarrativeBulkGovernanceResult, ProviderProvenanceSchedulerNarrativeGovernancePlan, ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult, ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep, ProviderProvenanceSchedulerNarrativeGovernanceQueueView, ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditRecord, ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplate, ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionEntry, ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateRevisionListPayload, ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord, ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog, ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry, ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionListPayload, ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord, ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate, ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionEntry, ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionListPayload, ProviderProvenanceSchedulerNarrativeRegistryEntry, ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry, ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload, ProviderProvenanceSchedulerNarrativeTemplateEntry, ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry, ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload, ProviderProvenanceScheduledReportEntry, ProviderProvenanceScheduledReportHistoryPayload, ProvenanceArtifactLineDetailView, ProvenanceArtifactLineMicroView, ReferenceSource, Run, RunComparison, RunHistoryFilter, RunHistorySurfaceKey, RunListBoundaryContract, RunListBoundaryEligibility, RunListBoundaryGroupKey, RunListBoundarySurfaceId, RunSurfaceCapabilities, RunSurfaceCapabilityFamily, RunSurfaceCapabilityFamilyContract, RunSurfaceCapabilityFamilyKey, RunSurfaceCapabilitySchemaContract, RunSurfaceCapabilitySurfaceKey, RunSurfaceCollectionQueryBuilderReplayIntentSnapshot, RunSurfaceCollectionQueryBuilderReplayLinkAliasRecordPayload, RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy, RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditEntry, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobDownloadPayload, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryEntry, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryPayload, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobListPayload, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobPrunePayload, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditListPayload, RunSurfaceCollectionQueryBuilderReplayLinkServerAuditPrunePayload, RunSurfaceCollectionQueryContract, RunSurfaceCollectionQueryElementField, RunSurfaceCollectionQueryExpressionAuthoring, RunSurfaceCollectionQueryParameterDomainDescriptor, RunSurfaceCollectionQuerySchema, RunSurfaceSharedContract, RunSurfaceSubresourceContract, SavedRunHistoryFilterPreset, SavedRunHistoryFilterPresetStateV1, Strategy, TouchGapWindowActivationFeedbackState, TouchGapWindowHoldProgressState } from "./ControlRoomCoreHelpersContext";
+import { defaultRunForm, defaultPresetForm, defaultPresetRevisionFilter, defaultMarketDataProvenanceExportFilterState, ProviderProvenanceAnalyticsScope, ProviderProvenanceSchedulerOccurrenceNarrativeFacet, ProviderProvenanceAnalyticsQueryState, ProviderProvenanceSchedulerSearchDashboardFilterState, ProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft, ProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilterState, ProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft, ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft, ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditFilterState, ProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyBulkDraft, ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyDraft, ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaQueueFilterState, ProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaStageDraft, ProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilterState, ProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft, ProviderProvenanceSchedulerSearchModerationQueueFilterState, ProviderProvenanceSchedulerSearchModerationStageDraft, ProviderProvenanceSchedulerExportPolicyDraft, OperatorVisibilityAlertEntry, defaultProviderProvenanceAnalyticsQueryState, defaultProviderProvenanceSchedulerSearchDashboardFilterState, defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogDraft, defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogAuditFilter, defaultProviderProvenanceSchedulerSearchModerationPolicyCatalogBulkDraft, defaultProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyDraft, defaultProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyAuditFilter, defaultProviderProvenanceSchedulerSearchModerationCatalogGovernancePolicyBulkDraft, defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaPolicyDraft, defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaQueueFilterState, defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceMetaStageDraft, defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceQueueFilterState, defaultProviderProvenanceSchedulerSearchModerationCatalogGovernanceStageDraft, defaultProviderProvenanceSchedulerSearchModerationQueueFilterState, defaultProviderProvenanceSchedulerSearchModerationStageDraft, normalizeProviderProvenanceSchedulerRoutingPolicyDraftValue, normalizeProviderProvenanceSchedulerApprovalPolicyDraftValue, buildProviderProvenanceSchedulerExportPolicyDraft, getProviderProvenanceSchedulerNarrativeGovernanceQueuePriorityRank, getProviderProvenanceSchedulerNarrativeGovernanceQueueState, formatProviderProvenanceSchedulerNarrativeGovernanceHierarchySummary, formatProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepSummary, formatProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyPosition, isProviderProvenanceSchedulerAlertCategory, getOperatorAlertOccurrenceKey, formatProviderProvenanceSchedulerTimelineSummary, formatProviderProvenanceSchedulerSearchMatchSummary, formatProviderProvenanceSchedulerRetrievalClusterSummary, buildProviderProvenanceSchedulerAlertWorkflowReason } from "./ControlRoomCoreDefaults";
+
+export const defaultProviderProvenanceDashboardLayout: ProviderProvenanceDashboardLayout = {
+  highlight_panel: "overview",
+  show_rollups: true,
+  show_time_series: true,
+  show_recent_exports: true,
+};
+
+export const DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT = "queue_priority";
+
+export const defaultProviderProvenanceWorkspaceDraft = {
+  name: "",
+  description: "",
+};
+
+export type ProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraftState = {
+  name: string;
+  description: string;
+  default_policy_template_id: string;
+  default_policy_catalog_id: string;
+};
+
+export const defaultProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraft:
+  ProviderProvenanceSchedulerStitchedReportGovernanceRegistryDraftState = {
+    name: "",
+    description: "",
+    default_policy_template_id: "",
+    default_policy_catalog_id: "",
+  };
+
+export type ProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  queue_state: string;
+  approval_lane: string;
+  approval_priority: string;
+  search: string;
+  sort: string;
+  default_policy_template_id: string;
+  default_policy_catalog_id: string;
+};
+
+export const defaultProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkDraft:
+  ProviderProvenanceSchedulerStitchedReportGovernanceRegistryBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    queue_state: "__keep_current__",
+    approval_lane: "__keep_current__",
+    approval_priority: "__keep_current__",
+    search: "__keep_current__",
+    sort: "__keep_current__",
+    default_policy_template_id: "__keep_current__",
+    default_policy_catalog_id: "__keep_current__",
+  };
+
+export const KEEP_CURRENT_BULK_GOVERNANCE_VALUE = "__keep_current__";
+export const CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE = "__clear_template_link__";
+
+export type ProviderProvenanceSchedulerNarrativeBulkToggleValue =
+  | typeof KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+  | "enable"
+  | "disable";
+
+export type ProviderProvenanceSchedulerNarrativeTemplateBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  scheduler_alert_category: string;
+  scheduler_alert_status: string;
+  scheduler_alert_narrative_facet:
+    | typeof KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    | ProviderProvenanceSchedulerOccurrenceNarrativeFacet;
+  window_days: string;
+  result_limit: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeTemplateBulkDraft: ProviderProvenanceSchedulerNarrativeTemplateBulkDraftState = {
+  name_prefix: "",
+  name_suffix: "",
+  description_append: "",
+  scheduler_alert_category: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  scheduler_alert_status: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  scheduler_alert_narrative_facet: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  window_days: "",
+  result_limit: "",
+};
+
+export type ProviderProvenanceSchedulerStitchedReportViewBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  scheduler_alert_category: string;
+  scheduler_alert_status: string;
+  scheduler_alert_narrative_facet:
+    | typeof KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    | ProviderProvenanceSchedulerOccurrenceNarrativeFacet;
+  window_days: string;
+  result_limit: string;
+  occurrence_limit: string;
+  history_limit: string;
+  drilldown_history_limit: string;
+};
+
+export const defaultProviderProvenanceSchedulerStitchedReportViewBulkDraft:
+  ProviderProvenanceSchedulerStitchedReportViewBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    scheduler_alert_category: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+    scheduler_alert_status: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+    scheduler_alert_narrative_facet: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+    window_days: "",
+    result_limit: "",
+    occurrence_limit: "",
+    history_limit: "",
+    drilldown_history_limit: "",
+  };
+
+export type ProviderProvenanceSchedulerNarrativeRegistryDraftState = {
+  name: string;
+  description: string;
+  template_id: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeRegistryDraft: ProviderProvenanceSchedulerNarrativeRegistryDraftState = {
+  name: "",
+  description: "",
+  template_id: "",
+};
+
+export type ProviderProvenanceSchedulerNarrativeRegistryBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  scheduler_alert_category: string;
+  scheduler_alert_status: string;
+  scheduler_alert_narrative_facet:
+    | typeof KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    | ProviderProvenanceSchedulerOccurrenceNarrativeFacet;
+  window_days: string;
+  result_limit: string;
+  template_id: string;
+  show_rollups: ProviderProvenanceSchedulerNarrativeBulkToggleValue;
+  show_time_series: ProviderProvenanceSchedulerNarrativeBulkToggleValue;
+  show_recent_exports: ProviderProvenanceSchedulerNarrativeBulkToggleValue;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeRegistryBulkDraft: ProviderProvenanceSchedulerNarrativeRegistryBulkDraftState = {
+  name_prefix: "",
+  name_suffix: "",
+  description_append: "",
+  scheduler_alert_category: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  scheduler_alert_status: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  scheduler_alert_narrative_facet: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  window_days: "",
+  result_limit: "",
+  template_id: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  show_rollups: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  show_time_series: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  show_recent_exports: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraftState = {
+  name: string;
+  description: string;
+  item_type_scope:
+    | "any"
+    | "template"
+    | "registry"
+    | "stitched_report_view"
+    | "stitched_report_governance_registry";
+  action_scope: "any" | "delete" | "restore" | "update";
+  approval_lane: string;
+  approval_priority: "low" | "normal" | "high" | "critical";
+  guidance: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraftState = {
+    name: "",
+    description: "",
+    item_type_scope: "any",
+    action_scope: "any",
+    approval_lane: "general",
+    approval_priority: "normal",
+    guidance: "",
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraftState = {
+  name: string;
+  description: string;
+  default_policy_template_id: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogDraftState = {
+    name: "",
+    description: "",
+    default_policy_template_id: "",
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  default_policy_template_id: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+  description_append: "",
+  default_policy_template_id: "",
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraftState = {
+  item_ids_text: string;
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  query_patch: string;
+  layout_patch: string;
+  template_id: string;
+  clear_template_link: boolean;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepDraftState = {
+    item_ids_text: "",
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    query_patch: "",
+    layout_patch: "",
+    template_id: "",
+    clear_template_link: false,
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  query_patch: string;
+  layout_patch: string;
+  template_id: string;
+  clear_template_link: boolean;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    query_patch: "",
+    layout_patch: "",
+    template_id: "",
+    clear_template_link: false,
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraftState = {
+  name: string;
+  description: string;
+  item_ids_text: string;
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  query_patch: string;
+  layout_patch: string;
+  template_id: string;
+  clear_template_link: boolean;
+  governance_policy_template_id: string;
+  governance_policy_catalog_id: string;
+  governance_approval_lane: string;
+  governance_approval_priority: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraft:
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateDraftState = {
+    name: "",
+    description: "",
+    item_ids_text: "",
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+  query_patch: "",
+  layout_patch: "",
+  template_id: "",
+  clear_template_link: false,
+  governance_policy_template_id: "",
+  governance_policy_catalog_id: "",
+  governance_approval_lane: "",
+  governance_approval_priority: "",
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  item_ids_text: string;
+  step_name_prefix: string;
+  step_name_suffix: string;
+  step_description_append: string;
+  query_patch: string;
+  layout_patch: string;
+  template_id: string;
+  clear_template_link: boolean;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraft:
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateBulkDraftState = {
+    name_prefix: "",
+    name_suffix: "",
+    description_append: "",
+    item_ids_text: "",
+    step_name_prefix: "",
+    step_name_suffix: "",
+    step_description_append: "",
+    query_patch: "",
+    layout_patch: "",
+    template_id: "",
+    clear_template_link: false,
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyStepVersionEntry = {
+  revision: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry;
+  step: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep;
+  position: number;
+  total: number;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
+  queue_state: typeof ALL_FILTER_VALUE | "pending_approval" | "ready_to_apply" | "completed";
+  item_type:
+    | typeof ALL_FILTER_VALUE
+    | "template"
+    | "registry"
+    | "stitched_report_view"
+    | "stitched_report_governance_registry";
+  approval_lane: string;
+  approval_priority: string;
+  policy_template_id: string;
+  policy_catalog_id: string;
+  source_hierarchy_step_template_id: string;
+  search: string;
+  sort: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter:
+  ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
+    queue_state: ALL_FILTER_VALUE,
+  item_type: ALL_FILTER_VALUE,
+  approval_lane: ALL_FILTER_VALUE,
+  approval_priority: ALL_FILTER_VALUE,
+  policy_template_id: ALL_FILTER_VALUE,
+  policy_catalog_id: ALL_FILTER_VALUE,
+  source_hierarchy_step_template_id: ALL_FILTER_VALUE,
+  search: "",
+  sort: DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
+};
+
+export type ProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterState = {
+  queue_state: typeof ALL_FILTER_VALUE | "pending_approval" | "ready_to_apply" | "completed";
+  approval_lane: string;
+  approval_priority: string;
+  policy_template_id: string;
+  policy_catalog_id: string;
+  search: string;
+  sort: string;
+};
+
+export const defaultProviderProvenanceSchedulerStitchedReportGovernanceQueueFilter:
+  ProviderProvenanceSchedulerStitchedReportGovernanceQueueFilterState = {
+    queue_state: ALL_FILTER_VALUE,
+    approval_lane: ALL_FILTER_VALUE,
+    approval_priority: ALL_FILTER_VALUE,
+    policy_template_id: ALL_FILTER_VALUE,
+    policy_catalog_id: ALL_FILTER_VALUE,
+    search: "",
+    sort: DEFAULT_PROVIDER_PROVENANCE_SCHEDULER_NARRATIVE_GOVERNANCE_QUEUE_SORT,
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState = {
+  policy_template_id: string;
+  action: string;
+  actor_tab_id: string;
+  search: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilter:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState = {
+    policy_template_id: "",
+    action: ALL_FILTER_VALUE,
+    actor_tab_id: "",
+    search: "",
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilterState = {
+  catalog_id: string;
+  action: string;
+  actor_tab_id: string;
+  search: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilter:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditFilterState = {
+    catalog_id: "",
+    action: ALL_FILTER_VALUE,
+    actor_tab_id: "",
+    search: "",
+  };
+
+export type ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditFilterState = {
+  hierarchy_step_template_id: string;
+  action: string;
+  actor_tab_id: string;
+  search: string;
+};
+
+export const defaultProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditFilter:
+  ProviderProvenanceSchedulerNarrativeGovernanceHierarchyStepTemplateAuditFilterState = {
+    hierarchy_step_template_id: "",
+    action: ALL_FILTER_VALUE,
+    actor_tab_id: "",
+    search: "",
+  };
+
+export type ProviderProvenanceSchedulerStitchedReportViewAuditFilterState = {
+  view_id: string;
+  action: string;
+  actor_tab_id: string;
+  search: string;
+};
+
+export const defaultProviderProvenanceSchedulerStitchedReportViewAuditFilter:
+  ProviderProvenanceSchedulerStitchedReportViewAuditFilterState = {
+    view_id: "",
+    action: ALL_FILTER_VALUE,
+    actor_tab_id: "",
+    search: "",
+  };
+
+export type ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilterState = {
+  registry_id: string;
+  action: string;
+  actor_tab_id: string;
+  search: string;
+};
+
+export const defaultProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilter:
+  ProviderProvenanceSchedulerStitchedReportGovernanceRegistryAuditFilterState = {
+    registry_id: "",
+    action: ALL_FILTER_VALUE,
+    actor_tab_id: "",
+    search: "",
+  };
+
+export type ProviderProvenanceReportDraftState = {
+  name: string;
+  description: string;
+  preset_id: string;
+  view_id: string;
+  cadence: "daily" | "weekly";
+  status: "scheduled" | "paused";
+};
+
+export const defaultProviderProvenanceReportDraft: ProviderProvenanceReportDraftState = {
+  name: "",
+  description: "",
+  preset_id: "",
+  view_id: "",
+  cadence: "daily",
+  status: "scheduled",
+};
