@@ -9,12 +9,16 @@ export type ControlWorkspaceDescriptor = {
   sections: string[];
 };
 
+export const ControlWorkspaceDescriptor = undefined;
+
 export type ControlStripMetric = {
   label: string;
   value: string;
   detail: string;
   tone?: "research" | "runtime" | "live" | "warning";
 };
+
+export const ControlStripMetric = undefined;
 
 type ControlWorkspaceDescriptorInput = {
   alertCount: number;

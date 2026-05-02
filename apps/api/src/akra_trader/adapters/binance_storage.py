@@ -50,6 +50,7 @@ from akra_trader.ports import MarketDataPort
 
 
 from akra_trader.adapters.binance_schema import _TIMEFRAME_SECONDS
+from akra_trader.adapters.binance_schema import BackfillSnapshot
 from akra_trader.adapters.binance_schema import market_candles
 from akra_trader.adapters.binance_schema import market_ingestion_jobs
 from akra_trader.adapters.binance_schema import market_lineage_history

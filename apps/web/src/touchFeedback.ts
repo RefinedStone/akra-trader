@@ -11,11 +11,15 @@ export type AkraTouchFeedbackDetail = {
   trigger: "touch-hold";
 };
 
+export const AkraTouchFeedbackDetail = undefined;
+
 export type AkraTouchFeedbackEnvelope = {
   detail: AkraTouchFeedbackDetail;
   type: typeof AKRA_TOUCH_FEEDBACK_EVENT_NAME;
   version: typeof AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION;
 };
+
+export const AkraTouchFeedbackEnvelope = undefined;
 
 type ReactNativeWebViewBridge = {
   postMessage?: (message: string) => void;
