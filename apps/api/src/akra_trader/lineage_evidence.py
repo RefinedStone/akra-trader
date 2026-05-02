@@ -290,6 +290,36 @@ def build_candle_dataset_identity(
   return f"candles-v1:{_build_digest(payload)}"
 
 
+def _build_digest(payload: dict) -> str:
+  encoded = json.dumps(
+    _normalize_json_value(payload),
+    separators=(",", ":"),
+    sort_keys=True,
+  ).encode("utf-8")
+  return hashlib.sha256(encoded).hexdigest()
+
+
+def _serialize_datetime(value: datetime) -> str:
+  if value.tzinfo is None:
+    return value.replace(tzinfo=UTC).isoformat()
+  return value.astimezone(UTC).isoformat()
+
+
+def _normalize_json_value(value):
+  if isinstance(value, dict):
+    return {
+      key: _normalize_json_value(item)
+      for key, item in value.items()
+    }
+  if isinstance(value, (list, tuple)):
+    return [_normalize_json_value(item) for item in value]
+  if isinstance(value, bool):
+    return value
+  if isinstance(value, float) and value.is_integer():
+    return int(value)
+  return value
+
+
 def _operator_lineage_history_cutoff(
   *,
   current_time: datetime,

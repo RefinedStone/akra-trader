@@ -536,6 +536,7 @@ from akra_trader.domain.services import build_equity_point
 from akra_trader.domain.services import summarize_performance
 from akra_trader.lineage import build_dataset_boundary_contract
 from akra_trader.lineage import build_rerun_boundary_identity
+from akra_trader.lineage import combine_reproducibility_states
 from akra_trader.ports import GuardedLiveStatePort
 from akra_trader.ports import ExperimentPresetCatalogPort
 from akra_trader.ports import MarketDataPort

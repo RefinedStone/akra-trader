@@ -410,6 +410,63 @@ class TradingApplicationCoreMixin:
     )
   def _get_preset_or_raise(self, preset_id: str) -> ExperimentPreset:
     return self._strategy_catalog_flow.get_preset_or_raise(preset_id)
+  def _resolve_experiment_preset(
+    self,
+    *,
+    preset_id: str | None,
+    strategy_id: str,
+    timeframe: str,
+  ) -> ExperimentPreset | None:
+    return self._strategy_catalog_flow.resolve_experiment_preset(
+      preset_id=preset_id,
+      strategy_id=strategy_id,
+      timeframe=timeframe,
+    )
+  def _attach_rerun_boundary(self, run: RunRecord) -> None:
+    boundary = build_dataset_boundary_contract(lineage=run.provenance.market_data)
+    if boundary is None:
+      run.provenance.rerun_boundary_id = None
+      run.provenance.rerun_boundary_state = "range_only"
+      return
+    symbol_boundaries = {
+      symbol: build_dataset_boundary_contract(lineage=lineage)
+      for symbol, lineage in run.provenance.market_data_by_symbol.items()
+    }
+    symbol_boundaries = {
+      symbol: contract
+      for symbol, contract in symbol_boundaries.items()
+      if contract is not None
+    }
+    for symbol in run.config.symbols:
+      symbol_boundaries.setdefault(symbol, boundary)
+    run.provenance.rerun_boundary_state = combine_reproducibility_states(
+      [boundary.reproducibility_state]
+      + [contract.reproducibility_state for contract in symbol_boundaries.values()]
+    )
+    run.provenance.rerun_boundary_id = build_rerun_boundary_identity(
+      lane=run.provenance.lane,
+      mode=run.config.mode.value,
+      strategy_id=run.config.strategy_id,
+      strategy_version=run.config.strategy_version,
+      resolved_parameters=run.config.parameters,
+      venue=run.config.venue,
+      symbols=run.config.symbols,
+      timeframe=run.config.timeframe,
+      initial_cash=run.config.initial_cash,
+      fee_rate=run.config.fee_rate,
+      slippage_bps=run.config.slippage_bps,
+      market_data_boundary=boundary,
+      market_data_symbol_boundaries=symbol_boundaries,
+      requested_start_at=run.config.start_at,
+      requested_end_at=run.config.end_at,
+      effective_start_at=run.provenance.market_data.effective_start_at,
+      effective_end_at=run.provenance.market_data.effective_end_at,
+      candle_count=run.provenance.market_data.candle_count,
+      reference_id=run.provenance.reference_id,
+      reference_version=run.provenance.reference_version,
+      integration_mode=run.provenance.integration_mode,
+      external_command=run.provenance.external_command,
+    )
   def _validate_preset_strategy(self, *, strategy_id: str | None) -> None:
     self._strategy_catalog_flow.validate_preset_strategy(strategy_id=strategy_id)
   def list_runs(
