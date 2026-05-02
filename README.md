@@ -57,9 +57,9 @@ Web default: `http://localhost:5173`
 
 Docker Compose host ports:
 
-- API: `http://localhost:18000`
-- Web: `http://localhost:15173`
-- Postgres: `localhost:15432`
+- API: `http://localhost:47680`
+- Web: `http://localhost:47613`
+- Postgres: not exposed on the host; services use `postgres:5432` inside Compose.
 
 ## Tests
 
