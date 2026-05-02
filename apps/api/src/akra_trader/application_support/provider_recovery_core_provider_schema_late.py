@@ -1,0 +1,876 @@
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import datetime
+from typing import Any
+
+from akra_trader.domain.models import (
+  OperatorIncidentAlertOpsRecoveryPhaseGraph,
+  OperatorIncidentAlertOpsRecoveryState,
+  OperatorIncidentAllquietRecoveryPhaseGraph,
+  OperatorIncidentAllquietRecoveryState,
+  OperatorIncidentBetterstackRecoveryPhaseGraph,
+  OperatorIncidentBetterstackRecoveryState,
+  OperatorIncidentBigPandaRecoveryPhaseGraph,
+  OperatorIncidentBigPandaRecoveryState,
+  OperatorIncidentBlamelessRecoveryPhaseGraph,
+  OperatorIncidentBlamelessRecoveryState,
+  OperatorIncidentBmcHelixRecoveryPhaseGraph,
+  OperatorIncidentBmcHelixRecoveryState,
+  OperatorIncidentCabotRecoveryPhaseGraph,
+  OperatorIncidentCabotRecoveryState,
+  OperatorIncidentCrisesControlRecoveryPhaseGraph,
+  OperatorIncidentCrisesControlRecoveryState,
+  OperatorIncidentDutyCallsRecoveryPhaseGraph,
+  OperatorIncidentDutyCallsRecoveryState,
+  OperatorIncidentFireHydrantRecoveryPhaseGraph,
+  OperatorIncidentFireHydrantRecoveryState,
+  OperatorIncidentFreshdeskRecoveryPhaseGraph,
+  OperatorIncidentFreshdeskRecoveryState,
+  OperatorIncidentFreshserviceRecoveryPhaseGraph,
+  OperatorIncidentFreshserviceRecoveryState,
+  OperatorIncidentFrontRecoveryPhaseGraph,
+  OperatorIncidentFrontRecoveryState,
+  OperatorIncidentGrafanaOnCallRecoveryPhaseGraph,
+  OperatorIncidentGrafanaOnCallRecoveryState,
+  OperatorIncidentHaloItsmRecoveryPhaseGraph,
+  OperatorIncidentHaloItsmRecoveryState,
+  OperatorIncidentHappyfoxRecoveryPhaseGraph,
+  OperatorIncidentHappyfoxRecoveryState,
+  OperatorIncidentHelpScoutRecoveryPhaseGraph,
+  OperatorIncidentHelpScoutRecoveryState,
+  OperatorIncidentIlertRecoveryPhaseGraph,
+  OperatorIncidentIlertRecoveryState,
+  OperatorIncidentIncidentHubRecoveryPhaseGraph,
+  OperatorIncidentIncidentHubRecoveryState,
+  OperatorIncidentIncidentIoRecoveryPhaseGraph,
+  OperatorIncidentIncidentIoRecoveryState,
+  OperatorIncidentIncidentManagerIoRecoveryPhaseGraph,
+  OperatorIncidentIncidentManagerIoRecoveryState,
+  OperatorIncidentIntercomRecoveryPhaseGraph,
+  OperatorIncidentIntercomRecoveryState,
+  OperatorIncidentInvGateServiceDeskRecoveryPhaseGraph,
+  OperatorIncidentInvGateServiceDeskRecoveryState,
+  OperatorIncidentJiraServiceManagementRecoveryPhaseGraph,
+  OperatorIncidentJiraServiceManagementRecoveryState,
+  OperatorIncidentKayakoRecoveryPhaseGraph,
+  OperatorIncidentKayakoRecoveryState,
+  OperatorIncidentMoogsoftRecoveryPhaseGraph,
+  OperatorIncidentMoogsoftRecoveryState,
+  OperatorIncidentOneUptimeRecoveryPhaseGraph,
+  OperatorIncidentOneUptimeRecoveryState,
+  OperatorIncidentOnpageRecoveryPhaseGraph,
+  OperatorIncidentOnpageRecoveryState,
+  OperatorIncidentOpenDutyRecoveryPhaseGraph,
+  OperatorIncidentOpenDutyRecoveryState,
+  OperatorIncidentOpsRampRecoveryPhaseGraph,
+  OperatorIncidentOpsRampRecoveryState,
+  OperatorIncidentOpsgenieRecoveryPhaseGraph,
+  OperatorIncidentOpsgenieRecoveryState,
+  OperatorIncidentPagerDutyRecoveryPhaseGraph,
+  OperatorIncidentPagerDutyRecoveryState,
+  OperatorIncidentPagerTreeRecoveryPhaseGraph,
+  OperatorIncidentPagerTreeRecoveryState,
+  OperatorIncidentProviderRecoveryState,
+  OperatorIncidentProviderRecoveryStatusMachine,
+  OperatorIncidentProviderRecoveryTelemetry,
+  OperatorIncidentProviderRecoveryVerification,
+  OperatorIncidentRemediation,
+  OperatorIncidentResolverRecoveryPhaseGraph,
+  OperatorIncidentResolverRecoveryState,
+  OperatorIncidentRootlyRecoveryPhaseGraph,
+  OperatorIncidentRootlyRecoveryState,
+  OperatorIncidentServiceDeskPlusRecoveryPhaseGraph,
+  OperatorIncidentServiceDeskPlusRecoveryState,
+  OperatorIncidentServicenowRecoveryPhaseGraph,
+  OperatorIncidentServicenowRecoveryState,
+  OperatorIncidentSignl4RecoveryPhaseGraph,
+  OperatorIncidentSignl4RecoveryState,
+  OperatorIncidentSolarWindsServiceDeskRecoveryPhaseGraph,
+  OperatorIncidentSolarWindsServiceDeskRecoveryState,
+  OperatorIncidentSpikeshRecoveryPhaseGraph,
+  OperatorIncidentSpikeshRecoveryState,
+  OperatorIncidentSplunkOnCallRecoveryPhaseGraph,
+  OperatorIncidentSplunkOnCallRecoveryState,
+  OperatorIncidentSquadcastRecoveryPhaseGraph,
+  OperatorIncidentSquadcastRecoveryState,
+  OperatorIncidentSquzyRecoveryPhaseGraph,
+  OperatorIncidentSquzyRecoveryState,
+  OperatorIncidentSysAidRecoveryPhaseGraph,
+  OperatorIncidentSysAidRecoveryState,
+  OperatorIncidentTopdeskRecoveryPhaseGraph,
+  OperatorIncidentTopdeskRecoveryState,
+  OperatorIncidentXmattersRecoveryPhaseGraph,
+  OperatorIncidentXmattersRecoveryState,
+  OperatorIncidentZendeskRecoveryPhaseGraph,
+  OperatorIncidentZendeskRecoveryState,
+  OperatorIncidentZendutyRecoveryPhaseGraph,
+  OperatorIncidentZendutyRecoveryState,
+  OperatorIncidentZohoDeskRecoveryPhaseGraph,
+  OperatorIncidentZohoDeskRecoveryState,
+)
+
+from akra_trader.application_support import provider_recovery_family_primary as _provider_recovery_family_primary
+from akra_trader.application_support import provider_recovery_family_secondary as _provider_recovery_family_secondary
+
+globals().update(
+  {
+    name: getattr(_provider_recovery_family_primary, name)
+    for name in dir(_provider_recovery_family_primary)
+    if name.startswith("_") and not name.startswith("__")
+  }
+)
+globals().update(
+  {
+    name: getattr(_provider_recovery_family_secondary, name)
+    for name in dir(_provider_recovery_family_secondary)
+    if name.startswith("_") and not name.startswith("__")
+  }
+)
+
+def _build_provider_recovery_provider_schema_group_late(
+  self,
+  *,
+  schema_payload: dict[str, Any],
+  payload: dict[str, Any],
+  lifecycle_state: str,
+  status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+  synced_at: datetime,
+  workflow_state: str | None,
+  workflow_reference: str | None,
+  reference: str | None,
+  existing: OperatorIncidentProviderRecoveryState,
+) -> tuple[Any, ...]:
+  bigpanda_payload = self._merge_payload_mappings(
+    schema_payload.get("bigpanda"),
+    schema_payload.get("big_panda"),
+    payload.get("bigpanda"),
+    payload.get("bigpanda_incident"),
+    payload.get("big_panda"),
+  )
+  bigpanda_status = self._first_non_empty_string(
+    bigpanda_payload.get("incident_status"),
+    bigpanda_payload.get("status"),
+    bigpanda_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.bigpanda.incident_status,
+  ) or "unknown"
+  bigpanda = OperatorIncidentBigPandaRecoveryState(
+    incident_id=self._first_non_empty_string(
+      bigpanda_payload.get("incident_id"),
+      bigpanda_payload.get("id"),
+      workflow_reference,
+      existing.bigpanda.incident_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      bigpanda_payload.get("external_reference"),
+      bigpanda_payload.get("reference"),
+      reference,
+      existing.bigpanda.external_reference,
+    ),
+    incident_status=bigpanda_status,
+    severity=self._first_non_empty_string(
+      bigpanda_payload.get("severity"),
+      bigpanda_payload.get("priority"),
+      existing.bigpanda.severity,
+    ),
+    assignee=self._first_non_empty_string(
+      bigpanda_payload.get("assignee"),
+      bigpanda_payload.get("owner"),
+      existing.bigpanda.assignee,
+    ),
+    team=self._first_non_empty_string(
+      bigpanda_payload.get("team"),
+      bigpanda_payload.get("team_name"),
+      existing.bigpanda.team,
+    ),
+    url=self._first_non_empty_string(
+      bigpanda_payload.get("url"),
+      bigpanda_payload.get("html_url"),
+      existing.bigpanda.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(bigpanda_payload.get("updated_at"))
+      or existing.bigpanda.updated_at
+    ),
+    phase_graph=self._build_bigpanda_recovery_phase_graph(
+      payload=bigpanda_payload,
+      incident_status=bigpanda_status,
+      severity=self._first_non_empty_string(
+        bigpanda_payload.get("severity"),
+        bigpanda_payload.get("priority"),
+        existing.bigpanda.severity,
+      ),
+      assignee=self._first_non_empty_string(
+        bigpanda_payload.get("assignee"),
+        bigpanda_payload.get("owner"),
+        existing.bigpanda.assignee,
+      ),
+      team=self._first_non_empty_string(
+        bigpanda_payload.get("team"),
+        bigpanda_payload.get("team_name"),
+        existing.bigpanda.team,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.bigpanda,
+    ),
+  )
+
+  grafana_oncall_payload = self._merge_payload_mappings(
+    schema_payload.get("grafana_oncall"),
+    schema_payload.get("grafanaoncall"),
+    payload.get("grafana_oncall"),
+    payload.get("grafana_oncall_incident"),
+    payload.get("grafanaoncall"),
+  )
+  grafana_oncall_status = self._first_non_empty_string(
+    grafana_oncall_payload.get("incident_status"),
+    grafana_oncall_payload.get("status"),
+    grafana_oncall_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.grafana_oncall.incident_status,
+  ) or "unknown"
+  grafana_oncall = OperatorIncidentGrafanaOnCallRecoveryState(
+    incident_id=self._first_non_empty_string(
+      grafana_oncall_payload.get("incident_id"),
+      grafana_oncall_payload.get("id"),
+      workflow_reference,
+      existing.grafana_oncall.incident_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      grafana_oncall_payload.get("external_reference"),
+      grafana_oncall_payload.get("reference"),
+      reference,
+      existing.grafana_oncall.external_reference,
+    ),
+    incident_status=grafana_oncall_status,
+    severity=self._first_non_empty_string(
+      grafana_oncall_payload.get("severity"),
+      grafana_oncall_payload.get("priority"),
+      existing.grafana_oncall.severity,
+    ),
+    assignee=self._first_non_empty_string(
+      grafana_oncall_payload.get("assignee"),
+      grafana_oncall_payload.get("owner"),
+      existing.grafana_oncall.assignee,
+    ),
+    escalation_chain=self._first_non_empty_string(
+      grafana_oncall_payload.get("escalation_chain"),
+      grafana_oncall_payload.get("escalation_chain_name"),
+      existing.grafana_oncall.escalation_chain,
+    ),
+    url=self._first_non_empty_string(
+      grafana_oncall_payload.get("url"),
+      grafana_oncall_payload.get("html_url"),
+      existing.grafana_oncall.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(grafana_oncall_payload.get("updated_at"))
+      or existing.grafana_oncall.updated_at
+    ),
+    phase_graph=self._build_grafana_oncall_recovery_phase_graph(
+      payload=grafana_oncall_payload,
+      incident_status=grafana_oncall_status,
+      severity=self._first_non_empty_string(
+        grafana_oncall_payload.get("severity"),
+        grafana_oncall_payload.get("priority"),
+        existing.grafana_oncall.severity,
+      ),
+      assignee=self._first_non_empty_string(
+        grafana_oncall_payload.get("assignee"),
+        grafana_oncall_payload.get("owner"),
+        existing.grafana_oncall.assignee,
+      ),
+      escalation_chain=self._first_non_empty_string(
+        grafana_oncall_payload.get("escalation_chain"),
+        grafana_oncall_payload.get("escalation_chain_name"),
+        existing.grafana_oncall.escalation_chain,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.grafana_oncall,
+    ),
+  )
+
+  zenduty_payload = self._merge_payload_mappings(
+    schema_payload.get("zenduty"),
+    payload.get("zenduty"),
+    payload.get("zenduty_incident"),
+  )
+  zenduty_status = self._first_non_empty_string(
+    zenduty_payload.get("incident_status"),
+    zenduty_payload.get("status"),
+    zenduty_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.zenduty.incident_status,
+  ) or "unknown"
+  zenduty = OperatorIncidentZendutyRecoveryState(
+    incident_id=self._first_non_empty_string(
+      zenduty_payload.get("incident_id"),
+      zenduty_payload.get("id"),
+      workflow_reference,
+      existing.zenduty.incident_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      zenduty_payload.get("external_reference"),
+      zenduty_payload.get("reference"),
+      reference,
+      existing.zenduty.external_reference,
+    ),
+    incident_status=zenduty_status,
+    severity=self._first_non_empty_string(
+      zenduty_payload.get("severity"),
+      zenduty_payload.get("priority"),
+      existing.zenduty.severity,
+    ),
+    assignee=self._first_non_empty_string(
+      zenduty_payload.get("assignee"),
+      zenduty_payload.get("owner"),
+      existing.zenduty.assignee,
+    ),
+    service=self._first_non_empty_string(
+      zenduty_payload.get("service"),
+      zenduty_payload.get("service_name"),
+      existing.zenduty.service,
+    ),
+    url=self._first_non_empty_string(
+      zenduty_payload.get("url"),
+      zenduty_payload.get("html_url"),
+      existing.zenduty.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(zenduty_payload.get("updated_at"))
+      or existing.zenduty.updated_at
+    ),
+    phase_graph=self._build_zenduty_recovery_phase_graph(
+      payload=zenduty_payload,
+      incident_status=zenduty_status,
+      severity=self._first_non_empty_string(
+        zenduty_payload.get("severity"),
+        zenduty_payload.get("priority"),
+        existing.zenduty.severity,
+      ),
+      assignee=self._first_non_empty_string(
+        zenduty_payload.get("assignee"),
+        zenduty_payload.get("owner"),
+        existing.zenduty.assignee,
+      ),
+      service=self._first_non_empty_string(
+        zenduty_payload.get("service"),
+        zenduty_payload.get("service_name"),
+        existing.zenduty.service,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.zenduty,
+    ),
+  )
+
+  splunk_oncall_payload = self._merge_payload_mappings(
+    schema_payload.get("splunk_oncall"),
+    schema_payload.get("splunkoncall"),
+    schema_payload.get("victorops"),
+    payload.get("splunk_oncall"),
+    payload.get("splunk_oncall_incident"),
+    payload.get("splunkoncall"),
+    payload.get("victorops"),
+  )
+  splunk_oncall_status = self._first_non_empty_string(
+    splunk_oncall_payload.get("incident_status"),
+    splunk_oncall_payload.get("status"),
+    splunk_oncall_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.splunk_oncall.incident_status,
+  ) or "unknown"
+  splunk_oncall = OperatorIncidentSplunkOnCallRecoveryState(
+    incident_id=self._first_non_empty_string(
+      splunk_oncall_payload.get("incident_id"),
+      splunk_oncall_payload.get("id"),
+      workflow_reference,
+      existing.splunk_oncall.incident_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      splunk_oncall_payload.get("external_reference"),
+      splunk_oncall_payload.get("reference"),
+      reference,
+      existing.splunk_oncall.external_reference,
+    ),
+    incident_status=splunk_oncall_status,
+    severity=self._first_non_empty_string(
+      splunk_oncall_payload.get("severity"),
+      splunk_oncall_payload.get("priority"),
+      existing.splunk_oncall.severity,
+    ),
+    assignee=self._first_non_empty_string(
+      splunk_oncall_payload.get("assignee"),
+      splunk_oncall_payload.get("owner"),
+      existing.splunk_oncall.assignee,
+    ),
+    routing_key=self._first_non_empty_string(
+      splunk_oncall_payload.get("routing_key"),
+      splunk_oncall_payload.get("routingKey"),
+      existing.splunk_oncall.routing_key,
+    ),
+    url=self._first_non_empty_string(
+      splunk_oncall_payload.get("url"),
+      splunk_oncall_payload.get("html_url"),
+      existing.splunk_oncall.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(splunk_oncall_payload.get("updated_at"))
+      or existing.splunk_oncall.updated_at
+    ),
+    phase_graph=self._build_splunk_oncall_recovery_phase_graph(
+      payload=splunk_oncall_payload,
+      incident_status=splunk_oncall_status,
+      severity=self._first_non_empty_string(
+        splunk_oncall_payload.get("severity"),
+        splunk_oncall_payload.get("priority"),
+        existing.splunk_oncall.severity,
+      ),
+      assignee=self._first_non_empty_string(
+        splunk_oncall_payload.get("assignee"),
+        splunk_oncall_payload.get("owner"),
+        existing.splunk_oncall.assignee,
+      ),
+      routing_key=self._first_non_empty_string(
+        splunk_oncall_payload.get("routing_key"),
+        splunk_oncall_payload.get("routingKey"),
+        existing.splunk_oncall.routing_key,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.splunk_oncall,
+    ),
+  )
+
+  jira_service_management_payload = self._merge_payload_mappings(
+    schema_payload.get("jira_service_management"),
+    schema_payload.get("jira_service_desk"),
+    schema_payload.get("jsm"),
+    payload.get("jira_service_management"),
+    payload.get("jira_service_management_incident"),
+    payload.get("jira_service_desk"),
+    payload.get("jsm"),
+  )
+  jira_service_management_status = self._first_non_empty_string(
+    jira_service_management_payload.get("incident_status"),
+    jira_service_management_payload.get("status"),
+    jira_service_management_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.jira_service_management.incident_status,
+  ) or "unknown"
+  jira_service_management = OperatorIncidentJiraServiceManagementRecoveryState(
+    incident_id=self._first_non_empty_string(
+      jira_service_management_payload.get("incident_id"),
+      jira_service_management_payload.get("id"),
+      workflow_reference,
+      existing.jira_service_management.incident_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      jira_service_management_payload.get("external_reference"),
+      jira_service_management_payload.get("reference"),
+      reference,
+      existing.jira_service_management.external_reference,
+    ),
+    incident_status=jira_service_management_status,
+    priority=self._first_non_empty_string(
+      jira_service_management_payload.get("priority"),
+      jira_service_management_payload.get("severity"),
+      existing.jira_service_management.priority,
+    ),
+    assignee=self._first_non_empty_string(
+      jira_service_management_payload.get("assignee"),
+      jira_service_management_payload.get("owner"),
+      existing.jira_service_management.assignee,
+    ),
+    service_project=self._first_non_empty_string(
+      jira_service_management_payload.get("service_project"),
+      jira_service_management_payload.get("project"),
+      jira_service_management_payload.get("service_desk"),
+      existing.jira_service_management.service_project,
+    ),
+    url=self._first_non_empty_string(
+      jira_service_management_payload.get("url"),
+      jira_service_management_payload.get("html_url"),
+      existing.jira_service_management.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(jira_service_management_payload.get("updated_at"))
+      or existing.jira_service_management.updated_at
+    ),
+    phase_graph=self._build_jira_service_management_recovery_phase_graph(
+      payload=jira_service_management_payload,
+      incident_status=jira_service_management_status,
+      priority=self._first_non_empty_string(
+        jira_service_management_payload.get("priority"),
+        jira_service_management_payload.get("severity"),
+        existing.jira_service_management.priority,
+      ),
+      assignee=self._first_non_empty_string(
+        jira_service_management_payload.get("assignee"),
+        jira_service_management_payload.get("owner"),
+        existing.jira_service_management.assignee,
+      ),
+      service_project=self._first_non_empty_string(
+        jira_service_management_payload.get("service_project"),
+        jira_service_management_payload.get("project"),
+        jira_service_management_payload.get("service_desk"),
+        existing.jira_service_management.service_project,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.jira_service_management,
+    ),
+  )
+
+  pagertree_payload = self._merge_payload_mappings(
+    schema_payload.get("pagertree"),
+    schema_payload.get("pager_tree"),
+    payload.get("pagertree"),
+    payload.get("pagertree_incident"),
+    payload.get("pager_tree"),
+  )
+  pagertree_status = self._first_non_empty_string(
+    pagertree_payload.get("incident_status"),
+    pagertree_payload.get("status"),
+    pagertree_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.pagertree.incident_status,
+  ) or "unknown"
+  pagertree = OperatorIncidentPagerTreeRecoveryState(
+    incident_id=self._first_non_empty_string(
+      pagertree_payload.get("incident_id"),
+      pagertree_payload.get("id"),
+      workflow_reference,
+      existing.pagertree.incident_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      pagertree_payload.get("external_reference"),
+      pagertree_payload.get("reference"),
+      reference,
+      existing.pagertree.external_reference,
+    ),
+    incident_status=pagertree_status,
+    urgency=self._first_non_empty_string(
+      pagertree_payload.get("urgency"),
+      pagertree_payload.get("priority"),
+      pagertree_payload.get("severity"),
+      existing.pagertree.urgency,
+    ),
+    assignee=self._first_non_empty_string(
+      pagertree_payload.get("assignee"),
+      pagertree_payload.get("owner"),
+      existing.pagertree.assignee,
+    ),
+    team=self._first_non_empty_string(
+      pagertree_payload.get("team"),
+      pagertree_payload.get("service"),
+      existing.pagertree.team,
+    ),
+    url=self._first_non_empty_string(
+      pagertree_payload.get("url"),
+      pagertree_payload.get("html_url"),
+      existing.pagertree.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(pagertree_payload.get("updated_at"))
+      or existing.pagertree.updated_at
+    ),
+    phase_graph=self._build_pagertree_recovery_phase_graph(
+      payload=pagertree_payload,
+      incident_status=pagertree_status,
+      urgency=self._first_non_empty_string(
+        pagertree_payload.get("urgency"),
+        pagertree_payload.get("priority"),
+        pagertree_payload.get("severity"),
+        existing.pagertree.urgency,
+      ),
+      assignee=self._first_non_empty_string(
+        pagertree_payload.get("assignee"),
+        pagertree_payload.get("owner"),
+        existing.pagertree.assignee,
+      ),
+      team=self._first_non_empty_string(
+        pagertree_payload.get("team"),
+        pagertree_payload.get("service"),
+        existing.pagertree.team,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.pagertree,
+    ),
+  )
+
+  alertops_payload = self._merge_payload_mappings(
+    schema_payload.get("alertops"),
+    schema_payload.get("alert_ops"),
+    payload.get("alertops"),
+    payload.get("alertops_incident"),
+    payload.get("alert_ops"),
+  )
+  alertops_status = self._first_non_empty_string(
+    alertops_payload.get("incident_status"),
+    alertops_payload.get("status"),
+    alertops_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.alertops.incident_status,
+  ) or "unknown"
+  alertops = OperatorIncidentAlertOpsRecoveryState(
+    incident_id=self._first_non_empty_string(
+      alertops_payload.get("incident_id"),
+      alertops_payload.get("id"),
+      workflow_reference,
+      existing.alertops.incident_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      alertops_payload.get("external_reference"),
+      alertops_payload.get("reference"),
+      reference,
+      existing.alertops.external_reference,
+    ),
+    incident_status=alertops_status,
+    priority=self._first_non_empty_string(
+      alertops_payload.get("priority"),
+      alertops_payload.get("severity"),
+      alertops_payload.get("urgency"),
+      existing.alertops.priority,
+    ),
+    owner=self._first_non_empty_string(
+      alertops_payload.get("owner"),
+      alertops_payload.get("assignee"),
+      existing.alertops.owner,
+    ),
+    service=self._first_non_empty_string(
+      alertops_payload.get("service"),
+      alertops_payload.get("team"),
+      existing.alertops.service,
+    ),
+    url=self._first_non_empty_string(
+      alertops_payload.get("url"),
+      alertops_payload.get("html_url"),
+      existing.alertops.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(alertops_payload.get("updated_at"))
+      or existing.alertops.updated_at
+    ),
+    phase_graph=self._build_alertops_recovery_phase_graph(
+      payload=alertops_payload,
+      incident_status=alertops_status,
+      priority=self._first_non_empty_string(
+        alertops_payload.get("priority"),
+        alertops_payload.get("severity"),
+        alertops_payload.get("urgency"),
+        existing.alertops.priority,
+      ),
+      owner=self._first_non_empty_string(
+        alertops_payload.get("owner"),
+        alertops_payload.get("assignee"),
+        existing.alertops.owner,
+      ),
+      service=self._first_non_empty_string(
+        alertops_payload.get("service"),
+        alertops_payload.get("team"),
+        existing.alertops.service,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.alertops,
+    ),
+  )
+
+  signl4_payload = self._merge_payload_mappings(
+    schema_payload.get("signl4"),
+    schema_payload.get("signl_4"),
+    payload.get("signl4"),
+    payload.get("signl4_alert"),
+    payload.get("signl_4"),
+  )
+  signl4_status = self._first_non_empty_string(
+    signl4_payload.get("alert_status"),
+    signl4_payload.get("status"),
+    signl4_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.signl4.alert_status,
+  ) or "unknown"
+  signl4 = OperatorIncidentSignl4RecoveryState(
+    alert_id=self._first_non_empty_string(
+      signl4_payload.get("alert_id"),
+      signl4_payload.get("id"),
+      workflow_reference,
+      existing.signl4.alert_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      signl4_payload.get("external_reference"),
+      signl4_payload.get("reference"),
+      reference,
+      existing.signl4.external_reference,
+    ),
+    alert_status=signl4_status,
+    priority=self._first_non_empty_string(
+      signl4_payload.get("priority"),
+      signl4_payload.get("severity"),
+      signl4_payload.get("urgency"),
+      existing.signl4.priority,
+    ),
+    team=self._first_non_empty_string(
+      signl4_payload.get("team"),
+      signl4_payload.get("service"),
+      existing.signl4.team,
+    ),
+    assignee=self._first_non_empty_string(
+      signl4_payload.get("assignee"),
+      signl4_payload.get("owner"),
+      existing.signl4.assignee,
+    ),
+    url=self._first_non_empty_string(
+      signl4_payload.get("url"),
+      signl4_payload.get("html_url"),
+      existing.signl4.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(signl4_payload.get("updated_at"))
+      or existing.signl4.updated_at
+    ),
+    phase_graph=self._build_signl4_recovery_phase_graph(
+      payload=signl4_payload,
+      alert_status=signl4_status,
+      priority=self._first_non_empty_string(
+        signl4_payload.get("priority"),
+        signl4_payload.get("severity"),
+        signl4_payload.get("urgency"),
+        existing.signl4.priority,
+      ),
+      team=self._first_non_empty_string(
+        signl4_payload.get("team"),
+        signl4_payload.get("service"),
+        existing.signl4.team,
+      ),
+      assignee=self._first_non_empty_string(
+        signl4_payload.get("assignee"),
+        signl4_payload.get("owner"),
+        existing.signl4.assignee,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.signl4,
+    ),
+  )
+
+  ilert_payload = self._merge_payload_mappings(
+    schema_payload.get("ilert"),
+    schema_payload.get("i_lert"),
+    payload.get("ilert"),
+    payload.get("ilert_alert"),
+    payload.get("i_lert"),
+  )
+  ilert_status = self._first_non_empty_string(
+    ilert_payload.get("alert_status"),
+    ilert_payload.get("status"),
+    ilert_payload.get("state"),
+    workflow_state,
+    payload.get("workflow_state"),
+    existing.ilert.alert_status,
+  ) or "unknown"
+  ilert = OperatorIncidentIlertRecoveryState(
+    alert_id=self._first_non_empty_string(
+      ilert_payload.get("alert_id"),
+      ilert_payload.get("id"),
+      ilert_payload.get("alertId"),
+      workflow_reference,
+      existing.ilert.alert_id,
+    ),
+    external_reference=self._first_non_empty_string(
+      ilert_payload.get("external_reference"),
+      ilert_payload.get("reference"),
+      reference,
+      existing.ilert.external_reference,
+    ),
+    alert_status=ilert_status,
+    priority=self._first_non_empty_string(
+      ilert_payload.get("priority"),
+      ilert_payload.get("severity"),
+      ilert_payload.get("urgency"),
+      existing.ilert.priority,
+    ),
+    escalation_policy=self._first_non_empty_string(
+      ilert_payload.get("escalation_policy"),
+      ilert_payload.get("escalationPolicy"),
+      ilert_payload.get("policy"),
+      ilert_payload.get("source"),
+      existing.ilert.escalation_policy,
+    ),
+    assignee=self._first_non_empty_string(
+      ilert_payload.get("assignee"),
+      ilert_payload.get("owner"),
+      ilert_payload.get("assigned_to"),
+      existing.ilert.assignee,
+    ),
+    url=self._first_non_empty_string(
+      ilert_payload.get("url"),
+      ilert_payload.get("html_url"),
+      ilert_payload.get("link"),
+      existing.ilert.url,
+    ),
+    updated_at=(
+      self._parse_payload_datetime(ilert_payload.get("updated_at"))
+      or existing.ilert.updated_at
+    ),
+    phase_graph=self._build_ilert_recovery_phase_graph(
+      payload=ilert_payload,
+      alert_status=ilert_status,
+      priority=self._first_non_empty_string(
+        ilert_payload.get("priority"),
+        ilert_payload.get("severity"),
+        ilert_payload.get("urgency"),
+        existing.ilert.priority,
+      ),
+      escalation_policy=self._first_non_empty_string(
+        ilert_payload.get("escalation_policy"),
+        ilert_payload.get("escalationPolicy"),
+        ilert_payload.get("policy"),
+        ilert_payload.get("source"),
+        existing.ilert.escalation_policy,
+      ),
+      assignee=self._first_non_empty_string(
+        ilert_payload.get("assignee"),
+        ilert_payload.get("owner"),
+        ilert_payload.get("assigned_to"),
+        existing.ilert.assignee,
+      ),
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
+      existing=existing.ilert,
+    ),
+  )
+
+  return (
+    bigpanda,
+    grafana_oncall,
+    zenduty,
+    splunk_oncall,
+    jira_service_management,
+    pagertree,
+    alertops,
+    signl4,
+    ilert,
+  )
