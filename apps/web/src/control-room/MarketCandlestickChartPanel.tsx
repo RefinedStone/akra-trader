@@ -16,7 +16,7 @@ import { getMarketDataStatus, listMarketDataCandles } from "../controlRoomApi";
 import type { MarketDataCandle, MarketDataStatus } from "../controlRoomDefinitions";
 
 const DEFAULT_SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"];
-const TIMEFRAMES = ["1m", "5m", "15m", "1h"];
+const TIMEFRAMES = ["1m", "5m", "15m", "1h", "1d"];
 const CANDLE_LIMIT = 800;
 
 type OrderBlockZone = {
@@ -71,30 +71,6 @@ function buildMovingAverage(candles: MarketDataCandle[], period: number) {
       rows.push({
         time: toUnixSeconds(candle.timestamp),
         value: sum / period,
-      });
-    }
-  });
-  return rows;
-}
-
-function buildExponentialMovingAverage(candles: MarketDataCandle[], period: number) {
-  const rows: { time: UTCTimestamp; value: number }[] = [];
-  const multiplier = 2 / (period + 1);
-  let ema: number | null = null;
-  let seedSum = 0;
-  candles.forEach((candle, index) => {
-    if (index < period) {
-      seedSum += candle.close;
-      if (index === period - 1) {
-        ema = seedSum / period;
-      }
-    } else if (ema !== null) {
-      ema = (candle.close - ema) * multiplier + ema;
-    }
-    if (ema !== null) {
-      rows.push({
-        time: toUnixSeconds(candle.timestamp),
-        value: ema,
       });
     }
   });
@@ -171,8 +147,9 @@ export function MarketCandlestickChartPanel() {
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const emaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ma5SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ma20SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ma60SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const rsiSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const rsiGuideLinesRef = useRef<IPriceLine[]>([]);
   const orderBlockLinesRef = useRef<IPriceLine[]>([]);
@@ -180,8 +157,9 @@ export function MarketCandlestickChartPanel() {
   const [candles, setCandles] = useState<MarketDataCandle[]>([]);
   const [symbol, setSymbol] = useState("BTC/USDT");
   const [timeframe, setTimeframe] = useState("5m");
-  const [showSma, setShowSma] = useState(true);
-  const [showEma, setShowEma] = useState(true);
+  const [showMa5, setShowMa5] = useState(true);
+  const [showMa20, setShowMa20] = useState(true);
+  const [showMa60, setShowMa60] = useState(true);
   const [showRsi, setShowRsi] = useState(true);
   const [showOrderBlocks, setShowOrderBlocks] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -193,8 +171,9 @@ export function MarketCandlestickChartPanel() {
   const latestInstrument = status?.instruments.find(
     (instrument) => instrument.instrument_id.endsWith(symbol) && instrument.timeframe === timeframe,
   );
-  const sma20 = useMemo(() => buildMovingAverage(candles, 20), [candles]);
-  const ema50 = useMemo(() => buildExponentialMovingAverage(candles, 50), [candles]);
+  const ma5 = useMemo(() => buildMovingAverage(candles, 5), [candles]);
+  const ma20 = useMemo(() => buildMovingAverage(candles, 20), [candles]);
+  const ma60 = useMemo(() => buildMovingAverage(candles, 60), [candles]);
   const rsi14 = useMemo(() => buildRsi(candles, 14), [candles]);
   const orderBlocks = useMemo(() => detectOrderBlocks(candles), [candles]);
   const activeOrderBlocks = orderBlocks.slice(0, 2);
@@ -281,17 +260,23 @@ export function MarketCandlestickChartPanel() {
       priceFormat: { type: "volume" },
       priceScaleId: "",
     });
-    const smaSeries = chart.addSeries(LineSeries, {
-      color: "#f59e0b",
+    const ma5Series = chart.addSeries(LineSeries, {
+      color: "#fbbf24",
       lineWidth: 2,
       priceLineVisible: false,
-      title: "SMA 20",
+      title: "MA 5",
     });
-    const emaSeries = chart.addSeries(LineSeries, {
+    const ma20Series = chart.addSeries(LineSeries, {
       color: "#38bdf8",
       lineWidth: 2,
       priceLineVisible: false,
-      title: "EMA 50",
+      title: "MA 20",
+    });
+    const ma60Series = chart.addSeries(LineSeries, {
+      color: "#f472b6",
+      lineWidth: 2,
+      priceLineVisible: false,
+      title: "MA 60",
     });
     const rsiSeries = chart.addSeries(
       LineSeries,
@@ -336,16 +321,18 @@ export function MarketCandlestickChartPanel() {
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
-    smaSeriesRef.current = smaSeries;
-    emaSeriesRef.current = emaSeries;
+    ma5SeriesRef.current = ma5Series;
+    ma20SeriesRef.current = ma20Series;
+    ma60SeriesRef.current = ma60Series;
     rsiSeriesRef.current = rsiSeries;
     return () => {
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
-      smaSeriesRef.current = null;
-      emaSeriesRef.current = null;
+      ma5SeriesRef.current = null;
+      ma20SeriesRef.current = null;
+      ma60SeriesRef.current = null;
       rsiSeriesRef.current = null;
       rsiGuideLinesRef.current = [];
       orderBlockLinesRef.current = [];
@@ -372,8 +359,9 @@ export function MarketCandlestickChartPanel() {
         value: candle.volume,
       })),
     );
-    smaSeriesRef.current?.setData(showSma ? sma20 : []);
-    emaSeriesRef.current?.setData(showEma ? ema50 : []);
+    ma5SeriesRef.current?.setData(showMa5 ? ma5 : []);
+    ma20SeriesRef.current?.setData(showMa20 ? ma20 : []);
+    ma60SeriesRef.current?.setData(showMa60 ? ma60 : []);
     rsiSeriesRef.current?.setData(showRsi ? rsi14 : []);
     if (candleSeriesRef.current) {
       for (const line of orderBlockLinesRef.current) {
@@ -400,7 +388,7 @@ export function MarketCandlestickChartPanel() {
       }
     }
     chartRef.current?.timeScale().fitContent();
-  }, [activeOrderBlocks, candles, ema50, rsi14, showEma, showOrderBlocks, showRsi, showSma, sma20]);
+  }, [activeOrderBlocks, candles, ma5, ma20, ma60, rsi14, showMa5, showMa20, showMa60, showOrderBlocks, showRsi]);
 
   useEffect(() => {
     for (const line of rsiGuideLinesRef.current) {
@@ -435,12 +423,16 @@ export function MarketCandlestickChartPanel() {
 
       <div className="market-chart-indicator-bar" aria-label="Indicator controls">
         <label>
-          <input checked={showSma} onChange={(event) => setShowSma(event.target.checked)} type="checkbox" />
-          SMA 20
+          <input checked={showMa5} onChange={(event) => setShowMa5(event.target.checked)} type="checkbox" />
+          MA 5
         </label>
         <label>
-          <input checked={showEma} onChange={(event) => setShowEma(event.target.checked)} type="checkbox" />
-          EMA 50
+          <input checked={showMa20} onChange={(event) => setShowMa20(event.target.checked)} type="checkbox" />
+          MA 20
+        </label>
+        <label>
+          <input checked={showMa60} onChange={(event) => setShowMa60(event.target.checked)} type="checkbox" />
+          MA 60
         </label>
         <label>
           <input checked={showRsi} onChange={(event) => setShowRsi(event.target.checked)} type="checkbox" />
