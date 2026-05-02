@@ -2,6 +2,7 @@
 import { RuntimeOperatorPanel } from "./RuntimeOperatorPanel";
 import { ControlRoomMarketDataPanel } from "./ControlRoomMarketDataPanel";
 import { ControlRoomLiveControlPanel } from "./ControlRoomLiveControlPanel";
+import { MarketCandlestickChartPanel } from "./MarketCandlestickChartPanel";
 
 export function ControlRoomRoutes({ model }: { model: any }) {
   const {
@@ -745,6 +746,9 @@ export function ControlRoomRoutes({ model }: { model: any }) {
               </section>
             ),
             ...runHistoryWorkspacePanels.research,
+          },
+          markets: {
+            chartPanel: <MarketCandlestickChartPanel />,
           },
           runtime: {
             launchPanel: (

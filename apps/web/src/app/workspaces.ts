@@ -1,4 +1,4 @@
-export type ControlWorkspaceId = "overview" | "research" | "runtime" | "live";
+export type ControlWorkspaceId = "overview" | "research" | "markets" | "runtime" | "live";
 
 export type ControlWorkspaceDescriptor = {
   id: ControlWorkspaceId;
@@ -38,6 +38,7 @@ type ControlWorkspaceDescriptorInput = {
 const WORKSPACE_PATHS: Record<ControlWorkspaceId, string> = {
   overview: "/",
   research: "/research",
+  markets: "/markets",
   runtime: "/runtime-ops",
   live: "/guarded-live",
 };
@@ -63,6 +64,15 @@ export function buildControlWorkspaceDescriptors(
         "실험 설계, Preset 관리, reference 검토, benchmark 비교를 운영 소음 없이 처리합니다.",
       summary: `Backtest ${input.backtestsCount}개 · Preset ${input.presetsCount}개 · reference ${input.referencesCount}개`,
       sections: ["Run 실행", "Scenario Preset", "외부 reference", "최근 Backtest"],
+    },
+    {
+      id: "markets",
+      kicker: "Binance 캔들",
+      label: "Markets",
+      description:
+        "Binance에서 동기화된 캔들 데이터와 수집 상태를 차트 중심으로 확인합니다.",
+      summary: `Instrument ${input.instrumentsCount}개 · 실시간 동기화`,
+      sections: ["Candlestick chart", "Symbol 전환", "수집 상태", "최근 캔들"],
     },
     {
       id: "runtime",
@@ -99,6 +109,9 @@ export function workspaceFromPathname(pathname: string): ControlWorkspaceId {
   const normalized = pathname.replace(/\/+$/, "") || "/";
   if (normalized === "/research") {
     return "research";
+  }
+  if (normalized === "/markets") {
+    return "markets";
   }
   if (normalized === "/runtime-ops") {
     return "runtime";

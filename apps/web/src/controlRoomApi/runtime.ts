@@ -1,10 +1,21 @@
 import type {
   MarketDataIngestionJobRecord,
+  MarketDataCandlesResponse,
   MarketDataLineageHistoryRecord,
+  MarketDataStatus,
   OperatorLineageDrillEvidencePack,
   OperatorLineageEvidenceRetentionResult,
 } from "../controlRoomDefinitions";
 import { fetchJson } from "./base";
+
+export async function getMarketDataStatus(params: { timeframe?: string } = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.timeframe?.trim()) {
+    searchParams.set("timeframe", params.timeframe.trim());
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<MarketDataStatus>(`/market-data/status${suffix}`);
+}
 
 export async function listMarketDataLineageHistory(params: {
   symbol?: string;
@@ -58,6 +69,30 @@ export async function listMarketDataIngestionJobs(params: {
   }
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<MarketDataIngestionJobRecord[]>(`/market-data/ingestion-jobs${suffix}`);
+}
+
+export async function listMarketDataCandles(params: {
+  symbol: string;
+  timeframe?: string;
+  startAt?: string;
+  endAt?: string;
+  limit?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  searchParams.set("symbol", params.symbol.trim());
+  if (params.timeframe?.trim()) {
+    searchParams.set("timeframe", params.timeframe.trim());
+  }
+  if (params.startAt?.trim()) {
+    searchParams.set("start_at", params.startAt.trim());
+  }
+  if (params.endAt?.trim()) {
+    searchParams.set("end_at", params.endAt.trim());
+  }
+  if (params.limit) {
+    searchParams.set("limit", String(params.limit));
+  }
+  return fetchJson<MarketDataCandlesResponse>(`/market-data/candles?${searchParams.toString()}`);
 }
 
 export async function pruneMarketDataLineageEvidenceRetention(payload: {

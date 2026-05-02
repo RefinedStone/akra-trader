@@ -94,6 +94,22 @@ export type MarketDataIngestionJobRecord = {
   last_error?: string | null;
 };
 
+export type MarketDataCandle = {
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
+export type MarketDataCandlesResponse = {
+  symbol: string;
+  timeframe: string;
+  limit: number;
+  candles: MarketDataCandle[];
+};
+
 export type OperatorLineageEvidenceRetentionPolicy = {
   policy_key: string;
   lineage_history_days: number;
@@ -190,6 +206,8 @@ export type MarketDataProvenanceExportStateV1 = {
 export const MarketDataStatus = undefined;
 export const MarketDataLineageHistoryRecord = undefined;
 export const MarketDataIngestionJobRecord = undefined;
+export const MarketDataCandle = undefined;
+export const MarketDataCandlesResponse = undefined;
 export const OperatorLineageEvidenceRetentionPolicy = undefined;
 export const OperatorLineageEvidenceRetentionResult = undefined;
 export const OperatorLineageDrillEvidencePack = undefined;

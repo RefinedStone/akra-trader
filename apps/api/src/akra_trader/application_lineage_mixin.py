@@ -94,6 +94,22 @@ class TradingApplicationLineageMixin:
     return parsed
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
     return self._market_data.get_status(timeframe)
+  def get_market_data_candles(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ):
+    return self._market_data.get_candles(
+      symbol=symbol,
+      timeframe=timeframe,
+      start_at=start_at,
+      end_at=end_at,
+      limit=limit,
+    )
   def list_market_data_lineage_history(
     self,
     *,

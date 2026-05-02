@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import inspect
+from datetime import UTC
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter
@@ -8,6 +10,7 @@ from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import Header
 from fastapi import HTTPException
+from fastapi import Query
 from fastapi import Request
 
 from akra_trader.application import execute_standalone_surface_binding
@@ -37,6 +40,58 @@ def create_router(container: Container) -> APIRouter:
     if callable(get_capabilities):
       return get_capabilities()
     return RunSurfaceCapabilities()
+
+  def parse_market_data_datetime(value: str | None, *, field_name: str) -> datetime | None:
+    if value is None or not value.strip():
+      return None
+    try:
+      parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+      raise HTTPException(
+        status_code=400,
+        detail=f"{field_name} must be an ISO-8601 datetime",
+      ) from exc
+    if parsed.tzinfo is None:
+      return parsed.replace(tzinfo=UTC)
+    return parsed
+
+  def serialize_market_data_timestamp(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+  @router.get("/market-data/candles")
+  def list_market_data_candles(
+    symbol: str = Query(..., min_length=1),
+    timeframe: str = Query("5m", min_length=1),
+    start_at: str | None = None,
+    end_at: str | None = None,
+    limit: int = Query(500, ge=1, le=5000),
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    normalized_symbol = symbol.strip()
+    normalized_timeframe = timeframe.strip()
+    candles = app.get_market_data_candles(
+      symbol=normalized_symbol,
+      timeframe=normalized_timeframe,
+      start_at=parse_market_data_datetime(start_at, field_name="start_at"),
+      end_at=parse_market_data_datetime(end_at, field_name="end_at"),
+      limit=limit,
+    )
+    return {
+      "symbol": normalized_symbol,
+      "timeframe": normalized_timeframe,
+      "limit": limit,
+      "candles": [
+        {
+          "timestamp": serialize_market_data_timestamp(candle.timestamp),
+          "open": candle.open,
+          "high": candle.high,
+          "low": candle.low,
+          "close": candle.close,
+          "volume": candle.volume,
+        }
+        for candle in candles
+      ],
+    }
 
   def dispatch_standalone_binding(
     *,

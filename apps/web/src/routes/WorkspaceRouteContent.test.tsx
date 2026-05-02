@@ -12,6 +12,9 @@ function buildRoutes() {
       referencePanel: <div>research-reference</div>,
       runsPanel: <div>research-runs</div>,
     },
+    markets: {
+      chartPanel: <div>markets-chart</div>,
+    },
     runtime: {
       launchPanel: <div>runtime-launch</div>,
       marketDataPanel: <div>runtime-market-data</div>,
@@ -49,6 +52,13 @@ describe("WorkspaceRouteContent", () => {
     expect(screen.getByText("runtime-launch")).toBeInTheDocument();
     expect(screen.getByText("runtime-market-data")).toBeInTheDocument();
     expect(screen.queryByText("overview-panel")).not.toBeInTheDocument();
+  });
+
+  it("renders markets panels for the markets workspace", () => {
+    render(<WorkspaceRouteContent activeWorkspace="markets" routes={buildRoutes()} />);
+
+    expect(screen.getByText("markets-chart")).toBeInTheDocument();
+    expect(screen.queryByText("runtime-launch")).not.toBeInTheDocument();
   });
 
   it("renders live panels for the live workspace", () => {

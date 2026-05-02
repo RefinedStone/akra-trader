@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { LiveWorkspaceRoute } from "./LiveWorkspaceRoute";
+import { MarketsWorkspaceRoute } from "./MarketsWorkspaceRoute";
 import { OverviewWorkspaceRoute } from "./OverviewWorkspaceRoute";
 import { ResearchWorkspaceRoute } from "./ResearchWorkspaceRoute";
 import { RuntimeWorkspaceRoute } from "./RuntimeWorkspaceRoute";
@@ -40,6 +41,12 @@ describe("workspace route smoke tests", () => {
 
     expect(screen.getByText("runtime-market-data")).toBeInTheDocument();
     expect(screen.getByText("runtime-paper")).toBeInTheDocument();
+  });
+
+  it("renders the markets route", () => {
+    render(<MarketsWorkspaceRoute chartPanel={<div>markets-chart</div>} />);
+
+    expect(screen.getByText("markets-chart")).toBeInTheDocument();
   });
 
   it("renders the live route", () => {

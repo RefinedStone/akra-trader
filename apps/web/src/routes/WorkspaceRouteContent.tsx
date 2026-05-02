@@ -1,11 +1,13 @@
 import { ControlWorkspaceId } from "../app/workspaces";
 import { LiveWorkspaceRoute, LiveWorkspaceRouteProps } from "./LiveWorkspaceRoute";
+import { MarketsWorkspaceRoute, MarketsWorkspaceRouteProps } from "./MarketsWorkspaceRoute";
 import { OverviewWorkspaceRoute, OverviewWorkspaceRouteProps } from "./OverviewWorkspaceRoute";
 import { ResearchWorkspaceRoute, ResearchWorkspaceRouteProps } from "./ResearchWorkspaceRoute";
 import { RuntimeWorkspaceRoute, RuntimeWorkspaceRouteProps } from "./RuntimeWorkspaceRoute";
 
 export type WorkspaceRoutePanels = {
   live: LiveWorkspaceRouteProps;
+  markets: MarketsWorkspaceRouteProps;
   overview: OverviewWorkspaceRouteProps;
   research: ResearchWorkspaceRouteProps;
   runtime: RuntimeWorkspaceRouteProps;
@@ -23,6 +25,9 @@ export function WorkspaceRouteContent({
   }
   if (activeWorkspace === "research") {
     return <ResearchWorkspaceRoute {...routes.research} />;
+  }
+  if (activeWorkspace === "markets") {
+    return <MarketsWorkspaceRoute {...routes.markets} />;
   }
   if (activeWorkspace === "runtime") {
     return <RuntimeWorkspaceRoute {...routes.runtime} />;
