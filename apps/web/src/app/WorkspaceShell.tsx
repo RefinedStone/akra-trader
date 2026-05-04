@@ -26,20 +26,34 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   const primaryMetric = controlStripMetrics[0];
   const secondaryMetrics = controlStripMetrics.slice(1, 3);
+  const marketFocusItems = [
+    { label: "주식", value: "Equity" },
+    { label: "코인", value: "Crypto" },
+    { label: "백테스트", value: "Backtest" },
+    { label: "리스크", value: "Risk" },
+  ];
 
   return (
     <div className="shell">
       <header className="hero">
         <div className="hero-copy-block">
-          <p className="eyebrow">Akra Trader / 운영 Control Room</p>
-          <h1>Trading operations command center</h1>
+          <p className="eyebrow">Akra Trader / 퀀트 운용 어드민</p>
+          <h1>주식·코인 전략을 검증하고 운용하는 퀀트 대시보드</h1>
           <p className="hero-copy">
-            실험, 시장 데이터, runtime, guarded live를 분리된 workspace로 운영하되
-            핵심 상태는 한 화면에서 판단합니다.
+            백테스트 성과, 시장 데이터 품질, 샌드박스·페이퍼 실행, 실전 보호 장치를
+            한 흐름에서 확인합니다.
           </p>
           <div className="hero-action-row" aria-label="주요 운영 상태">
-            <span>Active workspace · {activeWorkspaceDescriptor.label}</span>
+            <span>현재 화면 · {activeWorkspaceDescriptor.label}</span>
             <span>{statusText}</span>
+          </div>
+          <div className="quant-focus-strip" aria-label="지원 자산과 분석 축">
+            {marketFocusItems.map((item) => (
+              <span key={item.label}>
+                <small>{item.label}</small>
+                <strong>{item.value}</strong>
+              </span>
+            ))}
           </div>
         </div>
         <aside className="hero-panel">
@@ -47,7 +61,7 @@ export function WorkspaceShell({
             <span className="status-indicator" />
             <strong>{statusText}</strong>
           </div>
-          <p>API base: {apiBase}</p>
+          <p>API 기준 주소: {apiBase}</p>
           {primaryMetric ? (
             <div className="hero-primary-metric">
               <span>{primaryMetric.label}</span>
@@ -80,7 +94,7 @@ export function WorkspaceShell({
           ))}
         </section>
 
-        <nav className="workspace-nav" aria-label="Control room workspaces">
+        <nav className="workspace-nav" aria-label="퀀트 어드민 화면">
           {workspaceDescriptors.map((workspace) => (
             <button
               aria-pressed={activeWorkspace === workspace.id}
@@ -103,7 +117,7 @@ export function WorkspaceShell({
               <h2>{activeWorkspaceDescriptor.label}</h2>
             </div>
             <button className="ghost-button" onClick={onRefresh} type="button">
-              데이터 새로고침
+              최신 데이터 불러오기
             </button>
           </div>
           <div className="workspace-intro-grid">
@@ -111,7 +125,7 @@ export function WorkspaceShell({
               <p>{activeWorkspaceDescriptor.description}</p>
               <strong>{activeWorkspaceDescriptor.summary}</strong>
             </div>
-            <div className="workspace-chip-row" aria-label="Workspace surfaces">
+            <div className="workspace-chip-row" aria-label="화면 구성">
               {activeWorkspaceDescriptor.sections.map((section) => (
                 <span className="workspace-chip" key={section}>
                   {section}

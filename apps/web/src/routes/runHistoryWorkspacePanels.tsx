@@ -207,26 +207,26 @@ export function buildRunHistoryWorkspacePanels({
       runsPanel: renderRunSection({
         ...research,
         surfaceKey: "backtest",
-        title: research.title ?? "최근 Backtest",
+        title: research.title ?? "최근 백테스트",
       }),
     },
     runtime: {
       sandboxRunsPanel: renderRunSection({
         ...runtime.sandbox,
         surfaceKey: "sandbox",
-        title: runtime.sandbox.title ?? "Sandbox Run",
+        title: runtime.sandbox.title ?? "샌드박스 실행 이력",
       }),
       paperRunsPanel: renderRunSection({
         ...runtime.paper,
         surfaceKey: "paper",
-        title: runtime.paper.title ?? "Paper Run",
+        title: runtime.paper.title ?? "페이퍼 실행 이력",
       }),
     },
     live: {
       runsPanel: renderRunSection({
         ...live,
         surfaceKey: "live",
-        title: live.title ?? "Guarded Live Run",
+        title: live.title ?? "가드 라이브 실행 이력",
       }),
     },
   };
