@@ -8,15 +8,15 @@ export function RuntimeProviderProvenanceFocusedLineageIncidentHistorySection({
 
   return (
     <div>
-      <h3>Lineage incident history</h3>
+      <h3>Lineage incident history (이슈 이력)</h3>
       {focusedMarketIncidentHistory.length ? (
         <table className="data-table">
           <thead>
             <tr>
-              <th>When</th>
-              <th>Source</th>
+              <th>시각</th>
+              <th>출처</th>
               <th>Signal</th>
-              <th>Detail</th>
+              <th>상세</th>
             </tr>
           </thead>
           <tbody>
@@ -39,7 +39,7 @@ export function RuntimeProviderProvenanceFocusedLineageIncidentHistorySection({
         </table>
       ) : (
         <p className="empty-state">
-          No alert-linked lineage incident history recorded for this focus.
+          이 focus에 연결된 Alert/Incident 이력이 없습니다.
         </p>
       )}
     </div>

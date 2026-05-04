@@ -14,29 +14,29 @@ export function RuntimeProviderProvenanceFocusedSharedExportRegistrySection({ mo
   return (
     <>
       <div className="market-data-provenance-history-head">
-        <strong>Team-shared export registry</strong>
+        <strong>팀 공유 export registry</strong>
         <p>
           {sharedProviderProvenanceExports.length
-            ? `${sharedProviderProvenanceExports.length} shared export snapshot(s) are available for this focus.`
-            : "No shared provider provenance exports recorded for this focus yet."}
+            ? `이 focus에 공유된 export snapshot ${sharedProviderProvenanceExports.length}건이 있습니다.`
+            : "이 focus에 공유된 Provider provenance export가 아직 없습니다."}
         </p>
       </div>
       {sharedProviderProvenanceExportsLoading ? (
-        <p className="empty-state">Loading shared export registry…</p>
+        <p className="empty-state">Shared export registry를 불러오는 중입니다.</p>
       ) : null}
       {sharedProviderProvenanceExportsError ? (
         <p className="market-data-workflow-feedback">
-          Shared registry load failed: {sharedProviderProvenanceExportsError}
+          Shared registry 로드 실패: {sharedProviderProvenanceExportsError}
         </p>
       ) : null}
       {sharedProviderProvenanceExports.length ? (
         <table className="data-table">
           <thead>
             <tr>
-              <th>Exported</th>
+              <th>Export 시각</th>
               <th>Focus</th>
               <th>Filter</th>
-              <th>Action</th>
+              <th>동작</th>
             </tr>
           </thead>
           <tbody>
@@ -44,24 +44,24 @@ export function RuntimeProviderProvenanceFocusedSharedExportRegistrySection({ mo
               <tr key={entry.job_id}>
                 <td>{formatTimestamp(entry.exported_at ?? entry.created_at)}</td>
                 <td>
-                  <strong>{entry.focus_label ?? "Unknown focus"}</strong>
+                  <strong>{entry.focus_label ?? "알 수 없는 focus"}</strong>
                   <p className="run-lineage-symbol-copy">
                     {entry.market_data_provider ?? "n/a"} / {entry.venue ?? "n/a"} / {entry.symbol ?? "n/a"} · {entry.timeframe ?? "n/a"}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    {entry.result_count} result(s) from {entry.provider_provenance_count} provenance incident(s)
+                    Provenance incident {entry.provider_provenance_count}건 중 결과 {entry.result_count}건
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    Requested by {entry.requested_by_tab_label ?? entry.requested_by_tab_id ?? "unknown tab"}
+                    요청 탭: {entry.requested_by_tab_label ?? entry.requested_by_tab_id ?? "알 수 없음"}
                   </p>
                 </td>
                 <td>
-                  <strong>{entry.filter_summary ?? "No filter summary recorded."}</strong>
+                  <strong>{entry.filter_summary ?? "기록된 filter summary가 없습니다."}</strong>
                   <p className="run-lineage-symbol-copy">
-                    Providers: {entry.provider_labels.length ? entry.provider_labels.join(", ") : "n/a"}
+                    Providers: {entry.provider_labels.length ? entry.provider_labels.join(", ") : "없음"}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    Vendor fields: {entry.vendor_fields.length ? entry.vendor_fields.join(", ") : "n/a"}
+                    Vendor fields: {entry.vendor_fields.length ? entry.vendor_fields.join(", ") : "없음"}
                   </p>
                 </td>
                 <td>
@@ -73,7 +73,7 @@ export function RuntimeProviderProvenanceFocusedSharedExportRegistrySection({ mo
                       }}
                       type="button"
                     >
-                      Copy export
+                      Export 복사
                     </button>
                     <button
                       className="ghost-button"
@@ -84,8 +84,8 @@ export function RuntimeProviderProvenanceFocusedSharedExportRegistrySection({ mo
                     >
                       {selectedSharedProviderProvenanceExportJobId === entry.job_id
                         && selectedSharedProviderProvenanceExportHistory
-                        ? "Hide history"
-                        : "View history"}
+                        ? "이력 숨기기"
+                        : "이력 보기"}
                     </button>
                   </div>
                 </td>

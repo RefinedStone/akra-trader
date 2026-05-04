@@ -11,21 +11,21 @@ export function RuntimeProviderProvenanceFocusedPersistedExportHistorySection({ 
   return (
     <>
       <div className="market-data-provenance-history-head">
-        <strong>Persisted export history</strong>
+        <strong>저장된 export 이력</strong>
         <p>
           {marketDataProvenanceExportHistory.length
-            ? `${marketDataProvenanceExportHistory.length} saved export snapshot(s) are available in this browser.`
-            : "No persisted provider provenance exports recorded yet."}
+            ? `이 브라우저에 저장된 export snapshot ${marketDataProvenanceExportHistory.length}건이 있습니다.`
+            : "아직 저장된 Provider provenance export가 없습니다."}
         </p>
       </div>
       {marketDataProvenanceExportHistory.length ? (
         <table className="data-table">
           <thead>
             <tr>
-              <th>Exported</th>
+              <th>Export 시각</th>
               <th>Focus</th>
               <th>Filter</th>
-              <th>Action</th>
+              <th>동작</th>
             </tr>
           </thead>
           <tbody>
@@ -38,13 +38,13 @@ export function RuntimeProviderProvenanceFocusedPersistedExportHistorySection({ 
                     {entry.provider} / {entry.venue} / {entry.symbol} · {entry.timeframe}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    {entry.result_count} result(s) from {entry.provider_provenance_count} provenance incident(s)
+                    Provenance incident {entry.provider_provenance_count}건 중 결과 {entry.result_count}건
                   </p>
                 </td>
                 <td>
                   <strong>{formatMarketDataProvenanceExportFilterSummary(entry.filter)}</strong>
                   <p className="run-lineage-symbol-copy">
-                    Providers: {entry.provider_labels.length ? entry.provider_labels.join(", ") : "n/a"}
+                    Providers: {entry.provider_labels.length ? entry.provider_labels.join(", ") : "없음"}
                   </p>
                 </td>
                 <td>
@@ -56,14 +56,14 @@ export function RuntimeProviderProvenanceFocusedPersistedExportHistorySection({ 
                       }}
                       type="button"
                     >
-                      Copy export
+                      Export 복사
                     </button>
                     <button
                       className="ghost-button"
                       onClick={() => restoreMarketDataProvenanceExportFilter(entry)}
                       type="button"
                     >
-                      Load filters
+                      필터 불러오기
                     </button>
                   </div>
                 </td>

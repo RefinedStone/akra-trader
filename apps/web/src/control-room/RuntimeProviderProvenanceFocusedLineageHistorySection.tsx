@@ -10,12 +10,12 @@ export function RuntimeProviderProvenanceFocusedLineageHistorySection({ model }:
 
   return (
     <div>
-      <h3>Lineage history</h3>
+      <h3>Lineage history (동기화 근거)</h3>
       {marketDataLineageHistory.length ? (
         <table className="data-table">
           <thead>
             <tr>
-              <th>Recorded</th>
+              <th>기록 시각</th>
               <th>Sync</th>
               <th>Claim</th>
               <th>Boundary</th>
@@ -33,17 +33,17 @@ export function RuntimeProviderProvenanceFocusedLineageHistorySection({ model }:
                 </td>
                 <td>
                   <strong>
-                    {record.failure_count_24h} failures / 24h
-                    {record.gap_window_count ? ` · ${record.gap_window_count} gaps` : ""}
+                    24시간 실패 {record.failure_count_24h}건
+                    {record.gap_window_count ? ` · Gap ${record.gap_window_count}개` : ""}
                   </strong>
                   <p className="run-lineage-symbol-copy">
-                    {record.issues.length ? record.issues.join(", ") : "No lineage issues recorded."}
+                    {record.issues.length ? record.issues.join(", ") : "기록된 Lineage 이슈가 없습니다."}
                   </p>
                   <p className="run-lineage-symbol-copy">
                     Window: {formatRange(record.first_timestamp, record.last_timestamp)}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    Checkpoint: {record.checkpoint_id ? shortenIdentifier(record.checkpoint_id, 22) : "n/a"}
+                    Checkpoint: {record.checkpoint_id ? shortenIdentifier(record.checkpoint_id, 22) : "없음"}
                   </p>
                 </td>
               </tr>
@@ -51,7 +51,7 @@ export function RuntimeProviderProvenanceFocusedLineageHistorySection({ model }:
           </tbody>
         </table>
       ) : (
-        <p className="empty-state">No lineage history recorded for this focus.</p>
+        <p className="empty-state">이 focus에 기록된 Lineage 이력이 없습니다.</p>
       )}
     </div>
   );

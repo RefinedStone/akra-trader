@@ -436,6 +436,8 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
 
   const providerProvenanceSchedulerDrillDown = providerProvenanceSchedulerAnalytics?.drill_down ?? null;
 
+  const formatTriageFocusNote = (note: string | null) => (note ? ` Focus 선정 기준: ${note}` : "");
+
   const focusedMarketIncidentHistory = useMemo(() => {
     if (!activeMarketInstrument) {
       return [] as MarketDataIncidentHistoryEntry[];
@@ -444,27 +446,27 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
     const entries: MarketDataIncidentHistoryEntry[] = [];
 
     focusedLinkedOperatorAlerts.forEach(({ alert, link }) => {
-      const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(link);
+      const primaryFocusNote = formatTriageFocusNote(formatLinkedMarketPrimaryFocusNote(link));
       entries.push({
         entryId: `alert:${alert.alert_id}`,
         occurredAt: alert.detected_at,
-        sourceLabel: "Active alert",
+        sourceLabel: "활성 Alert",
         statusLabel: `${formatWorkflowToken(alert.severity)} / ${formatWorkflowToken(alert.category)}`,
         summary: alert.summary,
-        detail: `${alert.detail} Delivery: ${alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}.${primaryFocusNote ? ` ${primaryFocusNote}` : ""}`,
+        detail: `상세: ${alert.detail} 전달 대상(Delivery): ${alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "없음"}.${primaryFocusNote}`,
         tone: alert.severity === "critical" ? "critical" : "warning",
       });
     });
 
     focusedLinkedOperatorAlertHistory.forEach(({ alert, link }) => {
-      const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(link);
+      const primaryFocusNote = formatTriageFocusNote(formatLinkedMarketPrimaryFocusNote(link));
       entries.push({
         entryId: `alert-history:${getOperatorAlertOccurrenceKey(alert)}`,
         occurredAt: alert.resolved_at ?? alert.detected_at,
-        sourceLabel: alert.status === "resolved" ? "Resolved alert" : "Alert history",
+        sourceLabel: alert.status === "resolved" ? "해결된 Alert" : "Alert 이력",
         statusLabel: `${formatWorkflowToken(alert.status)} / ${formatWorkflowToken(alert.category)}`,
         summary: alert.summary,
-        detail: `${alert.detail} Detected ${formatTimestamp(alert.detected_at)}.${primaryFocusNote ? ` ${primaryFocusNote}` : ""}`,
+        detail: `상세: ${alert.detail} 감지 시각: ${formatTimestamp(alert.detected_at)}.${primaryFocusNote}`,
         tone:
           alert.status === "resolved"
             ? "neutral"
@@ -482,14 +484,14 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       const providerProvenanceSummary = summarizeProviderRecoveryMarketContextProvenance(
         event.remediation.provider_recovery,
       )?.summary;
-      const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(link);
+      const primaryFocusNote = formatTriageFocusNote(formatLinkedMarketPrimaryFocusNote(link));
       entries.push({
         entryId: `incident:${event.event_id}`,
         occurredAt: event.timestamp,
         sourceLabel: "Incident event",
         statusLabel: `${formatWorkflowToken(event.kind)} / ${formatWorkflowToken(event.severity)}`,
         summary: event.summary,
-        detail: `${event.detail} Ack: ${formatWorkflowToken(event.acknowledgment_state)}. Escalation: level ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail}${providerProvenanceSummary ? ` ${providerProvenanceSummary}.` : ""}${primaryFocusNote ? ` ${primaryFocusNote}` : ""}`,
+        detail: `상세: ${event.detail} Ack 상태: ${formatWorkflowToken(event.acknowledgment_state)}. Escalation: level ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail ? ` ${remediationDetail.trim()}` : ""}${providerProvenanceSummary ? ` Provider recovery: ${providerProvenanceSummary}.` : ""}${primaryFocusNote}`,
         tone: event.severity === "critical" ? "critical" : "warning",
       });
     });
@@ -506,14 +508,14 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       }
       const issueSummary = record.issues.length
         ? record.issues.join(", ")
-        : `${record.failure_count_24h} failures / 24h${record.gap_window_count ? ` · ${record.gap_window_count} gaps` : ""}`;
+        : `24시간 실패 ${record.failure_count_24h}건${record.gap_window_count ? ` · Gap ${record.gap_window_count}개` : ""}`;
       entries.push({
         entryId: `lineage:${record.history_id}`,
         occurredAt: record.recorded_at,
         sourceLabel: "Lineage snapshot",
         statusLabel: `${formatWorkflowToken(record.sync_status)} / ${formatWorkflowToken(record.validation_claim)}`,
-        summary: `${record.symbol} ${record.timeframe} lineage snapshot recorded.`,
-        detail: `${issueSummary || "No lineage issues recorded."} Window: ${formatRange(record.first_timestamp, record.last_timestamp)}.`,
+        summary: `${record.symbol} ${record.timeframe} Lineage snapshot 기록.`,
+        detail: `${issueSummary || "기록된 Lineage 이슈가 없습니다."} Window: ${formatRange(record.first_timestamp, record.last_timestamp)}.`,
         tone:
           record.sync_status === "error" || record.failure_count_24h > 0
             ? "critical"
@@ -533,8 +535,8 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
         occurredAt: job.finished_at,
         sourceLabel: "Ingestion job",
         statusLabel: `${formatWorkflowToken(job.status)} / ${formatWorkflowToken(job.operation)}`,
-        summary: `${job.symbol} ${job.timeframe} ingestion ${formatWorkflowToken(job.operation)} completed.`,
-        detail: `${job.fetched_candle_count} candles fetched in ${job.duration_ms} ms.${job.last_error ? ` Error: ${job.last_error}.` : ""}`,
+        summary: `${job.symbol} ${job.timeframe} Ingestion ${formatWorkflowToken(job.operation)} 완료.`,
+        detail: `${job.fetched_candle_count}개 candle을 ${job.duration_ms} ms에 수집했습니다.${job.last_error ? ` Error: ${job.last_error}.` : ""}`,
         tone: job.status === "succeeded" ? "neutral" : "warning",
       });
     });

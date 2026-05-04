@@ -31,32 +31,32 @@ export function RuntimeDataIncidentTriagePanel({ model }: { model: any }) {
                 defaultOpen={true}
                 summary={
                   activeMarketInstrument && focusedMarketWorkflowSummary
-                    ? `${focusedMarketWorkflowSummary.lineageCount} lineage snapshots · ${focusedMarketWorkflowSummary.ingestionJobCount} ingestion jobs · ${focusedMarketWorkflowSummary.linkedAlertCount} linked alerts for ${focusedMarketWorkflowSummary.focusLabel}.`
-                    : "Select a market-data instrument to inspect lineage and ingestion workflow history."
+                    ? `${focusedMarketWorkflowSummary.focusLabel} 기준 Lineage ${focusedMarketWorkflowSummary.lineageCount}건, Ingestion job ${focusedMarketWorkflowSummary.ingestionJobCount}건, 연결 Alert ${focusedMarketWorkflowSummary.linkedAlertCount}건을 확인합니다.`
+                    : "Market-data instrument를 선택하면 Lineage와 Ingestion workflow 이력을 확인할 수 있습니다."
                 }
-                title="Data incident triage"
+                title="Data incident triage (데이터 이슈 점검)"
               >
                 {marketStatus ? (
                   <>
                     <div className="market-data-workflow-toolbar">
                       <div className="market-data-workflow-focus-copy">
                         <strong>
-                          {focusedMarketWorkflowSummary?.focusLabel ?? "No triage focus selected"}
+                          {focusedMarketWorkflowSummary?.focusLabel ?? "선택된 triage focus 없음"}
                         </strong>
                         <p>
                           {marketDataWorkflowLoading
-                            ? "Refreshing lineage and ingestion workflow history..."
+                            ? "Lineage와 Ingestion workflow 이력을 새로 불러오는 중입니다."
                             : marketDataWorkflowError
-                              ? `History load failed: ${marketDataWorkflowError}`
+                              ? `이력 로드 실패: ${marketDataWorkflowError}`
                               : focusedMarketWorkflowSummary?.latestLineage
-                                ? `Latest lineage snapshot recorded ${formatTimestamp(focusedMarketWorkflowSummary.latestLineage.recorded_at)} with ${formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage.validation_claim)} claim. ${focusedMarketWorkflowSummary.linkedAlertCount} active alert(s) and ${focusedMarketWorkflowSummary.linkedIncidentCount} incident event(s) are linked to this focus.`
+                                ? `최근 Lineage snapshot은 ${formatTimestamp(focusedMarketWorkflowSummary.latestLineage.recorded_at)}에 기록됐고 claim은 ${formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage.validation_claim)}입니다. 이 focus에 활성 Alert ${focusedMarketWorkflowSummary.linkedAlertCount}건, Incident event ${focusedMarketWorkflowSummary.linkedIncidentCount}건이 연결되어 있습니다.`
                                 : autoLinkedMarketInstrumentLink
-                                  ? `Runtime alerts currently resolve to ${autoLinkedMarketInstrumentLink.symbol} · ${autoLinkedMarketInstrumentLink.timeframe}, but no lineage history has been recorded yet.`
-                                  : "No lineage or ingestion history recorded for the current focus."}
+                                  ? `Runtime alert는 현재 ${autoLinkedMarketInstrumentLink.symbol} · ${autoLinkedMarketInstrumentLink.timeframe}로 연결되지만, 아직 Lineage 이력은 없습니다.`
+                                  : "현재 focus에 기록된 Lineage 또는 Ingestion 이력이 없습니다."}
                         </p>
                         {focusedMultiSymbolPrimaryLink ? (
                           <p className="market-data-workflow-policy-copy">
-                            Multi-symbol primary focus: {focusedMultiSymbolPrimaryLink.primaryFocusReason} Candidate order: {focusedMultiSymbolPrimaryLink.candidateLabels.join(", ")}.
+                            Multi-symbol primary focus: {focusedMultiSymbolPrimaryLink.primaryFocusReason} 후보 순서: {focusedMultiSymbolPrimaryLink.candidateLabels.join(", ")}.
                           </p>
                         ) : null}
                       </div>
@@ -89,12 +89,12 @@ export function RuntimeDataIncidentTriagePanel({ model }: { model: any }) {
                             }}
                             type="button"
                           >
-                            Copy drill pack
+                            Drill pack 복사
                           </button>
                           <span className="market-data-workflow-export-copy">
                             {focusedMarketProviderProvenanceCount
-                              ? `${filteredFocusedMarketProviderProvenanceEvents.length} filtered provider result(s) and lineage evidence will be packed.`
-                              : "Lineage and ingestion evidence will be packed for this focus."}
+                              ? `필터된 Provider 결과 ${filteredFocusedMarketProviderProvenanceEvents.length}건과 Lineage evidence를 묶습니다.`
+                              : "이 focus의 Lineage 및 Ingestion evidence를 묶습니다."}
                           </span>
                         </div>
                       ) : null}
@@ -120,15 +120,15 @@ export function RuntimeDataIncidentTriagePanel({ model }: { model: any }) {
                             <strong>{focusedMarketWorkflowSummary.reviewSnapshotCount}</strong>
                           </div>
                           <div className="metric-tile">
-                            <span>Failed jobs</span>
+                            <span>실패 Job</span>
                             <strong>{focusedMarketWorkflowSummary.failedJobCount}</strong>
                           </div>
                           <div className="metric-tile">
-                            <span>Latest claim</span>
+                            <span>최근 Claim</span>
                             <strong>{formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage?.validation_claim)}</strong>
                           </div>
                           <div className="metric-tile">
-                            <span>Latest job</span>
+                            <span>최근 Job</span>
                             <strong>
                               {focusedMarketWorkflowSummary.latestJob
                                 ? `${formatWorkflowToken(focusedMarketWorkflowSummary.latestJob.status)} / ${formatWorkflowToken(focusedMarketWorkflowSummary.latestJob.operation)}`
@@ -136,15 +136,15 @@ export function RuntimeDataIncidentTriagePanel({ model }: { model: any }) {
                             </strong>
                           </div>
                           <div className="metric-tile">
-                            <span>Linked alerts</span>
+                            <span>연결 Alert</span>
                             <strong>{focusedMarketWorkflowSummary.linkedAlertCount}</strong>
                           </div>
                           <div className="metric-tile">
-                            <span>Incident history</span>
+                            <span>Incident 이력</span>
                             <strong>{focusedMarketWorkflowSummary.incidentHistoryCount}</strong>
                           </div>
                           <div className="metric-tile">
-                            <span>Provenance incidents</span>
+                            <span>Provenance incident</span>
                             <strong>
                               {filteredFocusedMarketProviderProvenanceEvents.length}
                               {` / ${focusedMarketProviderProvenanceCount}`}
@@ -159,11 +159,11 @@ export function RuntimeDataIncidentTriagePanel({ model }: { model: any }) {
                         <RuntimeProviderProvenanceFocusedExportSection model={model} />
                       </>
                     ) : (
-                      <p className="empty-state">No market-data instrument is currently selected for triage.</p>
+                      <p className="empty-state">현재 triage할 market-data instrument가 선택되지 않았습니다.</p>
                     )}
                   </>
                 ) : (
-                  <p className="empty-state">Load market-data status before reviewing lineage workflow history.</p>
+                  <p className="empty-state">Lineage workflow 이력을 보려면 먼저 market-data status를 불러와야 합니다.</p>
                 )}
               </PanelDisclosure>
   );

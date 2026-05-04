@@ -28,7 +28,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
             }
             value={marketDataProvenanceExportFilter.provider}
           >
-            <option value={ALL_FILTER_VALUE}>All providers</option>
+            <option value={ALL_FILTER_VALUE}>전체 Provider</option>
             {marketDataProvenanceExportProviderOptions.map((provider) => (
               <option key={provider} value={provider}>
                 {provider}
@@ -47,7 +47,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
             }
             value={marketDataProvenanceExportFilter.vendor_field}
           >
-            <option value={ALL_FILTER_VALUE}>All vendor fields</option>
+            <option value={ALL_FILTER_VALUE}>전체 vendor field</option>
             {marketDataProvenanceExportVendorFieldOptions.map((vendorField) => (
               <option key={vendorField} value={vendorField}>
                 {vendorField}
@@ -66,8 +66,8 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
             }
             value={marketDataProvenanceExportFilter.sort}
           >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
+            <option value="newest">최신순</option>
+            <option value="oldest">오래된순</option>
             <option value="provider">Provider</option>
             <option value="severity">Severity</option>
           </select>
@@ -81,7 +81,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
                 search_query: event.target.value,
               }))
             }
-            placeholder="summary, provider, path"
+            placeholder="summary, provider, path 검색"
             type="search"
             value={marketDataProvenanceExportFilter.search_query}
           />
@@ -89,10 +89,10 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
       </div>
       <div className="run-filter-summary-chip-row">
         <span className="run-filter-summary-chip">
-          {filteredFocusedMarketProviderProvenanceEvents.length} filtered result(s)
+          필터 결과 {filteredFocusedMarketProviderProvenanceEvents.length}건
         </span>
         <span className="run-filter-summary-chip">
-          {focusedMarketProviderProvenanceCount} total provenance incident(s)
+          전체 Provenance incident {focusedMarketProviderProvenanceCount}건
         </span>
         <span className="run-filter-summary-chip">
           {formatMarketDataProvenanceExportFilterSummary(marketDataProvenanceExportFilter)}
@@ -102,7 +102,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
         <table className="data-table">
           <thead>
             <tr>
-              <th>When</th>
+              <th>시각</th>
               <th>Provider</th>
               <th>Signal</th>
               <th>Provenance</th>
@@ -126,7 +126,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
                   <p className="run-lineage-symbol-copy">
                     {record.event.external_reference
                       ? `External ref: ${record.event.external_reference}`
-                      : "No external reference recorded."}
+                      : "기록된 external reference가 없습니다."}
                   </p>
                 </td>
                 <td>
@@ -143,7 +143,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
         </table>
       ) : (
         <p className="empty-state">
-          No provider provenance incidents match the current export filters.
+          현재 export 필터에 맞는 Provider provenance incident가 없습니다.
         </p>
       )}
     </>

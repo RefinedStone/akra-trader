@@ -10,16 +10,16 @@ export function RuntimeProviderProvenanceFocusedIngestionJobsSection({ model }: 
 
   return (
     <div>
-      <h3>Ingestion jobs</h3>
+      <h3>Ingestion jobs (수집 작업)</h3>
       {marketDataIngestionJobs.length ? (
         <table className="data-table">
           <thead>
             <tr>
-              <th>Finished</th>
+              <th>완료 시각</th>
               <th>Status</th>
               <th>Operation</th>
-              <th>Fetched</th>
-              <th>Detail</th>
+              <th>수집 수</th>
+              <th>상세</th>
             </tr>
           </thead>
           <tbody>
@@ -35,10 +35,10 @@ export function RuntimeProviderProvenanceFocusedIngestionJobsSection({ model }: 
                     Claim: {formatWorkflowToken(job.validation_claim)}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    Requested: {formatRange(job.requested_start_at, job.requested_end_at)}
+                    요청 구간: {formatRange(job.requested_start_at, job.requested_end_at)}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    {job.last_error ? truncateLabel(job.last_error, 84) : "No job error recorded."}
+                    {job.last_error ? truncateLabel(job.last_error, 84) : "기록된 Job error가 없습니다."}
                   </p>
                 </td>
               </tr>
@@ -46,7 +46,7 @@ export function RuntimeProviderProvenanceFocusedIngestionJobsSection({ model }: 
           </tbody>
         </table>
       ) : (
-        <p className="empty-state">No ingestion jobs recorded for this focus.</p>
+        <p className="empty-state">이 focus에 기록된 Ingestion job이 없습니다.</p>
       )}
     </div>
   );
