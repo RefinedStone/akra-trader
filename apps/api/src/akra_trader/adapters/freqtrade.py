@@ -36,6 +36,7 @@ from akra_trader.adapters.freqtrade_zip_summaries import FreqtradeZipSummaryMixi
 @dataclass(frozen=True)
 class PreparedCommand:
   command: list[str]
+  download_command: list[str] | None
   working_directory: str
   reference_id: str
   reference_version: str | None
@@ -68,16 +69,19 @@ class FreqtradeReferenceAdapter(
     timeframe = getattr(config, "timeframe", None)
     initial_cash = getattr(config, "initial_cash", None)
     fee_rate = getattr(config, "fee_rate", None)
-    command = [
-      "freqtrade",
-      "backtesting",
-      f"--strategy={metadata.entrypoint}",
-      f"--timerange={timerange}",
+    common_config_args = [
       "--user-data-dir=user_data",
       "--config=configs/exampleconfig.json",
       "--config=configs/exampleconfig_secret.json",
       f"--config=configs/trading_mode-{mode}.json",
       f"--config=configs/blacklist-{exchange}.json",
+    ]
+    command = [
+      "freqtrade",
+      "backtesting",
+      f"--strategy={metadata.entrypoint}",
+      f"--timerange={timerange}",
+      *common_config_args,
       f"--config=configs/pairlist-backtest-static-{exchange}-{mode}-usdt.json",
       "--breakdown=day",
       "--export=signals",
@@ -90,8 +94,22 @@ class FreqtradeReferenceAdapter(
       command.append(f"--dry-run-wallet={initial_cash}")
     if fee_rate is not None:
       command.append(f"--fee={fee_rate}")
+    download_command = None
+    if symbols:
+      download_command = [
+        "freqtrade",
+        "download-data",
+        *common_config_args,
+        f"--exchange={exchange}",
+        f"--timerange={timerange}",
+        "--pairs",
+        *symbols,
+        "--timeframes",
+        *self._resolve_download_timeframes(timeframe),
+      ]
     return PreparedCommand(
       command=command,
+      download_command=download_command,
       working_directory=str(working_directory),
       reference_id=reference.reference_id,
       reference_version=self._resolve_reference_version(working_directory, metadata.version),
@@ -152,6 +170,43 @@ class FreqtradeReferenceAdapter(
       )
       return run
 
+    if prepared.download_command is not None:
+      run.notes.append(
+        "Prepared NFI reference data sync command: "
+        + " ".join(prepared.download_command)
+      )
+      download_process = subprocess.run(
+        prepared.download_command,
+        cwd=prepared.working_directory,
+        check=False,
+        capture_output=True,
+        text=True,
+        shell=False,
+      )
+      download_stdout = download_process.stdout.strip()
+      download_stderr = download_process.stderr.strip()
+      if download_stdout:
+        run.notes.append(download_stdout)
+      if download_stderr:
+        run.notes.append(download_stderr)
+      if download_process.returncode != 0:
+        run.status = RunStatus.FAILED
+        run.notes.append(
+          "Reference backtest data sync failed before execution. "
+          "Check the Freqtrade download-data log and retry the backtest."
+        )
+        run.provenance.artifact_paths = self._resolve_post_run_artifact_paths(
+          artifact_roots=prepared.artifact_roots,
+          existing_artifacts=existing_artifacts,
+          process_succeeded=False,
+          reported_artifact_paths=(),
+        )
+        run.provenance.benchmark_artifacts = self._build_benchmark_artifacts(
+          run.provenance.artifact_paths
+        )
+        run.ended_at = datetime.now(UTC)
+        return run
+
     process = subprocess.run(
       prepared.command,
       cwd=prepared.working_directory,
@@ -210,6 +265,22 @@ class FreqtradeReferenceAdapter(
     return self._resolve_artifact_paths(
       artifact_roots=artifact_roots,
       existing_artifacts=existing_artifacts,
+    )
+
+  @staticmethod
+  def _resolve_download_timeframes(base_timeframe: str | None) -> tuple[str, ...]:
+    return tuple(
+      dict.fromkeys(
+        timeframe
+        for timeframe in (
+          base_timeframe,
+          "15m",
+          "1h",
+          "4h",
+          "1d",
+        )
+        if timeframe
+      )
     )
 
   @staticmethod

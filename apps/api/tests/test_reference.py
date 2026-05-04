@@ -50,6 +50,19 @@ def test_reference_adapter_builds_nfi_command() -> None:
   assert "--timeframe=5m" in prepared.command
   assert "--dry-run-wallet=10000.0" in prepared.command
   assert "--fee=0.001" in prepared.command
+  assert prepared.download_command is not None
+  assert prepared.download_command[0] == "freqtrade"
+  assert "download-data" in prepared.download_command
+  assert "--exchange=binance" in prepared.download_command
+  assert "--timerange=20250101-20250131" in prepared.download_command
+  assert "--pairs" in prepared.download_command
+  assert "BTC/USDT" in prepared.download_command
+  assert "--timeframes" in prepared.download_command
+  assert "5m" in prepared.download_command
+  assert "15m" in prepared.download_command
+  assert "1h" in prepared.download_command
+  assert "4h" in prepared.download_command
+  assert "1d" in prepared.download_command
   assert prepared.working_directory.endswith("reference/NostalgiaForInfinity")
   assert prepared.reference_id == "nostalgia-for-infinity"
   assert prepared.reference.title == "NostalgiaForInfinity"
