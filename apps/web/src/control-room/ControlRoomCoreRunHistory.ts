@@ -231,6 +231,14 @@ export function formatPresetLifecycleStage(stage: string) {
   return stage.replaceAll("_", " ");
 }
 
+function formatRunDateBoundary(dateValue: string, boundary: "start" | "end") {
+  const trimmed = dateValue.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return boundary === "start" ? `${trimmed}T00:00:00Z` : `${trimmed}T23:59:59Z`;
+}
+
 export function buildRunSubmissionPayload(form: typeof defaultRunForm, extras: Record<string, unknown> = {}) {
   const presetId = form.preset_id.trim();
   const benchmarkFamily = form.benchmark_family.trim();
@@ -242,6 +250,8 @@ export function buildRunSubmissionPayload(form: typeof defaultRunForm, extras: R
     fee_rate: form.fee_rate,
     slippage_bps: form.slippage_bps,
     parameters: {},
+    start_at: formatRunDateBoundary(form.start_date, "start"),
+    end_at: formatRunDateBoundary(form.end_date, "end"),
     tags: parseExperimentTags(form.tags_text),
     preset_id: presetId || null,
     benchmark_family: benchmarkFamily || null,

@@ -772,12 +772,14 @@ export function RunForm({
   setForm,
   strategies,
   presets,
+  showDateRange = false,
   onSubmit,
 }: {
   form: typeof defaultRunForm;
   setForm: (updater: (value: typeof defaultRunForm) => typeof defaultRunForm) => void;
   strategies: Strategy[];
   presets: ExperimentPreset[];
+  showDateRange?: boolean;
   onSubmit: (event: FormEvent) => Promise<void> | void;
 }) {
   const availablePresets = presets.filter(
@@ -842,6 +844,28 @@ export function RunForm({
           onChange={(event) => setForm((current) => ({ ...current, slippage_bps: Number(event.target.value) }))}
         />
       </label>
+      {showDateRange ? (
+        <>
+          <label>
+            시작일
+            <input
+              max={form.end_date || undefined}
+              type="date"
+              value={form.start_date}
+              onChange={(event) => setForm((current) => ({ ...current, start_date: event.target.value }))}
+            />
+          </label>
+          <label>
+            종료일
+            <input
+              min={form.start_date || undefined}
+              type="date"
+              value={form.end_date}
+              onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))}
+            />
+          </label>
+        </>
+      ) : null}
       <label>
         Preset
         <select

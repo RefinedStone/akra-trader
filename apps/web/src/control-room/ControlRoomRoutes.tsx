@@ -713,6 +713,7 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                   setForm={setBacktestForm}
                   strategies={strategies}
                   presets={presets}
+                  showDateRange
                   onSubmit={handleBacktestSubmit}
                 />
               </section>

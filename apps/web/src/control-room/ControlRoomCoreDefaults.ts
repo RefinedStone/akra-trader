@@ -9,6 +9,8 @@ export const defaultRunForm = {
   initial_cash: 10000,
   fee_rate: 0.001,
   slippage_bps: 3,
+  start_date: "",
+  end_date: "",
   tags_text: "",
   preset_id: "",
   benchmark_family: "",
