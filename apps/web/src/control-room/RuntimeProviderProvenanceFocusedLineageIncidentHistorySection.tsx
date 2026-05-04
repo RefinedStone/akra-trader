@@ -4,7 +4,7 @@ export function RuntimeProviderProvenanceFocusedLineageIncidentHistorySection({
 }: {
   model: any;
 }) {
-  const {} = model;
+  const { focusedMarketIncidentHistory, formatTimestamp } = model;
 
   return (
     <div>

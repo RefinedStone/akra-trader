@@ -1,6 +1,12 @@
 // @ts-nocheck
 export function RuntimeProviderProvenanceFocusedPersistedExportHistorySection({ model }: { model: any }) {
-  const {} = model;
+  const {
+    marketDataProvenanceExportHistory,
+    formatTimestamp,
+    formatMarketDataProvenanceExportFilterSummary,
+    copySavedMarketDataProvenanceExport,
+    restoreMarketDataProvenanceExportFilter,
+  } = model;
 
   return (
     <>

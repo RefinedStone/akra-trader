@@ -1,6 +1,18 @@
 // @ts-nocheck
 export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { model: any }) {
-  const {} = model;
+  const {
+    setMarketDataProvenanceExportFilter,
+    marketDataProvenanceExportFilter,
+    ALL_FILTER_VALUE,
+    marketDataProvenanceExportProviderOptions,
+    marketDataProvenanceExportVendorFieldOptions,
+    normalizeMarketDataProvenanceExportSort,
+    filteredFocusedMarketProviderProvenanceEvents,
+    focusedMarketProviderProvenanceCount,
+    formatMarketDataProvenanceExportFilterSummary,
+    formatTimestamp,
+    formatWorkflowToken,
+  } = model;
 
   return (
     <>

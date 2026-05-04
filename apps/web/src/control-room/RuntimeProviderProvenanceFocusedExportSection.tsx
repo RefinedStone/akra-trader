@@ -2,10 +2,14 @@
 import { RuntimeProviderProvenanceFocusedPersistedExportHistorySection } from "./RuntimeProviderProvenanceFocusedPersistedExportHistorySection";
 import { RuntimeProviderProvenanceFocusedReadbackSection } from "./RuntimeProviderProvenanceFocusedReadbackSection";
 import { RuntimeProviderProvenanceFocusedSharedExportRegistrySection } from "./RuntimeProviderProvenanceFocusedSharedExportRegistrySection";
-import { RuntimeProviderProvenanceWorkspaceSection } from "./RuntimeProviderProvenanceWorkspaceSection";
 
 export function RuntimeProviderProvenanceFocusedExportSection({ model }: { model: any }) {
-  const {} = model;
+  const {
+    copyFocusedMarketWorkflowExport,
+    resetMarketDataProvenanceExportFilter,
+    marketDataProvenanceExportHistory,
+    clearMarketDataProvenanceExportHistory,
+  } = model;
 
   return (
     <div>
@@ -51,9 +55,6 @@ export function RuntimeProviderProvenanceFocusedExportSection({ model }: { model
         <RuntimeProviderProvenanceFocusedReadbackSection model={model} />
         <RuntimeProviderProvenanceFocusedPersistedExportHistorySection model={model} />
         <RuntimeProviderProvenanceFocusedSharedExportRegistrySection model={model} />
-        <RuntimeProviderProvenanceWorkspaceSection
-          model={model.providerProvenanceRouteModel ?? model}
-        />
       </div>
     </div>
   );

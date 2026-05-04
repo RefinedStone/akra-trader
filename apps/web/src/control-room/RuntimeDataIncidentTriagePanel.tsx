@@ -4,7 +4,27 @@ import { RuntimeProviderProvenanceFocusedIngestionJobsSection } from "./RuntimeP
 import { RuntimeProviderProvenanceFocusedLineageIncidentHistorySection } from "./RuntimeProviderProvenanceFocusedLineageIncidentHistorySection";
 import { RuntimeProviderProvenanceFocusedLineageHistorySection } from "./RuntimeProviderProvenanceFocusedLineageHistorySection";
 export function RuntimeDataIncidentTriagePanel({ model }: { model: any }) {
-  const {} = model;
+  const {
+    PanelDisclosure,
+    activeMarketInstrument,
+    focusedMarketWorkflowSummary,
+    marketStatus,
+    marketDataWorkflowLoading,
+    marketDataWorkflowError,
+    formatTimestamp,
+    formatWorkflowToken,
+    autoLinkedMarketInstrumentLink,
+    focusedMultiSymbolPrimaryLink,
+    incidentFocusedInstruments,
+    buildMarketDataInstrumentFocusKey,
+    activeMarketInstrumentKey,
+    handleMarketInstrumentFocus,
+    resolveMarketDataSymbol,
+    copyFocusedMarketWorkflowExport,
+    focusedMarketProviderProvenanceCount,
+    filteredFocusedMarketProviderProvenanceEvents,
+    marketDataWorkflowExportFeedback,
+  } = model;
 
   return (
               <PanelDisclosure

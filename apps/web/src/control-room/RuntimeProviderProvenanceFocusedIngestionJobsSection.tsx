@@ -1,6 +1,12 @@
 // @ts-nocheck
 export function RuntimeProviderProvenanceFocusedIngestionJobsSection({ model }: { model: any }) {
-  const {} = model;
+  const {
+    marketDataIngestionJobs,
+    formatTimestamp,
+    formatWorkflowToken,
+    formatRange,
+    truncateLabel,
+  } = model;
 
   return (
     <div>

@@ -4,7 +4,14 @@ export function RuntimeProviderProvenanceWorkspaceQuerySurfaceSection({
 }: {
   model: any;
 }) {
-  const {} = model;
+  const {
+    setProviderProvenanceAnalyticsQuery,
+    providerProvenanceAnalyticsQuery,
+    ALL_FILTER_VALUE,
+    providerProvenanceAnalytics,
+    formatProviderProvenanceAnalyticsQuerySummary,
+    providerProvenanceDashboardLayout,
+  } = model;
 
   return (
     <div className="market-data-provenance-shared-history">

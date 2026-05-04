@@ -1,6 +1,12 @@
 // @ts-nocheck
 export function RuntimeProviderProvenanceFocusedLineageHistorySection({ model }: { model: any }) {
-  const {} = model;
+  const {
+    marketDataLineageHistory,
+    formatTimestamp,
+    formatWorkflowToken,
+    shortenIdentifier,
+    formatRange,
+  } = model;
 
   return (
     <div>

@@ -1,6 +1,15 @@
 // @ts-nocheck
 export function RuntimeProviderProvenanceFocusedSharedExportRegistrySection({ model }: { model: any }) {
-  const {} = model;
+  const {
+    sharedProviderProvenanceExports,
+    sharedProviderProvenanceExportsLoading,
+    sharedProviderProvenanceExportsError,
+    formatTimestamp,
+    copySharedProviderProvenanceExport,
+    loadSharedProviderProvenanceExportHistory,
+    selectedSharedProviderProvenanceExportJobId,
+    selectedSharedProviderProvenanceExportHistory,
+  } = model;
 
   return (
     <>
