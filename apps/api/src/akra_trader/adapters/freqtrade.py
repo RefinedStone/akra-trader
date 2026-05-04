@@ -160,10 +160,16 @@ class FreqtradeReferenceAdapter(
       text=True,
       shell=False,
     )
-    run.notes.append(process.stdout.strip())
-    if process.stderr.strip():
-      run.notes.append(process.stderr.strip())
-    resolved_artifact_paths = self._resolve_artifact_paths(
+    stdout = process.stdout.strip()
+    stderr = process.stderr.strip()
+    run.notes.append(stdout)
+    if stderr:
+      run.notes.append(stderr)
+    reported_artifact_paths = self._resolve_reported_artifact_paths(
+      "\n".join(part for part in (stdout, stderr) if part),
+      Path(prepared.working_directory),
+    )
+    resolved_artifact_paths = reported_artifact_paths or self._resolve_artifact_paths(
       artifact_roots=prepared.artifact_roots,
       existing_artifacts=existing_artifacts,
     )
@@ -172,3 +178,21 @@ class FreqtradeReferenceAdapter(
     run.status = RunStatus.COMPLETED if process.returncode == 0 else RunStatus.FAILED
     run.ended_at = datetime.now(UTC)
     return run
+
+  @staticmethod
+  def _resolve_reported_artifact_paths(process_output: str, working_directory: Path) -> tuple[str, ...]:
+    reported_paths: list[str] = []
+    patterns = (
+      r"Loading backtest result from (?P<path>[^\n]+)",
+      r"dumping (?:json|joblib) to \"(?P<path>[^\"]+)\"",
+    )
+    for pattern in patterns:
+      for match in re.finditer(pattern, process_output):
+        raw_path = match.group("path").strip().strip("\"")
+        if not raw_path:
+          continue
+        path = Path(raw_path)
+        resolved_path = path if path.is_absolute() else working_directory / path
+        if resolved_path.exists():
+          reported_paths.append(str(resolved_path))
+    return tuple(dict.fromkeys(reported_paths))

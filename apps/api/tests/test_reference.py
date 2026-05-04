@@ -95,6 +95,26 @@ def test_reference_adapter_uses_metadata_version_when_git_is_missing(monkeypatch
   assert prepared.reference_version == "reference"
 
 
+def test_reference_adapter_prefers_reported_cached_backtest_artifact(tmp_path: Path) -> None:
+  working_directory = tmp_path / "reference" / "NostalgiaForInfinity"
+  result_root = working_directory / "user_data" / "backtest_results"
+  result_root.mkdir(parents=True)
+  stale_snapshot = result_root / "backtest-result-20260417_030000.json"
+  cached_snapshot = result_root / "backtest-result-20260417_040000.json"
+  stale_snapshot.write_text("{}", encoding="utf-8")
+  cached_snapshot.write_text("{}", encoding="utf-8")
+
+  resolved_paths = FreqtradeReferenceAdapter._resolve_reported_artifact_paths(
+    "\n".join((
+      "Loading backtest result from user_data/backtest_results/backtest-result-20260417_040000.json",
+      'dumping json to "user_data/backtest_results/backtest-result-20260417_040000.meta.json"',
+    )),
+    working_directory,
+  )
+
+  assert resolved_paths == (str(cached_snapshot),)
+
+
 def test_benchmark_artifact_runtime_candidate_id_helpers_accept_multiple_source_keys() -> None:
   assert extract_benchmark_artifact_runtime_candidate_id(
     {"runtime_candidate_id": "freqtrade:pair-metric:BTC/USDT"}
