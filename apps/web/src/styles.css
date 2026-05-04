@@ -38,7 +38,7 @@ body {
     "Dotum",
     sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(19, 117, 236, 0.1), transparent 30%),
+    linear-gradient(90deg, rgba(19, 117, 236, 0.05), transparent 42%),
     linear-gradient(180deg, #f9fafc 0%, #f1f4f8 100%);
   color: var(--text);
 }
@@ -63,7 +63,7 @@ select {
   border: 1px solid var(--line-strong);
   border-radius: 30px;
   background:
-    radial-gradient(circle at top right, rgba(19, 117, 236, 0.12), transparent 34%),
+    linear-gradient(90deg, rgba(19, 117, 236, 0.08), transparent 42%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(247, 248, 250, 0.96));
   box-shadow: var(--shadow);
 }
@@ -83,7 +83,7 @@ select {
   margin: 0;
   font-size: clamp(2.1rem, 3vw, 3.6rem);
   line-height: 1;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .hero-copy {
@@ -172,7 +172,7 @@ select {
 
 .control-metric-card strong {
   font-size: clamp(1.4rem, 2vw, 2.1rem);
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .control-metric-card small {
@@ -3097,7 +3097,7 @@ select {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top right, rgba(var(--comparison-accent-rgb), 0.2), transparent 34%),
+    linear-gradient(135deg, rgba(var(--comparison-accent-rgb), 0.12), transparent 44%),
     linear-gradient(90deg, rgba(var(--comparison-accent-rgb), 0.1), transparent 26%);
   pointer-events: none;
 }
@@ -5366,7 +5366,7 @@ textarea:focus-visible {
 
 .comparison-panel::before {
   background:
-    radial-gradient(circle at top right, rgba(var(--comparison-accent-rgb), 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(var(--comparison-accent-rgb), 0.08), transparent 46%),
     linear-gradient(90deg, rgba(var(--comparison-accent-rgb), 0.04), transparent 26%);
 }
 
@@ -5545,6 +5545,435 @@ textarea:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .workspace-nav {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Command-center redesign layer */
+:root {
+  --bg: #eef2f6;
+  --bg-elevated: #ffffff;
+  --bg-panel: #ffffff;
+  --bg-panel-strong: #fbfcfe;
+  --surface-muted: #dde3eb;
+  --surface-raised: #f3f6fa;
+  --surface-subtle: #f8fafc;
+  --line: rgba(25, 35, 52, 0.1);
+  --line-strong: rgba(25, 35, 52, 0.18);
+  --text: #161a22;
+  --muted: #667085;
+  --blue: #2563eb;
+  --cyan: #0f766e;
+  --amber: #b7791f;
+  --ember: #c2410c;
+  --success: #0f8a5f;
+  --danger: #c2410c;
+  --shadow: 0 16px 38px rgba(28, 39, 58, 0.1);
+  --shadow-soft: 0 1px 2px rgba(28, 39, 58, 0.06);
+  --radius: 8px;
+}
+
+body {
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f6 100%);
+  background-size: 32px 32px, auto;
+}
+
+.shell {
+  width: min(1520px, calc(100vw - 28px));
+  padding: 18px 0 40px;
+}
+
+.hero {
+  position: relative;
+  grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.55fr);
+  gap: 18px;
+  padding: 22px;
+  overflow: hidden;
+  border-color: rgba(25, 35, 52, 0.14);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96)),
+    var(--bg-panel-strong);
+  box-shadow: var(--shadow);
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #2563eb, #0f8a5f 48%, #b7791f);
+}
+
+.hero-copy-block {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.eyebrow,
+.kicker {
+  margin: 0;
+  font-family: "IBM Plex Mono", "Noto Sans KR", monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--cyan);
+}
+
+.hero h1,
+.panel h2 {
+  letter-spacing: 0;
+}
+
+.hero h1 {
+  max-width: 820px;
+  font-size: clamp(2.35rem, 4vw, 4.25rem);
+  line-height: 0.96;
+}
+
+.hero-copy {
+  max-width: 720px;
+  margin: 0;
+  color: #475467;
+  font-size: 0.98rem;
+}
+
+.hero-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hero-action-row span,
+.hero-mini-metrics span,
+.workspace-chip,
+.run-status,
+.run-surface-query-builder-trace-chip,
+.reference-artifact-line-view-chip,
+.reference-artifact-line-signal-chip {
+  border-radius: 999px;
+}
+
+.hero-action-row span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: #344054;
+  font-size: 0.82rem;
+}
+
+.hero-panel,
+.panel,
+.control-metric-card,
+.workspace-tab,
+.workspace-route-card,
+.metric-tile,
+.run-card,
+.strategy-card,
+.strategy-column,
+.run-surface-capability-panel,
+.run-surface-query-builder,
+.run-filter-workbench,
+.run-filter-saved-card,
+.run-list-boundary-note,
+.comparison-panel,
+.comparison-dev-panel,
+.run-lineage,
+.run-strategy,
+.reference-provenance {
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+}
+
+.hero-panel {
+  padding: 18px;
+  border-color: rgba(25, 35, 52, 0.13);
+  background:
+    linear-gradient(180deg, rgba(15, 138, 95, 0.08), rgba(37, 99, 235, 0.035)),
+    #ffffff;
+}
+
+.hero-panel-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero-panel p {
+  margin: 0;
+  color: #667085;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+}
+
+.hero-primary-metric {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid rgba(15, 138, 95, 0.16);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.hero-primary-metric span,
+.hero-primary-metric small,
+.hero-mini-metrics small {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.hero-primary-metric strong {
+  color: var(--text);
+  font-size: 1.75rem;
+  letter-spacing: 0;
+}
+
+.hero-mini-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hero-mini-metrics span {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.hero-mini-metrics strong {
+  font-size: 1rem;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+}
+
+.workspace-shell {
+  gap: 16px;
+}
+
+.control-strip {
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.control-metric-card {
+  min-height: 112px;
+  padding: 14px 16px;
+  border-color: rgba(25, 35, 52, 0.12);
+  background: #ffffff;
+}
+
+.control-metric-card span {
+  color: #667085;
+  letter-spacing: 0.04em;
+}
+
+.control-metric-card strong {
+  color: #111827;
+  letter-spacing: 0;
+}
+
+.control-metric-card.is-research {
+  border-left: 4px solid #2563eb;
+  box-shadow: var(--shadow-soft);
+}
+
+.control-metric-card.is-runtime {
+  border-left: 4px solid #0f766e;
+  box-shadow: var(--shadow-soft);
+}
+
+.control-metric-card.is-live {
+  border-left: 4px solid #b7791f;
+  box-shadow: var(--shadow-soft);
+}
+
+.control-metric-card.is-warning {
+  border-left: 4px solid #c2410c;
+  box-shadow: var(--shadow-soft);
+}
+
+.workspace-nav {
+  top: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border-color: rgba(25, 35, 52, 0.12);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 22px rgba(28, 39, 58, 0.08);
+}
+
+.workspace-tab {
+  gap: 5px;
+  min-height: 92px;
+  padding: 12px;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.workspace-tab:hover {
+  background: #f8fafc;
+}
+
+.workspace-tab.is-active {
+  border-color: rgba(15, 118, 110, 0.26);
+  background: #ecfdf7;
+  box-shadow: inset 0 -2px 0 #0f8a5f;
+}
+
+.workspace-tab-kicker,
+.workspace-route-card span {
+  color: var(--cyan);
+  letter-spacing: 0.04em;
+}
+
+.workspace-tab strong {
+  font-size: 0.96rem;
+}
+
+.workspace-tab-summary {
+  font-size: 0.78rem;
+}
+
+.workspace-intro-panel {
+  background: #ffffff;
+}
+
+.workspace-intro-head {
+  align-items: center;
+}
+
+.workspace-intro-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+}
+
+.workspace-route-grid {
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+}
+
+.workspace-route-card {
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.panel {
+  padding: 20px;
+  border-color: rgba(25, 35, 52, 0.12);
+}
+
+.section-heading {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.run-form button,
+.ghost-button,
+.market-data-instrument-button,
+.comparison-run-card-pill-button,
+.comparison-run-card-link,
+.reference-artifact-line-note-button {
+  min-height: 38px;
+  border-radius: 8px;
+}
+
+.run-form button,
+.ghost-button {
+  border-color: rgba(15, 118, 110, 0.22);
+  background: #ffffff;
+  color: #175c52;
+  font-weight: 700;
+}
+
+.run-form button:hover,
+.ghost-button:hover,
+.workspace-route-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.36);
+  background: #f0fdfa;
+}
+
+.run-form input,
+.run-form select,
+.filter-bar select,
+.filter-bar input,
+.control-action-field input,
+.comparison-dev-field input,
+.comparison-dev-field select,
+.comparison-dev-field textarea,
+.market-chart-controls select,
+.run-surface-query-builder-control > select,
+.run-surface-query-builder-control > input,
+.run-surface-query-builder-control > textarea,
+.run-lineage-order-fields input,
+.run-lineage-order-fields select {
+  border-radius: 8px;
+  border-color: rgba(25, 35, 52, 0.16);
+  background: #ffffff;
+}
+
+.data-table,
+.comparison-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table th,
+.comparison-table th {
+  background: #f3f6fa;
+  color: #475467;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.data-table td,
+.comparison-table td {
+  background: #ffffff;
+}
+
+@media (max-width: 1080px) {
+  .hero,
+  .control-strip,
+  .workspace-intro-grid,
+  .workspace-route-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    width: min(100vw - 16px, 1520px);
+    padding-top: 12px;
+  }
+
+  .hero,
+  .panel {
+    padding: 16px;
+  }
+
+  .hero h1 {
+    font-size: 2.15rem;
+  }
+
+  .hero-mini-metrics,
   .workspace-nav {
     grid-template-columns: 1fr;
   }

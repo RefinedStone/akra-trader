@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Control Room UI Research</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Inter, "Noto Sans KR", system-ui, sans-serif;
+        background: #f6f7f9;
+        color: #161a22;
+      }
+      main {
+        width: min(920px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 48px 0;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 40px;
+      }
+      h2 {
+        margin-top: 32px;
+      }
+      p,
+      li {
+        line-height: 1.65;
+        color: #4c5564;
+      }
+      .note {
+        border: 1px solid #d9dee7;
+        border-radius: 8px;
+        background: #fff;
+        padding: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Admin Control Room UI Research</h1>
+      <p>2026-05-04</p>
+      <section class="note">
+        <p>
+          Lazyweb MCP and screenshot browse tooling are not exposed in this
+          environment, so no Lazyweb database screenshots could be downloaded.
+          The current implementation was inspected from the React shell, global
+          CSS, and route composition.
+        </p>
+      </section>
+      <h2>Direction</h2>
+      <ul>
+        <li>Favor command-center information density over marketing-style hero composition.</li>
+        <li>Keep persistent workspace navigation with a stronger active state.</li>
+        <li>Put status and API context near the top for fast operator orientation.</li>
+        <li>Use calmer tokens with purposeful accent colors for operational states.</li>
+        <li>Improve form, table, card, and button consistency globally.</li>
+      </ul>
+      <h2>References</h2>
+      <ul>
+        <li>SaaS Dashboard Design UX, Merveilleux Design, 2026-02-19.</li>
+        <li>Dashboard Design Best Practices, Boundev, 2026-03-09.</li>
+        <li>SaaS Dashboard UI/UX Best Practices, Octet Design, 2026-01-06.</li>
+        <li>UX Clarity in SaaS Dashboards, Typenorm, 2026-02-03.</li>
+      </ul>
+    </main>
+  </body>
+</html>

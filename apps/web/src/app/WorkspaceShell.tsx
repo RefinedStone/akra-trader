@@ -24,21 +24,45 @@ export function WorkspaceShell({
   statusText,
   workspaceDescriptors,
 }: WorkspaceShellProps) {
+  const primaryMetric = controlStripMetrics[0];
+  const secondaryMetrics = controlStripMetrics.slice(1, 3);
+
   return (
     <div className="shell">
       <header className="hero">
-        <div>
+        <div className="hero-copy-block">
           <p className="eyebrow">Akra Trader / 운영 Control Room</p>
-          <h1>Research, Runtime Ops, Guarded Live를 한 화면에서 관리합니다.</h1>
+          <h1>Trading operations command center</h1>
           <p className="hero-copy">
-            필요한 작업 영역만 빠르게 확인하고, 실험·운영·실행 제어를 분리해서 처리합니다.
+            실험, 시장 데이터, runtime, guarded live를 분리된 workspace로 운영하되
+            핵심 상태는 한 화면에서 판단합니다.
           </p>
+          <div className="hero-action-row" aria-label="주요 운영 상태">
+            <span>Active workspace · {activeWorkspaceDescriptor.label}</span>
+            <span>{statusText}</span>
+          </div>
         </div>
         <aside className="hero-panel">
-          <span className="status-indicator" />
-          <strong>{statusText}</strong>
+          <div className="hero-panel-status">
+            <span className="status-indicator" />
+            <strong>{statusText}</strong>
+          </div>
           <p>API base: {apiBase}</p>
-          <p>현재 workspace: {activeWorkspaceDescriptor.label}</p>
+          {primaryMetric ? (
+            <div className="hero-primary-metric">
+              <span>{primaryMetric.label}</span>
+              <strong>{primaryMetric.value}</strong>
+              <small>{primaryMetric.detail}</small>
+            </div>
+          ) : null}
+          <div className="hero-mini-metrics">
+            {secondaryMetrics.map((metric) => (
+              <span key={metric.label}>
+                <small>{metric.label}</small>
+                <strong>{metric.value}</strong>
+              </span>
+            ))}
+          </div>
         </aside>
       </header>
 
