@@ -18,7 +18,7 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
     BackfillCountStatus,
     instrumentGapRowKey,
     buildGapWindowKey,
-    expandedGapRows,
+    expandedGapRows = {},
     BackfillQualityStatus,
     activeGapWindowPickerRowKey,
     setExpandedGapWindowSelections,
@@ -27,7 +27,7 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
     setActiveGapWindowPickerRowKey,
     setExpandedGapRows,
     toggleExpandedGapRow,
-    expandedGapWindowSelections,
+    expandedGapWindowSelections = {},
     SyncCheckpointStatus,
     SyncFailureStatus,
   } = model;

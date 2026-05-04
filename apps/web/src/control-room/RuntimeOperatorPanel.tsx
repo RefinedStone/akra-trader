@@ -581,8 +581,8 @@ export function RuntimeOperatorPanel({ model }: { model: any }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {operatorVisibility.delivery_history.slice(0, 8).map((record) => (
-                        <tr key={`delivery-${record.delivery_id}`}>
+                      {operatorVisibility.delivery_history.slice(0, 8).map((record, index) => (
+                        <tr key={`delivery-${record.delivery_id}-${index}`}>
                           <td>{formatTimestamp(record.attempted_at)}</td>
                           <td>{record.target}</td>
                           <td>{record.status}</td>
