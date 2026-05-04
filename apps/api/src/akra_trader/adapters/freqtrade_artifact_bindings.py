@@ -304,7 +304,7 @@ class FreqtradeArtifactBindingMixin:
     trimmed = candidate_value.strip()
     if not trimmed:
       return None
-    normalized_symbol = FreqtradeReferenceAdapter._normalize_artifact_candidate_binding_symbol_key(symbol_key)
+    normalized_symbol = FreqtradeArtifactBindingMixin._normalize_artifact_candidate_binding_symbol_key(symbol_key)
     if normalized_symbol is None:
       return None
     return json.dumps(
@@ -397,7 +397,7 @@ class FreqtradeArtifactBindingMixin:
 
   @staticmethod
   def _set_summary_entry(summary: dict[str, Any], key: str, value: Any) -> None:
-    normalized = FreqtradeReferenceAdapter._normalize_summary_value(key, value)
+    normalized = FreqtradeArtifactBindingMixin._normalize_summary_value(key, value)
     if normalized is not None:
       summary[key] = normalized
 
@@ -406,9 +406,9 @@ class FreqtradeArtifactBindingMixin:
     if value in (None, "", [], {}):
       return None
     if key.endswith("_at"):
-      return FreqtradeReferenceAdapter._normalize_timestamp(value)
+      return FreqtradeArtifactBindingMixin._normalize_timestamp(value)
     if key.endswith("_count"):
-      return FreqtradeReferenceAdapter._coerce_count(value)
+      return FreqtradeArtifactBindingMixin._coerce_count(value)
     if isinstance(value, (str, int, float, bool)):
       return value
     if isinstance(value, tuple):

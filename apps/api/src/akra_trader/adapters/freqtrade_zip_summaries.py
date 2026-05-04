@@ -664,14 +664,17 @@ class FreqtradeZipSummaryMixin:
   def _resolve_reference_version(reference_root: Path, fallback: str | None) -> str | None:
     if not reference_root.exists():
       return fallback
-    process = subprocess.run(
-      ["git", "rev-parse", "HEAD"],
-      cwd=reference_root,
-      check=False,
-      capture_output=True,
-      text=True,
-      shell=False,
-    )
+    try:
+      process = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=reference_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        shell=False,
+      )
+    except OSError:
+      return fallback
     if process.returncode == 0 and process.stdout.strip():
       return process.stdout.strip()
     return fallback

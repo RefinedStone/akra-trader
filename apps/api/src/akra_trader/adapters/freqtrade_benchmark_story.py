@@ -15,6 +15,7 @@ from typing import Any
 from zipfile import BadZipFile
 from zipfile import ZipFile
 
+from akra_trader.adapters.freqtrade_artifact_bindings import FreqtradeArtifactBindingMixin
 from akra_trader.adapters.references import ReferenceCatalog
 from akra_trader.domain.models import BENCHMARK_ARTIFACT_RUNTIME_CANDIDATE_ID_METADATA_KEY
 from akra_trader.domain.models import BenchmarkArtifact
@@ -297,7 +298,7 @@ class FreqtradeBenchmarkStoryMixin:
     if not isinstance(entry, dict):
       return None
     label = entry.get(label_key)
-    count = FreqtradeReferenceAdapter._coerce_count(entry.get("count"))
+    count = FreqtradeArtifactBindingMixin._coerce_count(entry.get("count"))
     if not isinstance(label, str) or count is None:
       return None
     return {
@@ -307,7 +308,7 @@ class FreqtradeBenchmarkStoryMixin:
 
   @staticmethod
   def _format_number_text(value: Any) -> str | None:
-    number = FreqtradeReferenceAdapter._coerce_float(value)
+    number = FreqtradeArtifactBindingMixin._coerce_float(value)
     if number is None:
       return None
     rounded = round(number, 4)
@@ -317,17 +318,17 @@ class FreqtradeBenchmarkStoryMixin:
 
   @staticmethod
   def _format_pct_text(value: Any) -> str | None:
-    number_text = FreqtradeReferenceAdapter._format_number_text(value)
+    number_text = FreqtradeBenchmarkStoryMixin._format_number_text(value)
     if number_text is None:
       return None
     return f"{number_text}%"
 
   @staticmethod
   def _format_signed_pct_text(value: Any) -> str | None:
-    number = FreqtradeReferenceAdapter._coerce_float(value)
+    number = FreqtradeArtifactBindingMixin._coerce_float(value)
     if number is None:
       return None
-    pct_text = FreqtradeReferenceAdapter._format_pct_text(number)
+    pct_text = FreqtradeBenchmarkStoryMixin._format_pct_text(number)
     if pct_text is None:
       return None
     if number > 0:
@@ -336,7 +337,7 @@ class FreqtradeBenchmarkStoryMixin:
 
   @staticmethod
   def _format_count_phrase(value: Any, singular: str) -> str | None:
-    count = FreqtradeReferenceAdapter._coerce_count(value)
+    count = FreqtradeArtifactBindingMixin._coerce_count(value)
     if count is None:
       return None
     suffix = singular if count == 1 else f"{singular}s"
@@ -487,7 +488,7 @@ class FreqtradeBenchmarkStoryMixin:
     payload: dict[str, Any],
     candidates: list[dict[str, Any]],
   ) -> str | None:
-    direct_value = FreqtradeReferenceAdapter._lookup_value(
+    direct_value = FreqtradeBenchmarkStoryMixin._lookup_value(
       candidates,
       "strategy_name",
       "strategy",
@@ -531,10 +532,10 @@ class FreqtradeBenchmarkStoryMixin:
     pct_keys: tuple[str, ...],
     ratio_keys: tuple[str, ...],
   ) -> float | int | None:
-    direct_value = FreqtradeReferenceAdapter._lookup_value(candidates, *pct_keys)
+    direct_value = FreqtradeBenchmarkStoryMixin._lookup_value(candidates, *pct_keys)
     if isinstance(direct_value, (int, float)):
       return direct_value
-    ratio_value = FreqtradeReferenceAdapter._lookup_value(candidates, *ratio_keys)
+    ratio_value = FreqtradeBenchmarkStoryMixin._lookup_value(candidates, *ratio_keys)
     if isinstance(ratio_value, (int, float)):
       return round(ratio_value * 100, 4)
     return None

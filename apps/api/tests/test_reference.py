@@ -49,6 +49,43 @@ def test_reference_adapter_builds_nfi_command() -> None:
   assert any(path.endswith("user_data/logs") for path in prepared.artifact_roots)
 
 
+def test_reference_adapter_uses_metadata_version_when_git_is_missing(monkeypatch) -> None:
+  repo_root = Path(__file__).resolve().parents[3]
+  references = load_reference_catalog(repo_root / "reference" / "catalog.toml")
+  adapter = FreqtradeReferenceAdapter(repo_root, references)
+
+  def raise_missing_git(*args, **kwargs):
+    raise FileNotFoundError("git")
+
+  monkeypatch.setattr(
+    "akra_trader.adapters.freqtrade_zip_summaries.subprocess.run",
+    raise_missing_git,
+  )
+
+  prepared = adapter.prepare_backtest(
+    config=type(
+      "Config",
+      (),
+      {
+        "start_at": None,
+        "end_at": None,
+        "venue": "binance",
+      },
+    )(),
+    metadata=type(
+      "Metadata",
+      (),
+      {
+        "reference_id": "nostalgia-for-infinity",
+        "entrypoint": "NostalgiaForInfinityNext",
+        "version": "reference",
+      },
+    )(),
+  )
+
+  assert prepared.reference_version == "reference"
+
+
 def test_benchmark_artifact_runtime_candidate_id_helpers_accept_multiple_source_keys() -> None:
   assert extract_benchmark_artifact_runtime_candidate_id(
     {"runtime_candidate_id": "freqtrade:pair-metric:BTC/USDT"}
