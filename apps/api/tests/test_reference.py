@@ -26,6 +26,10 @@ def test_reference_adapter_builds_nfi_command() -> None:
         "start_at": None,
         "end_at": None,
         "venue": "binance",
+        "symbols": ("BTC/USDT",),
+        "timeframe": "5m",
+        "initial_cash": 10000.0,
+        "fee_rate": 0.001,
       },
     )(),
     metadata=type(
@@ -41,6 +45,11 @@ def test_reference_adapter_builds_nfi_command() -> None:
 
   assert prepared.command[0] == "freqtrade"
   assert "--strategy=NostalgiaForInfinityX7" in prepared.command
+  assert "--pairs" in prepared.command
+  assert "BTC/USDT" in prepared.command
+  assert "--timeframe=5m" in prepared.command
+  assert "--dry-run-wallet=10000.0" in prepared.command
+  assert "--fee=0.001" in prepared.command
   assert prepared.working_directory.endswith("reference/NostalgiaForInfinity")
   assert prepared.reference_id == "nostalgia-for-infinity"
   assert prepared.reference.title == "NostalgiaForInfinity"

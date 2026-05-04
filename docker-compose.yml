@@ -14,7 +14,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   api:
-    image: python:3.12-slim
+    image: akra-trader-api:freqtrade-reference-2024.5
+    build:
+      context: ./reference/NostalgiaForInfinity
+      dockerfile: docker/Dockerfile.custom
+      args:
+        sourcetag: "2024.5"
+    entrypoint: []
     working_dir: /workspace/apps/api
     environment:
       AKRA_TRADER_CORS_ORIGIN: http://localhost:47613
@@ -22,12 +28,11 @@ services:
       AKRA_TRADER_MARKET_DATA_SYNC_TIMEFRAMES: 1m,5m,15m,1h,1d
       AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_SERVICE_URL: memory://local
     command: >
-      bash -lc "python -m venv .venv &&
-      .venv/bin/python -m pip install -e '.[dev]' &&
-      .venv/bin/uvicorn akra_trader.main:app --host 0.0.0.0 --port 8000"
+      bash -lc "python -m pip install --user 'psycopg[binary]>=3.2.0,<4.0.0' &&
+      python -m pip install --user --no-deps -e . &&
+      python -m uvicorn akra_trader.main:app --host 0.0.0.0 --port 8000"
     volumes:
       - .:/workspace
-      - api_venv:/workspace/apps/api/.venv
     ports:
       - "47680:8000"
     healthcheck:
@@ -59,5 +64,4 @@ services:
 
 volumes:
   postgres_data:
-  api_venv:
   web_node_modules:

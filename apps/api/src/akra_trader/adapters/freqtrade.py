@@ -64,6 +64,10 @@ class FreqtradeReferenceAdapter(
     timerange = self._format_timerange(config.start_at, config.end_at)
     mode = "spot"
     exchange = config.venue
+    symbols = tuple(getattr(config, "symbols", ()) or ())
+    timeframe = getattr(config, "timeframe", None)
+    initial_cash = getattr(config, "initial_cash", None)
+    fee_rate = getattr(config, "fee_rate", None)
     command = [
       "freqtrade",
       "backtesting",
@@ -78,6 +82,14 @@ class FreqtradeReferenceAdapter(
       "--breakdown=day",
       "--export=signals",
     ]
+    if symbols:
+      command.extend(["--pairs", *symbols])
+    if timeframe:
+      command.append(f"--timeframe={timeframe}")
+    if initial_cash is not None:
+      command.append(f"--dry-run-wallet={initial_cash}")
+    if fee_rate is not None:
+      command.append(f"--fee={fee_rate}")
     return PreparedCommand(
       command=command,
       working_directory=str(working_directory),
