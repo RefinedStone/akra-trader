@@ -124,7 +124,7 @@ class FreqtradeReferenceAdapter(
     run.provenance.working_directory = prepared.working_directory
     run.provenance.external_command = tuple(prepared.command)
     run.provenance.artifact_paths = prepared.artifact_roots
-    run.provenance.benchmark_artifacts = self._build_benchmark_artifacts(prepared.artifact_roots)
+    run.provenance.benchmark_artifacts = ()
     run.provenance.market_data = MarketDataLineage(
       provider="freqtrade_reference",
       venue=run.config.venue,
@@ -169,15 +169,48 @@ class FreqtradeReferenceAdapter(
       "\n".join(part for part in (stdout, stderr) if part),
       Path(prepared.working_directory),
     )
-    resolved_artifact_paths = reported_artifact_paths or self._resolve_artifact_paths(
+    resolved_artifact_paths = self._resolve_post_run_artifact_paths(
       artifact_roots=prepared.artifact_roots,
       existing_artifacts=existing_artifacts,
+      process_succeeded=process.returncode == 0,
+      reported_artifact_paths=reported_artifact_paths,
     )
     run.provenance.artifact_paths = resolved_artifact_paths
     run.provenance.benchmark_artifacts = self._build_benchmark_artifacts(resolved_artifact_paths)
     run.status = RunStatus.COMPLETED if process.returncode == 0 else RunStatus.FAILED
+    if run.status == RunStatus.FAILED and "No data found" in "\n".join((stdout, stderr)):
+      run.notes.append(
+        "Reference backtest data is missing for the requested Freqtrade timerange. "
+        "Download the pair/timeframe data into reference/NostalgiaForInfinity/user_data/data "
+        "and re-run the backtest."
+      )
     run.ended_at = datetime.now(UTC)
     return run
+
+  def _resolve_post_run_artifact_paths(
+    self,
+    *,
+    artifact_roots: tuple[str, ...],
+    existing_artifacts: set[str],
+    process_succeeded: bool,
+    reported_artifact_paths: tuple[str, ...],
+  ) -> tuple[str, ...]:
+    if reported_artifact_paths:
+      return reported_artifact_paths
+    collected_artifacts = self._collect_artifacts(artifact_roots)
+    new_artifacts = sorted(collected_artifacts - existing_artifacts)
+    if new_artifacts:
+      return tuple(new_artifacts)
+    if not process_succeeded:
+      return tuple(
+        artifact_root
+        for artifact_root in artifact_roots
+        if Path(artifact_root).exists() and Path(artifact_root).name.lower() != "backtest_results"
+      )
+    return self._resolve_artifact_paths(
+      artifact_roots=artifact_roots,
+      existing_artifacts=existing_artifacts,
+    )
 
   @staticmethod
   def _resolve_reported_artifact_paths(process_output: str, working_directory: Path) -> tuple[str, ...]:

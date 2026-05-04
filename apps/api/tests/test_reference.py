@@ -115,6 +115,28 @@ def test_reference_adapter_prefers_reported_cached_backtest_artifact(tmp_path: P
   assert resolved_paths == (str(cached_snapshot),)
 
 
+def test_reference_adapter_does_not_fallback_to_stale_result_root_on_failure(tmp_path: Path) -> None:
+  repo_root = Path(__file__).resolve().parents[3]
+  references = load_reference_catalog(repo_root / "reference" / "catalog.toml")
+  adapter = FreqtradeReferenceAdapter(repo_root, references)
+  result_root = tmp_path / "user_data" / "backtest_results"
+  log_root = tmp_path / "user_data" / "logs"
+  result_root.mkdir(parents=True)
+  log_root.mkdir(parents=True)
+  stale_snapshot = result_root / "backtest-result-20250120_000000.json"
+  stale_snapshot.write_text("{}", encoding="utf-8")
+  existing_artifacts = adapter._collect_artifacts((str(result_root), str(log_root)))
+
+  resolved_paths = adapter._resolve_post_run_artifact_paths(
+    artifact_roots=(str(result_root), str(log_root)),
+    existing_artifacts=existing_artifacts,
+    process_succeeded=False,
+    reported_artifact_paths=(),
+  )
+
+  assert resolved_paths == (str(log_root),)
+
+
 def test_benchmark_artifact_runtime_candidate_id_helpers_accept_multiple_source_keys() -> None:
   assert extract_benchmark_artifact_runtime_candidate_id(
     {"runtime_candidate_id": "freqtrade:pair-metric:BTC/USDT"}
