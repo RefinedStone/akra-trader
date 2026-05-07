@@ -68,8 +68,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
               <section className="panel panel-wide">
                 <div className="section-heading">
                   <div>
-                    <p className="kicker">Strategy Catalog</p>
-                    <h2>Runtime 구분</h2>
+                    <p className="kicker">전략 운영 카탈로그</p>
+                    <h2>실행 가능한 전략</h2>
                   </div>
                   <button className="ghost-button" onClick={() => void loadAll()} type="button">
                     새로고침
@@ -80,12 +80,12 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                   <model.StrategyColumn
                     accent="amber"
                     strategies={strategyGroups.native}
-                    title="Native"
+                    title="운용 전략"
                   />
                   <model.StrategyColumn
                     accent="ember"
                     strategies={strategyGroups.future}
-                    title="Future LLM"
+                    title="준비 중인 전략"
                   />
                 </div>
               </section>
@@ -94,8 +94,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
           research: {
             launchPanel: (
               <section className="panel">
-                <p className="kicker">Backtest</p>
-                <h2>Run 실행</h2>
+                <p className="kicker">전략 검증</p>
+                <h2>백테스트 실행</h2>
                 <model.RunForm
                   form={backtestForm}
                   onSubmit={handleBacktestSubmit}
@@ -135,8 +135,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
           runtime: {
             launchPanel: (
               <section className="panel">
-                <p className="kicker">Sandbox</p>
-                <h2>Start sandbox worker</h2>
+                <p className="kicker">모의 운용</p>
+                <h2>샌드박스 실행</h2>
                 <model.RunForm
                   form={sandboxForm}
                   onSubmit={handleSandboxSubmit}
@@ -153,8 +153,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
           live: {
             launchPanel: (
               <section className="panel">
-                <p className="kicker">Guarded Live</p>
-                <h2>Live worker 시작</h2>
+                <p className="kicker">실전 보호 운용</p>
+                <h2>가드 라이브 시작</h2>
                 <model.RunForm
                   form={liveForm}
                   onSubmit={handleLiveSubmit}
