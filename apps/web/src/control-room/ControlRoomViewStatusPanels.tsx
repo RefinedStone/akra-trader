@@ -50,7 +50,7 @@ export function BackfillCountStatus({
   instrument: MarketDataStatus["instruments"][number];
 }) {
   if (instrument.backfill_target_candles === null) {
-    return <span>n/a</span>;
+    return <span>-</span>;
   }
   return (
     <div className="progress-stack">
@@ -58,7 +58,7 @@ export function BackfillCountStatus({
       <span>
         {Math.min(instrument.candle_count, instrument.backfill_target_candles)} /{" "}
         {instrument.backfill_target_candles}
-        {instrument.backfill_complete ? " ready" : ""}
+        {instrument.backfill_complete ? " 완료" : ""}
       </span>
       <div className="progress-track" aria-hidden="true">
         <span
@@ -178,7 +178,7 @@ export function BackfillQualityStatus({
     clearTouchSweepActivationFeedbackTimeout();
   }, []);
   if (instrument.backfill_contiguous_completion_ratio === null) {
-    return <span>n/a</span>;
+    return <span>-</span>;
   }
   const resolvedSelectedGapWindowKeys = resolveGapWindowSelectionList(
     orderedGapWindowKeys,
@@ -466,8 +466,8 @@ export function BackfillQualityStatus({
       <strong>{formatCompletion(instrument.backfill_contiguous_completion_ratio)}</strong>
       <span>
         {instrument.backfill_contiguous_complete
-          ? "gap-free"
-          : `gaps: ${instrument.backfill_contiguous_missing_candles ?? 0}`}
+          ? "빈 구간 없음"
+          : `빈 구간 ${instrument.backfill_contiguous_missing_candles ?? 0}개`}
       </span>
       {gapLines.length ? (
         <div className="progress-detail-list">
@@ -483,9 +483,9 @@ export function BackfillQualityStatus({
       ) : null}
       {hasGapWindowSubset ? (
         <span>
-          {`${expanded ? "Review subset" : "Focused subset"}: ${selectedGapWindowCount} / ${
+          {`${expanded ? "확인 중" : "선택 구간"}: ${selectedGapWindowCount} / ${
             instrument.backfill_gap_windows.length
-          } gaps`}
+          }개`}
         </span>
       ) : null}
       {canToggleGapWindows || canPickGapWindows ? (
@@ -497,8 +497,8 @@ export function BackfillQualityStatus({
               type="button"
             >
               {expanded
-                ? "Collapse gap detail"
-                : `Expand ${instrument.backfill_gap_windows.length}-gap detail`}
+                ? "상세 접기"
+                : `${instrument.backfill_gap_windows.length}개 빈 구간 보기`}
             </button>
           ) : null}
           {canPickGapWindows && onToggleGapWindowPicker ? (
@@ -508,10 +508,10 @@ export function BackfillQualityStatus({
               type="button"
             >
               {gapWindowPickerOpen
-                ? "Hide gap picker"
+                ? "구간 선택 닫기"
                 : hasGapWindowSubset
-                  ? "Refine focused gaps"
-                  : "Pick visible gaps"}
+                  ? "선택 구간 조정"
+                  : "볼 구간 선택"}
             </button>
           ) : null}
           {gapWindowPickerOpen && hasGapWindowSubset && onSelectAllGapWindows ? (
@@ -520,7 +520,7 @@ export function BackfillQualityStatus({
               onClick={onSelectAllGapWindows}
               type="button"
             >
-              Show full range
+              전체 보기
             </button>
           ) : null}
         </div>
@@ -532,23 +532,23 @@ export function BackfillQualityStatus({
           }`}
         >
           <div className="gap-window-picker-head">
-            <span className="gap-window-picker-title">Visible gap windows</span>
+            <span className="gap-window-picker-title">확인할 빈 구간</span>
             <span className="gap-window-picker-summary">
-              {`${selectedGapWindowCount} / ${instrument.backfill_gap_windows.length} selected · ${selectedGapWindowMissingCandles} missing candles`}
+              {`${selectedGapWindowCount} / ${instrument.backfill_gap_windows.length}개 선택 · 누락 캔들 ${selectedGapWindowMissingCandles}개`}
             </span>
           </div>
           <span className="gap-window-picker-anchor">
             {dragSelectionState
-              ? `Sweep ${dragSelectionState.targetSelected ? "select" : "hide"} mode from ${formatGapWindowKeyLabel(
+              ? `${formatGapWindowKeyLabel(
                   dragSelectionState.anchorGapWindowKey,
-                )}.`
+                )}부터 ${dragSelectionState.targetSelected ? "선택" : "숨김"} 중입니다.`
               : touchSweepHoldLabel
-                ? `Hold to ${
-                    touchSweepHoldProgressState?.targetSelected ? "sweep select" : "sweep hide"
-                  } from ${touchSweepHoldLabel}.`
+                ? `${touchSweepHoldLabel}부터 ${
+                    touchSweepHoldProgressState?.targetSelected ? "선택" : "숨김"
+                  }하려면 계속 누르세요.`
               : rangeAnchorLabel
-                ? `Range anchor: ${rangeAnchorLabel}. Shift-click another gap to apply the full range.`
-                : "Tip: click a gap to set the range anchor, then shift-click or drag across gaps to apply a range."}
+                ? `기준 구간: ${rangeAnchorLabel}. Shift-클릭으로 범위를 선택합니다.`
+                : "구간을 클릭해 기준을 잡고 Shift-클릭 또는 드래그로 범위를 선택합니다."}
           </span>
           {touchSweepHoldProgressState ? (
             <div
@@ -605,7 +605,7 @@ export function BackfillQualityStatus({
                       {formatGapWindowKeyLabel(gapWindowKey)}
                     </span>
                     <span className="gap-window-picker-option-meta">
-                      {`${gapWindow.missing_candles} missing candles`}
+                      {`누락 캔들 ${gapWindow.missing_candles}개`}
                     </span>
                   </span>
                 </label>
@@ -613,7 +613,7 @@ export function BackfillQualityStatus({
             })}
           </div>
           <span className="gap-window-picker-footnote">
-            Keep at least one gap window visible for review.
+            확인할 빈 구간은 하나 이상 남겨야 합니다.
           </span>
         </div>
       ) : null}
@@ -635,16 +635,16 @@ export function SyncCheckpointStatus({
 }) {
   const checkpoint = instrument.sync_checkpoint;
   if (!checkpoint) {
-    return <span>n/a</span>;
+    return <span>-</span>;
   }
   return (
     <div className="progress-stack">
       <strong title={checkpoint.checkpoint_id}>{shortenIdentifier(checkpoint.checkpoint_id)}</strong>
       <span>
-        {checkpoint.candle_count} candles
+        캔들 {checkpoint.candle_count}개
         {checkpoint.contiguous_missing_candles > 0
-          ? ` / gaps ${checkpoint.contiguous_missing_candles}`
-          : " / gap-free"}
+          ? ` / 빈 구간 ${checkpoint.contiguous_missing_candles}개`
+          : " / 빈 구간 없음"}
       </span>
       <span>{formatTimestamp(checkpoint.recorded_at)}</span>
     </div>
@@ -657,16 +657,16 @@ export function SyncFailureStatus({
   instrument: MarketDataStatus["instruments"][number];
 }) {
   if (instrument.failure_count_24h === 0 && instrument.recent_failures.length === 0) {
-    return <span>clear</span>;
+    return <span>정상</span>;
   }
   const latestFailure = instrument.recent_failures[0];
   return (
     <div className="progress-stack">
-      <strong>{instrument.failure_count_24h} in 24h</strong>
+      <strong>24시간 {instrument.failure_count_24h}건</strong>
       <span>
         {latestFailure
           ? `${latestFailure.operation} @ ${formatTimestamp(latestFailure.failed_at)}`
-          : "history unavailable"}
+          : "최근 이력 없음"}
       </span>
       {latestFailure ? (
         <span title={latestFailure.error}>{truncateLabel(latestFailure.error, 56)}</span>
@@ -677,7 +677,7 @@ export function SyncFailureStatus({
 
 export function formatCompletion(value: number | null) {
   if (value === null) {
-    return "n/a";
+    return "-";
   }
   return `${Math.round(value * 100)}%`;
 }

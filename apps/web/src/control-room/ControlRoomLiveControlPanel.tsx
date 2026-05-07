@@ -48,6 +48,34 @@ function fallbackNumber(value: number | null | undefined) {
   return value === null || value === undefined ? "n/a" : String(value);
 }
 
+function formatStatusToken(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+  const labels: Record<string, string> = {
+    acknowledged: "확인됨",
+    blocked: "차단됨",
+    buy: "매수",
+    canceled: "취소됨",
+    closed: "종료됨",
+    critical: "긴급",
+    eligible: "실전 가능",
+    engaged: "작동 중",
+    filled: "체결됨",
+    idle: "대기 중",
+    open: "열림",
+    partially_filled: "부분 체결",
+    pending: "대기",
+    rejected: "거절됨",
+    released: "해제됨",
+    remediated: "조치됨",
+    sell: "매도",
+    stable: "정상",
+    warning: "주의",
+  };
+  return labels[value] ?? value.replaceAll("_", " ");
+}
+
 export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanelModel }) {
   const {
     PanelDisclosure = DefaultDisclosure,
@@ -92,11 +120,11 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
       <div className="status-grid">
         <div className="metric-tile">
           <span>실전 가능 상태</span>
-          <strong>{guardedLive.candidacy_status}</strong>
+          <strong>{formatStatusToken(guardedLive.candidacy_status)}</strong>
         </div>
         <div className="metric-tile">
           <span>중지 스위치</span>
-          <strong>{guardedLive.kill_switch?.state ?? "n/a"}</strong>
+          <strong>{formatStatusToken(guardedLive.kill_switch?.state)}</strong>
         </div>
         <div className="metric-tile">
           <span>운영 알림</span>
@@ -104,7 +132,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
         </div>
         <div className="metric-tile">
           <span>거래소 확인</span>
-          <strong>{guardedLive.reconciliation?.venue_snapshot?.verification_state ?? "n/a"}</strong>
+          <strong>{formatStatusToken(guardedLive.reconciliation?.venue_snapshot?.verification_state)}</strong>
         </div>
         <div className="metric-tile">
           <span>최근 확인</span>
@@ -116,7 +144,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
         </div>
         <div className="metric-tile">
           <span>실전 실행</span>
-          <strong>{guardedLive.ownership?.state ?? "n/a"}</strong>
+          <strong>{formatStatusToken(guardedLive.ownership?.state)}</strong>
         </div>
         <div className="metric-tile">
           <span>미체결 주문</span>
@@ -154,7 +182,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
       <div className="panel-disclosure-grid">
         <PanelDisclosure
           defaultOpen={true}
-          summary={`중지 스위치 ${guardedLive.kill_switch?.state ?? "n/a"} · 차단 ${blockers.length}개 · 실행 ${guardedLive.ownership?.state ?? "n/a"}`}
+          summary={`중지 스위치 ${formatStatusToken(guardedLive.kill_switch?.state)} · 차단 ${blockers.length}개 · 실행 ${formatStatusToken(guardedLive.ownership?.state)}`}
           title="실전 보호 장치"
         >
           <div className="panel-disclosure-stack">
@@ -162,7 +190,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
               <tbody>
                 <tr>
                   <th>중지 스위치</th>
-                  <td>{guardedLive.kill_switch?.state ?? "n/a"}</td>
+                  <td>{formatStatusToken(guardedLive.kill_switch?.state)}</td>
                 </tr>
                 <tr>
                   <th>사유</th>
@@ -186,11 +214,11 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                 </tr>
                 <tr>
                   <th>세션 복구</th>
-                  <td>{guardedLive.session_restore?.state ?? "n/a"}</td>
+                  <td>{formatStatusToken(guardedLive.session_restore?.state)}</td>
                 </tr>
                 <tr>
                   <th>세션 인계</th>
-                  <td>{guardedLive.session_handoff?.state ?? "n/a"}</td>
+                  <td>{formatStatusToken(guardedLive.session_handoff?.state)}</td>
                 </tr>
               </tbody>
             </table>
@@ -231,8 +259,8 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                 <tbody>
                   {findings.map((finding: any) => (
                     <tr key={`${finding.kind}-${finding.summary}`}>
-                      <td>{finding.severity}</td>
-                      <td>{finding.kind}</td>
+                      <td>{formatStatusToken(finding.severity)}</td>
+                      <td>{formatStatusToken(finding.kind)}</td>
                       <td>
                         <strong>{finding.summary}</strong>
                         {finding.detail ? <p className="run-lineage-symbol-copy">{finding.detail}</p> : null}
@@ -261,10 +289,10 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                   {openOrders.slice(0, 10).map((order: any) => (
                     <tr key={order.order_id}>
                       <td>{order.order_id}</td>
-                      <td>{order.side}</td>
+                      <td>{formatStatusToken(order.side)}</td>
                       <td>{formatFixedNumber(order.quantity)}</td>
                       <td>{formatFixedNumber(order.price)}</td>
-                      <td>{order.status}</td>
+                      <td>{formatStatusToken(order.status)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -314,8 +342,8 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                 <tbody>
                   {incidents.slice(0, 8).map((incident: any) => (
                     <tr key={incident.incident_id}>
-                      <td>{incident.status}</td>
-                      <td>{incident.severity}</td>
+                      <td>{formatStatusToken(incident.status)}</td>
+                      <td>{formatStatusToken(incident.severity)}</td>
                       <td>{incident.summary}</td>
                       <td>{formatTimestamp(incident.updated_at ?? null)}</td>
                       <td>

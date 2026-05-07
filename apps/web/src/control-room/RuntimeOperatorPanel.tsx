@@ -64,6 +64,24 @@ function formatFallbackTimestamp(value: string | null | undefined) {
   return value ?? "n/a";
 }
 
+function formatOperatorToken(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+  const labels: Record<string, string> = {
+    acknowledged: "확인됨",
+    audit: "기록",
+    critical: "긴급",
+    escalated: "전달됨",
+    info: "정보",
+    open: "열림",
+    resolved: "해결됨",
+    system: "시스템",
+    warning: "주의",
+  };
+  return labels[value] ?? value.replaceAll("_", " ");
+}
+
 export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelModel }) {
   const {
     PanelDisclosure = DefaultDisclosure,
@@ -133,8 +151,8 @@ export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelMod
                 <tbody>
                   {alerts.map((alert) => (
                     <tr key={alert.alert_id}>
-                      <td>{alert.severity}</td>
-                      <td>{alert.category}</td>
+                      <td>{formatOperatorToken(alert.severity)}</td>
+                      <td>{formatOperatorToken(alert.category)}</td>
                       <td>
                         <strong>{alert.summary}</strong>
                         {alert.detail ? <p className="run-lineage-symbol-copy">{alert.detail}</p> : null}
@@ -166,8 +184,8 @@ export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelMod
                   {auditEvents.slice(0, 8).map((event) => (
                     <tr key={event.event_id}>
                       <td>{formatTimestamp(event.recorded_at)}</td>
-                      <td>{event.action}</td>
-                      <td>{event.actor ?? "system"}</td>
+                      <td>{formatOperatorToken(event.action)}</td>
+                      <td>{formatOperatorToken(event.actor ?? "system")}</td>
                       <td>{event.message ?? "n/a"}</td>
                     </tr>
                   ))}
@@ -198,8 +216,8 @@ export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelMod
             <tbody>
               {incidents.slice(0, 8).map((incident) => (
                 <tr key={incident.incident_id}>
-                  <td>{incident.severity}</td>
-                  <td>{incident.status}</td>
+                  <td>{formatOperatorToken(incident.severity)}</td>
+                  <td>{formatOperatorToken(incident.status)}</td>
                   <td>{incident.summary}</td>
                   <td>{formatTimestamp(incident.updated_at)}</td>
                 </tr>

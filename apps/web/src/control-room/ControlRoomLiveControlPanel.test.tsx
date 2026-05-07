@@ -86,6 +86,11 @@ describe("ControlRoomLiveControlPanel", () => {
     expect(screen.getAllByText("거래소 확인").length).toBeGreaterThan(0);
     expect(screen.getByText("실전 보호 장치")).toBeInTheDocument();
     expect(screen.getByText("거래소 상태와 사고")).toBeInTheDocument();
+    expect(screen.getByText("실전 가능")).toBeInTheDocument();
+    expect(screen.getAllByText("해제됨").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("대기 중").length).toBeGreaterThan(0);
+    expect(screen.queryByText("eligible")).not.toBeInTheDocument();
+    expect(screen.queryByText("released")).not.toBeInTheDocument();
     expect(screen.queryByText("Recovered runtime")).not.toBeInTheDocument();
     expect(screen.queryByText("Recovered market channels")).not.toBeInTheDocument();
     expect(screen.queryByText("Provider recovery payload")).not.toBeInTheDocument();

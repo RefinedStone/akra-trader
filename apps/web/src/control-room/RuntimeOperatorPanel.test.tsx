@@ -188,10 +188,50 @@ function buildModel(overrides: Record<string, unknown> = {}) {
 
 describe("RuntimeOperatorPanel", () => {
   it("renders the operator trust panel without missing model bindings", () => {
-    render(<RuntimeOperatorPanel model={buildModel()} />);
+    render(<RuntimeOperatorPanel model={buildModel({
+      operatorVisibility: {
+        alert_history: [],
+        alerts: [
+          {
+            alert_id: "alert-1",
+            category: "runtime_health",
+            detected_at: null,
+            run_id: null,
+            severity: "critical",
+            summary: "실전 실행 확인 필요",
+          },
+        ],
+        audit_events: [
+          {
+            action: "acknowledged",
+            actor: "system",
+            event_id: "audit-1",
+            message: null,
+            recorded_at: null,
+          },
+        ],
+        delivery_history: [],
+        incident_events: [
+          {
+            incident_id: "incident-1",
+            severity: "warning",
+            status: "open",
+            summary: "거래소 확인 필요",
+            updated_at: null,
+          },
+        ],
+      },
+    })} />);
 
     expect(screen.getByText("알림과 사고")).toBeInTheDocument();
-    expect(screen.getByText("현재 활성 알림이 없습니다.")).toBeInTheDocument();
+    expect(screen.getAllByText("긴급").length).toBeGreaterThan(0);
+    expect(screen.getByText("runtime health")).toBeInTheDocument();
+    expect(screen.getByText("확인됨")).toBeInTheDocument();
+    expect(screen.getByText("시스템")).toBeInTheDocument();
+    expect(screen.getAllByText("주의").length).toBeGreaterThan(0);
+    expect(screen.getByText("열림")).toBeInTheDocument();
+    expect(screen.queryByText("critical")).not.toBeInTheDocument();
+    expect(screen.queryByText("acknowledged")).not.toBeInTheDocument();
     expect(screen.queryByText("Start export workflow")).not.toBeInTheDocument();
     expect(screen.queryByText("Escalate snapshot")).not.toBeInTheDocument();
   });

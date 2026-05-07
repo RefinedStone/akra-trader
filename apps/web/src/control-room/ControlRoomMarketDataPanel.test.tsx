@@ -111,5 +111,8 @@ describe("ControlRoomMarketDataPanel", () => {
 
     expect(screen.getByText("데이터 상태")).toBeInTheDocument();
     expect(screen.getByText("binance:BTC/USDT")).toBeInTheDocument();
+    expect(screen.getByText("동기화됨")).toBeInTheDocument();
+    expect(screen.getAllByText("정상").length).toBeGreaterThan(0);
+    expect(screen.queryByText("synced")).not.toBeInTheDocument();
   });
 });

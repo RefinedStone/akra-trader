@@ -1,5 +1,23 @@
 // @ts-nocheck
 
+function formatMarketStatusToken(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+  const labels: Record<string, string> = {
+    backfilling: "수집 중",
+    failed: "오류",
+    invalid: "검증 실패",
+    ok: "정상",
+    pending: "대기",
+    stale: "지연",
+    synced: "동기화됨",
+    valid: "검증 완료",
+    warning: "확인 필요",
+  };
+  return labels[value] ?? value.replaceAll("_", " ");
+}
+
 export function ControlRoomMarketDataPanel({ model }: { model: any }) {
   const {
     marketStatus,
@@ -101,7 +119,7 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
                   </div>
                   <div className="metric-tile">
                     <span>동기화 상태</span>
-                    <strong>{activeMarketInstrument.sync_status}</strong>
+                    <strong>{formatMarketStatusToken(activeMarketInstrument.sync_status)}</strong>
                   </div>
                   <div className="metric-tile">
                     <span>검증 상태</span>
@@ -159,7 +177,7 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
                           </button>
                         </td>
                         <td>{instrument.timeframe}</td>
-                        <td>{instrument.sync_status}</td>
+                        <td>{formatMarketStatusToken(instrument.sync_status)}</td>
                         <td>{instrument.candle_count}</td>
                         <td>{instrument.backfill_target_candles ?? "n/a"}</td>
                         <td>
@@ -254,7 +272,7 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
                         <td>
                           <SyncFailureStatus instrument={instrument} />
                         </td>
-                        <td>{instrument.issues.length ? instrument.issues.join(", ") : "ok"}</td>
+                        <td>{instrument.issues.length ? instrument.issues.map(formatMarketStatusToken).join(", ") : "정상"}</td>
                       </tr>
                     );})}
                   </tbody>
