@@ -192,5 +192,7 @@ describe("RuntimeOperatorPanel", () => {
 
     expect(screen.getByText("Runtime alerts and audit")).toBeInTheDocument();
     expect(screen.getByText("No active runtime alerts.")).toBeInTheDocument();
+    expect(screen.queryByText("Start export workflow")).not.toBeInTheDocument();
+    expect(screen.queryByText("Escalate snapshot")).not.toBeInTheDocument();
   });
 });
