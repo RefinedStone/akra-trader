@@ -10,16 +10,16 @@ export function RuntimeProviderProvenanceFocusedLineageHistorySection({ model }:
 
   return (
     <div>
-      <h3>Lineage history (동기화 근거)</h3>
+      <h3>수집 이력</h3>
       {marketDataLineageHistory.length ? (
         <table className="data-table">
           <thead>
             <tr>
               <th>기록 시각</th>
-              <th>Sync</th>
-              <th>Claim</th>
-              <th>Boundary</th>
-              <th>Signal</th>
+              <th>동기화</th>
+              <th>검증</th>
+              <th>기준 ID</th>
+              <th>상태</th>
             </tr>
           </thead>
           <tbody>
@@ -34,16 +34,16 @@ export function RuntimeProviderProvenanceFocusedLineageHistorySection({ model }:
                 <td>
                   <strong>
                     24시간 실패 {record.failure_count_24h}건
-                    {record.gap_window_count ? ` · Gap ${record.gap_window_count}개` : ""}
+                    {record.gap_window_count ? ` · 빈 구간 ${record.gap_window_count}개` : ""}
                   </strong>
                   <p className="run-lineage-symbol-copy">
-                    {record.issues.length ? record.issues.join(", ") : "기록된 Lineage 이슈가 없습니다."}
+                    {record.issues.length ? record.issues.join(", ") : "기록된 수집 문제가 없습니다."}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    Window: {formatRange(record.first_timestamp, record.last_timestamp)}
+                    구간: {formatRange(record.first_timestamp, record.last_timestamp)}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    Checkpoint: {record.checkpoint_id ? shortenIdentifier(record.checkpoint_id, 22) : "없음"}
+                    저장 지점: {record.checkpoint_id ? shortenIdentifier(record.checkpoint_id, 22) : "없음"}
                   </p>
                 </td>
               </tr>
@@ -51,7 +51,7 @@ export function RuntimeProviderProvenanceFocusedLineageHistorySection({ model }:
           </tbody>
         </table>
       ) : (
-        <p className="empty-state">이 focus에 기록된 Lineage 이력이 없습니다.</p>
+        <p className="empty-state">이 대상에 기록된 수집 이력이 없습니다.</p>
       )}
     </div>
   );

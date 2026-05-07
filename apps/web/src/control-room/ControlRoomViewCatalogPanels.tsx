@@ -50,7 +50,7 @@ export function StrategyColumn({
             <p>{strategy.description}</p>
             <dl>
               <div>
-                <dt>운용 주기</dt>
+                <dt>봉 주기</dt>
                 <dd>{strategy.supported_timeframes.join(", ")}</dd>
               </div>
               <div>
@@ -274,7 +274,7 @@ export function PresetCatalogPanel({
           />
         </label>
         <label>
-          저장 키
+          저장 코드
           <input
             disabled={isEditing}
             placeholder="core_5m"
@@ -297,7 +297,7 @@ export function PresetCatalogPanel({
           </select>
         </label>
         <label>
-          운용 주기
+          봉 주기
           <input
             placeholder="5m"
             value={form.timeframe}
@@ -305,7 +305,7 @@ export function PresetCatalogPanel({
           />
         </label>
         <label>
-          비교 그룹
+          비교 기준
           <input
             placeholder="native_validation"
             value={form.benchmark_family}
@@ -315,7 +315,7 @@ export function PresetCatalogPanel({
           />
         </label>
         <label>
-          태그
+          분류 메모
           <input
             placeholder="baseline, momentum"
             value={form.tags_text}
@@ -325,7 +325,7 @@ export function PresetCatalogPanel({
         <label>
           설명
           <input
-            placeholder="재사용 가능한 backtest 기준"
+            placeholder="다시 사용할 검증 기준"
             value={form.description}
             onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
           />
@@ -348,7 +348,7 @@ export function PresetCatalogPanel({
         ) : null}
         {isEditing ? (
           <p className="run-note">
-            {editingPresetId} 수정 중입니다. 저장 키는 유지되고 현재 설정만 갱신됩니다.
+            {editingPresetId} 수정 중입니다. 저장 코드는 유지되고 현재 설정만 갱신됩니다.
           </p>
         ) : null}
         <div className="run-actions">
@@ -387,9 +387,9 @@ export function PresetCatalogPanel({
                     const diffBasisLabel =
                       revision.revision_id === latestRevisionId
                         ? revisions[index + 1]
-                          ? "이전 스냅샷"
+                          ? "이전 저장본"
                           : "최초 이력"
-                        : "현재 묶음";
+                        : "현재 설정";
                     const diff = describePresetRevisionDiff(
                       revision,
                       diffReference,
@@ -445,7 +445,7 @@ export function PresetCatalogPanel({
                               onClick={() => void onLifecycleAction(preset.preset_id, "promote")}
                               type="button"
                             >
-                              실전 후보로 승격
+                              실전 후보로 지정
                             </button>
                           ) : null}
                           <button
@@ -462,7 +462,7 @@ export function PresetCatalogPanel({
                           onClick={() => void onLifecycleAction(preset.preset_id, "restore")}
                           type="button"
                         >
-                          초안으로 복구
+                          작성 중 상태로 되돌리기
                         </button>
                       )}
                     </div>
@@ -472,7 +472,7 @@ export function PresetCatalogPanel({
                           <label>
                             변경 이력 검색
                             <input
-                              placeholder="담당자, 사유, 설정, 태그"
+                              placeholder="담당자, 사유, 설정, 분류 메모"
                               value={revisionFilter.query}
                               onChange={(event) =>
                                 setRevisionFiltersByPreset((current) => ({
@@ -502,7 +502,7 @@ export function PresetCatalogPanel({
                               <option value="all">전체 처리</option>
                               <option value="created">생성</option>
                               <option value="updated">수정</option>
-                              <option value="restored">복구</option>
+                              <option value="restored">되돌림</option>
                               <option value="migrated">이전 데이터 정리</option>
                             </select>
                           </label>
@@ -534,7 +534,7 @@ export function PresetCatalogPanel({
                                         revision.revision_id === latestRevisionId ? "completed" : "pending"
                                       }`}
                                     >
-                                      {revision.revision_id === latestRevisionId ? "현재 묶음" : "스냅샷"}
+                                      {revision.revision_id === latestRevisionId ? "현재 설정" : "저장본"}
                                     </div>
                                   </div>
                                   <div className="run-metrics">
@@ -549,7 +549,7 @@ export function PresetCatalogPanel({
                                   />
                                   <p className="run-note">
                                     사유: {revision.reason}. {diff.summary}
-                                    {revision.source_revision_id ? ` ${revision.source_revision_id}에서 복구됨.` : ""}
+                                    {revision.source_revision_id ? ` ${revision.source_revision_id}에서 되돌림.` : ""}
                                   </p>
                                   {revision.description ? <p className="run-note">{revision.description}</p> : null}
                                   <div className="run-actions">
@@ -580,7 +580,7 @@ export function PresetCatalogPanel({
                                         }}
                                         type="button"
                                       >
-                                        이 묶음으로 복구
+                                        이 저장본 적용
                                       </button>
                                     ) : null}
                                   </div>
@@ -589,23 +589,23 @@ export function PresetCatalogPanel({
                                       changedGroups={diff.changedGroups}
                                       emptyMessage={diff.summary}
                                       leftColumnLabel={diff.basisLabel}
-                                      rightColumnLabel="변경 스냅샷"
-                                      title={`차이: ${diff.basisLabel}`}
+                                      rightColumnLabel="변경된 저장본"
+                                      title={`달라진 점: ${diff.basisLabel}`}
                                       unchangedGroups={diff.unchangedGroups}
                                     />
                                   ) : null}
                                   {confirmingRestore ? (
                                     <div className="comparison-dev-confirm-card">
                                       <p className="comparison-dev-feedback">
-                                        {revision.revision_id}를 {preset.preset_id}에 복구할까요? 선택한 스냅샷으로 새 현재 이력이 생성됩니다.
+                                        {revision.revision_id}를 {preset.preset_id}에 적용할까요? 선택한 저장본이 새 현재 설정으로 기록됩니다.
                                       </p>
                                       <p className="run-note">{diff.summary}</p>
                                       <PresetStructuredDiffPreview
                                         changedGroups={diff.changedGroups}
                                         emptyMessage={diff.summary}
-                                        leftColumnLabel="현재 묶음"
-                                        rightColumnLabel="복구 대상"
-                                        title="복구 영향"
+                                        leftColumnLabel="현재 설정"
+                                        rightColumnLabel="적용할 저장본"
+                                        title="적용 후 달라지는 점"
                                         unchangedGroups={diff.unchangedGroups}
                                       />
                                       {hasDraftConflict && draftConflict ? (
@@ -619,9 +619,9 @@ export function PresetCatalogPanel({
                                           <PresetStructuredDiffPreview
                                             changedGroups={draftConflict.groups}
                                             emptyMessage={draftConflict.summary}
-                                            leftColumnLabel="저장된 묶음"
-                                            rightColumnLabel="현재 초안"
-                                            title="저장 전 초안 충돌"
+                                            leftColumnLabel="저장된 설정"
+                                            rightColumnLabel="작성 중인 내용"
+                                            title="저장 전 내용과 충돌"
                                             unchangedGroups={[]}
                                           />
                                           <label className="run-note">
@@ -635,7 +635,7 @@ export function PresetCatalogPanel({
                                               }
                                               type="checkbox"
                                             />{" "}
-                                            이 복구가 {preset.preset_id}의 저장 전 초안을 버린다는 점을 확인합니다.
+                                            이 작업을 진행하면 {preset.preset_id}의 저장 전 내용이 사라진다는 점을 확인합니다.
                                           </label>
                                         </>
                                       ) : null}
@@ -646,7 +646,7 @@ export function PresetCatalogPanel({
                                           onClick={() => void confirmRevisionRestore(preset.preset_id, revision.revision_id)}
                                           type="button"
                                         >
-                                          {hasDraftConflict ? "초안 폐기 후 복구" : "복구 확정"}
+                                          {hasDraftConflict ? "작성 중인 내용 버리고 적용" : "적용 확정"}
                                         </button>
                                         <button
                                           className="ghost-button comparison-dev-reset"
@@ -733,7 +733,7 @@ export function RunForm({
         />
       </label>
       <label>
-        운용 주기
+        봉 주기
         <input
           value={form.timeframe}
           onChange={(event) => setForm((current) => ({ ...current, timeframe: event.target.value }))}
@@ -757,7 +757,7 @@ export function RunForm({
         />
       </label>
       <label>
-        슬리피지 (bps)
+        예상 체결 오차
         <input
           type="number"
           value={form.slippage_bps}
@@ -801,7 +801,7 @@ export function RunForm({
         </select>
       </label>
       <label>
-        비교 그룹
+        비교 기준
         <input
           placeholder={selectedPreset?.benchmark_family ?? "native_validation"}
           value={form.benchmark_family}
@@ -811,7 +811,7 @@ export function RunForm({
         />
       </label>
       <label>
-        태그
+        분류 메모
         <input
           placeholder="baseline, momentum"
           value={form.tags_text}
@@ -820,7 +820,7 @@ export function RunForm({
       </label>
       {selectedPreset ? (
         <div className="run-note">
-          시나리오 단계: {formatPresetLifecycleStage(selectedPreset.lifecycle.stage)}. 설정:{" "}
+          시나리오 상태: {formatPresetLifecycleStage(selectedPreset.lifecycle.stage)}. 설정:{" "}
           {formatParameterMap(selectedPreset.parameters)}.
         </div>
       ) : null}

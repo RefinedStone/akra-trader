@@ -18,7 +18,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
     <>
       <div className="filter-bar">
         <label>
-          <span>Provider</span>
+          <span>제공처</span>
           <select
             onChange={(event) =>
               setMarketDataProvenanceExportFilter((current) => ({
@@ -28,7 +28,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
             }
             value={marketDataProvenanceExportFilter.provider}
           >
-            <option value={ALL_FILTER_VALUE}>전체 Provider</option>
+            <option value={ALL_FILTER_VALUE}>전체 제공처</option>
             {marketDataProvenanceExportProviderOptions.map((provider) => (
               <option key={provider} value={provider}>
                 {provider}
@@ -37,7 +37,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
           </select>
         </label>
         <label>
-          <span>Vendor field</span>
+          <span>제공처 필드</span>
           <select
             onChange={(event) =>
               setMarketDataProvenanceExportFilter((current) => ({
@@ -47,7 +47,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
             }
             value={marketDataProvenanceExportFilter.vendor_field}
           >
-            <option value={ALL_FILTER_VALUE}>전체 vendor field</option>
+            <option value={ALL_FILTER_VALUE}>전체 제공처 필드</option>
             {marketDataProvenanceExportVendorFieldOptions.map((vendorField) => (
               <option key={vendorField} value={vendorField}>
                 {vendorField}
@@ -56,7 +56,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
           </select>
         </label>
         <label>
-          <span>Sort</span>
+          <span>정렬</span>
           <select
             onChange={(event) =>
               setMarketDataProvenanceExportFilter((current) => ({
@@ -68,12 +68,12 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
           >
             <option value="newest">최신순</option>
             <option value="oldest">오래된순</option>
-            <option value="provider">Provider</option>
-            <option value="severity">Severity</option>
+            <option value="provider">제공처</option>
+            <option value="severity">심각도</option>
           </select>
         </label>
         <label>
-          <span>Search</span>
+          <span>검색</span>
           <input
             onChange={(event) =>
               setMarketDataProvenanceExportFilter((current) => ({
@@ -81,7 +81,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
                 search_query: event.target.value,
               }))
             }
-            placeholder="summary, provider, path 검색"
+            placeholder="요약, 제공처, 경로 검색"
             type="search"
             value={marketDataProvenanceExportFilter.search_query}
           />
@@ -92,7 +92,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
           필터 결과 {filteredFocusedMarketProviderProvenanceEvents.length}건
         </span>
         <span className="run-filter-summary-chip">
-          전체 Provenance incident {focusedMarketProviderProvenanceCount}건
+          전체 제공처 문제 {focusedMarketProviderProvenanceCount}건
         </span>
         <span className="run-filter-summary-chip">
           {formatMarketDataProvenanceExportFilterSummary(marketDataProvenanceExportFilter)}
@@ -103,9 +103,9 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
           <thead>
             <tr>
               <th>시각</th>
-              <th>Provider</th>
-              <th>Signal</th>
-              <th>Provenance</th>
+              <th>제공처</th>
+              <th>상태</th>
+              <th>근거</th>
             </tr>
           </thead>
           <tbody>
@@ -115,7 +115,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
                 <td>
                   <strong>{record.provider}</strong>
                   <p className="run-lineage-symbol-copy">
-                    Vendor field: {record.vendorField}
+                    제공처 필드: {record.vendorField}
                   </p>
                 </td>
                 <td>
@@ -125,8 +125,8 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
                   </p>
                   <p className="run-lineage-symbol-copy">
                     {record.event.external_reference
-                      ? `External ref: ${record.event.external_reference}`
-                      : "기록된 external reference가 없습니다."}
+                      ? `외부 참조: ${record.event.external_reference}`
+                      : "기록된 외부 참조가 없습니다."}
                   </p>
                 </td>
                 <td>
@@ -143,7 +143,7 @@ export function RuntimeProviderProvenanceFocusedReadbackSection({ model }: { mod
         </table>
       ) : (
         <p className="empty-state">
-          현재 export 필터에 맞는 Provider provenance incident가 없습니다.
+          현재 내보내기 필터에 맞는 제공처 문제가 없습니다.
         </p>
       )}
     </>

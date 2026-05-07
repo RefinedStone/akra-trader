@@ -68,8 +68,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
               <section className="panel panel-wide">
                 <div className="section-heading">
                   <div>
-                    <p className="kicker">전략 운영 카탈로그</p>
-                    <h2>실행 가능한 전략</h2>
+                    <p className="kicker">전략 목록</p>
+                    <h2>바로 실행할 전략</h2>
                   </div>
                   <button className="ghost-button" onClick={() => void loadAll()} type="button">
                     새로고침
@@ -94,9 +94,9 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                     <h3>새 전략은 연구 화면에서 먼저 검증합니다</h3>
                   </div>
                   <div className="future-llm-principles" aria-label="새 전략 검증 원칙">
-                    <span>실전 자동 진입 없음</span>
+                    <span>자동 실전 전환 없음</span>
                     <span>판단 근거 기록</span>
-                    <span>재현 가능한 비교</span>
+                    <span>같은 조건으로 비교</span>
                   </div>
                 </div>
               </section>
@@ -146,8 +146,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
           runtime: {
             launchPanel: (
               <section className="panel">
-                <p className="kicker">모의 운용</p>
-                <h2>샌드박스 실행</h2>
+                <p className="kicker">모의 실행</p>
+                <h2>테스트 실행</h2>
                 <model.RunForm
                   form={sandboxForm}
                   onSubmit={handleSandboxSubmit}
@@ -164,8 +164,8 @@ export function ControlRoomRoutes({ model }: { model: any }) {
           live: {
             launchPanel: (
               <section className="panel">
-                <p className="kicker">실전 보호 운용</p>
-                <h2>보호 실전 시작</h2>
+                <p className="kicker">실전 관리</p>
+                <h2>실전 실행 시작</h2>
                 <model.RunForm
                   form={liveForm}
                   onSubmit={handleLiveSubmit}

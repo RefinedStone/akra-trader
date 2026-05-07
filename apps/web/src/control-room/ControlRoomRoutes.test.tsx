@@ -104,9 +104,9 @@ describe("ControlRoomRoutes", () => {
     render(<ControlRoomRoutes model={buildModel()} />);
 
     expect(screen.getByText("오늘의 판단 순서")).toBeInTheDocument();
-    expect(screen.getByText("전략 운영 카탈로그")).toBeInTheDocument();
+    expect(screen.getByText("전략 목록")).toBeInTheDocument();
     expect(screen.getByText("향후 연구 전략")).toBeInTheDocument();
-    expect(screen.getByText("실전 자동 진입 없음")).toBeInTheDocument();
+    expect(screen.getByText("자동 실전 전환 없음")).toBeInTheDocument();
     expect(screen.queryByText("Strategy Catalog")).not.toBeInTheDocument();
     expect(screen.queryByText("Start sandbox worker")).not.toBeInTheDocument();
     expect(screen.queryByText("Guarded Live")).not.toBeInTheDocument();

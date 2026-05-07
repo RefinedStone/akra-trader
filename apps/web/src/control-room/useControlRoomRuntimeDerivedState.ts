@@ -1,6 +1,17 @@
 // @ts-nocheck
 import { useEffect, useMemo } from "react";
 
+function formatGuardState(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+  const labels: Record<string, string> = {
+    engaged: "작동 중",
+    released: "해제됨",
+  };
+  return labels[value] ?? value.replaceAll("_", " ");
+}
+
 export function useControlRoomRuntimeDerivedState({ model }: { model: any }): any {
   const {
     strategies, marketStatus, isMarketDataInstrumentAtRisk, sandboxRuns, paperRuns, liveRuns,
@@ -449,10 +460,10 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       entries.push({
         entryId: `alert:${alert.alert_id}`,
         occurredAt: alert.detected_at,
-        sourceLabel: "활성 Alert",
+        sourceLabel: "활성 알림",
         statusLabel: `${formatWorkflowToken(alert.severity)} / ${formatWorkflowToken(alert.category)}`,
         summary: alert.summary,
-        detail: `상세: ${alert.detail} 전달 대상(Delivery): ${alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "없음"}.${primaryFocusNote}`,
+        detail: `상세: ${alert.detail} 전달 대상: ${alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "없음"}.${primaryFocusNote}`,
         tone: alert.severity === "critical" ? "critical" : "warning",
       });
     });
@@ -462,7 +473,7 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       entries.push({
         entryId: `alert-history:${getOperatorAlertOccurrenceKey(alert)}`,
         occurredAt: alert.resolved_at ?? alert.detected_at,
-        sourceLabel: alert.status === "resolved" ? "해결된 Alert" : "Alert 이력",
+        sourceLabel: alert.status === "resolved" ? "해결된 알림" : "알림 이력",
         statusLabel: `${formatWorkflowToken(alert.status)} / ${formatWorkflowToken(alert.category)}`,
         summary: alert.summary,
         detail: `상세: ${alert.detail} 감지 시각: ${formatTimestamp(alert.detected_at)}.${primaryFocusNote}`,
@@ -478,7 +489,7 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
     focusedLinkedOperatorIncidentEvents.forEach(({ event, link }) => {
       const remediationDetail =
         event.remediation.state !== "not_applicable"
-          ? ` Remediation: ${formatWorkflowToken(event.remediation.state)}${event.remediation.summary ? ` / ${event.remediation.summary}` : ""}.`
+          ? ` 조치 상태: ${formatWorkflowToken(event.remediation.state)}${event.remediation.summary ? ` / ${event.remediation.summary}` : ""}.`
           : "";
       const providerProvenanceSummary = summarizeProviderRecoveryMarketContextProvenance(
         event.remediation.provider_recovery,
@@ -487,10 +498,10 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       entries.push({
         entryId: `incident:${event.event_id}`,
         occurredAt: event.timestamp,
-        sourceLabel: "Incident event",
+        sourceLabel: "문제 이력",
         statusLabel: `${formatWorkflowToken(event.kind)} / ${formatWorkflowToken(event.severity)}`,
         summary: event.summary,
-        detail: `상세: ${event.detail} Ack 상태: ${formatWorkflowToken(event.acknowledgment_state)}. Escalation: level ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail ? ` ${remediationDetail.trim()}` : ""}${providerProvenanceSummary ? ` Provider recovery: ${providerProvenanceSummary}.` : ""}${primaryFocusNote}`,
+        detail: `상세: ${event.detail} 확인 상태: ${formatWorkflowToken(event.acknowledgment_state)}. 전달 단계: ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail ? ` ${remediationDetail.trim()}` : ""}${providerProvenanceSummary ? ` 제공처 복구: ${providerProvenanceSummary}.` : ""}${primaryFocusNote}`,
         tone: event.severity === "critical" ? "critical" : "warning",
       });
     });
@@ -507,14 +518,14 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       }
       const issueSummary = record.issues.length
         ? record.issues.join(", ")
-        : `24시간 실패 ${record.failure_count_24h}건${record.gap_window_count ? ` · Gap ${record.gap_window_count}개` : ""}`;
+        : `24시간 실패 ${record.failure_count_24h}건${record.gap_window_count ? ` · 빈 구간 ${record.gap_window_count}개` : ""}`;
       entries.push({
         entryId: `lineage:${record.history_id}`,
         occurredAt: record.recorded_at,
-        sourceLabel: "Lineage snapshot",
+        sourceLabel: "수집 이력",
         statusLabel: `${formatWorkflowToken(record.sync_status)} / ${formatWorkflowToken(record.validation_claim)}`,
-        summary: `${record.symbol} ${record.timeframe} Lineage snapshot 기록.`,
-        detail: `${issueSummary || "기록된 Lineage 이슈가 없습니다."} Window: ${formatRange(record.first_timestamp, record.last_timestamp)}.`,
+        summary: `${record.symbol} ${record.timeframe} 수집 이력 기록.`,
+        detail: `${issueSummary || "기록된 수집 문제가 없습니다."} 구간: ${formatRange(record.first_timestamp, record.last_timestamp)}.`,
         tone:
           record.sync_status === "error" || record.failure_count_24h > 0
             ? "critical"
@@ -532,10 +543,10 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       entries.push({
         entryId: `ingestion:${job.job_id}`,
         occurredAt: job.finished_at,
-        sourceLabel: "Ingestion job",
+        sourceLabel: "수집 작업",
         statusLabel: `${formatWorkflowToken(job.status)} / ${formatWorkflowToken(job.operation)}`,
-        summary: `${job.symbol} ${job.timeframe} Ingestion ${formatWorkflowToken(job.operation)} 완료.`,
-        detail: `${job.fetched_candle_count}개 candle을 ${job.duration_ms} ms에 수집했습니다.${job.last_error ? ` Error: ${job.last_error}.` : ""}`,
+        summary: `${job.symbol} ${job.timeframe} ${formatWorkflowToken(job.operation)} 수집 완료.`,
+        detail: `가격봉 ${job.fetched_candle_count}개를 ${job.duration_ms}ms에 수집했습니다.${job.last_error ? ` 오류: ${job.last_error}.` : ""}`,
         tone: job.status === "succeeded" ? "neutral" : "warning",
       });
     });
@@ -920,26 +931,26 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
   const controlStripMetrics = useMemo<ControlStripMetric[]>(
     () => [
       {
-        label: "전략 카탈로그",
+        label: "전략 목록",
         value: `${strategies.length}`,
-        detail: `운용 ${strategyGroups.native.length}개 · Future LLM ${strategyGroups.future.length}개`,
+        detail: `운용 ${strategyGroups.native.length}개 · 연구 ${strategyGroups.future.length}개`,
         tone: "research",
       },
       {
         label: "실행 현황",
         value: `${totalTrackedRunCount}`,
-        detail: `백테스트 ${backtests.length}개 · 모의/실전 ${sandboxRuns.length + paperRuns.length + liveRuns.length}개`,
+        detail: `백테스트 ${backtests.length}개 · 모의/실전 실행 ${sandboxRuns.length + paperRuns.length + liveRuns.length}개`,
         tone: "runtime",
       },
       {
         label: "데이터 상태",
         value: formatCompletion(backfillSummary?.completionRatio ?? null),
-        detail: `instrument ${marketStatus?.instruments.length ?? 0}개 · 24h failure ${failureSummary?.failureCount24h ?? 0}개`,
+        detail: `종목 ${marketStatus?.instruments.length ?? 0}개 · 24시간 오류 ${failureSummary?.failureCount24h ?? 0}개`,
         tone: (failureSummary?.failureCount24h ?? 0) > 0 ? "warning" : "runtime",
       },
       {
-        label: "가드 라이브",
-        value: guardedLive?.kill_switch.state ?? "n/a",
+        label: "실전 관리",
+        value: formatGuardState(guardedLive?.kill_switch.state),
         detail: `차단 ${guardedLiveSummary?.blockerCount ?? 0}개 · 중요 알림 ${operatorSummary?.criticalCount ?? 0}개`,
         tone: "live",
       },

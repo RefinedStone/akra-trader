@@ -84,7 +84,7 @@ describe("ControlRoomLiveControlPanel", () => {
 
     expect(screen.getByText("중지 스위치와 거래소 확인")).toBeInTheDocument();
     expect(screen.getAllByText("거래소 확인").length).toBeGreaterThan(0);
-    expect(screen.getByText("실전 보호 장치")).toBeInTheDocument();
+    expect(screen.getByText("실전 안전장치")).toBeInTheDocument();
     expect(screen.getByText("거래소 상태와 사고")).toBeInTheDocument();
     expect(screen.getByText("실전 가능")).toBeInTheDocument();
     expect(screen.getAllByText("해제됨").length).toBeGreaterThan(0);

@@ -34,9 +34,9 @@ export function WorkspaceShell({
       <header className="hero">
         <div className="hero-copy-block">
           <p className="eyebrow">Akra Trader / 운용 화면</p>
-          <h1>전략 검증부터 실전 보호까지 한 화면에서 판단합니다</h1>
+          <h1>전략 검증부터 실전 관리까지 한눈에 확인합니다</h1>
           <p className="hero-copy">
-            현재 워크스페이스의 운영 맥락, 핵심 지표, 다음 점검 항목을 먼저 보여주고
+            현재 화면에서 봐야 할 운영 상황, 핵심 지표, 다음 점검 항목을 먼저 보여주고
             세부 화면으로 이어갑니다.
           </p>
           <div className="hero-action-row" aria-label="주요 운영 상태">

@@ -111,9 +111,9 @@ describe("RuntimeDataIncidentTriagePanel", () => {
   it("renders the unloaded market-data state without throwing", () => {
     render(<RuntimeDataIncidentTriagePanel model={buildModel()} />);
 
-    expect(screen.getByText("Data incident triage (데이터 이슈 점검)")).toBeInTheDocument();
+    expect(screen.getByText("데이터 문제 점검")).toBeInTheDocument();
     expect(
-      screen.getByText("Lineage workflow 이력을 보려면 먼저 market-data status를 불러와야 합니다."),
+      screen.getByText("수집 이력을 보려면 먼저 시장 데이터 상태를 불러와야 합니다."),
     ).toBeInTheDocument();
   });
 
@@ -165,6 +165,6 @@ describe("RuntimeDataIncidentTriagePanel", () => {
     );
 
     expect(screen.getByText("BTC/USDT · 5m")).toBeInTheDocument();
-    expect(screen.getByText("Provider provenance export (증거 내보내기)")).toBeInTheDocument();
+    expect(screen.getByText("수집 근거 내보내기")).toBeInTheDocument();
   });
 });

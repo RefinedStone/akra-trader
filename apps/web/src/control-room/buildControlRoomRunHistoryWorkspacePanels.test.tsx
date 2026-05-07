@@ -51,8 +51,8 @@ describe("buildControlRoomRunHistoryWorkspacePanels", () => {
     expect(researchPanel.props.rerunActions).toHaveLength(3);
     expect(researchPanel.props.rerunActions).toMatchObject([
       { label: "백테스트 다시 실행" },
-      { label: "샌드박스로 확인" },
-      { label: "페이퍼로 확인" },
+      { label: "테스트 실행으로 확인" },
+      { label: "모의 주문으로 확인" },
     ]);
   });
 

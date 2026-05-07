@@ -56,7 +56,7 @@ describe("WorkspaceShell", () => {
       </WorkspaceShell>,
     );
 
-    expect(screen.getByRole("heading", { name: "전략 검증부터 실전 보호까지 한 화면에서 판단합니다" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "전략 검증부터 실전 관리까지 한눈에 확인합니다" })).toBeInTheDocument();
     expect(screen.getByLabelText("운영 핵심 지표")).toHaveTextContent("실행 상태");
     expect(screen.getByLabelText("현재 화면 점검 항목")).toHaveTextContent("운용 상태");
     expect(screen.queryByText("Equity")).not.toBeInTheDocument();

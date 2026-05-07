@@ -99,9 +99,9 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
   if (!guardedLive) {
     return (
       <section className="panel panel-wide">
-        <p className="kicker">실전 보호</p>
+        <p className="kicker">실전 관리</p>
         <h2>중지 스위치와 거래소 확인</h2>
-        <p>실전 보호 상태를 불러오지 못했습니다.</p>
+        <p>실전 관리 상태를 불러오지 못했습니다.</p>
       </section>
     );
   }
@@ -114,7 +114,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
 
   return (
     <section className="panel panel-wide">
-      <p className="kicker">실전 보호</p>
+      <p className="kicker">실전 관리</p>
       <h2>중지 스위치와 거래소 확인</h2>
 
       <div className="status-grid">
@@ -166,7 +166,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
           거래소 확인
         </button>
         <button className="ghost-button" onClick={() => void recoverGuardedLiveRuntime?.()} type="button">
-          실행 상태 복구
+          실행 상태 되돌리기
         </button>
         <button className="ghost-button" onClick={() => void resumeGuardedLiveRun?.()} type="button">
           실전 실행 재개
@@ -183,7 +183,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
         <PanelDisclosure
           defaultOpen={true}
           summary={`중지 스위치 ${formatStatusToken(guardedLive.kill_switch?.state)} · 차단 ${blockers.length}개 · 실행 ${formatStatusToken(guardedLive.ownership?.state)}`}
-          title="실전 보호 장치"
+          title="실전 안전장치"
         >
           <div className="panel-disclosure-stack">
             <table className="data-table">
@@ -213,7 +213,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                   <td>{formatTimestamp(guardedLive.ownership?.last_order_sync_at ?? null)}</td>
                 </tr>
                 <tr>
-                  <th>세션 복구</th>
+                  <th>세션 복원</th>
                   <td>{formatStatusToken(guardedLive.session_restore?.state)}</td>
                 </tr>
                 <tr>

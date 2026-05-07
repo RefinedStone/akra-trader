@@ -13,14 +13,14 @@ export function RuntimeProviderProvenanceFocusedExportSection({ model }: { model
 
   return (
     <div>
-      <h3>Provider provenance export (증거 내보내기)</h3>
+      <h3>수집 근거 내보내기</h3>
       <div className="run-filter-workbench market-data-provenance-workbench">
         <div className="run-filter-workbench-head">
           <div className="market-data-provenance-copy">
-            <strong>필터된 Provider readback incident</strong>
+            <strong>필터된 제공처 문제</strong>
             <p>
-              현재 focus의 Lineage, Ingestion, Provider readback evidence를 drill pack으로 묶습니다.
-              필터는 이 브라우저에 유지되고, 복사한 export는 shared registry에도 기록됩니다.
+              현재 점검 대상의 수집 이력, 수집 작업, 제공처 확인 근거를 하나로 묶습니다.
+              필터는 이 브라우저에 유지되고, 복사한 자료는 팀 공유 이력에도 기록됩니다.
             </p>
           </div>
           <div className="run-filter-workbench-actions">
@@ -31,7 +31,7 @@ export function RuntimeProviderProvenanceFocusedExportSection({ model }: { model
               }}
               type="button"
             >
-              Drill pack 복사
+              점검 자료 복사
             </button>
             <button
               className="ghost-button"

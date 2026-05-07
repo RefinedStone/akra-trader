@@ -89,12 +89,12 @@ export function buildControlRoomRunHistoryWorkspacePanels(model: any) {
         },
         {
           availabilityKey: "rerun_sandbox",
-          label: "샌드박스로 확인",
+          label: "테스트 실행으로 확인",
           onRerun: rerunSandbox,
         },
         {
           availabilityKey: "rerun_paper",
-          label: "페이퍼로 확인",
+          label: "모의 주문으로 확인",
           onRerun: rerunPaper,
         },
       ],
@@ -110,12 +110,12 @@ export function buildControlRoomRunHistoryWorkspacePanels(model: any) {
         rerunActions: [
           {
             availabilityKey: "rerun_sandbox",
-            label: "샌드박스 다시 시작",
+            label: "테스트 실행 다시 시작",
             onRerun: rerunSandbox,
           },
           {
             availabilityKey: "rerun_paper",
-            label: "페이퍼로 확인",
+            label: "모의 주문으로 확인",
             onRerun: rerunPaper,
           },
         ],
@@ -131,12 +131,12 @@ export function buildControlRoomRunHistoryWorkspacePanels(model: any) {
         rerunActions: [
           {
             availabilityKey: "rerun_sandbox",
-            label: "샌드박스로 확인",
+            label: "테스트 실행으로 확인",
             onRerun: rerunSandbox,
           },
           {
             availabilityKey: "rerun_paper",
-            label: "페이퍼 다시 시작",
+            label: "모의 주문 다시 시작",
             onRerun: rerunPaper,
           },
         ],

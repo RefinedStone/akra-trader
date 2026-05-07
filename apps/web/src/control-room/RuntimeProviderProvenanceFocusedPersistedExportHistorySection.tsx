@@ -11,20 +11,20 @@ export function RuntimeProviderProvenanceFocusedPersistedExportHistorySection({ 
   return (
     <>
       <div className="market-data-provenance-history-head">
-        <strong>저장된 export 이력</strong>
+        <strong>저장된 내보내기 이력</strong>
         <p>
           {marketDataProvenanceExportHistory.length
-            ? `이 브라우저에 저장된 export snapshot ${marketDataProvenanceExportHistory.length}건이 있습니다.`
-            : "아직 저장된 Provider provenance export가 없습니다."}
+            ? `이 브라우저에 저장된 내보내기 이력 ${marketDataProvenanceExportHistory.length}건이 있습니다.`
+            : "아직 저장된 제공처 근거 내보내기 이력이 없습니다."}
         </p>
       </div>
       {marketDataProvenanceExportHistory.length ? (
         <table className="data-table">
           <thead>
             <tr>
-              <th>Export 시각</th>
-              <th>Focus</th>
-              <th>Filter</th>
+              <th>내보낸 시각</th>
+              <th>대상</th>
+              <th>필터</th>
               <th>동작</th>
             </tr>
           </thead>
@@ -38,13 +38,13 @@ export function RuntimeProviderProvenanceFocusedPersistedExportHistorySection({ 
                     {entry.provider} / {entry.venue} / {entry.symbol} · {entry.timeframe}
                   </p>
                   <p className="run-lineage-symbol-copy">
-                    Provenance incident {entry.provider_provenance_count}건 중 결과 {entry.result_count}건
+                    제공처 문제 {entry.provider_provenance_count}건 중 결과 {entry.result_count}건
                   </p>
                 </td>
                 <td>
                   <strong>{formatMarketDataProvenanceExportFilterSummary(entry.filter)}</strong>
                   <p className="run-lineage-symbol-copy">
-                    Providers: {entry.provider_labels.length ? entry.provider_labels.join(", ") : "없음"}
+                    제공처: {entry.provider_labels.length ? entry.provider_labels.join(", ") : "없음"}
                   </p>
                 </td>
                 <td>
@@ -56,7 +56,7 @@ export function RuntimeProviderProvenanceFocusedPersistedExportHistorySection({ 
                       }}
                       type="button"
                     >
-                      Export 복사
+                      내보내기 복사
                     </button>
                     <button
                       className="ghost-button"

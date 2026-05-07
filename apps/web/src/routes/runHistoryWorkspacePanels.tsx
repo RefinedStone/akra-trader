@@ -214,19 +214,19 @@ export function buildRunHistoryWorkspacePanels({
       sandboxRunsPanel: renderRunSection({
         ...runtime.sandbox,
         surfaceKey: "sandbox",
-        title: runtime.sandbox.title ?? "샌드박스 실행 이력",
+        title: runtime.sandbox.title ?? "테스트 실행 이력",
       }),
       paperRunsPanel: renderRunSection({
         ...runtime.paper,
         surfaceKey: "paper",
-        title: runtime.paper.title ?? "페이퍼 실행 이력",
+        title: runtime.paper.title ?? "모의 주문 이력",
       }),
     },
     live: {
       runsPanel: renderRunSection({
         ...live,
         surfaceKey: "live",
-        title: live.title ?? "보호 실전 이력",
+        title: live.title ?? "실전 실행 이력",
       }),
     },
   };
