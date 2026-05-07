@@ -25,43 +25,59 @@ export function WorkspaceShell({
   workspaceDescriptors,
 }: WorkspaceShellProps) {
   const primaryMetric = controlStripMetrics[0];
-  const secondaryMetrics = controlStripMetrics.slice(1, 3);
-  const marketFocusItems = [
-    { label: "주식", value: "Equity" },
-    { label: "코인", value: "Crypto" },
-    { label: "백테스트", value: "Backtest" },
-    { label: "리스크", value: "Risk" },
-  ];
+  const heroMetrics = controlStripMetrics.slice(0, 4);
+  const secondaryMetrics = controlStripMetrics.slice(1, 4);
+  const workflowItems = activeWorkspaceDescriptor.sections.slice(0, 4);
 
   return (
     <div className="shell">
       <header className="hero">
         <div className="hero-copy-block">
-          <p className="eyebrow">Akra Trader / 퀀트 운용 어드민</p>
-          <h1>주식·코인 전략을 검증하고 운용하는 퀀트 대시보드</h1>
+          <p className="eyebrow">Akra Trader / 운용 지휘 콘솔</p>
+          <h1>전략 검증부터 실전 보호까지 한 화면에서 판단합니다</h1>
           <p className="hero-copy">
-            백테스트 성과, 시장 데이터 품질, 샌드박스·페이퍼 실행, 실전 보호 장치를
-            한 흐름에서 확인합니다.
+            현재 워크스페이스의 운영 맥락, 핵심 지표, 다음 점검 항목을 먼저 보여주고
+            세부 작업면으로 이어갑니다.
           </p>
           <div className="hero-action-row" aria-label="주요 운영 상태">
-            <span>현재 화면 · {activeWorkspaceDescriptor.label}</span>
-            <span>{statusText}</span>
+            <span>
+              <small>상태</small>
+              <strong>{statusText}</strong>
+            </span>
+            <span>
+              <small>작업면</small>
+              <strong>{activeWorkspaceDescriptor.label}</strong>
+            </span>
+            <span>
+              <small>API</small>
+              <strong>{apiBase}</strong>
+            </span>
           </div>
-          <div className="quant-focus-strip" aria-label="지원 자산과 분석 축">
-            {marketFocusItems.map((item) => (
-              <span key={item.label}>
-                <small>{item.label}</small>
-                <strong>{item.value}</strong>
-              </span>
+          <div className="hero-command-grid" aria-label="운영 핵심 지표">
+            {(heroMetrics.length > 0 ? heroMetrics : [
+              {
+                label: activeWorkspaceDescriptor.kicker,
+                value: activeWorkspaceDescriptor.summary,
+                detail: activeWorkspaceDescriptor.description,
+              },
+            ]).map((metric) => (
+              <article
+                className={`hero-command-card ${metric.tone ? `is-${metric.tone}` : ""}`.trim()}
+                key={metric.label}
+              >
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+                <small>{metric.detail}</small>
+              </article>
             ))}
           </div>
         </div>
         <aside className="hero-panel">
           <div className="hero-panel-status">
             <span className="status-indicator" />
-            <strong>{statusText}</strong>
+            <strong>{activeWorkspaceDescriptor.kicker}</strong>
           </div>
-          <p>API 기준 주소: {apiBase}</p>
+          <p>{activeWorkspaceDescriptor.description}</p>
           {primaryMetric ? (
             <div className="hero-primary-metric">
               <span>{primaryMetric.label}</span>
@@ -74,6 +90,14 @@ export function WorkspaceShell({
               <span key={metric.label}>
                 <small>{metric.label}</small>
                 <strong>{metric.value}</strong>
+              </span>
+            ))}
+          </div>
+          <div className="hero-workflow-list" aria-label="현재 작업면 점검 항목">
+            {workflowItems.map((item, index) => (
+              <span key={item}>
+                <small>{String(index + 1).padStart(2, "0")}</small>
+                <strong>{item}</strong>
               </span>
             ))}
           </div>
