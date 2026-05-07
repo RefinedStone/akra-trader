@@ -5,7 +5,7 @@ import { WorkspaceRouteContent } from "./WorkspaceRouteContent";
 
 function buildRoutes() {
   return {
-    overview: { catalogPanel: <div>overview-panel</div> },
+    overview: { briefingPanel: <div>overview-briefing</div>, catalogPanel: <div>overview-panel</div> },
     research: {
       launchPanel: <div>research-launch</div>,
       presetPanel: <div>research-preset</div>,
@@ -33,6 +33,7 @@ describe("WorkspaceRouteContent", () => {
   it("renders overview panels for the overview workspace", () => {
     render(<WorkspaceRouteContent activeWorkspace="overview" routes={buildRoutes()} />);
 
+    expect(screen.getByText("overview-briefing")).toBeInTheDocument();
     expect(screen.getByText("overview-panel")).toBeInTheDocument();
     expect(screen.queryByText("research-launch")).not.toBeInTheDocument();
   });

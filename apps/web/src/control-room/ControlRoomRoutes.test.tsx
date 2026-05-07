@@ -11,6 +11,7 @@ function WorkspaceShell({ children }: { children: ReactNode }) {
 function WorkspaceRouteContent({ routes }: { routes: any }) {
   return (
     <div>
+      {routes.overview.briefingPanel}
       {routes.overview.catalogPanel}
       {routes.research.launchPanel}
       {routes.runtime.launchPanel}
@@ -76,7 +77,16 @@ function buildModel() {
     strategies: [{ runtime: "native" }],
     strategyGroups: { future: [], native: [] },
     togglePresetRevisions: vi.fn(),
-    workspaceDescriptors: [],
+    workspaceDescriptors: [
+      {
+        id: "overview",
+        kicker: "Overview",
+        label: "Overview",
+        description: "Overview",
+        summary: "Overview",
+        sections: [],
+      },
+    ],
   };
 
   return new Proxy(base, {
@@ -93,6 +103,7 @@ describe("ControlRoomRoutes", () => {
   it("composes workspace tabs without touching provider-provenance route bindings", () => {
     render(<ControlRoomRoutes model={buildModel()} />);
 
+    expect(screen.getByText("오늘의 판단 순서")).toBeInTheDocument();
     expect(screen.getByText("Strategy Catalog")).toBeInTheDocument();
     expect(screen.getAllByText("run-form")).toHaveLength(3);
   });

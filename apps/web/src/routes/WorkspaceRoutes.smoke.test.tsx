@@ -9,8 +9,14 @@ import { RuntimeWorkspaceRoute } from "./RuntimeWorkspaceRoute";
 
 describe("workspace route smoke tests", () => {
   it("renders the overview route", () => {
-    render(<OverviewWorkspaceRoute catalogPanel={<div>overview-catalog</div>} />);
+    render(
+      <OverviewWorkspaceRoute
+        briefingPanel={<div>overview-briefing</div>}
+        catalogPanel={<div>overview-catalog</div>}
+      />,
+    );
 
+    expect(screen.getByText("overview-briefing")).toBeInTheDocument();
     expect(screen.getByText("overview-catalog")).toBeInTheDocument();
   });
 

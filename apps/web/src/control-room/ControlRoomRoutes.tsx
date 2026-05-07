@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { ControlRoomLiveControlPanel } from "./ControlRoomLiveControlPanel";
 import { ControlRoomMarketDataPanel } from "./ControlRoomMarketDataPanel";
+import { ControlRoomOverviewPanel } from "./ControlRoomOverviewPanel";
 import { MarketCandlestickChartPanel } from "./MarketCandlestickChartPanel";
 import { RuntimeOperatorPanel } from "./RuntimeOperatorPanel";
 
@@ -55,6 +56,14 @@ export function ControlRoomRoutes({ model }: { model: any }) {
         activeWorkspace={activeWorkspace}
         routes={{
           overview: {
+            briefingPanel: (
+              <ControlRoomOverviewPanel
+                controlStripMetrics={controlStripMetrics}
+                onNavigate={navigateToWorkspace}
+                statusText={statusText}
+                workspaceDescriptors={workspaceDescriptors}
+              />
+            ),
             catalogPanel: (
               <section className="panel panel-wide">
                 <div className="section-heading">
