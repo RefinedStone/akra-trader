@@ -3,6 +3,41 @@ from __future__ import annotations
 from akra_trader.adapters.sqlalchemy_schema import *  # noqa: F403
 
 class SqlAlchemyRunRepositoryReplayIntentMixin:
+  def load_replay_intent_alias_signing_secret(self) -> str | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(replay_intent_alias_state.c.payload).where(
+          replay_intent_alias_state.c.state_key == "signing_secret"
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    secret = row["payload"].get("secret")
+    return secret if isinstance(secret, str) else None
+
+  def save_replay_intent_alias_signing_secret(self, secret: str) -> str:
+    payload = {"secret": secret}
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(replay_intent_alias_state.c.state_key).where(
+          replay_intent_alias_state.c.state_key == "signing_secret"
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(replay_intent_alias_state).values(
+            state_key="signing_secret",
+            payload=payload,
+          )
+        )
+      else:
+        connection.execute(
+          update(replay_intent_alias_state)
+          .where(replay_intent_alias_state.c.state_key == "signing_secret")
+          .values(payload=payload)
+        )
+    return secret
+
   def save_replay_intent_alias(self, record: ReplayIntentAliasRecord) -> ReplayIntentAliasRecord:
     payload = self._replay_alias_adapter.dump_python(record, mode="json")
     row = {

@@ -305,13 +305,13 @@ export function shouldEnableRunSnapshotSemantics(
   );
 }
 
-export function shouldEnableReferenceProvenanceSemantics(
+export function shouldEnableStrategyProvenanceSemantics(
   capabilities: RunSurfaceCapabilities | null | undefined,
 ) {
   return hasRunSurfaceCapabilitySurfaceRule(
     capabilities,
     "provenance_semantics",
-    "reference_provenance_panels",
+    "strategy_provenance_panels",
     "provenance_panel_rendering",
   );
 }

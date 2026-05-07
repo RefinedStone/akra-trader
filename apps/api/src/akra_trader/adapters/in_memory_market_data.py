@@ -68,7 +68,6 @@ from akra_trader.lineage import build_candle_dataset_identity
 from akra_trader.lineage import build_dataset_boundary_contract
 from akra_trader.strategies.base import Strategy
 from akra_trader.strategies.examples import MovingAverageCrossStrategy
-from akra_trader.strategies.reference import build_reference_strategies
 
 
 def build_seeded_market_data() -> dict[str, list[Candle]]:

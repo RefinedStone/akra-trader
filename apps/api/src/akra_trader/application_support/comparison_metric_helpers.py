@@ -23,18 +23,12 @@ from akra_trader.domain.models import default_comparison_eligibility_contract
 
 def _classify_comparison_type(baseline_run: RunRecord, run: RunRecord) -> str:
   lanes = {baseline_run.provenance.lane, run.provenance.lane}
-  if lanes == {"native", "reference"}:
-    return "native_vs_reference"
-  if lanes == {"reference"}:
-    return "reference_vs_reference"
   if lanes == {"native"}:
     return "native_vs_native"
   return "run_vs_baseline"
 
 
 def _comparison_run_label(run: RunRecord) -> str:
-  if run.provenance.reference is not None and run.provenance.reference.title:
-    return run.provenance.reference.title
   if run.provenance.strategy is not None and run.provenance.strategy.name:
     return run.provenance.strategy.name
   return run.config.strategy_id
@@ -44,17 +38,11 @@ def _comparison_subject_label(run: RunRecord) -> str:
   label = _comparison_run_label(run)
   semantics = _strategy_semantics(run)
   role = _format_comparison_semantic_role(run)
-  if run.provenance.lane == "reference":
-    return f"{role} benchmark {label}"
   if semantics.strategy_kind == "imported_module":
     return f"{role} strategy {label}"
   if run.provenance.lane == "native":
     return f"{role} run {label}"
   return label
-
-
-def _has_reference_context(run: RunRecord, baseline_run: RunRecord) -> bool:
-  return any(candidate.provenance.lane == "reference" for candidate in (run, baseline_run))
 
 
 def _build_metric_semantic_annotation_suffix(
@@ -119,10 +107,7 @@ def _build_comparison_semantic_context_sentence(
   baseline_role = _format_comparison_semantic_role(baseline_run, include_execution=True)
   run_role = _format_comparison_semantic_role(run, include_execution=True)
   run_source = _strategy_semantics(run).source_descriptor
-  if comparison_type == "native_vs_reference":
-    summary = f"Semantic context compares {baseline_role} execution to {run_role}"
-  else:
-    summary = f"Semantic context compares {run_role} against {baseline_role}"
+  summary = f"Semantic context compares {run_role} against {baseline_role}"
   if run_source:
     summary = f"{summary} (source {run_source})"
   return f"{summary}."
@@ -157,9 +142,7 @@ def _format_comparison_semantic_role(
 ) -> str:
   semantics = _strategy_semantics(run)
   lane = run.provenance.lane or "run"
-  if semantics.strategy_kind == "reference_delegate":
-    role = "reference delegate"
-  elif semantics.strategy_kind == "imported_module":
+  if semantics.strategy_kind == "imported_module":
     role = "imported module"
   elif semantics.strategy_kind in ("", "standard"):
     role = f"{lane} standard"
@@ -173,8 +156,6 @@ def _format_comparison_semantic_role(
 
 
 def _format_comparison_execution_label(run: RunRecord) -> str | None:
-  if run.provenance.integration_mode:
-    return run.provenance.integration_mode
   execution_model = _strategy_semantics(run).execution_model.strip()
   if execution_model and len(execution_model) <= 40:
     return execution_model

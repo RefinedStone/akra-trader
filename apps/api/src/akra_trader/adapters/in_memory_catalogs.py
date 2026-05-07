@@ -68,7 +68,6 @@ from akra_trader.lineage import build_candle_dataset_identity
 from akra_trader.lineage import build_dataset_boundary_contract
 from akra_trader.strategies.base import Strategy
 from akra_trader.strategies.examples import MovingAverageCrossStrategy
-from akra_trader.strategies.reference import build_reference_strategies
 
 
 class InMemoryExperimentPresetCatalog(ExperimentPresetCatalogPort):
@@ -117,10 +116,7 @@ class LocalStrategyCatalog(StrategyCatalogPort):
     for strategy in (builtins or (MovingAverageCrossStrategy,)):
       metadata = strategy().describe()
       builtin_factories[metadata.strategy_id] = strategy
-    for strategy in build_reference_strategies():
-      builtin_factories[strategy.describe().strategy_id] = strategy.__class__
     self._builtins = builtin_factories
-    self._references = {strategy.describe().strategy_id: strategy for strategy in build_reference_strategies()}
     self._registrations: dict[str, StrategyRegistration] = {}
 
   def list_strategies(
@@ -151,8 +147,6 @@ class LocalStrategyCatalog(StrategyCatalogPort):
     return sorted(metadata, key=lambda item: item.strategy_id)
 
   def load(self, strategy_id: str) -> Strategy:
-    if strategy_id in self._references:
-      return self._references[strategy_id]
     if strategy_id in self._builtins:
       return self._builtins[strategy_id]()
     registration = self._registrations[strategy_id]
@@ -171,9 +165,7 @@ class LocalStrategyCatalog(StrategyCatalogPort):
     return self._registrations.get(strategy_id)
 
   def _describe_strategy(self, strategy_id: str) -> StrategyMetadata:
-    if strategy_id in self._references:
-      metadata = self._references[strategy_id].describe()
-    elif strategy_id in self._builtins:
+    if strategy_id in self._builtins:
       metadata = self._builtins[strategy_id]().describe()
     else:
       metadata = self.load(strategy_id).describe()

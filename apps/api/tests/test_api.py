@@ -317,19 +317,13 @@ def test_external_decision_strategy_exposes_semantic_prompt_profile_metadata() -
 def test_list_strategies_can_filter_by_lane_and_lifecycle_stage(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 
-  response = client.get("/api/strategies?lane=freqtrade_reference&lifecycle_stage=imported")
+  response = client.get("/api/strategies?lane=native&lifecycle_stage=active")
 
   assert response.status_code == 200
   payload = response.json()
   assert payload
-  assert all(item["runtime"] == "freqtrade_reference" for item in payload)
-  assert all(item["lifecycle"]["stage"] == "imported" for item in payload)
-  assert all(item["catalog_semantics"]["strategy_kind"] == "reference_delegate" for item in payload)
-  assert all(item["catalog_semantics"]["source_descriptor"] for item in payload)
-  assert all(
-    "Freqtrade reference runtime" in item["catalog_semantics"]["execution_model"]
-    for item in payload
-  )
+  assert all(item["runtime"] == "native" for item in payload)
+  assert all(item["lifecycle"]["stage"] == "active" for item in payload)
 
 
 def test_register_strategy_endpoint_returns_import_catalog_semantics(tmp_path: Path) -> None:
@@ -2811,15 +2805,6 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   run_due_payload = run_due_response.json()
   assert run_due_payload["executed_count"] == 1
   assert run_due_payload["items"][0]["report"]["report_id"] == report_payload["report_id"]
-
-
-def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:
-  client = build_client(tmp_path / "runs.sqlite3")
-  response = client.get("/api/references")
-  assert response.status_code == 200
-  payload = response.json()
-  assert any(item["reference_id"] == "nautilus-trader" for item in payload)
-  assert any(item["reference_id"] == "nostalgia-for-infinity" for item in payload)
 
 
 def test_presets_endpoint_persists_catalog_entries_across_restart(tmp_path: Path) -> None:
@@ -5974,20 +5959,6 @@ def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   )
   assert native_response.status_code == 200
 
-  reference_response = client.post(
-    "/api/runs/backtests",
-    json={
-      "strategy_id": "nfi_x7_reference",
-      "symbol": "BTC/USDT",
-      "timeframe": "5m",
-      "initial_cash": 10000,
-      "fee_rate": 0.001,
-      "slippage_bps": 3,
-      "parameters": {},
-    },
-  )
-  assert reference_response.status_code == 200
-
   filtered = client.get("/api/runs?mode=backtest&strategy_id=ma_cross_v1&strategy_version=1.0.0")
 
   assert filtered.status_code == 200
@@ -6292,119 +6263,3 @@ def test_rerun_boundary_endpoint_returns_not_found_for_unknown_boundary(tmp_path
   sandbox_response = client.post("/api/runs/rerun-boundaries/rerun-v1:missing/sandbox")
 
   assert sandbox_response.status_code == 404
-
-
-def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tmp_path: Path) -> None:
-  client = build_client(tmp_path / "runs.sqlite3")
-  create_preset(
-    client,
-    name="Core 5m",
-    preset_id="core_5m",
-    strategy_id="ma_cross_v1",
-    timeframe="5m",
-  )
-  create_preset(
-    client,
-    name="NFI baseline",
-    preset_id="nfi_baseline",
-    strategy_id="nfi_x7_reference",
-    timeframe="5m",
-  )
-
-  native_response = client.post(
-    "/api/runs/backtests",
-    json={
-      "strategy_id": "ma_cross_v1",
-      "symbol": "BTC/USDT",
-      "timeframe": "5m",
-      "initial_cash": 10000,
-      "fee_rate": 0.001,
-      "slippage_bps": 3,
-      "parameters": {},
-      "tags": ["baseline"],
-      "preset_id": "core_5m",
-    },
-  )
-  assert native_response.status_code == 200
-  native_run_id = native_response.json()["config"]["run_id"]
-
-  reference_response = client.post(
-    "/api/runs/backtests",
-    json={
-      "strategy_id": "nfi_x7_reference",
-      "symbol": "BTC/USDT",
-      "timeframe": "5m",
-      "initial_cash": 10000,
-      "fee_rate": 0.001,
-      "slippage_bps": 3,
-      "parameters": {},
-      "tags": ["reference"],
-      "preset_id": "nfi_baseline",
-    },
-  )
-  assert reference_response.status_code == 200
-  reference_run_id = reference_response.json()["config"]["run_id"]
-
-  comparison_response = client.get(
-    f"/api/runs/compare?run_id={native_run_id}&run_id={reference_run_id}&intent=strategy_tuning"
-  )
-
-  assert comparison_response.status_code == 200
-  payload = comparison_response.json()
-  assert payload["intent"] == "strategy_tuning"
-  assert payload["baseline_run_id"] == native_run_id
-  assert [run["lane"] for run in payload["runs"]] == ["native", "reference"]
-  assert payload["runs"][0]["experiment"]["preset_id"] == "core_5m"
-  assert payload["runs"][0]["experiment"]["tags"] == ["baseline"]
-  assert payload["runs"][0]["catalog_semantics"]["strategy_kind"] == "standard"
-  assert payload["runs"][0]["dataset_identity"].startswith("dataset-v1:")
-  assert payload["runs"][1]["experiment"]["preset_id"] == "nfi_baseline"
-  assert payload["runs"][1]["experiment"]["benchmark_family"] == "reference:nostalgia-for-infinity"
-  assert payload["runs"][1]["reference_id"] == "nostalgia-for-infinity"
-  assert payload["runs"][1]["integration_mode"] == "external_runtime"
-  assert payload["runs"][1]["catalog_semantics"]["strategy_kind"] == "reference_delegate"
-  assert payload["runs"][1]["catalog_semantics"]["source_descriptor"] == (
-    "nostalgia-for-infinity:NostalgiaForInfinityX7"
-  )
-  assert payload["runs"][1]["catalog_semantics"]["operator_notes"]
-  assert payload["runs"][1]["reference"]["title"] == "NostalgiaForInfinity"
-  assert payload["runs"][1]["artifact_paths"]
-  assert "eligibility_contract" not in payload
-  assert len(payload["narratives"]) == 1
-  assert payload["narratives"][0]["comparison_type"] == "native_vs_reference"
-  assert payload["narratives"][0]["run_id"] == reference_run_id
-  assert payload["narratives"][0]["rank"] == 1
-  assert payload["narratives"][0]["is_primary"] is True
-  assert payload["narratives"][0]["insight_score"] > 0
-  assert payload["narratives"][0]["score_breakdown"]["total"] == payload["narratives"][0]["insight_score"]
-  assert payload["narratives"][0]["score_breakdown"]["semantics"]["components"]["strategy_kind"][
-    "applied"
-  ] is True
-  assert payload["narratives"][0]["score_breakdown"]["semantics"]["components"]["vocabulary"]["score"] > 0
-  assert (
-    payload["narratives"][0]["score_breakdown"]["semantics"]["components"]["provenance_richness"][
-      "score"
-    ] > 0
-  )
-  assert payload["narratives"][0]["title"].startswith("Strategy tuning")
-  assert "reference delegate via external_runtime" in payload["narratives"][0]["summary"]
-  artifact_kinds = {artifact["kind"] for artifact in payload["runs"][1]["benchmark_artifacts"]}
-  assert "result_snapshot_root" in artifact_kinds
-  assert "runtime_log_root" in artifact_kinds
-  assert all("summary" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
-  assert all("sections" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
-  assert all("summary_source_path" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
-  assert all("source_locations" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
-  metric_rows = {row["key"]: row for row in payload["metric_rows"]}
-  assert metric_rows["total_return_pct"]["annotation"].startswith(
-    "Tuning read: return deltas show optimization edge versus the baseline."
-  )
-  assert "reference delegate via external_runtime" in metric_rows["total_return_pct"]["annotation"]
-  assert metric_rows["total_return_pct"]["delta_annotations"][native_run_id] == "tuning baseline"
-  assert metric_rows["total_return_pct"]["values"][native_run_id] is not None
-  assert "tuning" in metric_rows["total_return_pct"]["delta_annotations"][reference_run_id]
-  assert "reference delegate via external_runtime" in metric_rows["total_return_pct"]["delta_annotations"][
-    reference_run_id
-  ]
-  assert reference_run_id in metric_rows["trade_count"]["values"]
-  assert payload["runs"][1]["notes"]

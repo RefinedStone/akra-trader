@@ -63,12 +63,12 @@ It is not yet a finished live trading product:
   dataset-boundary contracts, and rerun boundaries
 - normalized market-data lineage history and ingestion-job query surfaces for symbol/timeframe
   inspection
-- reference-runtime delegation for NostalgiaForInfinity backtests with stored benchmark provenance
+- native backtests with stored benchmark provenance
 
 ### Experiment OS baseline
 
 - run history listing and filtering by mode, strategy, version, and rerun-boundary identity
-- native vs reference comparison API and control-room comparison workflow
+- native comparison API and control-room comparison workflow
 - experiment presets with lifecycle actions, revisions, and restore flows
 - typed query/filter contracts for strategies, presets, runs, and comparison surfaces
 - shared query-discovery and run-surface capability contracts for typed query builders and run

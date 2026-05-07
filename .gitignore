@@ -1,7 +1,3 @@
-reference/NostalgiaForInfinity
-reference/cctx
-reference/yfinance
-reference/nautilus_trader
 .git.backup-*
 .codex-exec-loop/
 .idea/

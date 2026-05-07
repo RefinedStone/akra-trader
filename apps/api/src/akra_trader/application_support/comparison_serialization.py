@@ -32,7 +32,9 @@ from akra_trader.application_support.comparison_metric_helpers import _extract_b
 from akra_trader.application_support.comparison_metric_helpers import _format_comparison_execution_label
 from akra_trader.application_support.comparison_metric_helpers import _format_comparison_semantic_role
 from akra_trader.application_support.comparison_metric_helpers import _format_metric_delta
-from akra_trader.application_support.comparison_metric_helpers import _has_reference_context
+from akra_trader.application_support.comparison_metric_helpers import _build_comparison_semantic_context_sentence
+from akra_trader.application_support.comparison_metric_helpers import _build_metric_delta_semantic_suffix
+from akra_trader.application_support.comparison_metric_helpers import _build_metric_semantic_annotation_suffix
 from akra_trader.application_support.comparison_metric_helpers import _metric_row_delta
 from akra_trader.application_support.comparison_metric_helpers import _resolve_run_metric_value
 from akra_trader.application_support.comparison_metric_helpers import _strategy_semantics
@@ -53,7 +55,6 @@ def serialize_run_comparison(
         "tags": list(run.experiment.tags),
       },
       "symbols": list(run.symbols),
-      "external_command": list(run.external_command),
       "artifact_paths": list(run.artifact_paths),
       "benchmark_artifacts": [asdict(artifact) for artifact in run.benchmark_artifacts],
       "catalog_semantics": {
@@ -123,11 +124,6 @@ def _serialize_comparison_run(run: RunRecord) -> RunComparisonRun:
     timeframe=run.config.timeframe,
     started_at=run.started_at,
     ended_at=run.ended_at,
-    reference_id=run.provenance.reference_id,
-    reference_version=run.provenance.reference_version,
-    integration_mode=run.provenance.integration_mode,
-    reference=deepcopy(run.provenance.reference),
-    working_directory=run.provenance.working_directory,
     rerun_boundary_id=run.provenance.rerun_boundary_id,
     rerun_boundary_state=run.provenance.rerun_boundary_state,
     dataset_identity=(
@@ -136,7 +132,6 @@ def _serialize_comparison_run(run: RunRecord) -> RunComparisonRun:
       else None
     ),
     experiment=deepcopy(run.provenance.experiment),
-    external_command=tuple(run.provenance.external_command),
     artifact_paths=tuple(run.provenance.artifact_paths),
     benchmark_artifacts=tuple(run.provenance.benchmark_artifacts),
     metrics=deepcopy(run.metrics),
@@ -430,12 +425,6 @@ def _score_comparison_narrative(
     2,
   )
   context_total = _context_subtotal(context_components)
-  if metric_total + semantic_total + context_total == 0.0 and _has_reference_context(run, baseline_run):
-    context_components["reference_floor"] = {
-      "applied": True,
-      "score": weights["reference_floor"],
-    }
-    context_total = _context_subtotal(context_components)
   score = round(metric_total + semantic_total + context_total, 2)
 
   breakdown = {
@@ -609,19 +598,9 @@ def _build_comparison_context_score_breakdown(
   run: RunRecord,
   weights: dict[str, float],
 ) -> dict[str, dict[str, Any]]:
-  native_reference_applied = comparison_type == "native_vs_reference"
-  reference_applied = comparison_type == "reference_vs_reference"
   status_applied = run.status != baseline_run.status
   benchmark_story_applied = bool(_extract_benchmark_story(run) or _extract_benchmark_story(baseline_run))
   context_components = {
-    "native_reference_bonus": {
-      "applied": native_reference_applied,
-      "score": weights["native_reference_bonus"] if native_reference_applied else 0.0,
-    },
-    "reference_bonus": {
-      "applied": reference_applied,
-      "score": weights["reference_bonus"] if reference_applied else 0.0,
-    },
     "status_bonus": {
       "applied": status_applied,
       "score": weights["status_bonus"] if status_applied else 0.0,
@@ -629,10 +608,6 @@ def _build_comparison_context_score_breakdown(
     "benchmark_story_bonus": {
       "applied": benchmark_story_applied,
       "score": weights["benchmark_story_bonus"] if benchmark_story_applied else 0.0,
-    },
-    "reference_floor": {
-      "applied": False,
-      "score": 0.0,
     },
   }
   return context_components
@@ -717,7 +692,7 @@ def _build_comparison_narrative_title(
   max_drawdown_delta: float | int | None,
 ) -> str | None:
   copy = COMPARISON_INTENT_COPY[intent]
-  versus_baseline = "the baseline" if comparison_type != "native_vs_reference" else f"the native/reference baseline {baseline_label}"
+  versus_baseline = "the baseline"
   if total_return_delta is not None and max_drawdown_delta is not None:
     if intent == "benchmark_validation":
       if total_return_delta > 0 and max_drawdown_delta <= 0:
@@ -766,8 +741,6 @@ def _build_comparison_narrative_title(
     if max_drawdown_delta > 0:
       return f"{copy['title_prefix']} shows {target_subject} running with deeper drawdown than {versus_baseline}."
     return f"{copy['title_prefix']} shows {target_subject} matching {versus_baseline} on drawdown."
-  if comparison_type == "native_vs_reference":
-    return f"{copy['title_prefix']} frames {target_subject} as the comparison counterpart to {baseline_label}."
   return f"{copy['title_prefix']} reads {target_subject} against {baseline_label}."
 
 
@@ -817,9 +790,6 @@ def _build_comparison_narrative_summary(
     )
     return f"{summary} {semantic_context}" if semantic_context else summary
 
-  if comparison_type == "native_vs_reference" and _has_reference_context(run, baseline_run):
-    summary = copy["partial_summary"]
-    return f"{summary} {semantic_context}" if semantic_context else summary
   if run.status != baseline_run.status:
     summary = (
       f"{copy['summary_prefix']} also notes a status split: {run.status} versus "
@@ -860,12 +830,6 @@ def _build_comparison_narrative_bullets(
   if activity_context is not None:
     bullets.append(activity_context)
 
-  reference_story = _build_reference_story_bullet(intent=intent, baseline_run=baseline_run, run=run)
-  if reference_story is not None:
-    bullets.append(reference_story)
-
-  if not bullets and comparison_type == "native_vs_reference":
-    bullets.append(f"{COMPARISON_INTENT_COPY[intent]['lane_prefix']}: {target_label} is the reference/native counterpart to {baseline_label}.")
   return bullets[:3]
 
 
@@ -876,20 +840,7 @@ def _build_lane_context_bullet(
   baseline_run: RunRecord,
   run: RunRecord,
 ) -> str | None:
-  if comparison_type != "native_vs_reference":
-    return None
-  copy = COMPARISON_INTENT_COPY[intent]
-  reference_run = run if run.provenance.lane == "reference" else baseline_run
-  native_run = baseline_run if reference_run is run else run
-  reference_label = _comparison_run_label(reference_run)
-  native_role = _format_comparison_semantic_role(native_run)
-  reference_role = _format_comparison_semantic_role(reference_run, include_execution=True)
-  reference_source = _strategy_semantics(reference_run).source_descriptor
-  source_suffix = f" / source {reference_source}" if reference_source else ""
-  return (
-    f"{copy['lane_prefix']}: {native_role} engine {_comparison_run_label(native_run)} is being "
-    f"read against {reference_role} benchmark {reference_label}{source_suffix}."
-  )
+  return None
 
 
 def _build_activity_context_bullet(
@@ -916,27 +867,3 @@ def _build_activity_context_bullet(
   if not segments:
     return None
   return f"{copy['activity_prefix']}: " + "; ".join(segments) + "."
-
-
-def _build_reference_story_bullet(
-  *,
-  intent: str,
-  baseline_run: RunRecord,
-  run: RunRecord,
-) -> str | None:
-  copy = COMPARISON_INTENT_COPY[intent]
-  reference_run = None
-  if run.provenance.lane == "reference":
-    reference_run = run
-  elif baseline_run.provenance.lane == "reference":
-    reference_run = baseline_run
-  if reference_run is None:
-    return None
-  benchmark_story = _extract_benchmark_story(reference_run)
-  if not benchmark_story:
-    return None
-  for key in ("headline", "signal_context", "exit_context", "market_context", "pair_context", "portfolio_context"):
-    value = benchmark_story.get(key)
-    if isinstance(value, str) and value:
-      return f"{copy['reference_prefix']}: {value}"
-  return None

@@ -14,7 +14,7 @@ Advance the architecture without breaking the core boundary rule:
 Already implemented:
 
 - explicit ports for market data, strategy catalog, run storage, guarded-live state, venue state,
-  references, and decision engines
+  native strategies and decision engines
 - durable run persistence through SQLAlchemy
 - native runtime decomposition into data, execution, risk, cache, supervision, and mode services
 - market-data sync with checkpoints, backfill status, gap visibility, and failure history
@@ -52,7 +52,7 @@ creation.
 - durable run repository with rich provenance payloads
 - presets with revisions and lifecycle actions
 - richer run, preset, strategy, and comparison query contracts
-- native and reference runs already share a comparison and provenance posture
+- native runs already share a comparison and provenance posture
 
 ### Remaining work
 

@@ -15,7 +15,6 @@ class TradingApplicationCoreMixin:
     *,
     market_data: MarketDataPort,
     strategies: StrategyCatalogPort,
-    references: ReferenceCatalogPort,
     runs: RunRepositoryPort,
     presets: ExperimentPresetCatalogPort | None = None,
     provider_provenance_scheduler_search_backend: ProviderProvenanceSchedulerSearchBackendPort | None = None,
@@ -23,7 +22,6 @@ class TradingApplicationCoreMixin:
     venue_state: VenueStatePort | None = None,
     venue_execution: VenueExecutionPort | None = None,
     operator_alert_delivery: OperatorAlertDeliveryPort | None = None,
-    freqtrade_reference: FreqtradeReferenceAdapter | None = None,
     mode_service: ExecutionModeService | None = None,
     data_engine: DataEngine | None = None,
     execution_engine: ExecutionEngine | None = None,
@@ -59,11 +57,9 @@ class TradingApplicationCoreMixin:
     self._clock = clock or (lambda: datetime.now(UTC))
     self._market_data = market_data
     self._strategies = strategies
-    self._references = references
     self._presets = presets or _EphemeralExperimentPresetCatalog()
     self._strategy_catalog_flow = StrategyCatalogFlow(
       strategies=self._strategies,
-      references=self._references,
       presets=self._presets,
       clock=self._clock,
     )
@@ -83,7 +79,6 @@ class TradingApplicationCoreMixin:
     self._operator_alert_delivery = (
       operator_alert_delivery or NoopOperatorAlertDeliveryAdapter()
     )
-    self._freqtrade_reference = freqtrade_reference
     self._mode_service = mode_service or ExecutionModeService()
     self._data_engine = data_engine or DataEngine(market_data)
     self._execution_engine = execution_engine or ExecutionEngine()
@@ -96,6 +91,13 @@ class TradingApplicationCoreMixin:
     self._guarded_live_market_data_backfill_completion_floor = 0.95
     self._guarded_live_market_data_contiguous_completion_floor = 0.95
     self._guarded_live_market_data_failure_burst_threshold = 3
+    self._guarded_live_balance_tolerance = 1e-6
+    self._guarded_live_drawdown_breach_pct = 40.0
+    self._guarded_live_loss_breach_pct = 20.0
+    self._guarded_live_recovery_alert_threshold = 2
+    self._guarded_live_gross_open_risk_ratio = 1.0
+    self._sandbox_worker_kind = "sandbox_native_worker"
+    self._guarded_live_worker_kind = "guarded_live_native_worker"
     self._sandbox_worker_heartbeat_interval_seconds = sandbox_worker_heartbeat_interval_seconds
     self._sandbox_worker_heartbeat_timeout_seconds = sandbox_worker_heartbeat_timeout_seconds
     self._guarded_live_worker_heartbeat_interval_seconds = (
@@ -308,8 +310,6 @@ class TradingApplicationCoreMixin:
       lifecycle_stage=lifecycle_stage,
       version=version,
     )
-  def list_references(self) -> list[ReferenceSource]:
-    return self._strategy_catalog_flow.list_references()
   def register_strategy(self, *, strategy_id: str, module_path: str, class_name: str) -> StrategyMetadata:
     return self._strategy_catalog_flow.register_strategy(
       strategy_id=strategy_id,
@@ -443,12 +443,17 @@ class TradingApplicationCoreMixin:
       [boundary.reproducibility_state]
       + [contract.reproducibility_state for contract in symbol_boundaries.values()]
     )
+    resolved_parameters = (
+      run.provenance.strategy.parameter_snapshot.resolved
+      if run.provenance.strategy is not None
+      else run.config.parameters
+    )
     run.provenance.rerun_boundary_id = build_rerun_boundary_identity(
       lane=run.provenance.lane,
       mode=run.config.mode.value,
       strategy_id=run.config.strategy_id,
       strategy_version=run.config.strategy_version,
-      resolved_parameters=run.config.parameters,
+      resolved_parameters=resolved_parameters,
       venue=run.config.venue,
       symbols=run.config.symbols,
       timeframe=run.config.timeframe,
@@ -462,13 +467,11 @@ class TradingApplicationCoreMixin:
       effective_start_at=run.provenance.market_data.effective_start_at,
       effective_end_at=run.provenance.market_data.effective_end_at,
       candle_count=run.provenance.market_data.candle_count,
-      reference_id=run.provenance.reference_id,
-      reference_version=run.provenance.reference_version,
-      integration_mode=run.provenance.integration_mode,
-      external_command=run.provenance.external_command,
     )
   def _validate_preset_strategy(self, *, strategy_id: str | None) -> None:
     self._strategy_catalog_flow.validate_preset_strategy(strategy_id=strategy_id)
+  def _migrate_legacy_preset_from_run(self, run: RunRecord) -> ExperimentPreset | None:
+    return self._strategy_catalog_flow.migrate_legacy_preset_from_run(run)
   def list_runs(
     self,
     mode: str | None = None,

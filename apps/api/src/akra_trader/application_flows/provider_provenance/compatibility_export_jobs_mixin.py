@@ -712,13 +712,14 @@ class ProviderProvenanceCompatibilityExportJobsMixin:
     now: datetime,
   ) -> dict[str, Any]:
     normalized_window_days = max(3, min(window_days, 90))
-    anchor_candidates = [now]
+    anchor_candidates = []
     anchor_candidates.extend(record.exported_at or record.created_at for record in records)
     anchor_candidates.extend(
       audit_record.recorded_at
       for audit_record in audit_records
       if audit_record.action == "downloaded"
     )
+    anchor_candidates.append(now)
     window_anchor = cls._normalize_provider_provenance_export_bucket_start(max(anchor_candidates))
     window_started_at = window_anchor - timedelta(days=normalized_window_days - 1)
     window_ended_at = window_anchor + timedelta(days=1)
@@ -828,6 +829,10 @@ class ProviderProvenanceCompatibilityExportJobsMixin:
       default=None,
     )
     burn_up_latest = export_burn_up_series[-1] if export_burn_up_series else None
+    total_export_count = len(records)
+    total_result_count = sum(record.result_count for record in records)
+    total_provider_provenance_count = sum(record.provider_provenance_count for record in records)
+    total_download_count = sum(1 for record in audit_records if record.action == "downloaded")
 
     return {
       "bucket_size": "day",
@@ -893,22 +898,22 @@ class ProviderProvenanceCompatibilityExportJobsMixin:
             else None
           ),
           "cumulative_export_count": (
-            int(burn_up_latest["cumulative_export_count"])
+            total_export_count
             if burn_up_latest is not None
             else 0
           ),
           "cumulative_result_count": (
-            int(burn_up_latest["cumulative_result_count"])
+            total_result_count
             if burn_up_latest is not None
             else 0
           ),
           "cumulative_provider_provenance_count": (
-            int(burn_up_latest["cumulative_provider_provenance_count"])
+            total_provider_provenance_count
             if burn_up_latest is not None
             else 0
           ),
           "cumulative_download_count": (
-            int(burn_up_latest["cumulative_download_count"])
+            total_download_count
             if burn_up_latest is not None
             else 0
           ),

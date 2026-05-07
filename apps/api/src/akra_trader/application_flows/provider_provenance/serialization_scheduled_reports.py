@@ -6,6 +6,9 @@ from datetime import datetime
 from typing import Any
 
 from akra_trader.application_flows.provider_provenance.mixins import ProviderProvenanceCompatibilityMixin
+from akra_trader.application_flows.provider_provenance.serialization_aliases_exports import (
+  serialize_provider_provenance_export_job_record,
+)
 from akra_trader.domain.models import *  # noqa: F403
 
 __all__ = (

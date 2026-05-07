@@ -4,7 +4,6 @@ from akra_trader.port_contracts import GuardedLiveStatePort
 from akra_trader.port_contracts import MarketDataPort
 from akra_trader.port_contracts import OperatorAlertDeliveryPort
 from akra_trader.port_contracts import ProviderProvenanceSchedulerSearchBackendPort
-from akra_trader.port_contracts import ReferenceCatalogPort
 from akra_trader.port_contracts import RunRepositoryPort
 from akra_trader.port_contracts import StrategyCatalogPort
 from akra_trader.port_contracts import StrategyRuntime
@@ -18,7 +17,6 @@ __all__ = [
   "MarketDataPort",
   "OperatorAlertDeliveryPort",
   "ProviderProvenanceSchedulerSearchBackendPort",
-  "ReferenceCatalogPort",
   "RunRepositoryPort",
   "StrategyCatalogPort",
   "StrategyRuntime",

@@ -7,7 +7,6 @@ from sqlalchemy.engine import make_url
 
 from akra_trader.adapters.binance import CcxtMarketDataAdapter
 from akra_trader.adapters.binance import SUPPORTED_CCXT_MARKET_DATA_VENUES
-from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.operator_delivery import OperatorAlertDeliveryAdapter
@@ -26,7 +25,6 @@ from akra_trader.adapters.provider_provenance_search import (
 from akra_trader.adapters.provider_provenance_search import (
   SqlAlchemyProviderProvenanceSchedulerSearchStore,
 )
-from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
@@ -507,7 +505,6 @@ def build_container(settings: Settings) -> Container:
   repo_root = Path(__file__).resolve().parents[4]
   market_data = build_market_data_adapter(settings, repo_root)
   strategies = LocalStrategyCatalog()
-  references = load_reference_catalog(repo_root / "reference" / "catalog.toml")
   runs = SqlAlchemyRunRepository(
     settings.runs_database_url or build_default_runs_database_url(repo_root)
   )
@@ -556,7 +553,6 @@ def build_container(settings: Settings) -> Container:
   application = TradingApplication(
     market_data=market_data,
     strategies=strategies,
-    references=references,
     presets=presets,
     runs=runs,
     provider_provenance_scheduler_search_backend=provider_provenance_scheduler_search_backend,
@@ -564,7 +560,6 @@ def build_container(settings: Settings) -> Container:
     venue_state=venue_state,
     venue_execution=venue_execution,
     operator_alert_delivery=operator_alert_delivery,
-    freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
     guarded_live_venue=resolve_guarded_live_venue(settings),
     guarded_live_execution_enabled=settings.guarded_live_execution_enabled,
     market_data_sync_timeframes=settings.market_data_sync_timeframes,

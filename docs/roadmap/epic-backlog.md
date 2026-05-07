@@ -65,7 +65,7 @@ Current baseline:
 Acceptance criteria:
 
 - common experiment queries avoid payload-heavy scans
-- native and reference runs expose consistent artifact and export behavior
+- native runs expose consistent artifact and export behavior
 - benchmark packs and promotion review artifacts are first-class entities
 
 ## Epic 4: Control Room Productization

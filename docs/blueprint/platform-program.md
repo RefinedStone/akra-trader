@@ -52,7 +52,7 @@
 현재 baseline:
 
 - presets, revisions, query/filter contracts, comparison, rerun boundary가 이미 있다
-- native와 reference lane은 공통 비교 및 provenance 흐름을 공유한다
+- native 실행은 공통 비교 및 provenance 흐름을 공유한다
 
 남은 핵심 공백:
 
@@ -163,6 +163,6 @@
 ## 공통 기술 원칙
 
 - domain/application은 provider나 framework 세부 구현을 모르면 된다
-- reference lane은 benchmark lane이며 native contract를 대체하지 않는다
+- native contract는 제품 런타임의 기준 계약이다
 - preview와 worker, worker와 guarded-live를 문서와 모델에서 명확히 분리한다
 - audit와 alert는 운영 부가 기능이 아니라 제품 일부로 취급한다

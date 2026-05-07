@@ -31,7 +31,7 @@ LLM lane은 `akra-trader`의 본선 실행 경로가 아니라, deterministic st
 
 ### 1. deterministic lane을 대체하지 않는다
 
-- native와 reference lane이 본선 기준이다
+- native lane이 본선 기준이다
 - LLM lane은 비교 대상이자 연구 대상이다
 
 ### 2. trace 없는 run은 invalid다

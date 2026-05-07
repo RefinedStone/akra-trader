@@ -146,10 +146,6 @@ def _build_run_experiment_metadata(
   normalized_benchmark_family = _normalize_experiment_identifier(
     benchmark_family or (preset.benchmark_family if preset is not None else None)
   )
-  if normalized_benchmark_family is None and strategy_metadata.runtime == "freqtrade_reference":
-    normalized_benchmark_family = _normalize_experiment_identifier(
-      f"reference:{strategy_metadata.reference_id or strategy_metadata.strategy_id}"
-    )
   merged_tags = tuple(tags)
   if preset is not None:
     merged_tags = (*preset.tags, *merged_tags)

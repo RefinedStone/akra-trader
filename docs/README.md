@@ -64,12 +64,6 @@ longer-horizon blueprint.
 - `operations/*`
   - operator workflows, runbooks, checklists, and discipline documents
 
-### Reference
-
-- `reference*` and `reference/*`
-  - reference notes, adoption notes, and detailed implementation matrices that should not bloat the
-    core product docs
-
 ## Internal Planning Directions
 
 The internal planning directions also participate in the documentation contract:

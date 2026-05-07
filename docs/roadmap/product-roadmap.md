@@ -14,7 +14,7 @@ One operator can already:
 
 1. inspect market-data health
 2. launch durable native backtests
-3. compare native and reference runs
+3. compare native runs
 4. reuse presets and rerun stored execution boundaries
 5. start and stop sandbox workers
 6. inspect guarded-live blockers, incidents, and recovery state
@@ -34,7 +34,7 @@ The main product gaps are no longer "does the feature exist" but rather:
 - deterministic dataset-boundary contracts, claim-aware rerun validation categories, and lineage
   mismatch taxonomy are already implemented
 - ingestion-job history plus normalized lineage query surfaces are already available to operators
-- native vs reference comparison is already a normal workflow
+- native comparison is already a normal workflow
 - presets, preset lifecycle, revisions, and restore flows already exist
 - run and strategy query/filter surfaces are richer than a simple history list
 

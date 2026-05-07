@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Protocol
 
 from akra_trader.domain.models import ExperimentPreset
-from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import StrategyRegistration
 from akra_trader.port_contracts.strategies import StrategyRuntime
@@ -23,12 +22,6 @@ class StrategyCatalogPort(Protocol):
   def register(self, registration: StrategyRegistration) -> StrategyMetadata: ...
 
   def get_registration(self, strategy_id: str) -> StrategyRegistration | None: ...
-
-
-class ReferenceCatalogPort(Protocol):
-  def list_entries(self) -> list[ReferenceSource]: ...
-
-  def get(self, reference_id: str) -> ReferenceSource: ...
 
 
 class ExperimentPresetCatalogPort(Protocol):

@@ -11,11 +11,9 @@ from typing import Any
 import pytest
 
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
-from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
-from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
@@ -76,7 +74,6 @@ from .application_test_support import StaticVenueStateAdapter
 from .application_test_support import StatusOverrideSeededMarketDataAdapter
 from .application_test_support import build_guarded_live_repository
 from .application_test_support import build_preset_catalog
-from .application_test_support import build_references
 from .application_test_support import build_runs_repository
 from .application_test_support import without_surface_rule
 
@@ -96,7 +93,6 @@ def test_external_alertops_recovery_sync_populates_alertops_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -225,7 +221,6 @@ def test_incident_paging_provider_can_be_inferred_for_alertops_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -300,7 +295,6 @@ def test_external_signl4_recovery_sync_populates_signl4_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -429,7 +423,6 @@ def test_incident_paging_provider_can_be_inferred_for_signl4_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -504,7 +497,6 @@ def test_external_ilert_recovery_sync_populates_ilert_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -633,7 +625,6 @@ def test_incident_paging_provider_can_be_inferred_for_ilert_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -708,7 +699,6 @@ def test_external_betterstack_recovery_sync_populates_betterstack_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -837,7 +827,6 @@ def test_incident_paging_provider_can_be_inferred_for_betterstack_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -912,7 +901,6 @@ def test_external_onpage_recovery_sync_populates_onpage_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -1041,7 +1029,6 @@ def test_incident_paging_provider_can_be_inferred_for_onpage_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -1116,7 +1103,6 @@ def test_external_allquiet_recovery_sync_populates_allquiet_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -1245,7 +1231,6 @@ def test_incident_paging_provider_can_be_inferred_for_allquiet_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -1320,7 +1305,6 @@ def test_external_moogsoft_recovery_sync_populates_moogsoft_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -1449,7 +1433,6 @@ def test_incident_paging_provider_can_be_inferred_for_moogsoft_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -1524,7 +1507,6 @@ def test_external_spikesh_recovery_sync_populates_spikesh_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -1653,7 +1635,6 @@ def test_incident_paging_provider_can_be_inferred_for_spikesh_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -1728,7 +1709,6 @@ def test_external_dutycalls_recovery_sync_populates_dutycalls_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -1857,7 +1837,6 @@ def test_incident_paging_provider_can_be_inferred_for_dutycalls_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -1932,7 +1911,6 @@ def test_external_incidenthub_recovery_sync_populates_incidenthub_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -2061,7 +2039,6 @@ def test_incident_paging_provider_can_be_inferred_for_incidenthub_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -2136,7 +2113,6 @@ def test_external_opsramp_recovery_sync_populates_opsramp_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -2266,7 +2242,6 @@ def test_external_resolver_recovery_sync_populates_resolver_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -2395,7 +2370,6 @@ def test_incident_paging_provider_can_be_inferred_for_resolver_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -2470,7 +2444,6 @@ def test_external_openduty_recovery_sync_populates_openduty_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -2599,7 +2572,6 @@ def test_incident_paging_provider_can_be_inferred_for_openduty_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -2674,7 +2646,6 @@ def test_external_cabot_recovery_sync_populates_cabot_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -2803,7 +2774,6 @@ def test_incident_paging_provider_can_be_inferred_for_cabot_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -2878,7 +2848,6 @@ def test_external_haloitsm_recovery_sync_populates_haloitsm_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -3007,7 +2976,6 @@ def test_incident_paging_provider_can_be_inferred_for_haloitsm_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -3082,7 +3050,6 @@ def test_external_incidentmanagerio_recovery_sync_populates_incidentmanagerio_ty
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -3211,7 +3178,6 @@ def test_incident_paging_provider_can_be_inferred_for_incidentmanagerio_workflow
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -3286,7 +3252,6 @@ def test_external_oneuptime_recovery_sync_populates_oneuptime_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -3415,7 +3380,6 @@ def test_incident_paging_provider_can_be_inferred_for_oneuptime_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -3490,7 +3454,6 @@ def test_external_squzy_recovery_sync_populates_squzy_typed_schema(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -3619,7 +3582,6 @@ def test_incident_paging_provider_can_be_inferred_for_squzy_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -3694,7 +3656,6 @@ def test_external_crisescontrol_recovery_sync_populates_crisescontrol_typed_sche
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -3823,7 +3784,6 @@ def test_incident_paging_provider_can_be_inferred_for_crisescontrol_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,

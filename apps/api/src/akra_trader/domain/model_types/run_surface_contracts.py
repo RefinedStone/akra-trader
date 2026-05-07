@@ -450,12 +450,12 @@ def default_run_surface_shared_contracts() -> tuple[RunSurfaceSharedContract, ..
       related_family_keys=("provenance_semantics",),
       member_keys=(
         "run_strategy_snapshot",
-        "reference_provenance_panels",
+        "strategy_provenance_panels",
         "benchmark_artifact_summaries",
       ),
       ui_surfaces=(
         "Run strategy snapshot",
-        "Reference provenance panels",
+        "Strategy provenance panels",
         "Benchmark artifact summaries",
       ),
       schema_sources=(
@@ -487,9 +487,9 @@ def default_run_surface_shared_contracts() -> tuple[RunSurfaceSharedContract, ..
           source_of_truth="run_provenance.strategy",
         ),
         RunSurfaceCapabilities.SurfaceRule(
-          rule_key="reference_provenance_semantic_render",
-          surface_key="reference_provenance_panels",
-          surface_label="Reference provenance panels",
+          rule_key="strategy_provenance_semantic_render",
+          surface_key="strategy_provenance_panels",
+          surface_label="Strategy provenance panels",
           enforcement_point="provenance_panel_rendering",
           enforcement_mode="semantic_source_highlighting",
           level="snapshot_required",

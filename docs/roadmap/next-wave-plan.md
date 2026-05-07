@@ -95,7 +95,7 @@ Detailed work:
 - introduce a durable custom strategy registry
 - define lifecycle transitions and promotion records for registered strategies
 - normalize common experiment query paths
-- define artifact/export posture for native and reference runs
+- define artifact/export posture for native runs
 - document benchmark-pack and promotion-review flows
 
 Acceptance criteria:

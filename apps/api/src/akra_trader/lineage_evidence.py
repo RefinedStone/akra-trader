@@ -24,6 +24,10 @@ from akra_trader.domain.models import RunRecord
 OPERATOR_LINEAGE_RETENTION_FLOORS = OperatorLineageEvidenceRetentionPolicy()
 OPERATOR_LINEAGE_DRILL_EVIDENCE_PACK_RETENTION_DAYS = 180
 
+
+def _serialize_optional_datetime(value: datetime | None) -> str | None:
+  return value.isoformat() if value is not None else None
+
 def build_operator_lineage_evidence_retention_policy(
   *,
   lineage_history_days: int | None = None,

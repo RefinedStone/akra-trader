@@ -11,11 +11,9 @@ from typing import Any
 import pytest
 
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
-from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
-from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
@@ -85,11 +83,6 @@ class FakeExchange:
     if limit is not None:
       values = values[:limit]
     return values
-
-
-def build_references():
-  repo_root = Path(__file__).resolve().parents[3]
-  return load_reference_catalog(repo_root / "reference" / "catalog.toml")
 
 
 def build_runs_repository(tmp_path: Path) -> SqlAlchemyRunRepository:
@@ -566,4 +559,3 @@ class AlwaysBuyStrategy(Strategy):
       rationale="always_buy",
       context=context,
     )
-

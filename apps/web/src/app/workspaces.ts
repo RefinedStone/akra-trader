@@ -29,7 +29,6 @@ type ControlWorkspaceDescriptorInput = {
   liveRunsCount: number;
   paperRunsCount: number;
   presetsCount: number;
-  referencesCount: number;
   sandboxRunsCount: number;
   strategiesCount: number;
   totalTrackedRunCount: number;
@@ -61,9 +60,9 @@ export function buildControlWorkspaceDescriptors(
       kicker: "전략 검증",
       label: "백테스트",
       description:
-        "주식·코인 전략의 파라미터, 프리셋, 기준 전략 비교를 한곳에서 검증합니다.",
-      summary: `백테스트 ${input.backtestsCount}개 · 프리셋 ${input.presetsCount}개 · 기준 자료 ${input.referencesCount}개`,
-      sections: ["백테스트 실행", "시나리오 프리셋", "기준 전략", "최근 결과"],
+        "주식·코인 전략의 파라미터, 프리셋, 실행 결과를 한곳에서 검증합니다.",
+      summary: `백테스트 ${input.backtestsCount}개 · 프리셋 ${input.presetsCount}개 · 전략 ${input.strategiesCount}개`,
+      sections: ["백테스트 실행", "시나리오 프리셋", "전략", "최근 결과"],
     },
     {
       id: "markets",

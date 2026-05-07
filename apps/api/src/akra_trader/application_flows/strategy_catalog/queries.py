@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from akra_trader.domain.models import ExperimentPreset
-from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import StrategyMetadata
 
 from .support import _normalize_experiment_filter_value
@@ -23,10 +22,6 @@ def list_strategies(
     lifecycle_stage=lifecycle_stage,
     version=version,
   )
-
-
-def list_references(flow: Any) -> list[ReferenceSource]:
-  return flow.references.list_entries()
 
 
 def list_presets(

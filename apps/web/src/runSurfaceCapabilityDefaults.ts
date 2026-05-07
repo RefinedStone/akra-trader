@@ -227,7 +227,7 @@ export const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["d
       related_family_keys: ["provenance_semantics"],
       member_keys: [
         "run_strategy_snapshot",
-        "reference_provenance_panels",
+        "strategy_provenance_panels",
         "benchmark_artifact_summaries",
       ],
     },
@@ -625,9 +625,9 @@ export const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilityFamily
         source_of_truth: "run_provenance.strategy",
       },
       {
-        rule_key: "reference_provenance_semantic_render",
-        surface_key: "reference_provenance_panels",
-        surface_label: "Reference provenance panels",
+        rule_key: "strategy_provenance_semantic_render",
+        surface_key: "strategy_provenance_panels",
+        surface_label: "Strategy provenance panels",
         enforcement_point: "provenance_panel_rendering",
         enforcement_mode: "semantic_source_highlighting",
         level: "snapshot_required",

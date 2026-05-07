@@ -15,7 +15,7 @@ As of April 17, 2026, the repository already has durable run storage and a Binan
 The current platform still relies on in-memory run storage and seeded market data for the native demo
 flow. That is sufficient for proving architecture, but it is insufficient for research credibility.
 
-Backtests, sandbox runs, reference-runtime runs, and future live sessions must all be explainable after
+Backtests, sandbox runs, and future live sessions must all be explainable after
 the fact.
 
 ## Decision
@@ -30,7 +30,7 @@ At run creation time, the platform must persist:
 - venue, symbol set, timeframe, and execution mode
 - dataset lineage or candle source metadata
 - fee and slippage settings
-- execution provenance such as reference id, external command, and artifact paths when applicable
+- execution provenance such as runtime state, data lineage, and artifact paths when applicable
 - resulting metrics and operator notes
 
 Run storage will move behind a persistent repository adapter, with Postgres as the default implementation target.
@@ -54,5 +54,5 @@ Negative:
 - reproducibility metadata is captured on creation, not inferred later
 - any future result export feature should point back to one canonical stored run record
 - sandbox and live runs should use the same persistence model with different execution-mode flags
-- native and reference lanes should share one run record model with provenance extensions instead of
-  separate storage shapes
+- native runs should share one run record model with provenance extensions instead of separate
+  storage shapes

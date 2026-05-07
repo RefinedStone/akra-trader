@@ -131,3 +131,19 @@ class SqlAlchemyRunRepositoryMaintenanceMixin:
       self._provider_provenance_scheduler_narrative_governance_plan_adapter.validate_python(row["payload"])
       for row in rows
     )
+
+  def get_provider_provenance_scheduler_stitched_report_governance_plan(
+    self,
+    plan_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_stitched_report_governance_plans.c.payload).where(
+          provider_provenance_scheduler_stitched_report_governance_plans.c.plan_id == plan_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_narrative_governance_plan_adapter.validate_python(
+      row["payload"]
+    )

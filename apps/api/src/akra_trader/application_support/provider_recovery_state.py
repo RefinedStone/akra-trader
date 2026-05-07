@@ -215,6 +215,9 @@ def _build_provider_recovery_state(
     existing.reference,
     remediation.reference,
   )
+  normalized_provider = self._normalize_paging_provider(
+    provider or existing.provider or remediation.provider or ""
+  )
   (
     provider_schema_kind,
     pagerduty_schema,

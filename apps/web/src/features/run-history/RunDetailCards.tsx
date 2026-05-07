@@ -1,5 +1,4 @@
 export {
-  ReferenceRunProvenanceSummary,
   RunMarketDataLineage,
   RunOrderActionControls,
   RunOrderLifecycleSummary,

@@ -26,7 +26,6 @@ __all__ = [
   "Instrument",
   "Candle",
   "WarmupSpec",
-  "ReferenceSource",
   "SignalDecision",
   "ExecutionPlan",
   "StrategyExecutionState",
@@ -122,19 +121,6 @@ class Candle:
 class WarmupSpec:
   required_bars: int
   timeframes: tuple[str, ...] = ("5m",)
-
-
-@dataclass(frozen=True)
-class ReferenceSource:
-  reference_id: str
-  title: str
-  kind: str
-  homepage: str
-  license: str
-  integration_mode: str
-  local_path: str | None = None
-  runtime: str | None = None
-  summary: str = ""
 
 
 @dataclass(frozen=True)
@@ -309,12 +295,6 @@ def _default_run_experiment_metadata() -> RunExperimentMetadata:
 @dataclass
 class RunProvenance:
   lane: str = "native"
-  reference_id: str | None = None
-  reference_version: str | None = None
-  integration_mode: str | None = None
-  reference: ReferenceSource | None = None
-  working_directory: str | None = None
-  external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
   benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()
   strategy: StrategySnapshot | None = None

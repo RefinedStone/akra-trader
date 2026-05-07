@@ -14,12 +14,12 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   api:
-    image: akra-trader-api:freqtrade-reference-2024.5
+    image: python:3.12-slim
     build:
-      context: ./reference/NostalgiaForInfinity
-      dockerfile: docker/Dockerfile.custom
-      args:
-        sourcetag: "2024.5"
+      context: .
+      dockerfile_inline: |
+        FROM python:3.12-slim
+        RUN python -m pip install --no-cache-dir --upgrade pip
     entrypoint: []
     working_dir: /workspace/apps/api
     environment:

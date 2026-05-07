@@ -19,6 +19,9 @@ from uuid import uuid4
 from akra_trader.application_support.provider_governance_catalog_plan_workflows import (
   apply_provider_provenance_scheduler_search_moderation_catalog_governance_plan as apply_provider_provenance_scheduler_search_moderation_catalog_governance_plan_support,
 )
+from akra_trader.application_flows.provider_provenance.scheduler_narrative_governance_normalization_mixin import (
+  ProviderProvenanceSchedulerNarrativeGovernanceNormalizationMixin,
+)
 from akra_trader.application_support.provider_governance_catalog_plan_workflows import (
   approve_provider_provenance_scheduler_search_moderation_catalog_governance_plan as approve_provider_provenance_scheduler_search_moderation_catalog_governance_plan_support,
 )
@@ -308,7 +311,7 @@ class ProviderProvenanceCompatibilityWorkspacesMixin:
       "show_recent_exports": bool(layout.get("show_recent_exports", True)),
     }
     normalized_governance_queue_view = (
-      ProviderProvenanceCompatibilityMixin._normalize_provider_provenance_scheduler_narrative_governance_queue_view_payload(
+      ProviderProvenanceSchedulerNarrativeGovernanceNormalizationMixin._normalize_provider_provenance_scheduler_narrative_governance_queue_view_payload(
         layout.get("governance_queue_view")
       )
     )

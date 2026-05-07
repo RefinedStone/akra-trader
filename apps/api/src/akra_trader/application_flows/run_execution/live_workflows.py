@@ -109,22 +109,6 @@ def start_live_session(
     start_at=start_at,
     end_at=end_at,
   )
-  if metadata.runtime == "freqtrade_reference":
-    run = RunRecord(
-      config=config,
-      status=RunStatus.FAILED,
-      provenance=RunProvenance(
-        lane="reference",
-        strategy=strategy_snapshot,
-        experiment=experiment_metadata,
-      ),
-    )
-    run.notes.append(
-      "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
-      "Guarded live remains on the native venue-backed worker path."
-    )
-    return app._runs.save_run(run)
-
   loaded = app._data_engine.load_frame(config=config, active_bars=replay_bars)
   run = app._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
   run.provenance.experiment = experiment_metadata

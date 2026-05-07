@@ -1,6 +1,35 @@
 from __future__ import annotations
 
 from akra_trader.adapters.venue_execution_common import *
+from akra_trader.adapters.venue_execution_common import _build_coinbase_websocket_jwt
+from akra_trader.adapters.venue_execution_common import _coerce_datetime
+from akra_trader.adapters.venue_execution_common import _coerce_float
+from akra_trader.adapters.venue_execution_common import _coerce_int
+from akra_trader.adapters.venue_execution_common import _coerce_ohlcv_close_timestamp
+from akra_trader.adapters.venue_execution_common import _coerce_ohlcv_timestamp
+from akra_trader.adapters.venue_execution_common import _coerce_string
+from akra_trader.adapters.venue_execution_common import _drain_stream_event_queue
+from akra_trader.adapters.venue_execution_common import _max_datetime
+from akra_trader.adapters.venue_execution_common import _normalize_coinbase_product_id
+from akra_trader.adapters.venue_execution_common import _sanitize_coinbase_zero_time
+
+
+def _coinbase_websocket_jwt(
+  *,
+  api_key: str,
+  signing_key: str,
+  current_time: datetime,
+) -> str:
+  try:
+    from akra_trader.adapters import venue_execution
+  except Exception:
+    return _build_coinbase_websocket_jwt(
+      api_key=api_key,
+      signing_key=signing_key,
+      current_time=current_time,
+    )
+  builder = getattr(venue_execution, "_build_coinbase_websocket_jwt", _build_coinbase_websocket_jwt)
+  return builder(api_key=api_key, signing_key=signing_key, current_time=current_time)
 
 class CoinbaseAdvancedTradeWebSocketMarketStreamSession:
   transport = "coinbase_advanced_trade_market_websocket"
@@ -427,7 +456,7 @@ class CoinbaseAdvancedTradeUserStreamSession:
     heartbeat_message = {
       "type": "subscribe",
       "channel": "heartbeats",
-      "jwt": _build_coinbase_websocket_jwt(
+      "jwt": _coinbase_websocket_jwt(
         api_key=self._api_key,
         signing_key=self._signing_key,
         current_time=self._clock(),
@@ -436,7 +465,7 @@ class CoinbaseAdvancedTradeUserStreamSession:
     user_message: dict[str, Any] = {
       "type": "subscribe",
       "channel": "user",
-      "jwt": _build_coinbase_websocket_jwt(
+      "jwt": _coinbase_websocket_jwt(
         api_key=self._api_key,
         signing_key=self._signing_key,
         current_time=self._clock(),

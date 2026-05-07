@@ -49,7 +49,7 @@
 
 릴리즈 게이트:
 
-- native와 reference 전략을 공통 기준으로 비교할 수 있다
+- native 전략을 공통 기준으로 비교할 수 있다
 - 승격 판단에 필요한 artifact가 누락되지 않는다
 - 전략 버전과 scenario가 durable하게 남는다
 

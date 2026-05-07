@@ -13,7 +13,7 @@ Updated for the repository state as of April 21, 2026.
 The project is no longer only a backtest playground. It already includes:
 
 - durable native backtests with dataset lineage and rerun boundaries
-- native vs reference benchmark comparison with stored provenance
+- native benchmark comparison with stored provenance
 - experiment presets, richer query/filter surfaces, and replay-link audit utilities
 - supervised sandbox worker sessions with heartbeat and restart recovery
 - guarded-live kill switch, reconciliation, recovery, and venue-backed launch gates
@@ -83,14 +83,6 @@ npm run typecheck
 - [docs/architecture.md](docs/architecture.md): architectural shape and boundary rules
 - [docs/blueprint/README.md](docs/blueprint/README.md): longer-horizon blueprint and gate documents
 
-## Reference Lanes
+## Application Code
 
-Third-party materials are tracked in `reference/catalog.toml`.
-
-- `nostalgia-for-infinity`: external-runtime benchmark lane
-- `nautilus-trader`: architecture reference
-- `ccxt`: adapter dependency candidate already used in market-data and venue-facing layers
-- `yfinance`: future direct dependency candidate
-
-Freqtrade-backed reference backtests are available through the NFI catalog entries. Sandbox and
-guarded-live execution remain native-only today.
+Native strategy and runtime code lives in the application packages under `apps/`.

@@ -137,7 +137,7 @@ export function useControlRoomComparisonHistoryState({ model }: { model: any }):
     providerProvenanceSchedulerNarrativeGovernancePolicySupportsItemType, providerProvenanceSchedulerStitchedReportGovernanceRegistryPolicyCatalogSearch, providerProvenanceSchedulerStitchedReportGovernancePolicyCatalogEntries, providerProvenanceSchedulerStitchedReportGovernanceRegistrySearch, providerProvenanceSchedulerStitchedReportGovernanceRegistries, formatProviderProvenanceSchedulerNarrativeGovernanceQueueViewSummary,
     selectedProviderProvenanceSchedulerExportHistory, providerProvenanceSchedulerExports, selectedProviderProvenanceSchedulerExportJobId, normalizeControlRoomComparisonSelection, buildComparisonHistoryStepDescriptor, backtests,
     buildComparisonHistorySyncSignature, buildComparisonHistorySyncWorkspaceState, setStatusText, fetchJson, buildRunsPath, backtestRunFilter,
-    sandboxRunFilter, paperRunFilter, liveRunFilter, setRunSurfaceCapabilities, setStrategies, setReferences,
+    sandboxRunFilter, paperRunFilter, liveRunFilter, setRunSurfaceCapabilities, setStrategies,
     setPresets, setBacktests, setSandboxRuns, setPaperRuns, setLiveRuns, setMarketStatus,
     resolveAutoLinkedMarketInstrument, resolvePreferredMarketDataInstrument, activeMarketInstrumentKey, setActiveMarketInstrumentKey, buildMarketDataInstrumentFocusKey, setOperatorVisibility,
     setGuardedLive, loadMarketDataWorkflow, strategies, setBacktestForm, setSandboxForm, setLiveForm,
@@ -171,7 +171,6 @@ export function useControlRoomComparisonHistoryState({ model }: { model: any }):
     currentModel.setStatusText?.("데이터 동기화 중...");
     const [
       strategyPayload,
-      referencePayload,
       presetPayload,
       backtestPayload,
       sandboxPayload,
@@ -182,7 +181,6 @@ export function useControlRoomComparisonHistoryState({ model }: { model: any }):
       guardedLivePayload,
     ] = await Promise.all([
       safeFetchJson("/strategies", []),
-      safeFetchJson("/references", []),
       safeFetchJson("/presets", []),
       safeFetchJson(currentModel.buildRunsPath?.("backtest", currentModel.backtestRunFilter) ?? "/runs?mode=backtest", []),
       safeFetchJson(currentModel.buildRunsPath?.("sandbox", currentModel.sandboxRunFilter) ?? "/runs?mode=sandbox", []),
@@ -194,7 +192,6 @@ export function useControlRoomComparisonHistoryState({ model }: { model: any }):
     ]);
 
     currentModel.setStrategies?.(Array.isArray(strategyPayload) ? strategyPayload : []);
-    currentModel.setReferences?.(Array.isArray(referencePayload) ? referencePayload : []);
     currentModel.setPresets?.(Array.isArray(presetPayload) ? presetPayload : []);
     currentModel.setBacktests?.(Array.isArray(backtestPayload) ? backtestPayload : []);
     currentModel.setSandboxRuns?.(Array.isArray(sandboxPayload) ? sandboxPayload : []);

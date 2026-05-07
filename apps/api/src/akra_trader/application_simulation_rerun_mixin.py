@@ -334,8 +334,6 @@ class TradingApplicationSimulationRerunMixin:
       ),
       supported_timeframes=metadata.supported_timeframes,
       warmup=strategy.warmup_spec(),
-      reference_id=metadata.reference_id,
-      reference_path=metadata.reference_path,
       entrypoint=metadata.entrypoint,
     )
   @staticmethod

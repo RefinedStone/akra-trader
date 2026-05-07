@@ -142,9 +142,6 @@ def _build_provider_recovery_state_secondary_group_one(
   reference: str | None,
 ) -> tuple[Any, ...]:
   betterstack_schema = existing.betterstack
-  normalized_provider = self._normalize_paging_provider(
-    provider or existing.provider or remediation.provider or ""
-  )
   betterstack_payload = self._merge_payload_mappings(
     self._extract_payload_mapping(payload.get("provider_schema")).get("betterstack"),
     self._extract_payload_mapping(payload.get("provider_schema")).get("better_stack"),

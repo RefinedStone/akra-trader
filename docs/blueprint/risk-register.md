@@ -68,13 +68,13 @@
 - 대응: control room 집중, structured metadata, stop rules, runbooks
 - 종료 조건: daily workflow가 shell과 ad hoc note 없이 가능
 
-## Risk 9: reference lane 의존 왜곡
+## Risk 9: 외부 전략 의존 왜곡
 
-- 설명: NFI reference를 benchmark가 아니라 사실상 주 실행 경로처럼 다루게 될 수 있다
-- 트리거: reference-specific behavior가 native contract를 잠식
+- 설명: 외부 전략을 사실상 주 실행 경로처럼 다루게 될 수 있다
+- 트리거: 외부 전략 behavior가 native contract를 잠식
 - 영향: 아키텍처 일관성 붕괴
-- 대응: reference lane은 benchmark/external runtime lane으로 고정
-- 종료 조건: native contract와 reference lane의 경계 유지
+- 대응: 외부 전략은 제품 런타임에 직접 포함하지 않고 별도 검토로 제한
+- 종료 조건: native contract 경계 유지
 
 ## Risk 10: 문서와 구현의 재분리
 

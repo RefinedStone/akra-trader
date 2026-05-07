@@ -19,7 +19,6 @@ describe("workspace route smoke tests", () => {
       <ResearchWorkspaceRoute
         launchPanel={<div>research-launch</div>}
         presetPanel={<div>research-preset</div>}
-        referencePanel={<div>research-reference</div>}
         runsPanel={<div>research-runs</div>}
       />,
     );

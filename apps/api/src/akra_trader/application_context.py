@@ -255,7 +255,6 @@ from akra_trader.domain.models import OperatorIncidentProviderRecoveryVerificati
 from akra_trader.domain.models import OperatorIncidentRemediation
 from akra_trader.domain.models import OperatorVisibility
 from akra_trader.domain.models import Position
-from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunExperimentMetadata
 from akra_trader.domain.models import RunMode
@@ -269,7 +268,6 @@ from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import StrategyParameterSnapshot
 from akra_trader.domain.models import StrategyRegistration
 from akra_trader.domain.models import StrategySnapshot
-from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.application_support import COMPARISON_INTENT_COPY
 from akra_trader.application_support import COMPARISON_INTENT_DEFAULT
 from akra_trader.application_support import COMPARISON_INTENT_WEIGHTS
@@ -542,7 +540,6 @@ from akra_trader.ports import ExperimentPresetCatalogPort
 from akra_trader.ports import MarketDataPort
 from akra_trader.ports import OperatorAlertDeliveryPort
 from akra_trader.ports import ProviderProvenanceSchedulerSearchBackendPort
-from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
 from akra_trader.ports import StrategyRuntime

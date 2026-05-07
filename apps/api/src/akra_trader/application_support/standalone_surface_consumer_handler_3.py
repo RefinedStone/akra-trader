@@ -460,9 +460,6 @@ def handle_standalone_surface_binding_part_3(
       )
     ]
 
-  if binding.binding_kind == "reference_catalog_discovery":
-    return [asdict(reference) for reference in app.list_references()]
-
   if binding.binding_kind == "preset_catalog_discovery":
     return [
       serialize_preset(preset)

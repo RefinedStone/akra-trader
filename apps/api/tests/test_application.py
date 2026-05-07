@@ -11,11 +11,9 @@ from typing import Any
 import pytest
 
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
-from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
-from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
@@ -76,7 +74,6 @@ from .application_test_support import StaticVenueStateAdapter
 from .application_test_support import StatusOverrideSeededMarketDataAdapter
 from .application_test_support import build_guarded_live_repository
 from .application_test_support import build_preset_catalog
-from .application_test_support import build_references
 from .application_test_support import build_runs_repository
 from .application_test_support import without_surface_rule
 
@@ -86,7 +83,6 @@ def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -139,7 +135,6 @@ def test_backtest_dataset_identity_is_stable_for_matching_data_boundaries(tmp_pa
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -187,7 +182,6 @@ def test_backtest_rerun_boundary_is_stable_only_for_matching_execution_inputs(tm
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -253,7 +247,6 @@ def test_backtest_provenance_links_directly_to_binance_sync_checkpoint(tmp_path:
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=build_runs_repository(tmp_path),
   )
 
@@ -281,7 +274,6 @@ def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
   )
@@ -326,7 +318,6 @@ def test_paper_run_is_created_as_running_with_separate_mode(tmp_path: Path) -> N
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -362,7 +353,6 @@ def test_stop_sandbox_run_persists_terminal_state(tmp_path: Path) -> None:
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -402,7 +392,6 @@ def test_sandbox_worker_heartbeat_updates_runtime_session_state(tmp_path: Path) 
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
   )
@@ -438,7 +427,6 @@ def test_sandbox_worker_recovery_marks_restart_and_timeout_history(tmp_path: Pat
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     sandbox_worker_heartbeat_interval_seconds=5,
@@ -483,7 +471,6 @@ def test_sandbox_worker_processes_new_candles_continuously(tmp_path: Path) -> No
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
   )
@@ -539,7 +526,6 @@ def test_sandbox_worker_does_not_reprocess_same_latest_candle(tmp_path: Path) ->
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
   )
@@ -587,7 +573,6 @@ def test_operator_visibility_flags_stale_sandbox_worker_runtime(tmp_path: Path) 
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     sandbox_worker_heartbeat_interval_seconds=5,
@@ -627,7 +612,6 @@ def test_operator_visibility_surfaces_provider_provenance_scheduler_lag(tmp_path
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -732,7 +716,6 @@ def test_provider_provenance_scheduler_lag_auto_runs_export_workflow_once(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -793,7 +776,6 @@ def test_operator_visibility_surfaces_worker_failure_and_operator_stop_audit(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
   )
@@ -842,7 +824,6 @@ def test_operator_visibility_surfaces_provider_provenance_scheduler_failure(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -941,7 +922,6 @@ def test_provider_provenance_scheduler_failure_auto_runs_export_workflow(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -986,7 +966,6 @@ def test_resolved_scheduler_alert_row_reconstructs_historical_export(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -1091,7 +1070,6 @@ def test_resolved_scheduler_alert_row_can_export_mixed_status_post_resolution_na
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -1185,7 +1163,6 @@ def test_scheduler_alert_history_can_export_stitched_multi_occurrence_report(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -1274,7 +1251,6 @@ def test_scheduler_alert_history_tracks_multiple_resolved_occurrences_per_catego
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -1330,7 +1306,6 @@ def test_provider_provenance_scheduler_alert_history_page_paginates_occurrences(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -1411,7 +1386,6 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -1595,7 +1569,6 @@ def test_provider_provenance_scheduler_search_moderation_policy_catalog_and_plan
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -1767,7 +1740,6 @@ def test_provider_provenance_scheduler_search_moderation_catalog_governance_flow
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -2015,7 +1987,6 @@ def test_provider_provenance_scheduler_history_and_analytics_persist(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     presets=presets,
     clock=clock,
@@ -2112,7 +2083,6 @@ def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -2192,7 +2162,6 @@ def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
   restarted = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
@@ -2228,7 +2197,6 @@ def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_h
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     operator_alert_delivery=delivery,
@@ -2314,7 +2282,6 @@ def test_operator_visibility_persists_risk_breach_and_live_fault_incidents(
   app = TradingApplication(
     market_data=MutableSeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     operator_alert_delivery=delivery,
@@ -2399,7 +2366,6 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     operator_alert_delivery=delivery,
@@ -2597,7 +2563,6 @@ def test_multi_symbol_market_data_alerts_embed_primary_focus_metadata(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     operator_alert_delivery=FakeOperatorAlertDeliveryAdapter(),
@@ -2731,7 +2696,6 @@ def test_market_data_incidents_request_remediation_and_provider_workflow(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     operator_alert_delivery=delivery,
@@ -2901,7 +2865,6 @@ def test_market_data_incidents_auto_remediate_on_incident_open(
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -3013,7 +2976,6 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -3236,7 +3198,6 @@ def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_inc
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -3464,7 +3425,6 @@ def test_guarded_live_kill_switch_stops_operator_control_sessions_and_blocks_res
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -3528,7 +3488,6 @@ def test_guarded_live_reconciliation_records_runtime_findings(tmp_path: Path) ->
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     sandbox_worker_heartbeat_interval_seconds=5,
@@ -3590,7 +3549,6 @@ def test_guarded_live_reconciliation_verifies_venue_state_against_internal_expos
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     venue_state=StaticVenueStateAdapter(venue_snapshot),
@@ -3665,7 +3623,6 @@ def test_guarded_live_runtime_recovery_uses_last_verified_venue_snapshot_after_f
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     venue_state=StaticVenueStateAdapter(verified_snapshot),
@@ -3715,7 +3672,6 @@ def test_guarded_live_launch_requires_clear_reconciliation_and_recovery(tmp_path
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     venue_state=venue_state,
     venue_execution=SeededVenueExecutionAdapter(),
@@ -3783,7 +3739,6 @@ def test_guarded_live_reconciliation_and_launch_use_configured_supported_venue(t
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     venue_state=venue_state,
@@ -3827,7 +3782,6 @@ def test_guarded_live_worker_submits_venue_order_on_new_candle(tmp_path: Path) -
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(builtins=(AlwaysBuyStrategy,)),
-    references=build_references(),
     runs=runs,
     clock=clock,
     venue_state=StaticVenueStateAdapter(
@@ -3904,7 +3858,6 @@ def test_guarded_live_worker_syncs_recovered_order_lifecycle_into_local_state(tm
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     venue_state=StaticVenueStateAdapter(
@@ -4001,7 +3954,6 @@ def test_cancel_live_order_marks_recovered_order_canceled(tmp_path: Path) -> Non
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     venue_state=StaticVenueStateAdapter(
@@ -4065,7 +4017,6 @@ def test_replace_live_order_cancels_old_order_and_appends_limit_replacement(tmp_
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
     venue_state=StaticVenueStateAdapter(
@@ -4157,7 +4108,6 @@ def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp
   first_app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -4212,7 +4162,6 @@ def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp
   resumed_app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     guarded_live_state=guarded_live_state,
     clock=clock,
@@ -4282,7 +4231,6 @@ def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -4316,7 +4264,6 @@ def test_run_subresource_serializer_registry_rejects_unknown_key(tmp_path: Path)
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
   run = app.run_backtest(
@@ -4507,7 +4454,6 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     presets=build_preset_catalog(tmp_path),
     runs=build_runs_repository(tmp_path),
   )
@@ -4650,7 +4596,6 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_health_export",
     "guarded_live_status",
     "strategy_catalog_discovery",
-    "reference_catalog_discovery",
     "preset_catalog_discovery",
     "preset_catalog_create",
     "preset_catalog_item_get",
@@ -5052,7 +4997,6 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   )
   assert bindings_by_key["strategy_catalog_discovery"].sort_field_specs[0].key == "strategy_id"
   assert bindings_by_key["strategy_catalog_discovery"].sort_field_specs[-1].key == "lifecycle.registered_at"
-  assert bindings_by_key["reference_catalog_discovery"].route_path == "/references"
   assert bindings_by_key["preset_catalog_discovery"].route_path == "/presets"
   assert bindings_by_key["preset_catalog_discovery"].filter_param_specs[1].key == "timeframe"
   assert bindings_by_key["preset_catalog_discovery"].filter_param_specs[-1].key == "updated_at"
@@ -5301,10 +5245,6 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     app=app,
     filters={"lane": "native"},
   )
-  reference_payload = serialize_standalone_surface_response(
-    binding=bindings_by_key["reference_catalog_discovery"],
-    app=app,
-  )
   preset_payload = serialize_standalone_surface_response(
     binding=bindings_by_key["preset_catalog_discovery"],
     app=app,
@@ -5353,8 +5293,6 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert "orders" in orders_payload
   assert strategy_payload
   assert all(item["runtime"] == "native" for item in strategy_payload)
-  assert reference_payload
-  assert any(item["reference_id"] == "nautilus-trader" for item in reference_payload)
   assert sorted(item["preset_id"] for item in preset_payload) == ["core_5m", "swing_1h"]
   assert kill_switch_payload["kill_switch"]["state"] == "engaged"
   assert released_payload["kill_switch"]["state"] == "released"

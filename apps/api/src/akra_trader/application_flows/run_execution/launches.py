@@ -86,23 +86,6 @@ def run_backtest(
     start_at=start_at,
     end_at=end_at,
   )
-  if metadata.runtime == "freqtrade_reference":
-    run = RunRecord(
-      config=config,
-      status=RunStatus.PENDING,
-      provenance=RunProvenance(
-        lane="reference",
-        strategy=strategy_snapshot,
-        experiment=experiment_metadata,
-      ),
-    )
-    if app._freqtrade_reference is None:
-      run.status = RunStatus.FAILED
-      run.notes.append("Freqtrade reference adapter is not configured.")
-    else:
-      run = app._freqtrade_reference.execute_backtest(run, metadata)
-    app._attach_rerun_boundary(run)
-    return app._runs.save_run(run)
   run = app._simulate_run(
     config=config,
     strategy=strategy,
@@ -309,22 +292,6 @@ def start_native_session(
     end_at=end_at,
   )
   app._ensure_operator_control_runtime_allowed(target_mode)
-  if metadata.runtime == "freqtrade_reference":
-    run = RunRecord(
-      config=config,
-      status=RunStatus.FAILED,
-      provenance=RunProvenance(
-        lane="reference",
-        strategy=strategy_snapshot,
-        experiment=experiment_metadata,
-      ),
-    )
-    run.notes.append(
-      "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
-      + reference_failure_copy
-    )
-    return app._runs.save_run(run)
-
   loaded = app._data_engine.load_frame(config=config, active_bars=replay_bars)
   run = app._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
   run.provenance.experiment = experiment_metadata

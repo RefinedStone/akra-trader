@@ -58,8 +58,6 @@ class StrategyMetadata:
   lifecycle: StrategyLifecycle = field(default_factory=StrategyLifecycle)
   catalog_semantics: StrategyCatalogSemantics = field(default_factory=StrategyCatalogSemantics)
   version_lineage: tuple[str, ...] = ()
-  reference_id: str | None = None
-  reference_path: str | None = None
   entrypoint: str | None = None
 
 
@@ -82,8 +80,6 @@ class StrategySnapshot:
   parameter_snapshot: StrategyParameterSnapshot = field(default_factory=StrategyParameterSnapshot)
   supported_timeframes: tuple[str, ...] = ()
   warmup: WarmupSpec = field(default_factory=_default_warmup_spec)
-  reference_id: str | None = None
-  reference_path: str | None = None
   entrypoint: str | None = None
 
 

@@ -244,10 +244,6 @@ def build_rerun_boundary_identity(
   effective_start_at: datetime | None,
   effective_end_at: datetime | None,
   candle_count: int,
-  reference_id: str | None = None,
-  reference_version: str | None = None,
-  integration_mode: str | None = None,
-  external_command: tuple[str, ...] = (),
 ) -> str:
   payload = {
     "schema_version": 1,
@@ -276,12 +272,6 @@ def build_rerun_boundary_identity(
       "effective_start_at": _serialize_optional_datetime(effective_start_at),
       "effective_end_at": _serialize_optional_datetime(effective_end_at),
       "candle_count": candle_count,
-    },
-    "reference": {
-      "reference_id": reference_id,
-      "reference_version": reference_version,
-      "integration_mode": integration_mode,
-      "external_command": list(external_command),
     },
   }
   return f"rerun-v1:{_build_digest(payload)}"
@@ -484,10 +474,6 @@ def _execution_contract_matches(source_run: RunRecord, rerun: RunRecord) -> bool
     and source_run.config.fee_rate == rerun.config.fee_rate
     and source_run.config.slippage_bps == rerun.config.slippage_bps
     and _resolved_parameters(source_run) == _resolved_parameters(rerun)
-    and source_run.provenance.reference_id == rerun.provenance.reference_id
-    and source_run.provenance.reference_version == rerun.provenance.reference_version
-    and source_run.provenance.integration_mode == rerun.provenance.integration_mode
-    and source_run.provenance.external_command == rerun.provenance.external_command
   )
 
 

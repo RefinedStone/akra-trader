@@ -75,7 +75,7 @@ def _build_run_surface_enforcement(capabilities: RunSurfaceCapabilities) -> dict
     ("comparison_eligibility", "boundary_note_panels"),
     ("comparison_eligibility", "order_workflow_gates"),
     ("provenance_semantics", "run_strategy_snapshot"),
-    ("provenance_semantics", "reference_provenance_panels"),
+    ("provenance_semantics", "strategy_provenance_panels"),
     ("provenance_semantics", "benchmark_artifact_summaries"),
     ("execution_controls", "rerun_and_stop_controls"),
     ("execution_controls", "compare_selection_workflow"),
@@ -258,7 +258,6 @@ def serialize_run(run: RunRecord, *, capabilities: RunSurfaceCapabilities | None
   payload = asdict(run)
   payload["config"]["mode"] = run.config.mode.value
   payload["status"] = run.status.value
-  payload["provenance"]["external_command"] = list(run.provenance.external_command)
   payload["provenance"]["artifact_paths"] = list(run.provenance.artifact_paths)
   payload["provenance"]["experiment"]["tags"] = list(run.provenance.experiment.tags)
   payload["provenance"]["benchmark_artifacts"] = [

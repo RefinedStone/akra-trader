@@ -24,15 +24,6 @@ from akra_trader.application_support.standalone_surface_catalog_replay_links imp
 
 
 def build_standalone_surface_runtime_bindings_part_5() -> tuple[StandaloneSurfaceRuntimeBinding, ...]:
-  reference_discovery_binding = StandaloneSurfaceRuntimeBinding(
-    surface_key="reference_catalog_discovery",
-    route_path="/references",
-    route_name="list_references",
-    response_title="Reference catalog discovery",
-    scope="app",
-    binding_kind="reference_catalog_discovery",
-  )
-
   preset_discovery_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="preset_catalog_discovery",
     route_path="/presets",
@@ -245,7 +236,6 @@ def build_standalone_surface_runtime_bindings_part_5() -> tuple[StandaloneSurfac
   )
 
   return (
-    reference_discovery_binding,
     preset_discovery_binding,
     preset_create_binding,
     preset_item_get_binding,

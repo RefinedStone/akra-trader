@@ -10,7 +10,6 @@ from akra_trader.domain.models import ExperimentPreset
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.ports import ExperimentPresetCatalogPort
-from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import StrategyCatalogPort
 
 from . import commands
@@ -20,7 +19,6 @@ from . import queries
 @dataclass
 class StrategyCatalogFlow:
   strategies: StrategyCatalogPort
-  references: ReferenceCatalogPort
   presets: ExperimentPresetCatalogPort
   clock: Callable[[], datetime]
 
@@ -37,9 +35,6 @@ class StrategyCatalogFlow:
       lifecycle_stage=lifecycle_stage,
       version=version,
     )
-
-  def list_references(self):
-    return queries.list_references(self)
 
   def register_strategy(self, *, strategy_id: str, module_path: str, class_name: str) -> StrategyMetadata:
     return commands.register_strategy(

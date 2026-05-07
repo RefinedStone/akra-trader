@@ -11,11 +11,9 @@ from typing import Any
 import pytest
 
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
-from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
-from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
@@ -75,7 +73,6 @@ from .application_test_support import MutableSeededMarketDataAdapter
 from .application_test_support import StaticVenueStateAdapter
 from .application_test_support import StatusOverrideSeededMarketDataAdapter
 from .application_test_support import build_preset_catalog
-from .application_test_support import build_references
 from .application_test_support import build_runs_repository
 from .application_test_support import without_surface_rule
 
@@ -84,7 +81,6 @@ def test_replay_link_alias_bindings_create_resolve_and_revoke(tmp_path: Path) ->
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     presets=build_preset_catalog(tmp_path),
     runs=build_runs_repository(tmp_path),
   )
@@ -165,7 +161,6 @@ def test_replay_link_alias_records_survive_application_restart(tmp_path: Path) -
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -183,7 +178,6 @@ def test_replay_link_alias_records_survive_application_restart(tmp_path: Path) -
   restarted = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -199,7 +193,6 @@ def test_replay_link_alias_records_survive_application_restart(tmp_path: Path) -
   second_restart = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
   )
 
@@ -216,7 +209,6 @@ def test_replay_link_alias_history_retention_prunes_expired_audit_records(tmp_pa
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
   )
@@ -239,7 +231,6 @@ def test_replay_link_alias_history_retention_prunes_expired_audit_records(tmp_pa
   restarted = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=runs,
     clock=clock,
   )
@@ -250,7 +241,6 @@ def test_replay_link_alias_audit_admin_listing_and_pruning(tmp_path: Path) -> No
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     presets=build_preset_catalog(tmp_path),
     runs=build_runs_repository(tmp_path),
     replay_alias_audit_admin_read_token="read-token",
@@ -402,7 +392,6 @@ def test_replay_link_alias_audit_admin_binding_enforces_scoped_tokens(tmp_path: 
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=build_runs_repository(tmp_path),
     replay_alias_audit_admin_read_token="read-token",
     replay_alias_audit_admin_write_token="write-token",
@@ -504,7 +493,6 @@ def test_operator_provider_provenance_export_job_bindings_round_trip(tmp_path: P
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=build_runs_repository(tmp_path),
     clock=clock,
   )
@@ -679,7 +667,6 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
-    references=build_references(),
     runs=build_runs_repository(tmp_path),
     clock=clock,
     operator_alert_delivery=delivery,

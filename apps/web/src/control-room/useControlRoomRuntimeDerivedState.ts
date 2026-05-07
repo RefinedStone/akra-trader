@@ -12,13 +12,12 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
     formatLinkedMarketPrimaryFocusNote, formatWorkflowToken, formatTimestamp, summarizeProviderRecoveryMarketContextProvenance, marketDataLineageHistory, formatRange,
     marketDataIngestionJobs, getOperatorSeverityRank, setMarketDataProvenanceExportFilter, ALL_FILTER_VALUE, marketDataProvenanceExportFilter, formatMarketDataProvenanceExportFilterSummary,
     resolveMarketDataSymbol, serializeLinkedMarketInstrumentContext, backtests, formatCompletion, buildControlWorkspaceDescriptors, presets,
-    references, activeWorkspace,
+    activeWorkspace,
   } = model;
 
   const strategyGroups = useMemo(() => {
     return {
       native: strategies.filter((strategy) => strategy.runtime === "native"),
-      reference: strategies.filter((strategy) => strategy.runtime === "freqtrade_reference"),
       future: strategies.filter((strategy) => strategy.runtime === "decision_engine"),
     };
   }, [strategies]);
@@ -923,7 +922,7 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       {
         label: "Strategy Catalog",
         value: `${strategies.length}`,
-        detail: `native ${strategyGroups.native.length}개 · reference ${strategyGroups.reference.length}개`,
+        detail: `native ${strategyGroups.native.length}개 · future ${strategyGroups.future.length}개`,
         tone: "research",
       },
       {
@@ -954,7 +953,7 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       marketStatus?.instruments.length,
       operatorSummary?.criticalCount,
       paperRuns.length, sandboxRuns.length,
-      strategies.length, strategyGroups.native.length, strategyGroups.reference.length,
+      strategies.length, strategyGroups.native.length, strategyGroups.future.length,
       totalTrackedRunCount, liveRuns.length,
     ],
   );
@@ -969,7 +968,6 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       liveRunsCount: liveRuns.length,
       paperRunsCount: paperRuns.length,
       presetsCount: presets.length,
-      referencesCount: references.length,
       sandboxRunsCount: sandboxRuns.length,
       strategiesCount: strategies.length,
       totalTrackedRunCount,
@@ -979,7 +977,7 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
       guardedLive?.kill_switch.state,
       guardedLiveSummary?.blockerCount,
       liveRuns.length, marketStatus?.instruments.length, operatorSummary?.alertCount,
-      paperRuns.length, presets.length, references.length, sandboxRuns.length, strategies.length,
+      paperRuns.length, presets.length, sandboxRuns.length, strategies.length,
       totalTrackedRunCount,
     ],
   );

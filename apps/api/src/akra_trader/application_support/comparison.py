@@ -19,11 +19,8 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "semantic_parameter_contract_bonus": 0.4,
     "semantic_vocabulary_unit_bonus": 0.28,
     "provenance_richness_unit_bonus": 0.24,
-    "native_reference_bonus": 8.0,
-    "reference_bonus": 3.0,
     "status_bonus": 1.5,
     "benchmark_story_bonus": 1.5,
-    "reference_floor": 1.0,
   },
   "execution_regression": {
     "return": 0.9,
@@ -36,11 +33,8 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "semantic_parameter_contract_bonus": 0.3,
     "semantic_vocabulary_unit_bonus": 0.18,
     "provenance_richness_unit_bonus": 0.2,
-    "native_reference_bonus": 3.0,
-    "reference_bonus": 1.0,
     "status_bonus": 3.0,
     "benchmark_story_bonus": 0.8,
-    "reference_floor": 1.0,
   },
   "strategy_tuning": {
     "return": 2.0,
@@ -53,11 +47,8 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "semantic_parameter_contract_bonus": 0.5,
     "semantic_vocabulary_unit_bonus": 0.38,
     "provenance_richness_unit_bonus": 0.12,
-    "native_reference_bonus": 1.5,
-    "reference_bonus": 0.5,
     "status_bonus": 0.8,
     "benchmark_story_bonus": 0.4,
-    "reference_floor": 0.5,
   },
 }
 
@@ -65,34 +56,20 @@ COMPARISON_INTENT_COPY: dict[str, dict[str, str]] = {
   "benchmark_validation": {
     "title_prefix": "Benchmark validation",
     "summary_prefix": "Validation view",
-    "partial_summary": (
-      "Benchmark validation falls back to persisted reference provenance because direct metric "
-      "deltas are partial."
-    ),
     "lane_prefix": "Validation context",
     "activity_prefix": "Validation signal",
-    "reference_prefix": "Benchmark evidence",
   },
   "execution_regression": {
     "title_prefix": "Execution regression",
     "summary_prefix": "Regression view",
-    "partial_summary": (
-      "Execution regression falls back to persisted reference provenance because direct execution "
-      "deltas are partial."
-    ),
     "lane_prefix": "Regression context",
     "activity_prefix": "Execution signal",
-    "reference_prefix": "Reference baseline",
   },
   "strategy_tuning": {
     "title_prefix": "Strategy tuning",
     "summary_prefix": "Tuning view",
-    "partial_summary": (
-      "Strategy tuning falls back to benchmark provenance because direct optimization deltas are partial."
-    ),
     "lane_prefix": "Tuning context",
     "activity_prefix": "Tuning signal",
-    "reference_prefix": "Benchmark backdrop",
   },
 }
 

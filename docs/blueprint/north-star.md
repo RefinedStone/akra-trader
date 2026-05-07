@@ -32,7 +32,7 @@
 6-9개월 뒤 플랫폼은 다음 상태를 만족해야 합니다.
 
 - backtest는 durable하고 rerun 가능한 실험 기록으로 남는다
-- reference 전략과 native 전략은 동일한 비교 프레임 안에서 해석된다
+- native 전략은 동일한 비교 프레임 안에서 해석된다
 - sandbox는 replay preview가 아니라 continuous worker로 운영된다
 - operator는 데이터 상태, run 상태, alert, drift를 control room에서 파악할 수 있다
 - live는 guardrail, audit, reconciliation 없이는 열리지 않는다

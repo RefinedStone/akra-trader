@@ -9,10 +9,10 @@ Updated for the repository state as of April 21, 2026.
 
 ### Research and experiment surfaces
 
-- strategy catalog with native and reference lanes
+- strategy catalog for native strategies
 - strategy semantic metadata and parameter-contract hints carried into run-facing surfaces
 - durable run storage through SQLAlchemy
-- native backtests and reference-runtime delegation for NostalgiaForInfinity
+- native backtests
 - presets, rerun boundaries, comparison, richer query/filter contracts, and typed query-discovery
   metadata
 - run-surface capability contracts and shared run-subresource envelopes for action gating
@@ -77,7 +77,7 @@ Representative environment variables:
 
 The exhaustive provider and recovery-engine matrix is intentionally documented outside this README:
 
-- [Operator Delivery Matrix](../../docs/reference/operator-delivery-matrix.md)
+- [Operator Delivery Matrix](../../docs/operations/operator-delivery-matrix.md)
 
 For the exact settings surface, see `apps/api/src/akra_trader/config.py`.
 
@@ -88,7 +88,6 @@ For the exact settings surface, see `apps/api/src/akra_trader/config.py`.
 - `GET /api/health`
 - `GET /api/strategies`
 - `POST /api/strategies/register`
-- `GET /api/references`
 
 ### Experiment runs
 

@@ -1,5 +1,5 @@
 import type { ComparisonIntent } from "./comparisonCore";
-import type { ParameterSchema, ReferenceSource } from "./strategyCatalog";
+import type { ParameterSchema } from "./strategyCatalog";
 
 export type RunListBoundaryGroupKey =
   | "supporting_identity"
@@ -163,9 +163,6 @@ export type Run = {
   ended_at?: string | null;
   provenance: {
     lane: string;
-    reference_id?: string | null;
-    reference_version?: string | null;
-    integration_mode?: string | null;
     rerun_boundary_id?: string | null;
     rerun_boundary_state: string;
     rerun_source_run_id?: string | null;
@@ -174,9 +171,6 @@ export type Run = {
     rerun_validation_category: string;
     rerun_validation_summary?: string | null;
     lineage_summary?: OperatorLineageSummary | null;
-    reference?: ReferenceSource | null;
-    working_directory?: string | null;
-    external_command: string[];
     artifact_paths: string[];
     benchmark_artifacts: BenchmarkArtifact[];
     experiment: {
@@ -211,8 +205,6 @@ export type Run = {
         required_bars: number;
         timeframes: string[];
       };
-      reference_id?: string | null;
-      reference_path?: string | null;
       entrypoint?: string | null;
     } | null;
     market_data?: {
@@ -327,18 +319,12 @@ export type RunComparison = {
     timeframe: string;
     started_at: string;
     ended_at?: string | null;
-    reference_id?: string | null;
-    reference_version?: string | null;
-    integration_mode?: string | null;
-    reference?: ReferenceSource | null;
-    working_directory?: string | null;
     dataset_identity?: string | null;
     experiment: {
       tags: string[];
       preset_id?: string | null;
       benchmark_family?: string | null;
     };
-    external_command: string[];
     artifact_paths: string[];
     benchmark_artifacts: BenchmarkArtifact[];
     metrics: Record<string, number>;
@@ -446,7 +432,7 @@ export type RunSurfaceCapabilitySurfaceKey =
   | "collection_expression_builders"
   | "collection_parameter_domain_pickers"
   | "run_strategy_snapshot"
-  | "reference_provenance_panels"
+  | "strategy_provenance_panels"
   | "benchmark_artifact_summaries"
   | "rerun_and_stop_controls"
   | "compare_selection_workflow"

@@ -9,7 +9,7 @@ Updated for the repository state as of April 22, 2026.
 Its strongest current posture is:
 
 - durable research execution
-- benchmark comparison across native and reference lanes
+- benchmark comparison across native strategy runs
 - sandbox worker supervision
 - guarded-live safety gating and operator visibility
 
@@ -68,7 +68,7 @@ provider adapters do not.
 One operator can already do the following without ad hoc scripts:
 
 - inspect market-data health
-- run native or reference-backed research flows
+- run native research flows
 - compare runs and inspect provenance
 - start and stop sandbox workers
 - inspect guarded-live blockers, incidents, and reconciliation state

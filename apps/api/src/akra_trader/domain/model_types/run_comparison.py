@@ -9,7 +9,6 @@ from akra_trader.domain.model_types.strategy_catalog import StrategyCatalogSeman
 
 if TYPE_CHECKING:
   from akra_trader.domain.model_types.run_execution import BenchmarkArtifact
-  from akra_trader.domain.model_types.run_execution import ReferenceSource
 
 
 @dataclass(frozen=True)
@@ -26,16 +25,10 @@ class RunComparisonRun:
   started_at: datetime
   catalog_semantics: StrategyCatalogSemantics = field(default_factory=StrategyCatalogSemantics)
   ended_at: datetime | None = None
-  reference_id: str | None = None
-  reference_version: str | None = None
-  integration_mode: str | None = None
-  reference: ReferenceSource | None = None
-  working_directory: str | None = None
   rerun_boundary_id: str | None = None
   rerun_boundary_state: str = "range_only"
   dataset_identity: str | None = None
   experiment: RunExperimentMetadata = field(default_factory=RunExperimentMetadata)
-  external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
   benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()
   metrics: dict[str, Any] = field(default_factory=dict)

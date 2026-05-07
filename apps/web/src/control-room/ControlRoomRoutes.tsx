@@ -36,8 +36,6 @@ export function ControlRoomRoutes({ model }: { model: any }) {
     restorePresetRevision,
     handlePresetSubmit,
     togglePresetRevisions,
-    ReferenceCatalog,
-    references,
     runHistoryWorkspacePanels,
     sandboxForm,
     setSandboxForm,
@@ -688,12 +686,6 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                     runSurfaceCapabilities={runSurfaceCapabilities}
                   />
                   <StrategyColumn
-                    title="NFI References"
-                    strategies={strategyGroups.reference}
-                    accent="cyan"
-                    runSurfaceCapabilities={runSurfaceCapabilities}
-                  />
-                  <StrategyColumn
                     title="Future LLM"
                     strategies={strategyGroups.future}
                     accent="ember"
@@ -737,13 +729,6 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                   onSubmit={handlePresetSubmit}
                   onToggleRevisions={togglePresetRevisions}
                 />
-              </section>
-            ),
-            referencePanel: (
-              <section className="panel panel-wide">
-                <p className="kicker">Reference 관리</p>
-                <h2>외부 Reference</h2>
-                <ReferenceCatalog references={references} />
               </section>
             ),
             ...runHistoryWorkspacePanels.research,

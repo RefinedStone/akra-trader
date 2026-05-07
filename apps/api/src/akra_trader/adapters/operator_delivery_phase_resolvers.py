@@ -11,6 +11,7 @@ class OperatorDeliveryPhaseResolverMixin(OperatorDeliveryAlertPhaseResolverMixin
     if normalized in {"triggered", "acknowledged", "resolved"}:
       return normalized
     return "unknown"
+  @staticmethod
   def _resolve_pagerduty_responder_phase(incident_phase: str) -> str:
     if incident_phase == "triggered":
       return "awaiting_acknowledgment"

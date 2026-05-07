@@ -36,21 +36,7 @@ export type Strategy = {
     source_descriptor?: string | null;
     operator_notes: string[];
   };
-  reference_id?: string | null;
-  reference_path?: string | null;
   entrypoint?: string | null;
-};
-
-export type ReferenceSource = {
-  reference_id: string;
-  title: string;
-  kind?: string;
-  homepage?: string;
-  license: string;
-  integration_mode: string;
-  local_path?: string | null;
-  runtime?: string | null;
-  summary: string;
 };
 
 export type ExperimentPresetRevision = {
@@ -154,7 +140,6 @@ export type PresetDraftConflict = {
 // Runtime placeholders for generated barrel compatibility.
 export const ParameterSchema = undefined;
 export const Strategy = undefined;
-export const ReferenceSource = undefined;
 export const ExperimentPresetRevision = undefined;
 export const ExperimentPreset = undefined;
 export const PresetRevisionFilterState = undefined;
