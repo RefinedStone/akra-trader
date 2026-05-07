@@ -14,8 +14,10 @@ from akra_trader.adapters.sqlalchemy_schema import run_records
 
 
 LEGACY_NFI_MARKERS = (
-  "NostalgiaForInfinity",
+  "nostalgiaforinfinity",
   "nostalgia-for-infinity",
+  "nfi_",
+  "nfi-",
 )
 
 
@@ -37,7 +39,7 @@ def _payload_matches(payload: dict[str, Any]) -> bool:
     },
     sort_keys=True,
   )
-  return any(marker in legacy_text for marker in LEGACY_NFI_MARKERS)
+  return any(marker in legacy_text.lower() for marker in LEGACY_NFI_MARKERS)
 
 
 def purge_reference_runs(database_url: str, *, execute: bool) -> tuple[list[str], int]:

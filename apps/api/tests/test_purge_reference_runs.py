@@ -94,3 +94,44 @@ def test_purge_reference_runs_execute_deletes_reference_runs_and_tags_only(tmp_p
   with engine.begin() as connection:
     assert connection.execute(select(run_records.c.run_id)).scalars().all() == ["native-run"]
     assert connection.execute(select(run_record_tags.c.run_id)).scalars().all() == ["native-run"]
+
+
+def test_purge_reference_runs_deletes_legacy_nfi_strategy_id_without_provenance_marker(tmp_path):
+  database_url = f"sqlite:///{tmp_path / 'runs.sqlite3'}"
+  engine = create_engine(database_url)
+  metadata.create_all(engine)
+  with engine.begin() as connection:
+    _insert_run(
+      connection,
+      "legacy-nfi-run",
+      {
+        "config": {"run_id": "legacy-nfi-run", "strategy_id": "nfi_x7_reference"},
+        "provenance": {"lane": "native", "strategy": {"runtime": "native"}},
+      },
+    )
+    _insert_run(
+      connection,
+      "native-confidence-run",
+      {
+        "config": {"run_id": "native-confidence-run", "strategy_id": "ma_cross_v1"},
+        "provenance": {
+          "lane": "native",
+          "strategy": {
+            "runtime": "native",
+            "name": "Confidence preserving native strategy",
+          },
+        },
+      },
+    )
+
+  run_ids, deleted_tags = purge_reference_runs(database_url, execute=True)
+
+  assert run_ids == ["legacy-nfi-run"]
+  assert deleted_tags == 1
+  with engine.begin() as connection:
+    assert connection.execute(select(run_records.c.run_id)).scalars().all() == [
+      "native-confidence-run"
+    ]
+    assert connection.execute(select(run_record_tags.c.run_id)).scalars().all() == [
+      "native-confidence-run"
+    ]
