@@ -120,7 +120,7 @@ export function ControlRoomRoutes({ model }: { model: any }) {
             presetPanel: (
               <section className="panel panel-wide">
                 <p className="kicker">실험 운영</p>
-                <h2>시나리오 Preset</h2>
+                <h2>시나리오</h2>
                 <model.PresetCatalogPanel
                   editingPresetId={editingPresetId}
                   expandedPresetRevisionIds={expandedPresetRevisionIds}

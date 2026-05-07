@@ -39,9 +39,11 @@ describe("StrategyColumn", () => {
     render(<StrategyColumn accent="amber" strategies={[buildStrategy()]} title="운용 전략" />);
 
     expect(screen.getByText("Moving Average Cross")).toBeInTheDocument();
-    expect(screen.getByText("ma_cross_v1")).toBeInTheDocument();
-    expect(screen.getByText("전략 ID")).toBeInTheDocument();
-    expect(screen.getByText("내장 실행")).toBeInTheDocument();
+    expect(screen.getByText("운용 가능")).toBeInTheDocument();
+    expect(screen.queryByText("ma_cross_v1")).not.toBeInTheDocument();
+    expect(screen.queryByText("전략 ID")).not.toBeInTheDocument();
+    expect(screen.queryByText("내장 실행")).not.toBeInTheDocument();
+    expect(screen.queryByText("등록 시각")).not.toBeInTheDocument();
     expect(screen.queryByText("Timeframes")).not.toBeInTheDocument();
     expect(screen.queryByText("Assets")).not.toBeInTheDocument();
     expect(screen.queryByText("Defaults")).not.toBeInTheDocument();

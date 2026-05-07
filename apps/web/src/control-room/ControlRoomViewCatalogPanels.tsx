@@ -10,6 +10,19 @@ import { RunListBoundarySurfaceContract, RunListBoundaryGroupContract, Metric, f
 import { buildComparisonScoreHighlights, buildComparisonScoreDetailRows, formatComparisonScoreHighlight, formatComparisonScoreComponentLabel, formatComparisonScoreLinkSourceLabel, encodeComparisonScoreLinkToken, decodeComparisonScoreLinkToken, buildComparisonProvenanceLineSubFocusKey, buildComparisonRunCardLineSubFocusKey, buildComparisonRunListLineSubFocusKey, buildComparisonRunListOrderPreviewSubFocusKey, buildComparisonRunListDataSymbolSubFocusKey, buildComparisonProvenanceArtifactSubFocusKey, buildComparisonProvenanceArtifactSectionSubFocusKey, buildComparisonProvenanceArtifactSummaryHoverKey, buildComparisonProvenanceArtifactSectionLineHoverKey, buildComparisonProvenanceArtifactLineDetailHoverKey, buildComparisonMetricTooltipKey, formatComparisonScoreLinkSubFocusLabel, formatComparisonScoreLinkTooltipLabel, formatComparisonScoreLinkArtifactHoverLabel, formatComparisonScoreLinkArtifactLineDetailViewLabel, formatComparisonScoreLinkArtifactLineMicroViewLabel, formatComparisonScoreLinkArtifactLineDetailHoverLabel, formatComparisonScoreComponentDetail, buildComparisonScoreComponentDetails, formatComparisonScoreComponentRawValue, formatComparisonScoreSignedValue, getComparisonScoreLinkedRunRole, isSameComparisonScoreLinkTarget, isSameComparisonScoreLinkSurface, resolveComparisonScoreDrillBackTarget, isComparisonScoreLinkMatch, formatEditableNumber } from "./ControlRoomViewComparisonLinks";
 import { formatFixedNumber, buildLiveOrderDraftKey, formatComparisonMetric, formatComparisonDelta, formatComparisonNarrativeLabel, formatComparisonIntentLabel, formatComparisonIntentLegend, formatComparisonIntentTooltip, formatComparisonCueTooltip, buildComparisonCellTooltip, getComparisonIntentClassName, formatLaneLabel, formatVersionLineage, extractDefaultParameters, formatParameterMap, formatParameterValue, summarizeRunNotes } from "./ControlRoomViewFormatting";
 
+function formatStrategyStatus(stage?: string | null) {
+  if (stage === "active") {
+    return "운용 가능";
+  }
+  if (stage === "archived") {
+    return "보관됨";
+  }
+  if (stage === "draft") {
+    return "준비 중";
+  }
+  return stage || "상태 확인";
+}
+
 export function StrategyColumn({
   title,
   strategies,
@@ -29,19 +42,13 @@ export function StrategyColumn({
               <div>
                 <strong>{strategy.name}</strong>
                 <div className="strategy-badges">
-                  <span className="meta-pill">{formatLaneLabel(strategy.runtime)}</span>
-                  <span className="meta-pill subtle">{strategy.lifecycle.stage}</span>
                   <span className="meta-pill subtle">{strategy.version}</span>
+                  <span className="meta-pill">{formatStrategyStatus(strategy.lifecycle.stage)}</span>
                 </div>
               </div>
-              <span>{formatVersionLineage(strategy.version_lineage, strategy.version)}</span>
             </div>
             <p>{strategy.description}</p>
             <dl>
-              <div>
-                <dt>전략 ID</dt>
-                <dd>{strategy.strategy_id}</dd>
-              </div>
               <div>
                 <dt>운용 주기</dt>
                 <dd>{strategy.supported_timeframes.join(", ")}</dd>
@@ -50,12 +57,6 @@ export function StrategyColumn({
                 <dt>대상 시장</dt>
                 <dd>{strategy.asset_types.join(", ")}</dd>
               </div>
-              {strategy.lifecycle.registered_at ? (
-                <div>
-                  <dt>등록 시각</dt>
-                  <dd>{formatTimestamp(strategy.lifecycle.registered_at)}</dd>
-                </div>
-              ) : null}
             </dl>
           </article>
         ))
@@ -204,6 +205,8 @@ export function PresetCatalogPanel({
   const selectedStrategyDefaultParametersJson = Object.keys(selectedStrategyDefaultParameters).length
     ? JSON.stringify(selectedStrategyDefaultParameters, null, 2)
     : "";
+  const formatPresetStrategyName = (strategyId?: string | null) =>
+    strategies.find((strategy) => strategy.strategy_id === strategyId)?.name ?? strategyId ?? "전체";
   const [revisionFiltersByPreset, setRevisionFiltersByPreset] = useState<
     Record<string, PresetRevisionFilterState>
   >({});
@@ -271,7 +274,7 @@ export function PresetCatalogPanel({
           />
         </label>
         <label>
-          프리셋 ID
+          저장 키
           <input
             disabled={isEditing}
             placeholder="core_5m"
@@ -302,7 +305,7 @@ export function PresetCatalogPanel({
           />
         </label>
         <label>
-          벤치마크 묶음
+          비교 그룹
           <input
             placeholder="native_validation"
             value={form.benchmark_family}
@@ -328,7 +331,7 @@ export function PresetCatalogPanel({
           />
         </label>
         <label>
-          파라미터 JSON
+          전략 설정
           <textarea
             placeholder={selectedStrategyDefaultParametersJson || '{"short_window": 5, "long_window": 13}'}
             rows={4}
@@ -345,14 +348,14 @@ export function PresetCatalogPanel({
         ) : null}
         {isEditing ? (
           <p className="run-note">
-            {editingPresetId} 수정 중입니다. 프리셋 ID는 유지되고 현재 묶음만 갱신되며 새 변경 이력이 기록됩니다.
+            {editingPresetId} 수정 중입니다. 저장 키는 유지되고 현재 설정만 갱신됩니다.
           </p>
         ) : null}
         <div className="run-actions">
-          <button type="submit">{isEditing ? "변경 이력 저장" : "프리셋 저장"}</button>
+          <button type="submit">{isEditing ? "변경 저장" : "시나리오 저장"}</button>
           {isEditing ? (
             <button className="ghost-button" onClick={onResetEditor} type="button">
-              새 프리셋
+              새 시나리오
             </button>
           ) : null}
         </div>
@@ -408,10 +411,10 @@ export function PresetCatalogPanel({
                       </div>
                     </div>
                     <div className="run-metrics">
-                      <Metric label="전략" value={preset.strategy_id ?? "전체"} />
+                      <Metric label="전략" value={formatPresetStrategyName(preset.strategy_id)} />
                       <Metric label="주기" value={preset.timeframe ?? "전체"} />
-                      <Metric label="파라미터" value={formatParameterMap(preset.parameters)} />
-                      <Metric label="변경 이력" value={String(preset.revisions.length)} />
+                      <Metric label="설정" value={formatParameterMap(preset.parameters)} />
+                      <Metric label="변경" value={String(preset.revisions.length)} />
                       <Metric label="갱신" value={formatTimestamp(preset.updated_at)} />
                     </div>
                     <ExperimentMetadataPills
@@ -420,21 +423,19 @@ export function PresetCatalogPanel({
                       tags={preset.tags}
                     />
                     <p className="run-note">
-                      상태: {formatPresetLifecycleStage(preset.lifecycle.stage)} · 처리{" "}
-                      {preset.lifecycle.last_action} · 담당 {preset.lifecycle.updated_by} ·{" "}
-                      {formatTimestamp(preset.lifecycle.updated_at)}.
+                      마지막 갱신: {formatTimestamp(preset.lifecycle.updated_at)}.
                     </p>
                     {preset.description ? <p className="run-note">{preset.description}</p> : null}
                     <div className="run-actions">
                       <button className="ghost-button" onClick={() => onEditPreset(preset)} type="button">
-                        {editingPresetId === preset.preset_id ? "수정 중" : "프리셋 수정"}
+                        {editingPresetId === preset.preset_id ? "수정 중" : "수정"}
                       </button>
                       <button
                         className="ghost-button"
                         onClick={() => onToggleRevisions(preset.preset_id)}
                         type="button"
                       >
-                        {revisionsExpanded ? "변경 이력 접기" : `변경 이력 보기 (${preset.revisions.length})`}
+                        {revisionsExpanded ? "이전 변경 접기" : `이전 변경 보기 (${preset.revisions.length})`}
                       </button>
                       {preset.lifecycle.stage !== "archived" ? (
                         <>
@@ -539,7 +540,7 @@ export function PresetCatalogPanel({
                                   <div className="run-metrics">
                                     <Metric label="담당" value={revision.actor} />
                                     <Metric label="기록" value={formatRelativeTimestampLabel(revision.created_at)} />
-                                    <Metric label="전략" value={revision.strategy_id ?? "전체"} />
+                                    <Metric label="전략" value={formatPresetStrategyName(revision.strategy_id)} />
                                     <Metric label="변경" value={`${diff.changeCount}건`} />
                                   </div>
                                   <ExperimentMetadataPills
@@ -680,7 +681,7 @@ export function PresetCatalogPanel({
           ))}
         </div>
       ) : (
-        <p className="empty-state">저장된 durable Preset이 아직 없습니다.</p>
+        <p className="empty-state">저장된 시나리오가 아직 없습니다.</p>
       )}
     </>
   );
@@ -800,7 +801,7 @@ export function RunForm({
         </select>
       </label>
       <label>
-        벤치마크 묶음
+        비교 그룹
         <input
           placeholder={selectedPreset?.benchmark_family ?? "native_validation"}
           value={form.benchmark_family}
@@ -819,7 +820,7 @@ export function RunForm({
       </label>
       {selectedPreset ? (
         <div className="run-note">
-          프리셋 단계: {formatPresetLifecycleStage(selectedPreset.lifecycle.stage)}. 파라미터:{" "}
+          시나리오 단계: {formatPresetLifecycleStage(selectedPreset.lifecycle.stage)}. 설정:{" "}
           {formatParameterMap(selectedPreset.parameters)}.
         </div>
       ) : null}
