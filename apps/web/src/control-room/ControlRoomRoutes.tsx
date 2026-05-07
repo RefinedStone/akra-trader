@@ -85,15 +85,15 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                   <model.StrategyColumn
                     accent="ember"
                     strategies={strategyGroups.future}
-                    title="Future LLM 연구 레인"
+                    title="향후 연구 전략"
                   />
                 </div>
                 <div className="future-llm-brief">
                   <div>
                     <p className="kicker">핵심 방향</p>
-                    <h3>Future LLM은 연구 레인으로 먼저 정비합니다</h3>
+                    <h3>새 전략은 연구 화면에서 먼저 검증합니다</h3>
                   </div>
-                  <div className="future-llm-principles" aria-label="Future LLM 정비 원칙">
+                  <div className="future-llm-principles" aria-label="새 전략 검증 원칙">
                     <span>실전 자동 진입 없음</span>
                     <span>판단 근거 기록</span>
                     <span>재현 가능한 비교</span>
@@ -165,7 +165,7 @@ export function ControlRoomRoutes({ model }: { model: any }) {
             launchPanel: (
               <section className="panel">
                 <p className="kicker">실전 보호 운용</p>
-                <h2>가드 라이브 시작</h2>
+                <h2>보호 실전 시작</h2>
                 <model.RunForm
                   form={liveForm}
                   onSubmit={handleLiveSubmit}

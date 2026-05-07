@@ -18,8 +18,8 @@ const workspaceDescriptors: ControlWorkspaceDescriptor[] = [
     kicker: "전략 검증",
     label: "백테스트",
     description: "전략 실행 결과를 검증합니다.",
-    summary: "백테스트 2개 · 프리셋 1개",
-    sections: ["백테스트 실행", "시나리오 프리셋", "최근 결과"],
+    summary: "백테스트 2개 · 시나리오 1개",
+    sections: ["백테스트 실행", "시나리오", "최근 결과"],
   },
 ];
 
@@ -58,7 +58,7 @@ describe("WorkspaceShell", () => {
 
     expect(screen.getByRole("heading", { name: "전략 검증부터 실전 보호까지 한 화면에서 판단합니다" })).toBeInTheDocument();
     expect(screen.getByLabelText("운영 핵심 지표")).toHaveTextContent("실행 상태");
-    expect(screen.getByLabelText("현재 작업면 점검 항목")).toHaveTextContent("운용 상태");
+    expect(screen.getByLabelText("현재 화면 점검 항목")).toHaveTextContent("운용 상태");
     expect(screen.queryByText("Equity")).not.toBeInTheDocument();
     expect(screen.queryByText("Crypto")).not.toBeInTheDocument();
     expect(screen.queryByText("Backtest")).not.toBeInTheDocument();

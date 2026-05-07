@@ -60,9 +60,9 @@ export function buildControlWorkspaceDescriptors(
       kicker: "전략 검증",
       label: "백테스트",
       description:
-        "주식·코인 전략의 파라미터, 프리셋, 실행 결과를 한곳에서 검증합니다.",
-      summary: `백테스트 ${input.backtestsCount}개 · 프리셋 ${input.presetsCount}개 · 전략 ${input.strategiesCount}개`,
-      sections: ["백테스트 실행", "시나리오 프리셋", "전략", "최근 결과"],
+        "주식·코인 전략의 설정, 시나리오, 실행 결과를 한곳에서 검증합니다.",
+      summary: `백테스트 ${input.backtestsCount}개 · 시나리오 ${input.presetsCount}개 · 전략 ${input.strategiesCount}개`,
+      sections: ["백테스트 실행", "시나리오", "전략", "최근 결과"],
     },
     {
       id: "markets",
@@ -83,7 +83,7 @@ export function buildControlWorkspaceDescriptors(
       sections: [
         "샌드박스 실행",
         "시장 데이터 상태",
-        "운용 알림과 감사 기록",
+        "운용 알림과 기록",
         "샌드박스 이력",
         "페이퍼 이력",
       ],
@@ -91,11 +91,11 @@ export function buildControlWorkspaceDescriptors(
     {
       id: "live",
       kicker: "실전 보호 운용",
-      label: "가드 라이브",
+      label: "보호 실전",
       description:
-        "실전 주문은 소유권, 정합성 점검, 복구, 킬 스위치가 확인된 상태에서만 다룹니다.",
-      summary: `킬 스위치 ${input.killSwitchState} · 차단 요인 ${input.blockerCount}개 · 실전 실행 ${input.liveRunsCount}개`,
-      sections: ["실전 실행", "킬 스위치와 정합성", "실전 이력"],
+        "실전 주문은 실행 주체, 거래소 확인, 복구, 긴급 중지가 확인된 상태에서만 다룹니다.",
+      summary: `긴급 중지 ${input.killSwitchState} · 차단 요인 ${input.blockerCount}개 · 실전 실행 ${input.liveRunsCount}개`,
+      sections: ["실전 실행", "긴급 중지와 거래소 확인", "실전 이력"],
     },
   ];
 }

@@ -343,7 +343,7 @@ export function PresetCatalogPanel({
         </label>
         {presetParameterDefaultsEnabled && selectedStrategyDefaultParametersJson ? (
           <p className="run-note">
-            비어 있는 파라미터 묶음은 선택한 전략의 기본값으로 자동 보강됩니다.
+            비어 있는 설정은 선택한 전략의 기본값으로 자동 보강됩니다.
           </p>
         ) : null}
         {isEditing ? (
@@ -472,7 +472,7 @@ export function PresetCatalogPanel({
                           <label>
                             변경 이력 검색
                             <input
-                              placeholder="actor, reason, parameter, tag"
+                              placeholder="담당자, 사유, 설정, 태그"
                               value={revisionFilter.query}
                               onChange={(event) =>
                                 setRevisionFiltersByPreset((current) => ({
@@ -503,7 +503,7 @@ export function PresetCatalogPanel({
                               <option value="created">생성</option>
                               <option value="updated">수정</option>
                               <option value="restored">복구</option>
-                              <option value="migrated">마이그레이션</option>
+                              <option value="migrated">이전 데이터 정리</option>
                             </select>
                           </label>
                         </div>
@@ -613,7 +613,7 @@ export function PresetCatalogPanel({
                                           <p className="comparison-dev-feedback">
                                             {draftConflict.summary}
                                             {draftConflict.hasInvalidParameters
-                                              ? " 현재 초안에도 유효하지 않은 파라미터 JSON이 있습니다."
+                                              ? " 현재 작성 중인 설정 형식도 올바르지 않습니다."
                                               : ""}
                                           </p>
                                           <PresetStructuredDiffPreview
@@ -787,12 +787,12 @@ export function RunForm({
         </>
       ) : null}
       <label>
-        프리셋
+        시나리오
         <select
           value={form.preset_id}
           onChange={(event) => setForm((current) => ({ ...current, preset_id: event.target.value }))}
         >
-          <option value="">프리셋 없음</option>
+          <option value="">시나리오 없음</option>
           {availablePresets.map((preset) => (
             <option key={preset.preset_id} value={preset.preset_id}>
               {preset.name} ({preset.preset_id})

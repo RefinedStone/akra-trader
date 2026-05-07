@@ -46,7 +46,7 @@ export function ControlRoomOverviewPanel({
         </div>
       </div>
 
-      <div className="overview-action-grid" aria-label="운영 작업면 바로가기">
+      <div className="overview-action-grid" aria-label="운영 화면 바로가기">
         {actionWorkspaces.map((workspace) => (
           <button
             className="overview-action-card"

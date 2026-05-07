@@ -33,11 +33,11 @@ export function WorkspaceShell({
     <div className="shell">
       <header className="hero">
         <div className="hero-copy-block">
-          <p className="eyebrow">Akra Trader / 운용 지휘 콘솔</p>
+          <p className="eyebrow">Akra Trader / 운용 화면</p>
           <h1>전략 검증부터 실전 보호까지 한 화면에서 판단합니다</h1>
           <p className="hero-copy">
             현재 워크스페이스의 운영 맥락, 핵심 지표, 다음 점검 항목을 먼저 보여주고
-            세부 작업면으로 이어갑니다.
+            세부 화면으로 이어갑니다.
           </p>
           <div className="hero-action-row" aria-label="주요 운영 상태">
             <span>
@@ -45,11 +45,11 @@ export function WorkspaceShell({
               <strong>{statusText}</strong>
             </span>
             <span>
-              <small>작업면</small>
+              <small>화면</small>
               <strong>{activeWorkspaceDescriptor.label}</strong>
             </span>
             <span>
-              <small>API</small>
+              <small>서버</small>
               <strong>{apiBase}</strong>
             </span>
           </div>
@@ -93,7 +93,7 @@ export function WorkspaceShell({
               </span>
             ))}
           </div>
-          <div className="hero-workflow-list" aria-label="현재 작업면 점검 항목">
+          <div className="hero-workflow-list" aria-label="현재 화면 점검 항목">
             {workflowItems.map((item, index) => (
               <span key={item}>
                 <small>{String(index + 1).padStart(2, "0")}</small>

@@ -80,7 +80,7 @@ describe("RunForm", () => {
     expect(screen.getByText("전략")).toBeInTheDocument();
     expect(screen.getByText("종목")).toBeInTheDocument();
     expect(screen.getByText("운용 주기")).toBeInTheDocument();
-    expect(screen.getByText("프리셋")).toBeInTheDocument();
+    expect(screen.getByText("시나리오")).toBeInTheDocument();
     expect(screen.queryByText("Strategy")).not.toBeInTheDocument();
     expect(screen.queryByText("Timeframe")).not.toBeInTheDocument();
     expect(screen.queryByText("Benchmark family")).not.toBeInTheDocument();

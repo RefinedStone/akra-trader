@@ -226,7 +226,7 @@ export function buildRunHistoryWorkspacePanels({
       runsPanel: renderRunSection({
         ...live,
         surfaceKey: "live",
-        title: live.title ?? "가드 라이브 실행 이력",
+        title: live.title ?? "보호 실전 이력",
       }),
     },
   };

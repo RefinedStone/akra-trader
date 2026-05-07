@@ -53,12 +53,12 @@ describe("buildRunHistoryWorkspacePanels", () => {
       "backtest:최근 백테스트",
       "sandbox:샌드박스 실행 이력",
       "paper:페이퍼 실행 이력",
-      "live:가드 라이브 실행 이력",
+      "live:보호 실전 이력",
     ]);
     expect(panels.research.runsPanel).toBe("backtest:최근 백테스트");
     expect(panels.runtime.sandboxRunsPanel).toBe("sandbox:샌드박스 실행 이력");
     expect(panels.runtime.paperRunsPanel).toBe("paper:페이퍼 실행 이력");
-    expect(panels.live.runsPanel).toBe("live:가드 라이브 실행 이력");
+    expect(panels.live.runsPanel).toBe("live:보호 실전 이력");
   });
 
   it("preserves caller-supplied titles and handlers", () => {
