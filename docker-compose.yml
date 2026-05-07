@@ -28,8 +28,7 @@ services:
       AKRA_TRADER_MARKET_DATA_SYNC_TIMEFRAMES: 1m,5m,15m,1h,1d
       AKRA_TRADER_PROVIDER_PROVENANCE_SCHEDULER_SEARCH_SERVICE_URL: memory://local
     command: >
-      bash -lc "python -m pip install --user 'psycopg[binary]>=3.2.0,<4.0.0' &&
-      python -m pip install --user --no-deps -e . &&
+      bash -lc "python -m pip install --user -e . &&
       python -m uvicorn akra_trader.main:app --host 0.0.0.0 --port 8000"
     volumes:
       - .:/workspace
