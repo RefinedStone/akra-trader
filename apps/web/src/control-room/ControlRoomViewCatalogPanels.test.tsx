@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { StrategyColumn } from "./ControlRoomViewCatalogPanels";
+import { RunForm, StrategyColumn } from "./ControlRoomViewCatalogPanels";
 
 function buildStrategy(overrides: Record<string, unknown> = {}) {
   return {
@@ -48,5 +48,39 @@ describe("StrategyColumn", () => {
     expect(screen.queryByText("Parameter contract")).not.toBeInTheDocument();
     expect(screen.queryByText("Source")).not.toBeInTheDocument();
     expect(screen.queryByText("Operator notes")).not.toBeInTheDocument();
+  });
+});
+
+describe("RunForm", () => {
+  it("uses operator-facing labels for execution inputs", () => {
+    render(
+      <RunForm
+        form={{
+          benchmark_family: "",
+          end_date: "",
+          fee_rate: 0.001,
+          initial_cash: 10000,
+          preset_id: "",
+          slippage_bps: 3,
+          start_date: "",
+          strategy_id: "ma_cross_v1",
+          symbol: "BTC/USDT",
+          tags_text: "",
+          timeframe: "5m",
+        }}
+        onSubmit={(event) => event.preventDefault()}
+        presets={[]}
+        setForm={() => undefined}
+        strategies={[buildStrategy()]}
+      />,
+    );
+
+    expect(screen.getByText("전략")).toBeInTheDocument();
+    expect(screen.getByText("종목")).toBeInTheDocument();
+    expect(screen.getByText("운용 주기")).toBeInTheDocument();
+    expect(screen.getByText("프리셋")).toBeInTheDocument();
+    expect(screen.queryByText("Strategy")).not.toBeInTheDocument();
+    expect(screen.queryByText("Timeframe")).not.toBeInTheDocument();
+    expect(screen.queryByText("Benchmark family")).not.toBeInTheDocument();
   });
 });
