@@ -26,7 +26,9 @@ def _payload_matches(payload: dict[str, Any]) -> bool:
   strategy = provenance.get("strategy") or {}
   if provenance.get("lane") == "reference":
     return True
-  if provenance.get("reference_id") is not None or provenance.get("reference") is not None:
+  if "reference_id" in provenance or "reference" in provenance:
+    return True
+  if "reference_path" in strategy or "reference_id" in strategy:
     return True
   if strategy.get("runtime") == "freqtrade_reference":
     return True
