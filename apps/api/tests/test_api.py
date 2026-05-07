@@ -309,7 +309,9 @@ def test_list_strategies_returns_builtin_strategy(tmp_path: Path) -> None:
 def test_external_decision_strategy_exposes_semantic_prompt_profile_metadata() -> None:
   metadata = ExternalDecisionStrategy(decision_engine=StubDecisionEngine()).describe()
   prompt_profile = metadata.parameter_schema["prompt_profile"]
-  assert prompt_profile["semantic_hint"] == "Decision-engine prompt posture."
+  assert metadata.name == "Future LLM Research Lane"
+  assert "trace, replay, and fallback gates" in metadata.description
+  assert prompt_profile["semantic_hint"] == "Future LLM decision posture for isolated research runs."
   assert prompt_profile["semantic_ranks"]["aggressive"] == 4
   assert prompt_profile["delta_lower_label"] == "safer prompt posture"
 

@@ -19,7 +19,7 @@ class ExternalDecisionStrategy(Strategy):
   def describe(self) -> StrategyMetadata:
     return StrategyMetadata(
       strategy_id="external_decision_template",
-      name="External Decision Template",
+      name="Future LLM Research Lane",
       version="0.1.0",
       runtime="decision_engine",
       asset_types=(AssetType.CRYPTO, AssetType.STOCK),
@@ -28,7 +28,7 @@ class ExternalDecisionStrategy(Strategy):
         "prompt_profile": {
           "type": "string",
           "default": "balanced",
-          "semantic_hint": "Decision-engine prompt posture.",
+          "semantic_hint": "Future LLM decision posture for isolated research runs.",
           "semantic_ranks": {
             "safe": 0,
             "cautious": 1,
@@ -40,7 +40,10 @@ class ExternalDecisionStrategy(Strategy):
           "delta_lower_label": "safer prompt posture",
         },
       },
-      description="Template strategy that delegates final trade selection to an external decision engine such as an LLM.",
+      description=(
+        "Isolated Future LLM research strategy. It records decision posture and keeps live "
+        "promotion outside this scaffold until trace, replay, and fallback gates are ready."
+      ),
       lifecycle=StrategyLifecycle(stage="experimental"),
       version_lineage=("0.1.0",),
     )
