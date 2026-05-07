@@ -105,6 +105,8 @@ describe("ControlRoomRoutes", () => {
 
     expect(screen.getByText("오늘의 판단 순서")).toBeInTheDocument();
     expect(screen.getByText("전략 운영 카탈로그")).toBeInTheDocument();
+    expect(screen.getByText("Future LLM 연구 레인")).toBeInTheDocument();
+    expect(screen.getByText("실전 자동 진입 없음")).toBeInTheDocument();
     expect(screen.queryByText("Strategy Catalog")).not.toBeInTheDocument();
     expect(screen.queryByText("Start sandbox worker")).not.toBeInTheDocument();
     expect(screen.queryByText("Guarded Live")).not.toBeInTheDocument();

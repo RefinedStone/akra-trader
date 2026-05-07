@@ -6139,6 +6139,44 @@ body {
   background: #f8fffc;
 }
 
+.future-llm-brief {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.7fr) minmax(0, 1.3fr);
+  gap: 12px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(239, 246, 255, 0.86), rgba(255, 255, 255, 0.96)),
+    #ffffff;
+}
+
+.future-llm-brief h3 {
+  margin: 4px 0 0;
+  color: #111827;
+  font-size: 1rem;
+}
+
+.future-llm-principles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.future-llm-principles span {
+  display: grid;
+  align-items: center;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
 .run-form input,
 .run-form select,
 .filter-bar select,
@@ -6216,6 +6254,7 @@ body {
   .hero-command-grid,
   .overview-briefing-grid,
   .overview-action-grid,
+  .future-llm-brief,
   .workspace-route-grid {
     grid-template-columns: 1fr;
   }
@@ -6243,6 +6282,7 @@ body {
   .hero-mini-metrics,
   .hero-command-grid,
   .overview-metric-stack,
+  .future-llm-principles,
   .workspace-nav {
     grid-template-columns: 1fr;
   }

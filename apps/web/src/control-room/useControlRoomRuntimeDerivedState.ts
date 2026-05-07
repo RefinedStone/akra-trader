@@ -920,15 +920,15 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
   const controlStripMetrics = useMemo<ControlStripMetric[]>(
     () => [
       {
-        label: "Strategy Catalog",
+        label: "전략 카탈로그",
         value: `${strategies.length}`,
-        detail: `native ${strategyGroups.native.length}개 · future ${strategyGroups.future.length}개`,
+        detail: `운용 ${strategyGroups.native.length}개 · Future LLM ${strategyGroups.future.length}개`,
         tone: "research",
       },
       {
-        label: "Run 현황",
+        label: "실행 현황",
         value: `${totalTrackedRunCount}`,
-        detail: `Backtest ${backtests.length}개 · Runtime ${sandboxRuns.length + paperRuns.length + liveRuns.length}개`,
+        detail: `백테스트 ${backtests.length}개 · 모의/실전 ${sandboxRuns.length + paperRuns.length + liveRuns.length}개`,
         tone: "runtime",
       },
       {
@@ -938,9 +938,9 @@ export function useControlRoomRuntimeDerivedState({ model }: { model: any }): an
         tone: (failureSummary?.failureCount24h ?? 0) > 0 ? "warning" : "runtime",
       },
       {
-        label: "Guarded Live",
+        label: "가드 라이브",
         value: guardedLive?.kill_switch.state ?? "n/a",
-        detail: `blocker ${guardedLiveSummary?.blockerCount ?? 0}개 · critical alert ${operatorSummary?.criticalCount ?? 0}개`,
+        detail: `차단 ${guardedLiveSummary?.blockerCount ?? 0}개 · 중요 알림 ${operatorSummary?.criticalCount ?? 0}개`,
         tone: "live",
       },
     ],

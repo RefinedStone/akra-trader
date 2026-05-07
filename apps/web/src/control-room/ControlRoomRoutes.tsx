@@ -85,8 +85,19 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                   <model.StrategyColumn
                     accent="ember"
                     strategies={strategyGroups.future}
-                    title="준비 중인 전략"
+                    title="Future LLM 연구 레인"
                   />
+                </div>
+                <div className="future-llm-brief">
+                  <div>
+                    <p className="kicker">핵심 방향</p>
+                    <h3>Future LLM은 연구 레인으로 먼저 정비합니다</h3>
+                  </div>
+                  <div className="future-llm-principles" aria-label="Future LLM 정비 원칙">
+                    <span>실전 자동 진입 없음</span>
+                    <span>판단 근거 기록</span>
+                    <span>재현 가능한 비교</span>
+                  </div>
                 </div>
               </section>
             ),
