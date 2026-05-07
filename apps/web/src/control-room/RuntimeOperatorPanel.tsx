@@ -77,57 +77,57 @@ export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelMod
 
   return (
     <section className="panel panel-wide">
-      <p className="kicker">Operator trust</p>
-      <h2>Runtime alerts and audit</h2>
+      <p className="kicker">운영 확인</p>
+      <h2>알림과 사고</h2>
 
       <div className="status-grid">
         <div className="metric-tile">
-          <span>Active alerts</span>
+          <span>활성 알림</span>
           <strong>{operatorSummary?.alertCount ?? alerts.length}</strong>
         </div>
         <div className="metric-tile">
-          <span>Critical</span>
+          <span>긴급</span>
           <strong>{operatorSummary?.criticalCount ?? alerts.filter((alert) => alert.severity === "critical").length}</strong>
         </div>
         <div className="metric-tile">
-          <span>Warnings</span>
+          <span>주의</span>
           <strong>{operatorSummary?.warningCount ?? alerts.filter((alert) => alert.severity === "warning").length}</strong>
         </div>
         <div className="metric-tile">
-          <span>Latest audit</span>
+          <span>최근 기록</span>
           <strong>{formatTimestamp(operatorSummary?.latestAuditAt ?? null)}</strong>
         </div>
         <div className="metric-tile">
-          <span>Alert history</span>
+          <span>알림 이력</span>
           <strong>{operatorSummary?.historyCount ?? 0}</strong>
         </div>
         <div className="metric-tile">
-          <span>Incidents</span>
+          <span>사고</span>
           <strong>{operatorSummary?.incidentCount ?? incidents.length}</strong>
         </div>
         <div className="metric-tile">
-          <span>Deliveries</span>
+          <span>전달</span>
           <strong>{operatorSummary?.deliveryCount ?? 0}</strong>
         </div>
       </div>
 
       <PanelDisclosure
         defaultOpen={true}
-        summary={`${alerts.length} active alerts · ${auditEvents.length} recent audit events`}
-        title="Active alerts and audit"
+        summary={`${alerts.length}개 활성 알림 · ${auditEvents.length}개 최근 기록`}
+        title="현재 알림"
       >
         <div className="status-grid-two-column">
           <div>
-            <h3>Active alerts</h3>
+            <h3>현재 알림</h3>
             {alerts.length ? (
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Severity</th>
-                    <th>Category</th>
-                    <th>Summary</th>
-                    <th>Detected</th>
-                    <th>Run</th>
+                    <th>심각도</th>
+                    <th>분류</th>
+                    <th>내용</th>
+                    <th>발견</th>
+                    <th>실행</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -146,20 +146,20 @@ export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelMod
                 </tbody>
               </table>
             ) : (
-              <p className="muted-copy">No active runtime alerts.</p>
+              <p className="muted-copy">현재 활성 알림이 없습니다.</p>
             )}
           </div>
 
           <div>
-            <h3>Recent audit</h3>
+            <h3>최근 기록</h3>
             {auditEvents.length ? (
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>When</th>
-                    <th>Action</th>
-                    <th>Actor</th>
-                    <th>Message</th>
+                    <th>시간</th>
+                    <th>처리</th>
+                    <th>담당</th>
+                    <th>메시지</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -174,7 +174,7 @@ export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelMod
                 </tbody>
               </table>
             ) : (
-              <p className="muted-copy">No recent audit events.</p>
+              <p className="muted-copy">최근 기록이 없습니다.</p>
             )}
           </div>
         </div>
@@ -182,17 +182,17 @@ export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelMod
 
       <PanelDisclosure
         defaultOpen={false}
-        summary={`${incidents.length} incidents`}
-        title="Incident queue"
+        summary={`${incidents.length}개 사고`}
+        title="사고 목록"
       >
         {incidents.length ? (
           <table className="data-table">
             <thead>
               <tr>
-                <th>Severity</th>
-                <th>Status</th>
-                <th>Summary</th>
-                <th>Updated</th>
+                <th>심각도</th>
+                <th>상태</th>
+                <th>내용</th>
+                <th>갱신</th>
               </tr>
             </thead>
             <tbody>
@@ -207,7 +207,7 @@ export function RuntimeOperatorPanel({ model }: { model: RuntimeOperatorPanelMod
             </tbody>
           </table>
         ) : (
-          <p className="muted-copy">No runtime incidents.</p>
+          <p className="muted-copy">현재 사고가 없습니다.</p>
         )}
       </PanelDisclosure>
     </section>

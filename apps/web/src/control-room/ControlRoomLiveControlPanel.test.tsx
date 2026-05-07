@@ -53,7 +53,7 @@ function buildModel(overrides: Record<string, unknown> = {}) {
       },
       reconciliation: {
         findings: [],
-        summary: "No reconciliation findings.",
+        summary: "거래소 확인 결과가 없습니다.",
         venue_snapshot: null,
       },
       session_handoff: {
@@ -82,10 +82,10 @@ describe("ControlRoomLiveControlPanel", () => {
   it("renders core guarded-live controls without provider recovery readbacks", () => {
     render(<ControlRoomLiveControlPanel model={buildModel()} />);
 
-    expect(screen.getByText("Kill switch and reconciliation")).toBeInTheDocument();
-    expect(screen.getByText("Run reconciliation")).toBeInTheDocument();
-    expect(screen.getByText("Control guardrails")).toBeInTheDocument();
-    expect(screen.getByText("Venue state and incidents")).toBeInTheDocument();
+    expect(screen.getByText("중지 스위치와 거래소 확인")).toBeInTheDocument();
+    expect(screen.getAllByText("거래소 확인").length).toBeGreaterThan(0);
+    expect(screen.getByText("실전 보호 장치")).toBeInTheDocument();
+    expect(screen.getByText("거래소 상태와 사고")).toBeInTheDocument();
     expect(screen.queryByText("Recovered runtime")).not.toBeInTheDocument();
     expect(screen.queryByText("Recovered market channels")).not.toBeInTheDocument();
     expect(screen.queryByText("Provider recovery payload")).not.toBeInTheDocument();

@@ -35,34 +35,34 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
   return (
 
               <section className="panel panel-wide">
-          <p className="kicker">Data plane</p>
-          <h2>Market data status</h2>
+          <p className="kicker">시장 데이터</p>
+          <h2>데이터 상태</h2>
           {marketStatus ? (
             <div className="status-grid">
               <div className="metric-tile">
-                <span>Provider</span>
+                <span>데이터 제공처</span>
                 <strong>{marketStatus.provider}</strong>
               </div>
               <div className="metric-tile">
-                <span>Venue</span>
+                <span>거래소</span>
                 <strong>{marketStatus.venue}</strong>
               </div>
               <div className="metric-tile">
-                <span>Tracked symbols</span>
+                <span>관리 종목</span>
                 <strong>{marketStatus.instruments.length}</strong>
               </div>
               {failureSummary ? (
                 <>
                   <div className="metric-tile">
-                    <span>Failures 24h</span>
+                    <span>24시간 오류</span>
                     <strong>{failureSummary.failureCount24h}</strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Affected instruments</span>
+                    <span>영향 종목</span>
                     <strong>{failureSummary.affectedInstrumentCount}</strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Latest failure</span>
+                    <span>최근 오류</span>
                     <strong>{formatTimestamp(failureSummary.lastFailureAt)}</strong>
                   </div>
                 </>
@@ -70,21 +70,21 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
               {backfillSummary ? (
                 <>
                   <div className="metric-tile">
-                    <span>Backfill count</span>
+                    <span>수집 진행</span>
                     <strong>{formatCompletion(backfillSummary.completionRatio)}</strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Count complete</span>
+                    <span>완료 종목</span>
                     <strong>
                       {backfillSummary.completeCount} / {backfillSummary.instrumentCount}
                     </strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Contiguous quality</span>
+                    <span>데이터 품질</span>
                     <strong>{formatCompletion(backfillSummary.contiguousQualityRatio)}</strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Gap-free spans</span>
+                    <span>빈 구간 없음</span>
                     <strong>
                       {backfillSummary.contiguousInstrumentCount > 0
                         ? `${backfillSummary.contiguousCompleteCount} / ${backfillSummary.contiguousInstrumentCount}`
@@ -96,19 +96,19 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
               {activeMarketInstrument && focusedMarketWorkflowSummary ? (
                 <>
                   <div className="metric-tile">
-                    <span>Triage focus</span>
+                    <span>확인 대상</span>
                     <strong>{focusedMarketWorkflowSummary.focusLabel}</strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Focused sync</span>
+                    <span>동기화 상태</span>
                     <strong>{activeMarketInstrument.sync_status}</strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Lineage claim</span>
+                    <span>검증 상태</span>
                     <strong>{formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage?.validation_claim)}</strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Latest ingestion</span>
+                    <span>최근 수집</span>
                     <strong>{formatWorkflowToken(focusedMarketWorkflowSummary.latestJob?.status)}</strong>
                   </div>
                 </>
@@ -117,24 +117,24 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
                 defaultOpen={false}
                 summary={`${
                   marketStatus.instruments.length
-                } instruments across ${marketStatus.provider} / ${marketStatus.venue}.${activeMarketInstrument ? ` Focused triage: ${activeMarketInstrument.instrument_id} ${activeMarketInstrument.timeframe}.` : ""}`}
-                title="Instrument sync ledger"
+                }개 종목을 ${marketStatus.venue}에서 관리합니다.${activeMarketInstrument ? ` 확인 중: ${activeMarketInstrument.instrument_id} ${activeMarketInstrument.timeframe}.` : ""}`}
+                title="종목별 수집 상태"
               >
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Instrument</th>
-                      <th>Timeframe</th>
-                      <th>Sync</th>
-                      <th>Candles</th>
-                      <th>Target</th>
-                      <th>Count</th>
-                      <th>Quality</th>
-                      <th>Lag</th>
-                      <th>Latest</th>
-                      <th>Checkpoint</th>
-                      <th>Failures</th>
-                      <th>Issues</th>
+                      <th>종목</th>
+                      <th>주기</th>
+                      <th>상태</th>
+                      <th>캔들</th>
+                      <th>목표</th>
+                      <th>수집</th>
+                      <th>품질</th>
+                      <th>지연</th>
+                      <th>최근</th>
+                      <th>저장 지점</th>
+                      <th>오류</th>
+                      <th>메모</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -155,7 +155,7 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
                             type="button"
                           >
                             <strong>{instrument.instrument_id}</strong>
-                            <span>{isMarketDataInstrumentAtRisk(instrument) ? "review" : "clear"}</span>
+                            <span>{isMarketDataInstrumentAtRisk(instrument) ? "확인 필요" : "정상"}</span>
                           </button>
                         </td>
                         <td>{instrument.timeframe}</td>
@@ -262,7 +262,7 @@ export function ControlRoomMarketDataPanel({ model }: { model: any }) {
               </PanelDisclosure>
             </div>
           ) : (
-            <p>No data status loaded.</p>
+            <p>데이터 상태를 불러오지 못했습니다.</p>
           )}
               </section>
 

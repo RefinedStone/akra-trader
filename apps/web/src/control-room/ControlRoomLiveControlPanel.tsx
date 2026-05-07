@@ -71,9 +71,9 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
   if (!guardedLive) {
     return (
       <section className="panel panel-wide">
-        <p className="kicker">Guarded live</p>
-        <h2>Kill switch and reconciliation</h2>
-        <p>No guarded-live status loaded.</p>
+        <p className="kicker">실전 보호</p>
+        <h2>중지 스위치와 거래소 확인</h2>
+        <p>실전 보호 상태를 불러오지 못했습니다.</p>
       </section>
     );
   }
@@ -86,47 +86,47 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
 
   return (
     <section className="panel panel-wide">
-      <p className="kicker">Guarded live</p>
-      <h2>Kill switch and reconciliation</h2>
+      <p className="kicker">실전 보호</p>
+      <h2>중지 스위치와 거래소 확인</h2>
 
       <div className="status-grid">
         <div className="metric-tile">
-          <span>Candidacy</span>
+          <span>실전 가능 상태</span>
           <strong>{guardedLive.candidacy_status}</strong>
         </div>
         <div className="metric-tile">
-          <span>Kill switch</span>
+          <span>중지 스위치</span>
           <strong>{guardedLive.kill_switch?.state ?? "n/a"}</strong>
         </div>
         <div className="metric-tile">
-          <span>Runtime alerts</span>
+          <span>운영 알림</span>
           <strong>{guardedLive.active_runtime_alert_count ?? activeGuardedLiveAlertIds.length}</strong>
         </div>
         <div className="metric-tile">
-          <span>Venue verification</span>
+          <span>거래소 확인</span>
           <strong>{guardedLive.reconciliation?.venue_snapshot?.verification_state ?? "n/a"}</strong>
         </div>
         <div className="metric-tile">
-          <span>Last reconciliation</span>
+          <span>최근 확인</span>
           <strong>{formatTimestamp(guardedLiveSummary?.latestReconciliationAt ?? null)}</strong>
         </div>
         <div className="metric-tile">
-          <span>Blockers</span>
+          <span>차단 사유</span>
           <strong>{guardedLiveSummary?.blockerCount ?? blockers.length}</strong>
         </div>
         <div className="metric-tile">
-          <span>Live owner</span>
+          <span>실전 실행</span>
           <strong>{guardedLive.ownership?.state ?? "n/a"}</strong>
         </div>
         <div className="metric-tile">
-          <span>Open orders</span>
+          <span>미체결 주문</span>
           <strong>{openOrders.length}</strong>
         </div>
       </div>
 
       <div className="control-action-row">
         <label className="control-action-field">
-          <span>Operator reason</span>
+          <span>처리 사유</span>
           <input
             onChange={(event) => setGuardedLiveReason?.(event.target.value)}
             placeholder="operator_safety_drill"
@@ -135,67 +135,67 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
           />
         </label>
         <button className="ghost-button" onClick={() => void runGuardedLiveReconciliation?.()} type="button">
-          Run reconciliation
+          거래소 확인
         </button>
         <button className="ghost-button" onClick={() => void recoverGuardedLiveRuntime?.()} type="button">
-          Recover runtime state
+          실행 상태 복구
         </button>
         <button className="ghost-button" onClick={() => void resumeGuardedLiveRun?.()} type="button">
-          Resume live owner
+          실전 실행 재개
         </button>
         <button className="ghost-button" onClick={() => void engageGuardedLiveKillSwitch?.()} type="button">
-          Engage kill switch
+          중지 스위치 켜기
         </button>
         <button className="ghost-button" onClick={() => void releaseGuardedLiveKillSwitch?.()} type="button">
-          Release kill switch
+          중지 스위치 해제
         </button>
       </div>
 
       <div className="panel-disclosure-grid">
         <PanelDisclosure
           defaultOpen={true}
-          summary={`${guardedLive.kill_switch?.state ?? "n/a"} kill switch · ${blockers.length} blockers · owner ${guardedLive.ownership?.state ?? "n/a"}`}
-          title="Control guardrails"
+          summary={`중지 스위치 ${guardedLive.kill_switch?.state ?? "n/a"} · 차단 ${blockers.length}개 · 실행 ${guardedLive.ownership?.state ?? "n/a"}`}
+          title="실전 보호 장치"
         >
           <div className="panel-disclosure-stack">
             <table className="data-table">
               <tbody>
                 <tr>
-                  <th>Kill switch</th>
+                  <th>중지 스위치</th>
                   <td>{guardedLive.kill_switch?.state ?? "n/a"}</td>
                 </tr>
                 <tr>
-                  <th>Reason</th>
+                  <th>사유</th>
                   <td>{guardedLive.kill_switch?.reason ?? "n/a"}</td>
                 </tr>
                 <tr>
-                  <th>Owner run</th>
+                  <th>실행 ID</th>
                   <td>{guardedLive.ownership?.owner_run_id ?? "n/a"}</td>
                 </tr>
                 <tr>
-                  <th>Owner session</th>
+                  <th>세션</th>
                   <td>{guardedLive.ownership?.owner_session_id ?? "n/a"}</td>
                 </tr>
                 <tr>
-                  <th>Owner symbol</th>
+                  <th>종목</th>
                   <td>{guardedLive.ownership?.symbol ?? "n/a"}</td>
                 </tr>
                 <tr>
-                  <th>Last order sync</th>
+                  <th>최근 주문 확인</th>
                   <td>{formatTimestamp(guardedLive.ownership?.last_order_sync_at ?? null)}</td>
                 </tr>
                 <tr>
-                  <th>Session restore</th>
+                  <th>세션 복구</th>
                   <td>{guardedLive.session_restore?.state ?? "n/a"}</td>
                 </tr>
                 <tr>
-                  <th>Session handoff</th>
+                  <th>세션 인계</th>
                   <td>{guardedLive.session_handoff?.state ?? "n/a"}</td>
                 </tr>
               </tbody>
             </table>
 
-            <h3>Candidate blockers</h3>
+            <h3>차단 사유</h3>
             {blockers.length ? (
               <table className="data-table">
                 <tbody>
@@ -207,25 +207,25 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                 </tbody>
               </table>
             ) : (
-              <p className="empty-state">No guarded-live blockers recorded.</p>
+              <p className="empty-state">현재 실전 차단 사유가 없습니다.</p>
             )}
           </div>
         </PanelDisclosure>
 
         <PanelDisclosure
           defaultOpen={false}
-          summary={`${findings.length} findings · ${openOrders.length} open orders · ${incidents.length} incidents`}
-          title="Venue state and incidents"
+          summary={`확인 결과 ${findings.length}개 · 미체결 주문 ${openOrders.length}개 · 사고 ${incidents.length}개`}
+          title="거래소 상태와 사고"
         >
           <div className="panel-disclosure-stack panel-disclosure-scroll">
-            <h3>Reconciliation findings</h3>
+            <h3>거래소 확인 결과</h3>
             {findings.length ? (
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Severity</th>
-                    <th>Finding</th>
-                    <th>Summary</th>
+                    <th>심각도</th>
+                    <th>항목</th>
+                    <th>내용</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -242,19 +242,19 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                 </tbody>
               </table>
             ) : (
-              <p className="empty-state">{guardedLive.reconciliation?.summary ?? "No reconciliation findings."}</p>
+              <p className="empty-state">{guardedLive.reconciliation?.summary ?? "거래소 확인 결과가 없습니다."}</p>
             )}
 
-            <h3>Open orders</h3>
+            <h3>미체결 주문</h3>
             {openOrders.length ? (
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Order</th>
-                    <th>Side</th>
-                    <th>Quantity</th>
-                    <th>Price</th>
-                    <th>Status</th>
+                    <th>주문</th>
+                    <th>방향</th>
+                    <th>수량</th>
+                    <th>가격</th>
+                    <th>상태</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -270,18 +270,18 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                 </tbody>
               </table>
             ) : (
-              <p className="empty-state">No durable open orders.</p>
+              <p className="empty-state">미체결 주문이 없습니다.</p>
             )}
 
-            <h3>Exposure</h3>
+            <h3>보유 현황</h3>
             {exposures.length ? (
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Asset</th>
-                    <th>Free</th>
-                    <th>Locked</th>
-                    <th>Total</th>
+                    <th>자산</th>
+                    <th>사용 가능</th>
+                    <th>묶임</th>
+                    <th>합계</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -296,19 +296,19 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                 </tbody>
               </table>
             ) : (
-              <p className="empty-state">No venue exposure snapshot.</p>
+              <p className="empty-state">거래소 보유 현황이 없습니다.</p>
             )}
 
-            <h3>Incidents</h3>
+            <h3>사고</h3>
             {incidents.length ? (
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Status</th>
-                    <th>Severity</th>
-                    <th>Summary</th>
-                    <th>Updated</th>
-                    <th>Actions</th>
+                    <th>상태</th>
+                    <th>심각도</th>
+                    <th>내용</th>
+                    <th>갱신</th>
+                    <th>처리</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -325,21 +325,21 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                             onClick={() => void acknowledgeGuardedLiveIncident?.(incident.incident_id)}
                             type="button"
                           >
-                            Acknowledge
+                            확인
                           </button>
                           <button
                             className="ghost-button"
                             onClick={() => void remediateGuardedLiveIncident?.(incident.incident_id)}
                             type="button"
                           >
-                            Remediate
+                            조치
                           </button>
                           <button
                             className="ghost-button"
                             onClick={() => void escalateGuardedLiveIncident?.(incident.incident_id)}
                             type="button"
                           >
-                            Escalate
+                            전달
                           </button>
                         </div>
                       </td>
@@ -348,7 +348,7 @@ export function ControlRoomLiveControlPanel({ model }: { model: LiveControlPanel
                 </tbody>
               </table>
             ) : (
-              <p className="empty-state">No guarded-live incidents.</p>
+              <p className="empty-state">현재 실전 사고가 없습니다.</p>
             )}
           </div>
         </PanelDisclosure>

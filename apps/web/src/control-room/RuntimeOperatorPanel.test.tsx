@@ -190,8 +190,8 @@ describe("RuntimeOperatorPanel", () => {
   it("renders the operator trust panel without missing model bindings", () => {
     render(<RuntimeOperatorPanel model={buildModel()} />);
 
-    expect(screen.getByText("Runtime alerts and audit")).toBeInTheDocument();
-    expect(screen.getByText("No active runtime alerts.")).toBeInTheDocument();
+    expect(screen.getByText("알림과 사고")).toBeInTheDocument();
+    expect(screen.getByText("현재 활성 알림이 없습니다.")).toBeInTheDocument();
     expect(screen.queryByText("Start export workflow")).not.toBeInTheDocument();
     expect(screen.queryByText("Escalate snapshot")).not.toBeInTheDocument();
   });

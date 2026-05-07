@@ -109,7 +109,7 @@ describe("ControlRoomMarketDataPanel", () => {
 
     render(<ControlRoomMarketDataPanel model={model} />);
 
-    expect(screen.getByText("Market data status")).toBeInTheDocument();
+    expect(screen.getByText("데이터 상태")).toBeInTheDocument();
     expect(screen.getByText("binance:BTC/USDT")).toBeInTheDocument();
   });
 });
