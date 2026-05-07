@@ -165,8 +165,10 @@ export function getComparisonIntentClassName(value: ComparisonIntent) {
 
 export function formatLaneLabel(runtime: string) {
   switch (runtime) {
+    case "native":
+      return "내장 실행";
     case "decision_engine":
-      return "decision";
+      return "의사결정 엔진";
     default:
       return runtime;
   }

@@ -36,10 +36,14 @@ function buildStrategy(overrides: Record<string, unknown> = {}) {
 
 describe("StrategyColumn", () => {
   it("renders the overview catalog without schema-hint detail blocks", () => {
-    render(<StrategyColumn accent="amber" strategies={[buildStrategy()]} title="Native" />);
+    render(<StrategyColumn accent="amber" strategies={[buildStrategy()]} title="운용 전략" />);
 
     expect(screen.getByText("Moving Average Cross")).toBeInTheDocument();
     expect(screen.getByText("ma_cross_v1")).toBeInTheDocument();
+    expect(screen.getByText("전략 ID")).toBeInTheDocument();
+    expect(screen.getByText("내장 실행")).toBeInTheDocument();
+    expect(screen.queryByText("Timeframes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Assets")).not.toBeInTheDocument();
     expect(screen.queryByText("Defaults")).not.toBeInTheDocument();
     expect(screen.queryByText("Parameter contract")).not.toBeInTheDocument();
     expect(screen.queryByText("Source")).not.toBeInTheDocument();

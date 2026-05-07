@@ -39,20 +39,20 @@ export function StrategyColumn({
             <p>{strategy.description}</p>
             <dl>
               <div>
-                <dt>ID</dt>
+                <dt>전략 ID</dt>
                 <dd>{strategy.strategy_id}</dd>
               </div>
               <div>
-                <dt>Timeframes</dt>
+                <dt>운용 주기</dt>
                 <dd>{strategy.supported_timeframes.join(", ")}</dd>
               </div>
               <div>
-                <dt>Assets</dt>
+                <dt>대상 시장</dt>
                 <dd>{strategy.asset_types.join(", ")}</dd>
               </div>
               {strategy.lifecycle.registered_at ? (
                 <div>
-                  <dt>Registered</dt>
+                  <dt>등록 시각</dt>
                   <dd>{formatTimestamp(strategy.lifecycle.registered_at)}</dd>
                 </div>
               ) : null}
@@ -60,7 +60,7 @@ export function StrategyColumn({
           </article>
         ))
       ) : (
-        <p className="empty-state">No strategies registered.</p>
+        <p className="empty-state">등록된 전략이 없습니다.</p>
       )}
     </div>
   );
