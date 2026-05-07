@@ -14,14 +14,11 @@ export function StrategyColumn({
   title,
   strategies,
   accent,
-  runSurfaceCapabilities,
 }: {
   title: string;
   strategies: Strategy[];
   accent: string;
-  runSurfaceCapabilities: RunSurfaceCapabilities | null;
 }) {
-  const schemaHintsEnabled = shouldEnableStrategyCatalogSchemaHints(runSurfaceCapabilities);
   return (
     <div className={`strategy-column ${accent}`}>
       <h3>{title}</h3>
@@ -40,9 +37,6 @@ export function StrategyColumn({
               <span>{formatVersionLineage(strategy.version_lineage, strategy.version)}</span>
             </div>
             <p>{strategy.description}</p>
-            {schemaHintsEnabled && strategy.catalog_semantics.execution_model ? (
-              <p className="run-note">{strategy.catalog_semantics.execution_model}</p>
-            ) : null}
             <dl>
               <div>
                 <dt>ID</dt>
@@ -56,34 +50,10 @@ export function StrategyColumn({
                 <dt>Assets</dt>
                 <dd>{strategy.asset_types.join(", ")}</dd>
               </div>
-              {schemaHintsEnabled ? (
-                <div>
-                  <dt>Defaults</dt>
-                  <dd>{formatParameterMap(extractDefaultParameters(strategy.parameter_schema))}</dd>
-                </div>
-              ) : null}
-              {schemaHintsEnabled && strategy.catalog_semantics.parameter_contract ? (
-                <div>
-                  <dt>Parameter contract</dt>
-                  <dd>{strategy.catalog_semantics.parameter_contract}</dd>
-                </div>
-              ) : null}
-              {schemaHintsEnabled && strategy.catalog_semantics.source_descriptor ? (
-                <div>
-                  <dt>Source</dt>
-                  <dd>{strategy.catalog_semantics.source_descriptor}</dd>
-                </div>
-              ) : null}
               {strategy.lifecycle.registered_at ? (
                 <div>
                   <dt>Registered</dt>
                   <dd>{formatTimestamp(strategy.lifecycle.registered_at)}</dd>
-                </div>
-              ) : null}
-              {schemaHintsEnabled && strategy.catalog_semantics.operator_notes.length ? (
-                <div>
-                  <dt>Operator notes</dt>
-                  <dd>{strategy.catalog_semantics.operator_notes.join(" | ")}</dd>
                 </div>
               ) : null}
             </dl>

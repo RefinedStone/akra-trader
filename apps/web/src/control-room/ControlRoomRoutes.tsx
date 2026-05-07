@@ -683,13 +683,11 @@ export function ControlRoomRoutes({ model }: { model: any }) {
                     title="Native"
                     strategies={strategyGroups.native}
                     accent="amber"
-                    runSurfaceCapabilities={runSurfaceCapabilities}
                   />
                   <StrategyColumn
                     title="Future LLM"
                     strategies={strategyGroups.future}
                     accent="ember"
-                    runSurfaceCapabilities={runSurfaceCapabilities}
                   />
                 </div>
               </section>
