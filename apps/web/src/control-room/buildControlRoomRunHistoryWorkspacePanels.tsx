@@ -5,6 +5,45 @@ import {
   type RunHistoryWorkspaceSectionProps,
 } from "../routes/runHistoryWorkspacePanels";
 
+const legacyReferenceRunMarkers = [
+  "nostalgiaforinfinity",
+  "nostalgia-for-infinity",
+  "nfi_",
+  "nfi-",
+  "freqtrade_reference",
+  "v17.3.",
+];
+
+export function isLegacyReferenceRun(run: any) {
+  const provenance = run?.provenance ?? {};
+  const strategy = provenance.strategy ?? {};
+  if (provenance.lane === "reference") {
+    return true;
+  }
+  if ("reference_id" in provenance || "reference" in provenance) {
+    return true;
+  }
+  if ("reference_path" in strategy || "reference_id" in strategy) {
+    return true;
+  }
+  if (strategy.runtime === "freqtrade_reference") {
+    return true;
+  }
+  const legacyText = JSON.stringify({
+    runId: run?.config?.run_id,
+    strategyId: run?.config?.strategy_id,
+    strategyVersion: run?.config?.strategy_version,
+    strategyRuntime: strategy.runtime,
+    strategyEntrypoint: strategy.entrypoint,
+    strategyName: strategy.name,
+  }).toLowerCase();
+  return legacyReferenceRunMarkers.some((marker) => legacyText.includes(marker));
+}
+
+function visibleRuns(runs: any[]) {
+  return Array.isArray(runs) ? runs.filter((run) => !isLegacyReferenceRun(run)) : [];
+}
+
 export function buildControlRoomRunHistoryWorkspacePanels(model: any) {
   const {
     backtestRunFilter,
@@ -20,7 +59,6 @@ export function buildControlRoomRunHistoryWorkspacePanels(model: any) {
     rerunBacktest,
     rerunPaper,
     rerunSandbox,
-    runSurfaceCapabilities,
     sandboxRunFilter,
     sandboxRuns,
     setBacktestRunFilter,
@@ -37,68 +75,68 @@ export function buildControlRoomRunHistoryWorkspacePanels(model: any) {
   return buildRunHistoryWorkspacePanels({
     renderRunSection: (props: RunHistoryWorkspaceSectionProps) => <RunSection {...props} />,
     research: {
-      runs: backtests,
+      runs: visibleRuns(backtests),
       presets,
-      runSurfaceCapabilities,
+      runSurfaceCapabilities: null,
       strategies,
       filter: backtestRunFilter,
       setFilter: setBacktestRunFilter,
       rerunActions: [
         {
           availabilityKey: "rerun_backtest",
-          label: "Rerun backtest",
+          label: "백테스트 다시 실행",
           onRerun: rerunBacktest,
         },
         {
           availabilityKey: "rerun_sandbox",
-          label: "Start sandbox worker",
+          label: "샌드박스로 확인",
           onRerun: rerunSandbox,
         },
         {
           availabilityKey: "rerun_paper",
-          label: "Start paper session",
+          label: "페이퍼로 확인",
           onRerun: rerunPaper,
         },
       ],
     },
     runtime: {
       sandbox: {
-        runs: sandboxRuns,
+        runs: visibleRuns(sandboxRuns),
         presets,
-        runSurfaceCapabilities,
+        runSurfaceCapabilities: null,
         strategies,
         filter: sandboxRunFilter,
         setFilter: setSandboxRunFilter,
         rerunActions: [
           {
             availabilityKey: "rerun_sandbox",
-            label: "Restore sandbox worker",
+            label: "샌드박스 다시 시작",
             onRerun: rerunSandbox,
           },
           {
             availabilityKey: "rerun_paper",
-            label: "Start paper session",
+            label: "페이퍼로 확인",
             onRerun: rerunPaper,
           },
         ],
         onStop: stopSandboxRun,
       },
       paper: {
-        runs: paperRuns,
+        runs: visibleRuns(paperRuns),
         presets,
-        runSurfaceCapabilities,
+        runSurfaceCapabilities: null,
         strategies,
         filter: paperRunFilter,
         setFilter: setPaperRunFilter,
         rerunActions: [
           {
             availabilityKey: "rerun_sandbox",
-            label: "Start sandbox worker",
+            label: "샌드박스로 확인",
             onRerun: rerunSandbox,
           },
           {
             availabilityKey: "rerun_paper",
-            label: "Start paper session",
+            label: "페이퍼 다시 시작",
             onRerun: rerunPaper,
           },
         ],
@@ -106,9 +144,9 @@ export function buildControlRoomRunHistoryWorkspacePanels(model: any) {
       },
     },
     live: {
-      runs: liveRuns,
+      runs: visibleRuns(liveRuns),
       presets,
-      runSurfaceCapabilities,
+      runSurfaceCapabilities: null,
       strategies,
       filter: liveRunFilter,
       setFilter: setLiveRunFilter,

@@ -19,9 +19,17 @@ LEGACY_NFI_MARKERS = (
   "nfi_",
   "nfi-",
 )
+LEGACY_NFI_VERSION_MARKERS = (
+  "v17.3.",
+)
 
 
-def _payload_matches(payload: dict[str, Any]) -> bool:
+def _payload_matches(
+  payload: dict[str, Any],
+  *,
+  strategy_id: str | None = None,
+  strategy_version: str | None = None,
+) -> bool:
   provenance = payload.get("provenance") or {}
   strategy = provenance.get("strategy") or {}
   if provenance.get("lane") == "reference":
@@ -34,25 +42,41 @@ def _payload_matches(payload: dict[str, Any]) -> bool:
     return True
   legacy_text = json.dumps(
     {
-      "strategy_id": payload.get("config", {}).get("strategy_id"),
+      "strategy_id": strategy_id or payload.get("config", {}).get("strategy_id"),
+      "strategy_version": strategy_version or payload.get("config", {}).get("strategy_version"),
       "strategy_runtime": strategy.get("runtime"),
       "strategy_entrypoint": strategy.get("entrypoint"),
       "strategy_name": strategy.get("name"),
     },
     sort_keys=True,
   )
-  return any(marker in legacy_text.lower() for marker in LEGACY_NFI_MARKERS)
+  normalized_legacy_text = legacy_text.lower()
+  if any(marker in normalized_legacy_text for marker in LEGACY_NFI_MARKERS):
+    return True
+  return any(marker in normalized_legacy_text for marker in LEGACY_NFI_VERSION_MARKERS)
 
 
 def purge_reference_runs(database_url: str, *, execute: bool) -> tuple[list[str], int]:
   engine = create_engine(database_url)
   metadata.create_all(engine)
   with engine.begin() as connection:
-    rows = connection.execute(select(run_records.c.run_id, run_records.c.payload)).all()
+    rows = connection.execute(
+      select(
+        run_records.c.run_id,
+        run_records.c.strategy_id,
+        run_records.c.strategy_version,
+        run_records.c.payload,
+      )
+    ).all()
     run_ids = [
       row.run_id
       for row in rows
-      if isinstance(row.payload, dict) and _payload_matches(row.payload)
+      if isinstance(row.payload, dict)
+      and _payload_matches(
+        row.payload,
+        strategy_id=row.strategy_id,
+        strategy_version=row.strategy_version,
+      )
     ]
     deleted_tags = 0
     if execute and run_ids:
