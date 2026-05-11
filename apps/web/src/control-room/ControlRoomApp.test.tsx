@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import App from "./ControlRoomApp";
+import App, { buildOrderMarkers } from "./ControlRoomApp";
 
 const strategyResponse = {
   strategies: [
@@ -455,6 +455,38 @@ describe("ControlRoomApp", () => {
       start_at: new Date("2025-01-01T01:20").toISOString(),
       end_at: new Date("2025-01-01T02:15").toISOString(),
     });
+  });
+
+  it("maps backtest orders onto wider chart timeframe candles", () => {
+    const order = {
+      ...orderFixture,
+      filled_at: "2026-05-11T00:10:01Z",
+    };
+    const selectedRun = backtestRun as Parameters<typeof buildOrderMarkers>[1]["selectedRun"];
+
+    expect(
+      buildOrderMarkers([order], {
+        candles: [
+          { timestamp: "2026-05-11T00:00:00Z", open: 81000, high: 81300, low: 80900, close: 81250, volume: 10 },
+          { timestamp: "2026-05-11T00:15:00Z", open: 81250, high: 81400, low: 81100, close: 81320, volume: 12 },
+        ],
+        selectedRun,
+        symbol: "BTC/USDT",
+        timeframe: "15m",
+      }),
+    ).toMatchObject([{ id: "order-1", side: "buy", time: 1778457600 }]);
+
+    expect(
+      buildOrderMarkers([order], {
+        candles: [
+          { timestamp: "2026-05-11T00:00:00Z", open: 81000, high: 81400, low: 80900, close: 81320, volume: 22 },
+          { timestamp: "2026-05-11T01:00:00Z", open: 81320, high: 81600, low: 81200, close: 81550, volume: 18 },
+        ],
+        selectedRun,
+        symbol: "BTC/USDT",
+        timeframe: "1h",
+      }),
+    ).toMatchObject([{ id: "order-1", side: "buy", time: 1778457600 }]);
   });
 
   it("renders operational detail tabs with summarized orders, positions, and logs", async () => {

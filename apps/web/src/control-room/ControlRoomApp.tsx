@@ -3363,7 +3363,7 @@ function buildOrderBlockOverlays(
   });
 }
 
-function buildOrderMarkers(
+export function buildOrderMarkers(
   orders: unknown[],
   {
     candles,
@@ -3382,9 +3382,6 @@ function buildOrderMarkers(
   }
   const runSymbol = selectedRun.config?.symbols?.[0];
   if (runSymbol && runSymbol !== symbol) {
-    return [];
-  }
-  if (selectedRun.config?.timeframe && selectedRun.config.timeframe !== timeframe) {
     return [];
   }
   const sortedCandles = [...candles].sort(
