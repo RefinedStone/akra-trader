@@ -147,6 +147,28 @@ type PerformanceMonthRow = {
   values: number[];
 };
 
+type OrderBlockZone = {
+  direction: "bullish" | "bearish";
+  endTime: UTCTimestamp;
+  high: number;
+  id: string;
+  low: number;
+  startTime: UTCTimestamp;
+  strength: number;
+};
+
+type OrderBlockOverlay = {
+  direction: OrderBlockZone["direction"];
+  id: string;
+  label: string;
+  style: {
+    height: string;
+    left: string;
+    top: string;
+    width: string;
+  };
+};
+
 type RunFormState = {
   strategy_id: string;
   symbol: string;
@@ -201,6 +223,9 @@ const movingAverageLines = [
 
 const rsiIndicator = { period: 14, label: "RSI14", color: "#ff8f3d", width: 1 } as const;
 const marketChartHeight = 340;
+const orderBlockLookback = 20;
+const orderBlockBreakoutLookback = 6;
+const maxOrderBlockZones = 8;
 
 const performanceModeMeta: Record<RunSummary["mode"], { color: string; label: string }> = {
   backtest: { color: "#9f7aff", label: "백테스트" },
@@ -1217,17 +1242,21 @@ function MarketChart({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const visibleRangeRef = useRef<IRange<Time> | null>(null);
+  const [orderBlockOverlays, setOrderBlockOverlays] = useState<OrderBlockOverlay[]>([]);
 
   useEffect(() => {
     visibleRangeRef.current = null;
+    setOrderBlockOverlays([]);
   }, [symbol, timeframe]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container || candles.length === 0 || import.meta.env.MODE === "test") {
+      setOrderBlockOverlays([]);
       return;
     }
 
+    const orderBlocks = detectOrderBlocks(candles);
     let chart: IChartApi | null = null;
     let series: ISeriesApi<"Candlestick"> | null = null;
     let averageSeries: Array<ISeriesApi<"Line">> = [];
@@ -1239,6 +1268,14 @@ function MarketChart({
       if (acceptsVisibleRangeChanges && range) {
         visibleRangeRef.current = range;
       }
+      updateOrderBlockOverlays();
+    };
+
+    const updateOrderBlockOverlays = () => {
+      if (disposed || !chart || !series || !containerRef.current) {
+        return;
+      }
+      setOrderBlockOverlays(buildOrderBlockOverlays(orderBlocks, chart, series, containerRef.current));
     };
 
     const renderChart = async () => {
@@ -1363,9 +1400,11 @@ function MarketChart({
         const width = containerRef.current?.clientWidth ?? 0;
         if (chart && width > 0) {
           chart.resize(width, marketChartHeight);
+          updateOrderBlockOverlays();
         }
       };
       resize();
+      updateOrderBlockOverlays();
 
       resizeObserver = new ResizeObserver(resize);
       resizeObserver.observe(containerRef.current);
@@ -1385,6 +1424,7 @@ function MarketChart({
       resizeObserver?.disconnect();
       chart?.remove();
       averageSeries = [];
+      setOrderBlockOverlays([]);
       series = null;
       chart = null;
     };
@@ -1410,10 +1450,29 @@ function MarketChart({
               <b style={{ backgroundColor: rsiIndicator.color }} />
               {rsiIndicator.label}
             </span>
+            <span>
+              <b className="legend-zone bullish" />
+              Bull OB
+            </span>
+            <span>
+              <b className="legend-zone bearish" />
+              Bear OB
+            </span>
           </div>
         </div>
       </div>
       <div className="market-chart" ref={containerRef}>
+        <div className="order-block-layer" aria-hidden="true">
+          {orderBlockOverlays.map((zone) => (
+            <span
+              className={`order-block-zone ${zone.direction}`}
+              key={zone.id}
+              style={zone.style}
+            >
+              <small>{zone.label}</small>
+            </span>
+          ))}
+        </div>
         {loading ? (
           <div className="chart-loading" role="status">
             <span className="loading-spinner" aria-hidden="true" />
@@ -3075,6 +3134,143 @@ function mergeCandles(...groups: Candle[][]) {
   return [...byTimestamp.values()].sort(
     (left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime(),
   );
+}
+
+function detectOrderBlocks(candles: Candle[]): OrderBlockZone[] {
+  const sortedCandles = [...candles].sort(
+    (left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime(),
+  );
+  const activeZones: OrderBlockZone[] = [];
+  const latestTime = candleTimestamp(sortedCandles.at(-1));
+  if (latestTime === null) {
+    return [];
+  }
+
+  for (let index = 1; index < sortedCandles.length; index += 1) {
+    const current = sortedCandles[index];
+    for (let zoneIndex = activeZones.length - 1; zoneIndex >= 0; zoneIndex -= 1) {
+      const zone = activeZones[zoneIndex];
+      if (
+        (zone.direction === "bullish" && current.close < zone.low) ||
+        (zone.direction === "bearish" && current.close > zone.high)
+      ) {
+        activeZones.splice(zoneIndex, 1);
+      }
+    }
+
+    if (index < orderBlockLookback) {
+      continue;
+    }
+
+    const previous = sortedCandles[index - 1];
+    const lookback = sortedCandles.slice(Math.max(0, index - orderBlockLookback), index);
+    const breakoutLookback = sortedCandles.slice(Math.max(0, index - orderBlockBreakoutLookback), index);
+    const averageRange = average(lookback.map((candle) => candle.high - candle.low).filter((range) => range > 0));
+    const currentRange = current.high - current.low;
+    if (averageRange <= 0 || currentRange <= 0) {
+      continue;
+    }
+
+    const currentBody = Math.abs(current.close - current.open);
+    const displacement = currentRange >= averageRange * 1.6 && currentBody >= currentRange * 0.55;
+    if (!displacement || breakoutLookback.length === 0) {
+      continue;
+    }
+
+    const previousTime = candleTimestamp(previous);
+    if (previousTime === null) {
+      continue;
+    }
+    const breakoutHigh = Math.max(...breakoutLookback.map((candle) => candle.high));
+    const breakoutLow = Math.min(...breakoutLookback.map((candle) => candle.low));
+    const bullishBreak = current.close > current.open && current.close > breakoutHigh && previous.close < previous.open;
+    const bearishBreak = current.close < current.open && current.close < breakoutLow && previous.close > previous.open;
+
+    if (bullishBreak || bearishBreak) {
+      activeZones.push({
+        direction: bullishBreak ? "bullish" : "bearish",
+        endTime: latestTime,
+        high: Math.max(previous.high, previous.low),
+        id: `${bullishBreak ? "bullish" : "bearish"}-${previous.timestamp}`,
+        low: Math.min(previous.high, previous.low),
+        startTime: previousTime,
+        strength: currentRange / averageRange,
+      });
+    }
+  }
+
+  return activeZones
+    .slice(-maxOrderBlockZones)
+    .map((zone) => ({ ...zone, endTime: latestTime }))
+    .sort((left, right) => left.startTime - right.startTime);
+}
+
+function buildOrderBlockOverlays(
+  zones: OrderBlockZone[],
+  chart: IChartApi,
+  series: ISeriesApi<"Candlestick">,
+  container: HTMLDivElement,
+): OrderBlockOverlay[] {
+  const visibleRange = chart.timeScale().getVisibleRange();
+  const visibleStart = visibleRange ? timeToUnixSeconds(visibleRange.from) : null;
+  const visibleEnd = visibleRange ? timeToUnixSeconds(visibleRange.to) : null;
+  const width = container.clientWidth;
+  return zones.flatMap((zone) => {
+    const startTime = visibleStart === null ? zone.startTime : Math.max(zone.startTime, visibleStart);
+    const endTime = visibleEnd === null ? zone.endTime : Math.min(zone.endTime, visibleEnd);
+    if (endTime <= startTime) {
+      return [];
+    }
+    const leftCoordinate = chart.timeScale().timeToCoordinate(startTime as UTCTimestamp);
+    const rightCoordinate = chart.timeScale().timeToCoordinate(endTime as UTCTimestamp);
+    const highCoordinate = series.priceToCoordinate(zone.high);
+    const lowCoordinate = series.priceToCoordinate(zone.low);
+    if (
+      leftCoordinate === null ||
+      rightCoordinate === null ||
+      highCoordinate === null ||
+      lowCoordinate === null
+    ) {
+      return [];
+    }
+    const left = Math.max(0, Math.min(leftCoordinate, rightCoordinate));
+    const right = Math.min(width, Math.max(leftCoordinate, rightCoordinate));
+    const top = Math.min(highCoordinate, lowCoordinate);
+    const height = Math.max(Math.abs(lowCoordinate - highCoordinate), 3);
+    if (right - left < 4 || top > marketChartHeight || top + height < 0) {
+      return [];
+    }
+    return [
+      {
+        direction: zone.direction,
+        id: zone.id,
+        label: `${zone.direction === "bullish" ? "Bull" : "Bear"} OB ${zone.strength.toFixed(1)}x`,
+        style: {
+          height: `${height}px`,
+          left: `${left}px`,
+          top: `${Math.max(0, top)}px`,
+          width: `${right - left}px`,
+        },
+      },
+    ];
+  });
+}
+
+function candleTimestamp(candle?: Candle) {
+  if (!candle) {
+    return null;
+  }
+  const timestamp = Math.floor(new Date(candle.timestamp).getTime() / 1000);
+  return Number.isFinite(timestamp) ? (timestamp as UTCTimestamp) : null;
+}
+
+function timeToUnixSeconds(time: Time) {
+  const date = timeToDate(time);
+  if (date === null) {
+    return null;
+  }
+  const timestamp = Math.floor(date.getTime() / 1000);
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 function toCandlestickSeriesData(candles: Candle[]): CandlestickData[] {
