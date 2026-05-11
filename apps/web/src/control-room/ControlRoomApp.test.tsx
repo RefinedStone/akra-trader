@@ -12,7 +12,50 @@ const strategyResponse = {
       runtime: "native",
       lifecycle: { stage: "active" },
       supported_timeframes: ["5m"],
-      parameter_schema: {},
+      parameter_schema: {
+        short_window: {
+          type: "integer",
+          default: 8,
+          minimum: 2,
+          unit: "bars",
+          semantic_hint: "Fast crossover trigger leg.",
+        },
+        long_window: {
+          type: "integer",
+          default: 21,
+          minimum: 5,
+          unit: "bars",
+          semantic_hint: "Slow crossover confirmation baseline.",
+        },
+      },
+    },
+    {
+      strategy_id: "rsi_atr_trend_pullback_v1",
+      name: "RSI ATR Trend Pullback",
+      runtime: "native_composable",
+      lifecycle: { stage: "experimental" },
+      supported_timeframes: ["5m"],
+      parameter_schema: {
+        fast_ema_window: {
+          type: "integer",
+          default: 20,
+          minimum: 2,
+          unit: "bars",
+          semantic_hint: "Fast trend leg.",
+        },
+        risk_fraction: {
+          type: "number",
+          default: 0.01,
+          minimum: 0,
+          maximum: 1,
+          semantic_hint: "Portfolio risk budget per trade.",
+        },
+        use_llm_regime_hint: {
+          type: "boolean",
+          default: true,
+          semantic_hint: "Calls context.llm.function() as an optional regime overlay.",
+        },
+      },
     },
     {
       strategy_id: "external_decision_template",
@@ -432,6 +475,42 @@ describe("ControlRoomApp", () => {
     expect(JSON.parse(String(runCall?.[1]?.body))).toMatchObject({
       start_at: new Date("2025-01-01T00:00").toISOString(),
       end_at: new Date("2025-01-02T00:00").toISOString(),
+    });
+  });
+
+  it("renders strategy schema parameters and submits them as run parameters", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /백테스트/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "전략" }), {
+      target: { value: "rsi_atr_trend_pullback_v1" },
+    });
+
+    expect(screen.getByLabelText(/fast_ema_window/)).toHaveValue(20);
+    expect(screen.getByLabelText(/risk_fraction/)).toHaveValue(0.01);
+    expect(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ })).toBeChecked();
+
+    fireEvent.change(screen.getByLabelText(/fast_ema_window/), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText(/risk_fraction/), { target: { value: "0.02" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ }));
+    fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/runs/backtests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    const runCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) =>
+      String(url).endsWith("/api/runs/backtests"),
+    );
+    expect(JSON.parse(String(runCall?.[1]?.body))).toMatchObject({
+      strategy_id: "rsi_atr_trend_pullback_v1",
+      parameters: {
+        fast_ema_window: 12,
+        risk_fraction: 0.02,
+        use_llm_regime_hint: false,
+      },
     });
   });
 

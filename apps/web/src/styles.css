@@ -438,6 +438,84 @@ textarea {
   line-height: 1.55;
 }
 
+.parameter-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.parameter-editor-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.parameter-editor-heading div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.parameter-editor-heading strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.parameter-editor-heading span,
+.parameter-editor-heading small,
+.parameter-empty {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.parameter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.parameter-field {
+  align-content: start;
+}
+
+.parameter-field span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.parameter-field b {
+  overflow: hidden;
+  color: var(--muted-strong);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parameter-field small {
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.parameter-toggle {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 70px;
+}
+
+.parameter-toggle input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--accent);
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1691,7 +1769,8 @@ td {
   .metric-grid,
   .form-grid,
   .form-grid.compact,
-  .form-grid.sync-grid {
+  .form-grid.sync-grid,
+  .parameter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1703,6 +1782,7 @@ td {
   .form-grid,
   .form-grid.compact,
   .form-grid.sync-grid,
+  .parameter-grid,
   .run-row,
   .log-list article {
     grid-template-columns: 1fr;

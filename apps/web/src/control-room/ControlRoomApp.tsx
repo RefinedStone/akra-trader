@@ -71,6 +71,15 @@ type Strategy = {
   parameter_schema: Record<string, unknown>;
 };
 
+type StrategyParameterSpec = {
+  type?: string;
+  default?: unknown;
+  minimum?: number;
+  maximum?: number;
+  unit?: string;
+  semantic_hint?: string;
+};
+
 type MarketStatus = {
   provider: string;
   venue: string;
@@ -1584,7 +1593,17 @@ function RunLaunchSection({
     void onSubmit(mode);
   };
   const runnableStrategies = strategies.filter((strategy) => strategy.runtime !== "decision_engine");
+  const selectedStrategy =
+    runnableStrategies.find((strategy) => strategy.strategy_id === form.strategy_id) ?? runnableStrategies[0] ?? null;
   const latestRun = activeRuns[0];
+  const handleStrategyChange = (strategyId: string) => {
+    const nextStrategy = runnableStrategies.find((strategy) => strategy.strategy_id === strategyId);
+    setForm({
+      ...form,
+      strategy_id: strategyId,
+      parameters: formatStrategyParameters(defaultParametersForStrategy(nextStrategy)),
+    });
+  };
   return (
     <section className="core-panel core-panel-main">
       <div className="panel-heading">
@@ -1605,7 +1624,7 @@ function RunLaunchSection({
             전략
             <select
               value={form.strategy_id}
-              onChange={(event) => setForm({ ...form, strategy_id: event.target.value })}
+              onChange={(event) => handleStrategyChange(event.target.value)}
             >
               {runnableStrategies.map((strategy) => (
                 <option key={strategy.strategy_id} value={strategy.strategy_id}>
@@ -1704,13 +1723,11 @@ function RunLaunchSection({
             />
           </label>
         </div>
-        <label>
-          전략 파라미터
-          <textarea
-            value={form.parameters}
-            onChange={(event) => setForm({ ...form, parameters: event.target.value })}
-          />
-        </label>
+        <StrategyParameterEditor
+          parameters={form.parameters}
+          strategy={selectedStrategy}
+          setParameters={(parameters) => setForm({ ...form, parameters })}
+        />
         <button type="submit">{title} 실행</button>
       </form>
       <RunList activeRuns={activeRuns} onSelectRun={onSelectRun} selectedRunId={selectedRunId} />
@@ -1802,6 +1819,111 @@ function LogsSection({
       </div>
       <LogList logs={logs} />
     </section>
+  );
+}
+
+function StrategyParameterEditor({
+  parameters,
+  setParameters,
+  strategy,
+}: {
+  parameters: string;
+  setParameters: (parameters: string) => void;
+  strategy: Strategy | null;
+}) {
+  const entries = strategyParameterEntries(strategy?.parameter_schema ?? {});
+  const parsed = parseStrategyParameters(parameters);
+  const setParameter = (key: string, value: unknown) => {
+    const next = { ...parsed, [key]: value };
+    setParameters(formatStrategyParameters(next));
+  };
+
+  return (
+    <section className="parameter-editor" aria-label="전략 파라미터">
+      <div className="parameter-editor-heading">
+        <div>
+          <strong>전략 파라미터</strong>
+          <span>{strategy?.name ?? "전략 선택 대기"}</span>
+        </div>
+        <small>{entries.length > 0 ? `${entries.length}개 조정 가능` : "스키마 없음"}</small>
+      </div>
+      {entries.length === 0 ? (
+        <p className="parameter-empty">이 전략은 노출된 조정 파라미터가 없습니다.</p>
+      ) : (
+        <div className="parameter-grid">
+          {entries.map(([key, spec]) => (
+            <StrategyParameterField
+              key={key}
+              name={key}
+              onChange={(value) => setParameter(key, value)}
+              spec={spec}
+              value={parameterValue(parsed, key, spec)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StrategyParameterField({
+  name,
+  onChange,
+  spec,
+  value,
+}: {
+  name: string;
+  onChange: (value: unknown) => void;
+  spec: StrategyParameterSpec;
+  value: unknown;
+}) {
+  const type = String(spec.type ?? typeof value);
+  const hint = [spec.semantic_hint, spec.unit ? `단위: ${spec.unit}` : ""].filter(Boolean).join(" · ");
+  if (type === "boolean") {
+    return (
+      <label className="parameter-field parameter-toggle">
+        <span>
+          <b>{name}</b>
+          {hint ? <small>{hint}</small> : null}
+        </span>
+        <input
+          checked={Boolean(value)}
+          onChange={(event) => onChange(event.target.checked)}
+          type="checkbox"
+        />
+      </label>
+    );
+  }
+  if (type === "integer" || type === "number") {
+    return (
+      <label className="parameter-field">
+        <span>
+          <b>{name}</b>
+          {hint ? <small>{hint}</small> : null}
+        </span>
+        <input
+          max={spec.maximum}
+          min={spec.minimum}
+          onChange={(event) => onChange(parseNumericParameter(event.target.value, spec))}
+          step={type === "integer" ? 1 : "any"}
+          type="number"
+          value={String(value ?? spec.default ?? "")}
+        />
+      </label>
+    );
+  }
+  return (
+    <label className="parameter-field">
+      <span>
+        <b>{name}</b>
+        {hint ? <small>{hint}</small> : null}
+      </span>
+      <input
+        onChange={(event) => onChange(event.target.value)}
+        type="text"
+        value={String(value ?? spec.default ?? "")}
+      />
+    </label>
   );
 }
 
@@ -2947,6 +3069,70 @@ function formatMetricLabel(value: string) {
     default:
       return value.replaceAll("_", " ");
   }
+}
+
+function strategyParameterEntries(schema: Record<string, unknown>) {
+  return Object.entries(schema)
+    .map(([key, spec]) => [key, normalizeParameterSpec(spec)] as const)
+    .filter(([, spec]) => spec.type || "default" in spec || spec.semantic_hint);
+}
+
+function normalizeParameterSpec(spec: unknown): StrategyParameterSpec {
+  const record = asRecord(spec);
+  return {
+    type: typeof record.type === "string" ? record.type : undefined,
+    default: record.default,
+    minimum: typeof record.minimum === "number" ? record.minimum : undefined,
+    maximum: typeof record.maximum === "number" ? record.maximum : undefined,
+    unit: typeof record.unit === "string" ? record.unit : undefined,
+    semantic_hint: typeof record.semantic_hint === "string" ? record.semantic_hint : undefined,
+  };
+}
+
+function defaultParametersForStrategy(strategy?: Strategy | null) {
+  return Object.fromEntries(
+    strategyParameterEntries(strategy?.parameter_schema ?? {}).map(([key, spec]) => [
+      key,
+      parameterDefaultValue(spec),
+    ]),
+  );
+}
+
+function parseStrategyParameters(value: string) {
+  try {
+    return asRecord(JSON.parse(value));
+  } catch {
+    return {};
+  }
+}
+
+function formatStrategyParameters(parameters: Record<string, unknown>) {
+  return JSON.stringify(parameters, null, 2);
+}
+
+function parameterValue(parameters: Record<string, unknown>, key: string, spec: StrategyParameterSpec) {
+  return key in parameters ? parameters[key] : parameterDefaultValue(spec);
+}
+
+function parameterDefaultValue(spec: StrategyParameterSpec) {
+  if ("default" in spec && spec.default !== undefined) {
+    return spec.default;
+  }
+  if (spec.type === "boolean") {
+    return false;
+  }
+  if (spec.type === "integer" || spec.type === "number") {
+    return 0;
+  }
+  return "";
+}
+
+function parseNumericParameter(value: string, spec: StrategyParameterSpec) {
+  if (value.trim() === "") {
+    return parameterDefaultValue(spec);
+  }
+  const parsed = spec.type === "integer" ? Number.parseInt(value, 10) : Number(value);
+  return Number.isFinite(parsed) ? parsed : parameterDefaultValue(spec);
 }
 
 function formatRange(start?: string | null, end?: string | null) {
