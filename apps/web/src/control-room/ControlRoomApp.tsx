@@ -822,7 +822,7 @@ function MarketChart({
           borderColor: "rgba(46, 62, 91, 0.8)",
           timeVisible: true,
           secondsVisible: false,
-          tickMarkFormatter: (time: Time) => formatChartTime(time),
+          tickMarkFormatter: (time: Time) => formatChartAxisTick(time),
         },
         crosshair: {
           vertLine: { color: "rgba(159, 122, 255, 0.48)" },
@@ -1405,17 +1405,28 @@ function formatTimestamp(value?: string | null) {
 }
 
 function formatChartTime(time: Time) {
-  if (typeof time === "number") {
-    return formatKstDate(new Date(time * 1000));
+  const date = timeToDate(time);
+  return date === null ? String(time) : formatKstDate(date);
+}
+
+function formatChartAxisTick(time: Time) {
+  const date = timeToDate(time);
+  if (date === null) {
+    return String(time);
   }
-  if (typeof time === "string") {
-    const date = new Date(time);
-    return Number.isNaN(date.getTime()) ? time : formatKstDate(date);
+  const parts = getKstDateParts(date);
+  if (parts.hour === "00" && parts.minute === "00") {
+    return `${parts.month}-${parts.day}`;
   }
-  return formatKstDate(new Date(Date.UTC(time.year, time.month - 1, time.day)));
+  return `${parts.hour}:${parts.minute}`;
 }
 
 function formatKstDate(date: Date) {
+  const parts = getKstDateParts(date);
+  return `${parts.hour}:${parts.minute} ${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function getKstDateParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en", {
     day: "2-digit",
     hour: "2-digit",
@@ -1428,7 +1439,24 @@ function formatKstDate(date: Date) {
   }).formatToParts(date);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((item) => item.type === type)?.value ?? "00";
-  return `${part("hour")}:${part("minute")} ${part("year")}-${part("month")}-${part("day")}`;
+  return {
+    day: part("day"),
+    hour: part("hour"),
+    minute: part("minute"),
+    month: part("month"),
+    year: part("year"),
+  };
+}
+
+function timeToDate(time: Time) {
+  if (typeof time === "number") {
+    return new Date(time * 1000);
+  }
+  if (typeof time === "string") {
+    const date = new Date(time);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return new Date(Date.UTC(time.year, time.month - 1, time.day));
 }
 
 function toApiDateTime(value: string) {
