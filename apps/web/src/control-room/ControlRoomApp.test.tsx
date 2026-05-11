@@ -249,13 +249,14 @@ describe("ControlRoomApp", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the six core sections and submits a sandbox payload", async () => {
+  it("renders the core sections and submits a sandbox payload", async () => {
     render(<App />);
 
     expect(await screen.findByRole("button", { name: /데이터/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /백테스트/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /샌드박스/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /실전 매매/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /성과/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /로그/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /LLM 전략/ })).toBeInTheDocument();
     expect(screen.getByText("MA5")).toBeInTheDocument();
@@ -285,6 +286,20 @@ describe("ControlRoomApp", () => {
 
     expect(screen.getByText("DecisionEnginePort")).toBeInTheDocument();
     expect(screen.getByText("인터페이스만 유지")).toBeInTheDocument();
+  });
+
+  it("renders the performance dashboard from run metrics", async () => {
+    runs = [backtestRun, sandboxRun];
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /성과/ }));
+
+    expect(screen.getByText("성과 대시보드")).toBeInTheDocument();
+    expect(screen.getByText("누적 수익률 비교")).toBeInTheDocument();
+    expect(screen.getByText("전략 성과 비교")).toBeInTheDocument();
+    expect(screen.getByText("심볼별 수익 기여도")).toBeInTheDocument();
+    expect(screen.getByText("성과 인사이트")).toBeInTheDocument();
+    expect(screen.queryByText("실행 상세")).not.toBeInTheDocument();
   });
 
   it("loads market data through one sync-backed query flow", async () => {

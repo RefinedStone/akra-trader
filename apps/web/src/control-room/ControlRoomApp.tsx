@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CandlestickData, IChartApi, IRange, ISeriesApi, LineData, Time, UTCTimestamp } from "lightweight-charts";
 
-type SectionId = "data" | "backtest" | "sandbox" | "live" | "logs" | "llm";
+type SectionId = "data" | "backtest" | "sandbox" | "live" | "performance" | "logs" | "llm";
 type DetailTabId = "overview" | "orders" | "positions" | "metrics" | "logs";
 
 type RunConfigSummary = {
@@ -109,6 +109,44 @@ type Candle = {
 
 type UnknownRecord = Record<string, unknown>;
 
+type PerformanceModeRow = {
+  color: string;
+  label: string;
+  maxDrawdownPct: number;
+  mode: RunSummary["mode"];
+  runCount: number;
+  totalReturnPct: number;
+  tradeCount: number;
+  winRatePct: number;
+};
+
+type PerformanceStrategyRow = {
+  lastRunAt: string | null;
+  maxDrawdownPct: number;
+  mode: RunSummary["mode"];
+  modeLabel: string;
+  runCount: number;
+  sharpeRatio: number;
+  strategy: string;
+  totalReturnPct: number;
+  tradeCount: number;
+  winRatePct: number;
+};
+
+type PerformanceSymbolRow = {
+  runCount: number;
+  symbol: string;
+  totalReturnPct: number;
+  weightPct: number;
+};
+
+type PerformanceMonthRow = {
+  label: string;
+  mode: RunSummary["mode"];
+  months: string[];
+  values: number[];
+};
+
 type RunFormState = {
   strategy_id: string;
   symbol: string;
@@ -141,6 +179,7 @@ const sections: Array<{ id: SectionId; label: string; eyebrow: string; mark: str
   { id: "backtest", label: "백테스트", eyebrow: "과거 검증", mark: "B", path: "/backtest" },
   { id: "sandbox", label: "샌드박스", eyebrow: "모의 테스트", mark: "S", path: "/sandbox" },
   { id: "live", label: "실전 매매", eyebrow: "가드드 라이브", mark: "L", path: "/live" },
+  { id: "performance", label: "성과", eyebrow: "성과 분석", mark: "P", path: "/performance" },
   { id: "logs", label: "로그", eyebrow: "운영 기록", mark: "O", path: "/logs" },
   { id: "llm", label: "LLM 전략", eyebrow: "격리 계층", mark: "A", path: "/llm-strategy" },
 ];
@@ -158,6 +197,12 @@ const movingAverageLines = [
   { period: 20, label: "MA20 황금선", color: "#f0c43c", width: 2 },
   { period: 60, label: "MA60", color: "#31d17d", width: 1 },
 ] as const;
+
+const performanceModeMeta: Record<RunSummary["mode"], { color: string; label: string }> = {
+  backtest: { color: "#9f7aff", label: "백테스트" },
+  sandbox: { color: "#4d8dff", label: "샌드박스" },
+  live: { color: "#31d17d", label: "실전 매매" },
+};
 
 const defaultRunForm: RunFormState = {
   strategy_id: "ma_cross_v1",
@@ -508,7 +553,7 @@ export default function App() {
 
         {error ? <div className="core-alert">{error}</div> : null}
 
-        <main className="core-layout">
+        <main className={activeSection === "performance" ? "core-layout performance-layout" : "core-layout"}>
           {activeSection === "data" ? (
             <DataSection
               candles={candles}
@@ -572,6 +617,10 @@ export default function App() {
             />
           ) : null}
 
+          {activeSection === "performance" ? (
+            <PerformanceSection logs={logs} onRefresh={() => void refresh()} runs={runs} />
+          ) : null}
+
           {activeSection === "logs" ? (
             <LogsSection
               logFilter={logFilter}
@@ -585,15 +634,375 @@ export default function App() {
             <LlmSection llmStrategy={llmStrategy} strategies={strategies} />
           ) : null}
 
-          <RunDetailPanel
-            logs={logs.filter((log) => log.run_id === selectedRunId)}
-            orders={orders}
-            positions={positions}
-            run={selectedRun}
-            onStop={stopSelectedRun}
-          />
+          {activeSection !== "performance" ? (
+            <RunDetailPanel
+              logs={logs.filter((log) => log.run_id === selectedRunId)}
+              orders={orders}
+              positions={positions}
+              run={selectedRun}
+              onStop={stopSelectedRun}
+            />
+          ) : null}
         </main>
       </div>
+    </div>
+  );
+}
+
+function PerformanceSection({
+  logs,
+  onRefresh,
+  runs,
+}: {
+  logs: OperationLog[];
+  onRefresh: () => void;
+  runs: RunSummary[];
+}) {
+  const [filters, setFilters] = useState({ mode: "all", symbol: "all", timeframe: "all" });
+  const symbolOptions = useMemo(
+    () => uniqueOptions(runs.map((run) => run.config?.symbols?.[0] ?? "").filter(Boolean)),
+    [runs],
+  );
+  const timeframeOptions = useMemo(
+    () => uniqueOptions(runs.map((run) => run.config?.timeframe ?? "").filter(Boolean)),
+    [runs],
+  );
+  const filteredRuns = useMemo(
+    () =>
+      runs.filter((run) => {
+        const symbol = run.config?.symbols?.[0] ?? "";
+        const timeframe = run.config?.timeframe ?? "";
+        return (
+          (filters.mode === "all" || run.mode === filters.mode) &&
+          (filters.symbol === "all" || symbol === filters.symbol) &&
+          (filters.timeframe === "all" || timeframe === filters.timeframe)
+        );
+      }),
+    [filters, runs],
+  );
+  const summary = useMemo(() => buildPerformanceSummary(filteredRuns), [filteredRuns]);
+  const modeRows = useMemo(() => buildModePerformanceRows(filteredRuns), [filteredRuns]);
+  const strategyRows = useMemo(() => buildStrategyPerformanceRows(filteredRuns), [filteredRuns]);
+  const symbolRows = useMemo(() => buildSymbolPerformanceRows(filteredRuns), [filteredRuns]);
+  const monthlyRows = useMemo(() => buildMonthlyPerformanceRows(filteredRuns), [filteredRuns]);
+  const cumulativeSeries = useMemo(() => buildCumulativePerformanceSeries(filteredRuns), [filteredRuns]);
+  const insightCards = useMemo(
+    () => buildPerformanceInsights({ logs, modeRows, runs: filteredRuns, strategyRows }),
+    [filteredRuns, logs, modeRows, strategyRows],
+  );
+
+  return (
+    <section className="core-panel core-panel-main performance-panel">
+      <div className="performance-heading">
+        <div>
+          <p className="core-eyebrow">성과</p>
+          <h2>성과 대시보드</h2>
+          <span>백테스트, 샌드박스, 실전 매매의 전략 성과를 같은 기준으로 비교합니다.</span>
+        </div>
+        <button type="button" onClick={onRefresh}>
+          새로고침
+        </button>
+      </div>
+
+      <div className="performance-toolbar">
+        <div className="segmented-control" aria-label="performance mode filter">
+          {[
+            ["all", "전체"],
+            ["backtest", "백테스트"],
+            ["sandbox", "샌드박스"],
+            ["live", "실전 매매"],
+          ].map(([value, label]) => (
+            <button
+              aria-pressed={filters.mode === value}
+              className={filters.mode === value ? "is-active" : ""}
+              key={value}
+              onClick={() => setFilters({ ...filters, mode: value })}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label>
+          심볼
+          <select value={filters.symbol} onChange={(event) => setFilters({ ...filters, symbol: event.target.value })}>
+            <option value="all">전체</option>
+            {symbolOptions.map((symbol) => (
+              <option key={symbol} value={symbol}>
+                {symbol}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          타임프레임
+          <select
+            value={filters.timeframe}
+            onChange={(event) => setFilters({ ...filters, timeframe: event.target.value })}
+          >
+            <option value="all">전체</option>
+            {timeframeOptions.map((timeframe) => (
+              <option key={timeframe} value={timeframe}>
+                {timeframe}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="performance-stat-grid">
+        <PerformanceStatCard label="누적 수익률" tone={summary.totalReturnPct >= 0 ? "positive" : "negative"} value={formatPercent(summary.totalReturnPct)} />
+        <PerformanceStatCard label="최대 낙폭" tone={summary.maxDrawdownPct < 0 ? "negative" : "neutral"} value={formatPercent(summary.maxDrawdownPct)} />
+        <PerformanceStatCard label="승률" tone={summary.winRatePct >= 50 ? "positive" : "neutral"} value={formatPercent(summary.winRatePct)} />
+        <PerformanceStatCard label="샤프 비율" tone={summary.sharpeRatio >= 1 ? "positive" : "neutral"} value={formatMetricValue(summary.sharpeRatio)} />
+        <PerformanceStatCard label="총 거래 수" value={formatNumber(summary.tradeCount)} />
+        <PerformanceStatCard label="활성 실행 수" value={formatNumber(summary.activeRunCount)} />
+      </div>
+
+      <div className="performance-grid">
+        <article className="performance-card performance-chart-card wide">
+          <div className="performance-card-heading">
+            <strong>누적 수익률 비교</strong>
+            <span>{filteredRuns.length}개 실행</span>
+          </div>
+          <PerformanceLineChart series={cumulativeSeries} />
+        </article>
+
+        <article className="performance-card">
+          <div className="performance-card-heading">
+            <strong>최대 낙폭</strong>
+            <span>MDD</span>
+          </div>
+          <div className="drawdown-list">
+            {modeRows.map((row) => (
+              <div key={row.mode}>
+                <span>{row.label}</span>
+                <b>
+                  <i style={{ width: `${Math.min(Math.abs(row.maxDrawdownPct), 100)}%` }} />
+                </b>
+                <strong>{formatPercent(row.maxDrawdownPct)}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="performance-card">
+          <div className="performance-card-heading">
+            <strong>모드별 수익 기여도</strong>
+            <span>{formatPercent(summary.totalReturnPct)}</span>
+          </div>
+          <ContributionRing rows={modeRows} />
+        </article>
+
+        <article className="performance-card">
+          <div className="performance-card-heading">
+            <strong>성과 인사이트</strong>
+            <span>최근 {logs.length} 로그</span>
+          </div>
+          <div className="insight-list">
+            {insightCards.map((insight) => (
+              <article key={insight.title}>
+                <span className={`insight-icon ${insight.tone}`}>{insight.mark}</span>
+                <div>
+                  <strong>{insight.title}</strong>
+                  <p>{insight.body}</p>
+                  <small>{insight.value}</small>
+                </div>
+              </article>
+            ))}
+          </div>
+        </article>
+
+        <article className="performance-card heatmap-card">
+          <div className="performance-card-heading">
+            <strong>월별 수익률 히트맵</strong>
+            <span>최근 실행 기준</span>
+          </div>
+          <PerformanceHeatmap rows={monthlyRows} />
+        </article>
+
+        <article className="performance-card table-card">
+          <div className="performance-card-heading">
+            <strong>전략 성과 비교</strong>
+            <span>Top 8</span>
+          </div>
+          <PerformanceTable rows={strategyRows} />
+        </article>
+
+        <article className="performance-card">
+          <div className="performance-card-heading">
+            <strong>심볼별 수익 기여도</strong>
+            <span>{symbolRows.length}개 심볼</span>
+          </div>
+          <SymbolContributionList rows={symbolRows} />
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function PerformanceStatCard({
+  label,
+  tone = "neutral",
+  value,
+}: {
+  label: string;
+  tone?: "neutral" | "positive" | "negative";
+  value: string;
+}) {
+  return (
+    <article className={`performance-stat ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function PerformanceLineChart({
+  series,
+}: {
+  series: Array<{ color: string; label: string; points: number[] }>;
+}) {
+  const width = 720;
+  const height = 260;
+  const values = series.flatMap((item) => item.points);
+  const minValue = Math.min(0, ...values);
+  const maxValue = Math.max(1, ...values);
+  const range = Math.max(maxValue - minValue, 1);
+  const maxLength = Math.max(2, ...series.map((item) => item.points.length));
+  const yFor = (value: number) => height - 28 - ((value - minValue) / range) * (height - 56);
+  const xFor = (index: number) => 38 + (index / Math.max(maxLength - 1, 1)) * (width - 70);
+  return (
+    <div className="performance-chart">
+      <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`}>
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = 18 + ratio * (height - 48);
+          return <line key={ratio} x1="36" x2={width - 24} y1={y} y2={y} />;
+        })}
+        {series.map((item) => {
+          const points = item.points.length ? item.points : [0];
+          const line = points.map((value, index) => `${xFor(index)},${yFor(value)}`).join(" ");
+          const area = `${xFor(0)},${yFor(0)} ${line} ${xFor(points.length - 1)},${yFor(0)}`;
+          return (
+            <g key={item.label}>
+              <polygon fill={item.color} points={area} />
+              <polyline points={line} stroke={item.color} />
+            </g>
+          );
+        })}
+      </svg>
+      <div className="chart-legend">
+        {series.map((item) => (
+          <span key={item.label}>
+            <b style={{ backgroundColor: item.color }} />
+            {item.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ContributionRing({ rows }: { rows: PerformanceModeRow[] }) {
+  const positiveRows = rows.filter((row) => row.totalReturnPct > 0);
+  const total = positiveRows.reduce((sum, row) => sum + row.totalReturnPct, 0);
+  return (
+    <div className="contribution-ring">
+      <div className="ring-visual">
+        <span>총 수익</span>
+        <strong>{formatPercent(rows.reduce((sum, row) => sum + row.totalReturnPct, 0))}</strong>
+      </div>
+      <div className="ring-list">
+        {rows.map((row) => (
+          <div key={row.mode}>
+            <span><b style={{ backgroundColor: row.color }} />{row.label}</span>
+            <strong>{formatPercent(row.totalReturnPct)}</strong>
+            <small>{total > 0 ? `${formatNumber((Math.max(row.totalReturnPct, 0) / total) * 100)}%` : "0%"}</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PerformanceHeatmap({ rows }: { rows: PerformanceMonthRow[] }) {
+  if (rows.length === 0) {
+    return <p className="muted">성과 데이터가 없습니다.</p>;
+  }
+  return (
+    <div className="performance-heatmap">
+      <div />
+      {rows[0].months.map((month) => (
+        <strong key={month}>{month}</strong>
+      ))}
+      {rows.map((row) => (
+        <div className="heatmap-row" key={row.mode}>
+          <span>{row.label}</span>
+          {row.values.map((value, index) => (
+            <b className={value >= 0 ? "positive" : "negative"} key={`${row.mode}-${row.months[index]}`}>
+              {formatPercent(value)}
+            </b>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PerformanceTable({ rows }: { rows: PerformanceStrategyRow[] }) {
+  if (rows.length === 0) {
+    return <p className="muted">전략 성과 데이터가 없습니다.</p>;
+  }
+  return (
+    <div className="performance-table-wrap">
+      <table className="performance-table">
+        <thead>
+          <tr>
+            <th>전략명</th>
+            <th>모드</th>
+            <th>수익률</th>
+            <th>MDD</th>
+            <th>샤프</th>
+            <th>승률</th>
+            <th>거래 수</th>
+            <th>최근 실행</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.strategy}-${row.mode}`}>
+              <td>{row.strategy}</td>
+              <td>{row.modeLabel}</td>
+              <td className={row.totalReturnPct >= 0 ? "positive" : "negative"}>{formatPercent(row.totalReturnPct)}</td>
+              <td className={row.maxDrawdownPct < 0 ? "negative" : ""}>{formatPercent(row.maxDrawdownPct)}</td>
+              <td>{formatMetricValue(row.sharpeRatio)}</td>
+              <td>{formatPercent(row.winRatePct)}</td>
+              <td>{formatNumber(row.tradeCount)}</td>
+              <td>{formatTimestamp(row.lastRunAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SymbolContributionList({ rows }: { rows: PerformanceSymbolRow[] }) {
+  if (rows.length === 0) {
+    return <p className="muted">심볼별 성과 데이터가 없습니다.</p>;
+  }
+  return (
+    <div className="symbol-contribution-list">
+      {rows.map((row) => (
+        <div key={row.symbol}>
+          <span>{row.symbol}</span>
+          <strong className={row.totalReturnPct >= 0 ? "positive" : "negative"}>{formatPercent(row.totalReturnPct)}</strong>
+          <b>
+            <i style={{ width: `${Math.max(row.weightPct, 3)}%` }} />
+          </b>
+          <small>{formatNumber(row.runCount)}회</small>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1729,6 +2138,184 @@ function Metric({
   );
 }
 
+function buildPerformanceSummary(runs: RunSummary[]) {
+  const returns = runs.map(runReturnPct).filter(Number.isFinite);
+  const drawdowns = runs.map(runDrawdownPct).filter(Number.isFinite);
+  const winRates = runs.map(runWinRatePct).filter(Number.isFinite);
+  const sharpeValues = runs.map((run) => metricNumber(run.metrics.sharpe_ratio ?? run.metrics.sharpe)).filter(Number.isFinite);
+  return {
+    activeRunCount: runs.filter((run) => run.status === "running").length,
+    maxDrawdownPct: drawdowns.length ? Math.min(...drawdowns) : 0,
+    sharpeRatio: average(sharpeValues),
+    totalReturnPct: compoundReturnPct(returns),
+    tradeCount: runs.reduce((sum, run) => sum + runTradeCount(run), 0),
+    winRatePct: winRates.length ? average(winRates) : inferWinRatePct(runs),
+  };
+}
+
+function buildModePerformanceRows(runs: RunSummary[]): PerformanceModeRow[] {
+  return (["backtest", "sandbox", "live"] as const).map((mode) => {
+    const modeRuns = runs.filter((run) => run.mode === mode);
+    const returns = modeRuns.map(runReturnPct).filter(Number.isFinite);
+    const drawdowns = modeRuns.map(runDrawdownPct).filter(Number.isFinite);
+    const meta = performanceModeMeta[mode];
+    return {
+      color: meta.color,
+      label: meta.label,
+      maxDrawdownPct: drawdowns.length ? Math.min(...drawdowns) : 0,
+      mode,
+      runCount: modeRuns.length,
+      totalReturnPct: compoundReturnPct(returns),
+      tradeCount: modeRuns.reduce((sum, run) => sum + runTradeCount(run), 0),
+      winRatePct: inferWinRatePct(modeRuns),
+    };
+  });
+}
+
+function buildStrategyPerformanceRows(runs: RunSummary[]): PerformanceStrategyRow[] {
+  const groups = new Map<string, RunSummary[]>();
+  for (const run of runs) {
+    const strategy = run.strategy?.name ?? run.strategy?.strategy_id ?? "전략 미지정";
+    const key = `${strategy}|${run.mode}`;
+    groups.set(key, [...(groups.get(key) ?? []), run]);
+  }
+  return [...groups.entries()]
+    .map(([key, groupRuns]) => {
+      const [strategy, mode] = key.split("|") as [string, RunSummary["mode"]];
+      const returns = groupRuns.map(runReturnPct).filter(Number.isFinite);
+      const drawdowns = groupRuns.map(runDrawdownPct).filter(Number.isFinite);
+      const sharpeValues = groupRuns
+        .map((run) => metricNumber(run.metrics.sharpe_ratio ?? run.metrics.sharpe))
+        .filter(Number.isFinite);
+      const latest = [...groupRuns].sort((left, right) => Date.parse(right.started_at) - Date.parse(left.started_at))[0];
+      return {
+        lastRunAt: latest?.started_at ?? null,
+        maxDrawdownPct: drawdowns.length ? Math.min(...drawdowns) : 0,
+        mode,
+        modeLabel: performanceModeMeta[mode]?.label ?? mode,
+        runCount: groupRuns.length,
+        sharpeRatio: average(sharpeValues),
+        strategy,
+        totalReturnPct: compoundReturnPct(returns),
+        tradeCount: groupRuns.reduce((sum, run) => sum + runTradeCount(run), 0),
+        winRatePct: inferWinRatePct(groupRuns),
+      };
+    })
+    .sort((left, right) => right.totalReturnPct - left.totalReturnPct)
+    .slice(0, 8);
+}
+
+function buildSymbolPerformanceRows(runs: RunSummary[]): PerformanceSymbolRow[] {
+  const groups = new Map<string, RunSummary[]>();
+  for (const run of runs) {
+    const symbol = run.config?.symbols?.[0] ?? "심볼 없음";
+    groups.set(symbol, [...(groups.get(symbol) ?? []), run]);
+  }
+  const rows = [...groups.entries()].map(([symbol, groupRuns]) => ({
+    runCount: groupRuns.length,
+    symbol,
+    totalReturnPct: compoundReturnPct(groupRuns.map(runReturnPct).filter(Number.isFinite)),
+    weightPct: 0,
+  }));
+  const totalWeight = rows.reduce((sum, row) => sum + Math.abs(row.totalReturnPct), 0);
+  return rows
+    .map((row) => ({
+      ...row,
+      weightPct: totalWeight > 0 ? (Math.abs(row.totalReturnPct) / totalWeight) * 100 : 0,
+    }))
+    .sort((left, right) => Math.abs(right.totalReturnPct) - Math.abs(left.totalReturnPct));
+}
+
+function buildMonthlyPerformanceRows(runs: RunSummary[]): PerformanceMonthRow[] {
+  const monthKeys = [...new Set(runs.map((run) => monthKey(run.started_at)).filter(Boolean))].sort().slice(-6);
+  if (monthKeys.length === 0) {
+    return [];
+  }
+  return (["backtest", "sandbox", "live"] as const).map((mode) => {
+    const modeRuns = runs.filter((run) => run.mode === mode);
+    return {
+      label: performanceModeMeta[mode].label,
+      mode,
+      months: monthKeys.map(formatMonthKey),
+      values: monthKeys.map((key) =>
+        compoundReturnPct(modeRuns.filter((run) => monthKey(run.started_at) === key).map(runReturnPct).filter(Number.isFinite)),
+      ),
+    };
+  });
+}
+
+function buildCumulativePerformanceSeries(runs: RunSummary[]) {
+  return (["backtest", "sandbox", "live"] as const).map((mode) => {
+    const modeRuns = runs
+      .filter((run) => run.mode === mode)
+      .sort((left, right) => Date.parse(left.started_at) - Date.parse(right.started_at));
+    let equity = 1;
+    const points = modeRuns.map((run) => {
+      equity *= 1 + runReturnPct(run) / 100;
+      return (equity - 1) * 100;
+    });
+    return {
+      color: performanceModeMeta[mode].color,
+      label: performanceModeMeta[mode].label,
+      points: points.length ? points : [0],
+    };
+  });
+}
+
+function buildPerformanceInsights({
+  logs,
+  modeRows,
+  runs,
+  strategyRows,
+}: {
+  logs: OperationLog[];
+  modeRows: PerformanceModeRow[];
+  runs: RunSummary[];
+  strategyRows: PerformanceStrategyRow[];
+}) {
+  const bestMode = [...modeRows].sort((left, right) => right.totalReturnPct - left.totalReturnPct)[0];
+  const worstMode = [...modeRows].sort((left, right) => left.maxDrawdownPct - right.maxDrawdownPct)[0];
+  const bestStrategy = strategyRows[0];
+  const recentErrors = logs.filter((log) => log.severity === "error").length;
+  return [
+    {
+      body: `${bestMode?.label ?? "전체"} 모드가 가장 높은 누적 수익률을 기록했습니다.`,
+      mark: "T",
+      title: "최고 성과 모드",
+      tone: "positive",
+      value: formatPercent(bestMode?.totalReturnPct ?? 0),
+    },
+    {
+      body: `${worstMode?.label ?? "전체"} 구간에서 가장 큰 낙폭이 발생했습니다.`,
+      mark: "D",
+      title: "가장 큰 낙폭",
+      tone: "negative",
+      value: formatPercent(worstMode?.maxDrawdownPct ?? 0),
+    },
+    {
+      body: bestStrategy ? `${bestStrategy.strategy} 전략이 현재 필터에서 가장 앞섭니다.` : "전략 성과 데이터가 아직 부족합니다.",
+      mark: "S",
+      title: "최고 전략",
+      tone: "positive",
+      value: bestStrategy ? formatPercent(bestStrategy.totalReturnPct) : "-",
+    },
+    {
+      body: recentErrors > 0 ? "최근 로그에 오류가 있어 성과 해석 전 운영 상태 확인이 필요합니다." : "최근 오류 없이 성과 집계가 유지되고 있습니다.",
+      mark: "L",
+      title: "운영 상태",
+      tone: recentErrors > 0 ? "negative" : "neutral",
+      value: `${formatNumber(recentErrors)}개 오류`,
+    },
+    {
+      body: `${runs.length}개 실행 기준으로 수익, 낙폭, 거래 수를 집계했습니다.`,
+      mark: "R",
+      title: "성과 요약",
+      tone: "neutral",
+      value: `${formatNumber(runs.length)}개 실행`,
+    },
+  ];
+}
+
 function shortId(value: string) {
   return value.length > 8 ? value.slice(0, 8) : value;
 }
@@ -1953,6 +2540,10 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
 }
 
+function formatPercent(value: number) {
+  return `${value >= 0 ? "+" : ""}${formatNumber(value)}%`;
+}
+
 function formatMetricValue(value: unknown, suffix = "") {
   if (value === null || value === undefined || value === "") {
     return "-";
@@ -1961,6 +2552,73 @@ function formatMetricValue(value: unknown, suffix = "") {
     return `${formatNumber(value)}${suffix}`;
   }
   return `${value}${suffix}`;
+}
+
+function metricNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+  return NaN;
+}
+
+function average(values: number[]) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function compoundReturnPct(values: number[]) {
+  if (values.length === 0) {
+    return 0;
+  }
+  return (values.reduce((equity, value) => equity * (1 + value / 100), 1) - 1) * 100;
+}
+
+function runReturnPct(run: RunSummary) {
+  return metricNumber(run.metrics.total_return_pct ?? run.metrics.return_pct ?? run.metrics.pnl_pct);
+}
+
+function runDrawdownPct(run: RunSummary) {
+  const value = metricNumber(run.metrics.max_drawdown_pct ?? run.metrics.drawdown_pct ?? run.metrics.mdd_pct);
+  return Number.isFinite(value) ? -Math.abs(value) : 0;
+}
+
+function runWinRatePct(run: RunSummary) {
+  return metricNumber(run.metrics.win_rate_pct ?? run.metrics.win_rate);
+}
+
+function runTradeCount(run: RunSummary) {
+  const count = metricNumber(run.metrics.trade_count);
+  return Number.isFinite(count) ? count : run.orders_count;
+}
+
+function inferWinRatePct(runs: RunSummary[]) {
+  if (runs.length === 0) {
+    return 0;
+  }
+  const explicitRates = runs.map(runWinRatePct).filter(Number.isFinite);
+  if (explicitRates.length > 0) {
+    return average(explicitRates);
+  }
+  return (runs.filter((run) => runReturnPct(run) > 0).length / runs.length) * 100;
+}
+
+function monthKey(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthKey(value: string) {
+  const [, month] = value.split("-");
+  return `${Number(month)}월`;
 }
 
 function formatMetricDisplay(key: string, value: unknown) {
