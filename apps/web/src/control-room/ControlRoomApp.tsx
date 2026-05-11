@@ -151,7 +151,6 @@ const movingAverageLines = [
   { period: 5, label: "MA5", color: "#4d8dff", width: 1 },
   { period: 20, label: "MA20 황금선", color: "#f0c43c", width: 2 },
   { period: 60, label: "MA60", color: "#31d17d", width: 1 },
-  { period: 120, label: "MA120", color: "#ff7a7a", width: 1 },
 ] as const;
 
 const defaultRunForm: RunFormState = {

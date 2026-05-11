@@ -218,7 +218,6 @@ describe("ControlRoomApp", () => {
     expect(screen.getByText("MA5")).toBeInTheDocument();
     expect(screen.getByText("MA20 황금선")).toBeInTheDocument();
     expect(screen.getByText("MA60")).toBeInTheDocument();
-    expect(screen.getByText("MA120")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /샌드박스/ }));
     expect(screen.getByRole("combobox", { name: "심볼" })).toHaveValue("BTC/USDT");
