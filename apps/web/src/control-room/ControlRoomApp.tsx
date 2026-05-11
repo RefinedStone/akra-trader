@@ -751,7 +751,7 @@ function PerformanceSection({
       </div>
 
       <div className="performance-stat-grid">
-        <PerformanceStatCard label="누적 수익률" tone={summary.totalReturnPct >= 0 ? "positive" : "negative"} value={formatPercent(summary.totalReturnPct)} />
+        <PerformanceStatCard label="가중 수익률" tone={summary.totalReturnPct >= 0 ? "positive" : "negative"} value={formatPercent(summary.totalReturnPct)} />
         <PerformanceStatCard label="최대 낙폭" tone={summary.maxDrawdownPct < 0 ? "negative" : "neutral"} value={formatPercent(summary.maxDrawdownPct)} />
         <PerformanceStatCard label="승률" tone={summary.winRatePct >= 50 ? "positive" : "neutral"} value={formatPercent(summary.winRatePct)} />
         <PerformanceStatCard label="샤프 비율" tone={summary.sharpeRatio >= 1 ? "positive" : "neutral"} value={formatMetricValue(summary.sharpeRatio)} />
@@ -762,7 +762,7 @@ function PerformanceSection({
       <div className="performance-grid">
         <article className="performance-card performance-chart-card wide">
           <div className="performance-card-heading">
-            <strong>누적 수익률 비교</strong>
+            <strong>수익률 추이 비교</strong>
             <span>{filteredRuns.length}개 실행</span>
           </div>
           <PerformanceLineChart series={cumulativeSeries} />
@@ -906,11 +906,13 @@ function PerformanceLineChart({
 function ContributionRing({ rows }: { rows: PerformanceModeRow[] }) {
   const positiveRows = rows.filter((row) => row.totalReturnPct > 0);
   const total = positiveRows.reduce((sum, row) => sum + row.totalReturnPct, 0);
+  const activeRows = rows.filter((row) => row.runCount > 0);
+  const averageReturnPct = average(activeRows.map((row) => row.totalReturnPct));
   return (
     <div className="contribution-ring">
       <div className="ring-visual">
-        <span>총 수익</span>
-        <strong>{formatPercent(rows.reduce((sum, row) => sum + row.totalReturnPct, 0))}</strong>
+        <span>평균 수익</span>
+        <strong>{formatPercent(averageReturnPct)}</strong>
       </div>
       <div className="ring-list">
         {rows.map((row) => (
@@ -2139,7 +2141,6 @@ function Metric({
 }
 
 function buildPerformanceSummary(runs: RunSummary[]) {
-  const returns = runs.map(runReturnPct).filter(Number.isFinite);
   const drawdowns = runs.map(runDrawdownPct).filter(Number.isFinite);
   const winRates = runs.map(runWinRatePct).filter(Number.isFinite);
   const sharpeValues = runs.map((run) => metricNumber(run.metrics.sharpe_ratio ?? run.metrics.sharpe)).filter(Number.isFinite);
@@ -2147,7 +2148,7 @@ function buildPerformanceSummary(runs: RunSummary[]) {
     activeRunCount: runs.filter((run) => run.status === "running").length,
     maxDrawdownPct: drawdowns.length ? Math.min(...drawdowns) : 0,
     sharpeRatio: average(sharpeValues),
-    totalReturnPct: compoundReturnPct(returns),
+    totalReturnPct: aggregateRunReturnPct(runs),
     tradeCount: runs.reduce((sum, run) => sum + runTradeCount(run), 0),
     winRatePct: winRates.length ? average(winRates) : inferWinRatePct(runs),
   };
@@ -2156,7 +2157,6 @@ function buildPerformanceSummary(runs: RunSummary[]) {
 function buildModePerformanceRows(runs: RunSummary[]): PerformanceModeRow[] {
   return (["backtest", "sandbox", "live"] as const).map((mode) => {
     const modeRuns = runs.filter((run) => run.mode === mode);
-    const returns = modeRuns.map(runReturnPct).filter(Number.isFinite);
     const drawdowns = modeRuns.map(runDrawdownPct).filter(Number.isFinite);
     const meta = performanceModeMeta[mode];
     return {
@@ -2165,7 +2165,7 @@ function buildModePerformanceRows(runs: RunSummary[]): PerformanceModeRow[] {
       maxDrawdownPct: drawdowns.length ? Math.min(...drawdowns) : 0,
       mode,
       runCount: modeRuns.length,
-      totalReturnPct: compoundReturnPct(returns),
+      totalReturnPct: aggregateRunReturnPct(modeRuns),
       tradeCount: modeRuns.reduce((sum, run) => sum + runTradeCount(run), 0),
       winRatePct: inferWinRatePct(modeRuns),
     };
@@ -2182,7 +2182,6 @@ function buildStrategyPerformanceRows(runs: RunSummary[]): PerformanceStrategyRo
   return [...groups.entries()]
     .map(([key, groupRuns]) => {
       const [strategy, mode] = key.split("|") as [string, RunSummary["mode"]];
-      const returns = groupRuns.map(runReturnPct).filter(Number.isFinite);
       const drawdowns = groupRuns.map(runDrawdownPct).filter(Number.isFinite);
       const sharpeValues = groupRuns
         .map((run) => metricNumber(run.metrics.sharpe_ratio ?? run.metrics.sharpe))
@@ -2196,7 +2195,7 @@ function buildStrategyPerformanceRows(runs: RunSummary[]): PerformanceStrategyRo
         runCount: groupRuns.length,
         sharpeRatio: average(sharpeValues),
         strategy,
-        totalReturnPct: compoundReturnPct(returns),
+        totalReturnPct: aggregateRunReturnPct(groupRuns),
         tradeCount: groupRuns.reduce((sum, run) => sum + runTradeCount(run), 0),
         winRatePct: inferWinRatePct(groupRuns),
       };
@@ -2214,7 +2213,7 @@ function buildSymbolPerformanceRows(runs: RunSummary[]): PerformanceSymbolRow[] 
   const rows = [...groups.entries()].map(([symbol, groupRuns]) => ({
     runCount: groupRuns.length,
     symbol,
-    totalReturnPct: compoundReturnPct(groupRuns.map(runReturnPct).filter(Number.isFinite)),
+    totalReturnPct: aggregateRunReturnPct(groupRuns),
     weightPct: 0,
   }));
   const totalWeight = rows.reduce((sum, row) => sum + Math.abs(row.totalReturnPct), 0);
@@ -2237,9 +2236,7 @@ function buildMonthlyPerformanceRows(runs: RunSummary[]): PerformanceMonthRow[] 
       label: performanceModeMeta[mode].label,
       mode,
       months: monthKeys.map(formatMonthKey),
-      values: monthKeys.map((key) =>
-        compoundReturnPct(modeRuns.filter((run) => monthKey(run.started_at) === key).map(runReturnPct).filter(Number.isFinite)),
-      ),
+      values: monthKeys.map((key) => aggregateRunReturnPct(modeRuns.filter((run) => monthKey(run.started_at) === key))),
     };
   });
 }
@@ -2249,11 +2246,7 @@ function buildCumulativePerformanceSeries(runs: RunSummary[]) {
     const modeRuns = runs
       .filter((run) => run.mode === mode)
       .sort((left, right) => Date.parse(left.started_at) - Date.parse(right.started_at));
-    let equity = 1;
-    const points = modeRuns.map((run) => {
-      equity *= 1 + runReturnPct(run) / 100;
-      return (equity - 1) * 100;
-    });
+    const points = modeRuns.map((_, index) => aggregateRunReturnPct(modeRuns.slice(0, index + 1)));
     return {
       color: performanceModeMeta[mode].color,
       label: performanceModeMeta[mode].label,
@@ -2279,7 +2272,7 @@ function buildPerformanceInsights({
   const recentErrors = logs.filter((log) => log.severity === "error").length;
   return [
     {
-      body: `${bestMode?.label ?? "전체"} 모드가 가장 높은 누적 수익률을 기록했습니다.`,
+      body: `${bestMode?.label ?? "전체"} 모드가 가장 높은 가중 수익률을 기록했습니다.`,
       mark: "T",
       title: "최고 성과 모드",
       tone: "positive",
@@ -2569,15 +2562,47 @@ function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
-function compoundReturnPct(values: number[]) {
-  if (values.length === 0) {
+function aggregateRunReturnPct(runs: RunSummary[]) {
+  const samples = runs
+    .map((run) => ({
+      initialCapital: runInitialCapital(run),
+      returnPct: runReturnPct(run),
+    }))
+    .filter((sample) => Number.isFinite(sample.returnPct));
+  if (samples.length === 0) {
     return 0;
   }
-  return (values.reduce((equity, value) => equity * (1 + value / 100), 1) - 1) * 100;
+  const weightedSamples = samples.filter((sample) => Number.isFinite(sample.initialCapital) && sample.initialCapital > 0);
+  if (weightedSamples.length === samples.length) {
+    const totalCapital = weightedSamples.reduce((sum, sample) => sum + sample.initialCapital, 0);
+    if (totalCapital > 0) {
+      return weightedSamples.reduce((sum, sample) => sum + sample.returnPct * sample.initialCapital, 0) / totalCapital;
+    }
+  }
+  return average(samples.map((sample) => sample.returnPct));
 }
 
 function runReturnPct(run: RunSummary) {
   return metricNumber(run.metrics.total_return_pct ?? run.metrics.return_pct ?? run.metrics.pnl_pct);
+}
+
+function runInitialCapital(run: RunSummary) {
+  const configInitialCash = metricNumber(run.config?.initial_cash);
+  if (Number.isFinite(configInitialCash) && configInitialCash > 0) {
+    return configInitialCash;
+  }
+  const metricInitialCash = metricNumber(
+    run.metrics.initial_cash ?? run.metrics.initial_equity ?? run.metrics.starting_equity ?? run.metrics.starting_balance,
+  );
+  if (Number.isFinite(metricInitialCash) && metricInitialCash > 0) {
+    return metricInitialCash;
+  }
+  const endingEquity = metricNumber(run.metrics.ending_equity ?? run.metrics.equity);
+  const returnPct = runReturnPct(run);
+  if (Number.isFinite(endingEquity) && endingEquity > 0 && Number.isFinite(returnPct) && returnPct > -100) {
+    return endingEquity / (1 + returnPct / 100);
+  }
+  return NaN;
 }
 
 function runDrawdownPct(run: RunSummary) {

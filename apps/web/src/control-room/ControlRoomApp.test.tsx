@@ -236,6 +236,16 @@ describe("ControlRoomApp", () => {
         if (url.endsWith("/api/runs/run-backtest")) {
           return jsonResponse(backtestRun);
         }
+        const dynamicRun = runs.find((run) => url.endsWith(`/api/runs/${run.run_id}`));
+        if (dynamicRun) {
+          return jsonResponse(dynamicRun);
+        }
+        if (runs.some((run) => url.endsWith(`/api/runs/${run.run_id}/orders`))) {
+          return jsonResponse({ orders: [] });
+        }
+        if (runs.some((run) => url.endsWith(`/api/runs/${run.run_id}/positions`))) {
+          return jsonResponse({ positions: [] });
+        }
         if (url.endsWith("/api/runs")) {
           return jsonResponse({ runs });
         }
@@ -295,11 +305,32 @@ describe("ControlRoomApp", () => {
     fireEvent.click(await screen.findByRole("button", { name: /성과/ }));
 
     expect(screen.getByText("성과 대시보드")).toBeInTheDocument();
-    expect(screen.getByText("누적 수익률 비교")).toBeInTheDocument();
+    expect(screen.getByText("수익률 추이 비교")).toBeInTheDocument();
     expect(screen.getByText("전략 성과 비교")).toBeInTheDocument();
     expect(screen.getByText("심볼별 수익 기여도")).toBeInTheDocument();
     expect(screen.getByText("성과 인사이트")).toBeInTheDocument();
     expect(screen.queryByText("실행 상세")).not.toBeInTheDocument();
+  });
+
+  it("aggregates independent run returns without compounding them", async () => {
+    runs = [0, 1, 2].map((index) => ({
+      ...backtestRun,
+      run_id: `high-return-${index}`,
+      started_at: `2026-05-1${index}T00:00:00Z`,
+      metrics: {
+        ...backtestRun.metrics,
+        ending_equity: 20000,
+        initial_cash: 10000,
+        total_return_pct: 100,
+      },
+    }));
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /성과/ }));
+
+    expect(screen.getByText("가중 수익률")).toBeInTheDocument();
+    expect(screen.getAllByText("+100%").length).toBeGreaterThan(0);
+    expect(screen.queryByText("+700%")).not.toBeInTheDocument();
   });
 
   it("loads market data through one sync-backed query flow", async () => {
