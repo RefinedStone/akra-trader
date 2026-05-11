@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { UTCTimestamp } from "lightweight-charts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import App, { buildOrderMarkers } from "./ControlRoomApp";
+import App, { buildOrderMarkers, buildSeriesOrderMarkers } from "./ControlRoomApp";
 
 const strategyResponse = {
   strategies: [
@@ -487,6 +488,18 @@ describe("ControlRoomApp", () => {
         timeframe: "1h",
       }),
     ).toMatchObject([{ id: "order-1", side: "buy", time: 1778457600 }]);
+  });
+
+  it("anchors order markers to chart bars instead of absolute overlay coordinates", () => {
+    const markers = [
+      { id: "buy-1", price: 81210, side: "buy" as const, time: 1778457600 as UTCTimestamp },
+      { id: "sell-1", price: 81310, side: "sell" as const, time: 1778458500 as UTCTimestamp },
+    ];
+
+    expect(buildSeriesOrderMarkers(markers, "buy-1")).toMatchObject([
+      { id: "buy-1", position: "belowBar", shape: "arrowUp", size: 1.85, text: "BUY" },
+      { id: "sell-1", position: "aboveBar", shape: "arrowDown", size: 1.15, text: "SELL" },
+    ]);
   });
 
   it("renders operational detail tabs with summarized orders, positions, and logs", async () => {

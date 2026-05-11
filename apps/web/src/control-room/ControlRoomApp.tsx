@@ -1,5 +1,15 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import type { CandlestickData, IChartApi, IRange, ISeriesApi, LineData, Time, UTCTimestamp } from "lightweight-charts";
+import type {
+  CandlestickData,
+  IChartApi,
+  IRange,
+  ISeriesApi,
+  ISeriesMarkersPluginApi,
+  LineData,
+  SeriesMarker,
+  Time,
+  UTCTimestamp,
+} from "lightweight-charts";
 
 type SectionId = "data" | "backtest" | "sandbox" | "live" | "performance" | "logs" | "llm";
 type DetailTabId = "overview" | "orders" | "positions" | "metrics" | "logs";
@@ -166,16 +176,6 @@ type OrderBlockOverlay = {
     left: string;
     top: string;
     width: string;
-  };
-};
-
-type OrderMarkerOverlay = {
-  id: string;
-  selected: boolean;
-  side: "buy" | "sell";
-  style: {
-    left: string;
-    top: string;
   };
 };
 
@@ -1282,19 +1282,16 @@ function MarketChart({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const visibleRangeRef = useRef<IRange<Time> | null>(null);
   const [orderBlockOverlays, setOrderBlockOverlays] = useState<OrderBlockOverlay[]>([]);
-  const [orderMarkerOverlays, setOrderMarkerOverlays] = useState<OrderMarkerOverlay[]>([]);
 
   useEffect(() => {
     visibleRangeRef.current = null;
     setOrderBlockOverlays([]);
-    setOrderMarkerOverlays([]);
   }, [symbol, timeframe]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container || candles.length === 0 || import.meta.env.MODE === "test") {
       setOrderBlockOverlays([]);
-      setOrderMarkerOverlays([]);
       return;
     }
 
@@ -1307,6 +1304,7 @@ function MarketChart({
     });
     let chart: IChartApi | null = null;
     let series: ISeriesApi<"Candlestick"> | null = null;
+    let orderMarkersPlugin: ISeriesMarkersPluginApi<Time> | null = null;
     let averageSeries: Array<ISeriesApi<"Line">> = [];
     let resizeObserver: ResizeObserver | null = null;
     let visibleRangeAnimationFrame = 0;
@@ -1324,11 +1322,12 @@ function MarketChart({
         return;
       }
       setOrderBlockOverlays(buildOrderBlockOverlays(orderBlocks, chart, series, containerRef.current));
-      setOrderMarkerOverlays(buildOrderMarkerOverlays(orderMarkers, chart, series, selectedOrderId));
     };
 
     const renderChart = async () => {
-      const { CandlestickSeries, ColorType, LineSeries, LineStyle, createChart } = await import("lightweight-charts");
+      const { CandlestickSeries, ColorType, LineSeries, LineStyle, createChart, createSeriesMarkers } = await import(
+        "lightweight-charts"
+      );
       if (disposed || !containerRef.current) {
         return;
       }
@@ -1387,6 +1386,10 @@ function MarketChart({
         lastValueVisible: true,
       });
       series.setData(toCandlestickSeriesData(candles));
+      orderMarkersPlugin = createSeriesMarkers(series, buildSeriesOrderMarkers(orderMarkers, selectedOrderId), {
+        autoScale: false,
+        zOrder: "top",
+      });
       averageSeries = movingAverageLines.map((average) => {
         const line = chart!.addSeries(LineSeries, {
           color: average.color,
@@ -1478,11 +1481,12 @@ function MarketChart({
       }
       chart?.timeScale().unsubscribeVisibleTimeRangeChange(handleVisibleRangeChange);
       resizeObserver?.disconnect();
+      orderMarkersPlugin?.detach();
       chart?.remove();
       averageSeries = [];
       setOrderBlockOverlays([]);
-      setOrderMarkerOverlays([]);
       series = null;
+      orderMarkersPlugin = null;
       chart = null;
     };
   }, [candles, orders, selectedOrderId, selectedRun, symbol, timeframe]);
@@ -1535,17 +1539,6 @@ function MarketChart({
               style={zone.style}
             >
               <small>{zone.label}</small>
-            </span>
-          ))}
-        </div>
-        <div className="order-marker-layer" aria-label="주문 마커">
-          {orderMarkerOverlays.map((marker) => (
-            <span
-              className={`order-marker ${marker.side}${marker.selected ? " is-selected" : ""}`}
-              key={marker.id}
-              style={marker.style}
-            >
-              <b>{marker.side.toUpperCase()}</b>
             </span>
           ))}
         </div>
@@ -3413,38 +3406,21 @@ export function buildOrderMarkers(
   });
 }
 
-function buildOrderMarkerOverlays(
+export function buildSeriesOrderMarkers(
   markers: OrderMarker[],
-  chart: IChartApi,
-  series: ISeriesApi<"Candlestick">,
   selectedOrderId?: string | null,
-): OrderMarkerOverlay[] {
-  const visibleRange = chart.timeScale().getVisibleRange();
-  const visibleStart = visibleRange ? timeToUnixSeconds(visibleRange.from) : null;
-  const visibleEnd = visibleRange ? timeToUnixSeconds(visibleRange.to) : null;
-  return markers.flatMap((marker) => {
-    if (
-      (visibleStart !== null && marker.time < visibleStart) ||
-      (visibleEnd !== null && marker.time > visibleEnd)
-    ) {
-      return [];
-    }
-    const x = chart.timeScale().timeToCoordinate(marker.time);
-    const y = marker.price === null ? null : series.priceToCoordinate(marker.price);
-    if (x === null || y === null) {
-      return [];
-    }
-    return [
-      {
-        id: marker.id,
-        selected: marker.id === selectedOrderId,
-        side: marker.side,
-        style: {
-          left: `${x}px`,
-          top: `${y}px`,
-        },
-      },
-    ];
+): SeriesMarker<Time>[] {
+  return markers.map((marker) => {
+    const selected = marker.id === selectedOrderId;
+    return {
+      color: marker.side === "buy" ? "#31d17d" : "#ff514f",
+      id: marker.id,
+      position: marker.side === "buy" ? "belowBar" : "aboveBar",
+      shape: marker.side === "buy" ? "arrowUp" : "arrowDown",
+      size: selected ? 1.85 : 1.15,
+      text: marker.side.toUpperCase(),
+      time: marker.time as Time,
+    };
   });
 }
 
