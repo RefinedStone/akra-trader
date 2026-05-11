@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import type { CandlestickData, IChartApi, ISeriesApi, LineData, Time, UTCTimestamp } from "lightweight-charts";
+import type { CandlestickData, IChartApi, IRange, ISeriesApi, LineData, Time, UTCTimestamp } from "lightweight-charts";
 
 type SectionId = "data" | "backtest" | "sandbox" | "live" | "logs" | "llm";
 type DetailTabId = "overview" | "orders" | "positions" | "metrics" | "logs";
@@ -800,6 +800,11 @@ function MarketChart({
   timeframe: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const visibleRangeRef = useRef<IRange<Time> | null>(null);
+
+  useEffect(() => {
+    visibleRangeRef.current = null;
+  }, [symbol, timeframe]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -811,7 +816,14 @@ function MarketChart({
     let series: ISeriesApi<"Candlestick"> | null = null;
     let averageSeries: Array<ISeriesApi<"Line">> = [];
     let resizeObserver: ResizeObserver | null = null;
+    let visibleRangeAnimationFrame = 0;
+    let acceptsVisibleRangeChanges = false;
     let disposed = false;
+    const handleVisibleRangeChange = (range: IRange<Time> | null) => {
+      if (acceptsVisibleRangeChanges && range) {
+        visibleRangeRef.current = range;
+      }
+    };
 
     const renderChart = async () => {
       const { CandlestickSeries, ColorType, LineSeries, createChart } = await import("lightweight-charts");
@@ -872,7 +884,16 @@ function MarketChart({
         line.setData(toMovingAverageSeriesData(candles, average.period));
         return line;
       });
-      chart.timeScale().fitContent();
+      const savedRange = visibleRangeRef.current;
+      if (savedRange && timeRangeOverlapsCandles(savedRange, candles)) {
+        chart.timeScale().setVisibleRange(savedRange);
+      } else {
+        chart.timeScale().fitContent();
+      }
+      chart.timeScale().subscribeVisibleTimeRangeChange(handleVisibleRangeChange);
+      visibleRangeAnimationFrame = window.requestAnimationFrame(() => {
+        acceptsVisibleRangeChanges = true;
+      });
 
       const resize = () => {
         const width = containerRef.current?.clientWidth ?? 0;
@@ -890,6 +911,13 @@ function MarketChart({
 
     return () => {
       disposed = true;
+      if (chart && acceptsVisibleRangeChanges) {
+        visibleRangeRef.current = chart.timeScale().getVisibleRange() ?? visibleRangeRef.current;
+      }
+      if (visibleRangeAnimationFrame) {
+        window.cancelAnimationFrame(visibleRangeAnimationFrame);
+      }
+      chart?.timeScale().unsubscribeVisibleTimeRangeChange(handleVisibleRangeChange);
       resizeObserver?.disconnect();
       chart?.remove();
       averageSeries = [];
@@ -1778,6 +1806,23 @@ function timeToDate(time: Time) {
     return Number.isNaN(date.getTime()) ? null : date;
   }
   return new Date(Date.UTC(time.year, time.month - 1, time.day));
+}
+
+function timeRangeOverlapsCandles(range: IRange<Time>, candles: Candle[]) {
+  const from = timeToDate(range.from);
+  const to = timeToDate(range.to);
+  if (from === null || to === null || candles.length === 0) {
+    return false;
+  }
+  const timestamps = candles
+    .map((candle) => new Date(candle.timestamp).getTime())
+    .filter((timestamp) => Number.isFinite(timestamp));
+  if (timestamps.length === 0) {
+    return false;
+  }
+  const first = Math.min(...timestamps);
+  const last = Math.max(...timestamps);
+  return from.getTime() <= last && to.getTime() >= first;
 }
 
 type TimeBoundary = "start" | "end";
