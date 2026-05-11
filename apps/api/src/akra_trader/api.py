@@ -4,6 +4,7 @@ from dataclasses import fields
 from dataclasses import is_dataclass
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 from enum import Enum
 from typing import Any
 
@@ -162,11 +163,16 @@ def create_router(container: Container) -> APIRouter:
     limit: int = Query(500, ge=1, le=5_000),
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    candles = app.get_market_data_candles(
-      symbol=symbol.strip(),
+    aligned_start_at, aligned_end_at = _align_time_range(
       timeframe=timeframe.strip(),
       start_at=_ensure_utc(start_at),
       end_at=_ensure_utc(end_at),
+    )
+    candles = app.get_market_data_candles(
+      symbol=symbol.strip(),
+      timeframe=timeframe.strip(),
+      start_at=aligned_start_at,
+      end_at=aligned_end_at,
       limit=limit,
     )
     return {
@@ -189,12 +195,17 @@ def create_router(container: Container) -> APIRouter:
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
     try:
+      aligned_start_at, aligned_end_at = _align_time_range(
+        timeframe=request.timeframe.strip(),
+        start_at=_ensure_utc(request.start_at),
+        end_at=_ensure_utc(request.end_at),
+      )
       return _to_json(
         app.sync_market_data(
           symbol=request.symbol.strip(),
           timeframe=request.timeframe.strip(),
-          start_at=_ensure_utc(request.start_at),
-          end_at=_ensure_utc(request.end_at),
+          start_at=aligned_start_at,
+          end_at=aligned_end_at,
           limit=request.limit,
         )
       )
@@ -255,8 +266,11 @@ def _run_request_kwargs(
   include_replay_bars: bool,
 ) -> dict[str, Any]:
   values = request.model_dump()
-  values["start_at"] = _ensure_utc(values["start_at"])
-  values["end_at"] = _ensure_utc(values["end_at"])
+  values["start_at"], values["end_at"] = _align_time_range(
+    timeframe=str(values["timeframe"]),
+    start_at=_ensure_utc(values["start_at"]),
+    end_at=_ensure_utc(values["end_at"]),
+  )
   if not include_replay_bars:
     values.pop("replay_bars", None)
   return values
@@ -268,6 +282,60 @@ def _ensure_utc(value: datetime | None) -> datetime | None:
   if value.tzinfo is None:
     return value.replace(tzinfo=UTC)
   return value.astimezone(UTC)
+
+
+def _align_time_range(
+  *,
+  timeframe: str,
+  start_at: datetime | None,
+  end_at: datetime | None,
+) -> tuple[datetime | None, datetime | None]:
+  aligned_start = _align_datetime_to_timeframe(start_at, timeframe=timeframe, boundary="start")
+  aligned_end = _align_datetime_to_timeframe(end_at, timeframe=timeframe, boundary="end")
+  if aligned_start is not None and aligned_end is not None and aligned_end < aligned_start:
+    aligned_end = aligned_start
+  return aligned_start, aligned_end
+
+
+def _align_datetime_to_timeframe(
+  value: datetime | None,
+  *,
+  timeframe: str,
+  boundary: str,
+) -> datetime | None:
+  if value is None:
+    return None
+  seconds = _timeframe_seconds(timeframe)
+  if seconds is None:
+    return value
+  epoch = datetime(1970, 1, 1, tzinfo=UTC)
+  offset = value - epoch
+  interval = timedelta(seconds=seconds)
+  remainder = offset % interval
+  if remainder == timedelta(0):
+    return value
+  if boundary == "start":
+    return value + (interval - remainder)
+  return value - remainder
+
+
+def _timeframe_seconds(timeframe: str) -> int | None:
+  if len(timeframe) < 2:
+    return None
+  try:
+    amount = int(timeframe[:-1])
+  except ValueError:
+    return None
+  if amount <= 0:
+    return None
+  unit = timeframe[-1]
+  if unit == "m":
+    return amount * 60
+  if unit == "h":
+    return amount * 60 * 60
+  if unit == "d":
+    return amount * 24 * 60 * 60
+  return None
 
 
 def _to_json(value: Any) -> Any:

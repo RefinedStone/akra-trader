@@ -142,6 +142,28 @@ def test_backtest_create_list_detail_metrics_and_logs(tmp_path):
   assert client.get(f"/api/runs/{run_id}/logs").json()["logs"][0]["event_type"] == "backtest_completed"
 
 
+def test_run_request_datetimes_align_to_timeframe(tmp_path):
+  client = build_client(tmp_path)
+
+  response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "start_at": "2025-01-01T00:19:00Z",
+      "end_at": "2025-01-01T02:19:00Z",
+      "parameters": {"short_window": 3, "long_window": 5},
+    },
+  )
+
+  assert response.status_code == 200
+  run = response.json()
+  assert run["config"]["start_at"] == "2025-01-01T00:20:00Z"
+  assert run["config"]["end_at"] == "2025-01-01T02:15:00Z"
+  assert run["status"] == "completed"
+
+
 def test_sandbox_create_heartbeat_stop_and_log_filters(tmp_path):
   client = build_client(tmp_path)
 

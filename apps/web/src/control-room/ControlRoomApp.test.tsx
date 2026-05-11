@@ -349,7 +349,7 @@ describe("ControlRoomApp", () => {
     );
     expect(JSON.parse(String(syncCall?.[1]?.body))).toMatchObject({
       start_at: null,
-      end_at: "2024-12-31T23:59:59.999Z",
+      end_at: "2024-12-31T23:55:00.000Z",
       limit: 500,
     });
     await waitFor(() => {
@@ -377,6 +377,29 @@ describe("ControlRoomApp", () => {
     expect(JSON.parse(String(runCall?.[1]?.body))).toMatchObject({
       start_at: new Date("2025-01-01T00:00").toISOString(),
       end_at: new Date("2025-01-02T00:00").toISOString(),
+    });
+  });
+
+  it("aligns backtest datetimes to the selected timeframe before submit", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /백테스트/ }));
+    fireEvent.change(screen.getByLabelText("시작일"), { target: { value: "2025-01-01T01:19" } });
+    fireEvent.change(screen.getByLabelText("종료일"), { target: { value: "2025-01-01T02:19" } });
+    fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/runs/backtests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    const runCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) =>
+      String(url).endsWith("/api/runs/backtests"),
+    );
+    expect(JSON.parse(String(runCall?.[1]?.body))).toMatchObject({
+      start_at: new Date("2025-01-01T01:20").toISOString(),
+      end_at: new Date("2025-01-01T02:15").toISOString(),
     });
   });
 

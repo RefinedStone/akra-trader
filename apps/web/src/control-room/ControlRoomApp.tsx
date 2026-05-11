@@ -341,8 +341,7 @@ export default function App() {
       fee_rate: Number(form.fee_rate),
       slippage_bps: Number(form.slippage_bps),
       replay_bars: Number(form.replay_bars),
-      start_at: toApiDateTime(form.start_at),
-      end_at: toApiDateTime(form.end_at),
+      ...buildAlignedDateRange(form.start_at, form.end_at, form.timeframe),
       parameters,
     };
     try {
@@ -422,7 +421,7 @@ export default function App() {
     }
     await loadCandles(dataQuery, {
       appendOlder: true,
-      endAtOverride: new Date(earliestCandleAt.getTime() - 1).toISOString(),
+      endAtOverride: getPreviousPageEndAt(earliestCandleAt, dataQuery.timeframe)?.toISOString() ?? null,
       startAtOverride: null,
     });
   };
@@ -680,18 +679,32 @@ function DataSection({
             시작일
             <input
               disabled={isLoading}
+              step={timeframeStepSeconds(dataQuery.timeframe)}
               type="datetime-local"
               value={dataQuery.start_at}
               onChange={(event) => setDataQuery({ ...dataQuery, start_at: event.target.value })}
+              onBlur={() =>
+                setDataQuery({
+                  ...dataQuery,
+                  start_at: snapDateTimeInput(dataQuery.start_at, dataQuery.timeframe, "start"),
+                })
+              }
             />
           </label>
           <label>
             종료일
             <input
               disabled={isLoading}
+              step={timeframeStepSeconds(dataQuery.timeframe)}
               type="datetime-local"
               value={dataQuery.end_at}
               onChange={(event) => setDataQuery({ ...dataQuery, end_at: event.target.value })}
+              onBlur={() =>
+                setDataQuery({
+                  ...dataQuery,
+                  end_at: snapDateTimeInput(dataQuery.end_at, dataQuery.timeframe, "end"),
+                })
+              }
             />
           </label>
           <label>
@@ -1039,17 +1052,31 @@ function RunLaunchSection({
           <label>
             시작일
             <input
+              step={timeframeStepSeconds(form.timeframe)}
               type="datetime-local"
               value={form.start_at}
               onChange={(event) => setForm({ ...form, start_at: event.target.value })}
+              onBlur={() =>
+                setForm({
+                  ...form,
+                  start_at: snapDateTimeInput(form.start_at, form.timeframe, "start"),
+                })
+              }
             />
           </label>
           <label>
             종료일
             <input
+              step={timeframeStepSeconds(form.timeframe)}
               type="datetime-local"
               value={form.end_at}
               onChange={(event) => setForm({ ...form, end_at: event.target.value })}
+              onBlur={() =>
+                setForm({
+                  ...form,
+                  end_at: snapDateTimeInput(form.end_at, form.timeframe, "end"),
+                })
+              }
             />
           </label>
         </div>
@@ -1753,22 +1780,99 @@ function timeToDate(time: Time) {
   return new Date(Date.UTC(time.year, time.month - 1, time.day));
 }
 
-function toApiDateTime(value: string) {
+type TimeBoundary = "start" | "end";
+
+function toApiDateTime(value: string, timeframe?: string, boundary: TimeBoundary = "start") {
   if (!value) {
     return null;
   }
-  return new Date(value).toISOString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return alignDateToTimeframe(date, timeframe, boundary).toISOString();
+}
+
+function buildAlignedDateRange(startValue: string, endValue: string, timeframe: string) {
+  const startAt = toApiDateTime(startValue, timeframe, "start");
+  let endAt = toApiDateTime(endValue, timeframe, "end");
+  if (startAt && endAt && new Date(endAt).getTime() < new Date(startAt).getTime()) {
+    endAt = startAt;
+  }
+  return { start_at: startAt, end_at: endAt };
+}
+
+function snapDateTimeInput(value: string, timeframe: string, boundary: TimeBoundary) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return formatDateTimeInput(alignDateToTimeframe(date, timeframe, boundary));
+}
+
+function alignDateToTimeframe(date: Date, timeframe?: string, boundary: TimeBoundary = "start") {
+  const seconds = timeframeToSeconds(timeframe);
+  if (!seconds) {
+    return date;
+  }
+  const interval = seconds * 1000;
+  const timestamp = date.getTime();
+  const remainder = ((timestamp % interval) + interval) % interval;
+  if (remainder === 0) {
+    return date;
+  }
+  return new Date(boundary === "start" ? timestamp + interval - remainder : timestamp - remainder);
+}
+
+function timeframeStepSeconds(timeframe: string) {
+  return timeframeToSeconds(timeframe) ?? 60;
+}
+
+function timeframeToSeconds(timeframe?: string) {
+  const match = /^(\d+)([mhd])$/.exec(timeframe?.trim() ?? "");
+  if (!match) {
+    return null;
+  }
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+  switch (match[2]) {
+    case "m":
+      return amount * 60;
+    case "h":
+      return amount * 60 * 60;
+    case "d":
+      return amount * 24 * 60 * 60;
+    default:
+      return null;
+  }
+}
+
+function formatDateTimeInput(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function buildMarketDataPayload(
   queryState: DataQueryState,
   options: { endAtOverride?: string | null; startAtOverride?: string | null } = {},
 ) {
+  const startAt =
+    "startAtOverride" in options ? options.startAtOverride : toApiDateTime(queryState.start_at, queryState.timeframe, "start");
+  let endAt =
+    "endAtOverride" in options ? options.endAtOverride : toApiDateTime(queryState.end_at, queryState.timeframe, "end");
+  if (startAt && endAt && new Date(endAt).getTime() < new Date(startAt).getTime()) {
+    endAt = startAt;
+  }
   return {
     symbol: queryState.symbol,
     timeframe: queryState.timeframe,
-    start_at: "startAtOverride" in options ? options.startAtOverride : toApiDateTime(queryState.start_at),
-    end_at: "endAtOverride" in options ? options.endAtOverride : toApiDateTime(queryState.end_at),
+    start_at: startAt,
+    end_at: endAt,
     limit: normalizeCandleLimit(queryState.limit),
   };
 }
@@ -2120,6 +2224,14 @@ function getEarliestCandleTimestamp(candles: Candle[]) {
     return null;
   }
   return new Date(Math.min(...timestamps));
+}
+
+function getPreviousPageEndAt(earliestCandleAt: Date, timeframe: string) {
+  const seconds = timeframeToSeconds(timeframe);
+  if (!seconds) {
+    return new Date(earliestCandleAt.getTime() - 1);
+  }
+  return new Date(earliestCandleAt.getTime() - seconds * 1000);
 }
 
 function mergeCandles(...groups: Candle[][]) {
