@@ -278,6 +278,8 @@ describe("ControlRoomApp", () => {
     expect(screen.getByText("RSI14")).toBeInTheDocument();
     expect(screen.getByText("Bull OB")).toBeInTheDocument();
     expect(screen.getByText("Bear OB")).toBeInTheDocument();
+    expect(screen.getByText("BUY")).toBeInTheDocument();
+    expect(screen.getByText("SELL")).toBeInTheDocument();
     expect(screen.getByText("2025-01-01 09:00:00")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /샌드박스/ }));

@@ -169,6 +169,16 @@ type OrderBlockOverlay = {
   };
 };
 
+type OrderMarkerOverlay = {
+  id: string;
+  label: string;
+  side: "buy" | "sell";
+  style: {
+    left: string;
+    top: string;
+  };
+};
+
 type RunFormState = {
   strategy_id: string;
   symbol: string;
@@ -593,6 +603,8 @@ export default function App() {
               marketStatus={marketStatus}
               onLoadCandles={() => void loadCandles()}
               onLoadOlderCandles={() => void loadOlderCandles()}
+              orders={orders}
+              selectedRun={selectedRun}
               setDataQuery={setDataQuery}
               symbolOptions={symbolOptions}
               timeframeOptions={timeframeOptions}
@@ -1047,6 +1059,8 @@ function DataSection({
   marketStatus,
   onLoadCandles,
   onLoadOlderCandles,
+  orders,
+  selectedRun,
   setDataQuery,
   symbolOptions,
   timeframeOptions,
@@ -1058,6 +1072,8 @@ function DataSection({
   marketStatus: MarketStatus | null;
   onLoadCandles: () => void;
   onLoadOlderCandles: () => void;
+  orders: unknown[];
+  selectedRun: RunSummary | null;
   setDataQuery: (value: DataQueryState) => void;
   symbolOptions: string[];
   timeframeOptions: string[];
@@ -1186,6 +1202,8 @@ function DataSection({
         candles={candles}
         loading={isLoading}
         loadingText={dataLoadingMessage(dataLoadingMode)}
+        orders={orders}
+        selectedRun={selectedRun}
         symbol={dataQuery.symbol}
         timeframe={dataQuery.timeframe}
       />
@@ -1231,32 +1249,44 @@ function MarketChart({
   candles,
   loading = false,
   loadingText = "불러오는 중",
+  orders = [],
+  selectedRun,
   symbol,
   timeframe,
 }: {
   candles: Candle[];
   loading?: boolean;
   loadingText?: string;
+  orders?: unknown[];
+  selectedRun?: RunSummary | null;
   symbol: string;
   timeframe: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const visibleRangeRef = useRef<IRange<Time> | null>(null);
   const [orderBlockOverlays, setOrderBlockOverlays] = useState<OrderBlockOverlay[]>([]);
+  const [orderMarkerOverlays, setOrderMarkerOverlays] = useState<OrderMarkerOverlay[]>([]);
 
   useEffect(() => {
     visibleRangeRef.current = null;
     setOrderBlockOverlays([]);
+    setOrderMarkerOverlays([]);
   }, [symbol, timeframe]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container || candles.length === 0 || import.meta.env.MODE === "test") {
       setOrderBlockOverlays([]);
+      setOrderMarkerOverlays([]);
       return;
     }
 
     const orderBlocks = detectOrderBlocks(candles);
+    const orderMarkers = buildOrderMarkers(orders, {
+      selectedRun,
+      symbol,
+      timeframe,
+    });
     let chart: IChartApi | null = null;
     let series: ISeriesApi<"Candlestick"> | null = null;
     let averageSeries: Array<ISeriesApi<"Line">> = [];
@@ -1276,6 +1306,7 @@ function MarketChart({
         return;
       }
       setOrderBlockOverlays(buildOrderBlockOverlays(orderBlocks, chart, series, containerRef.current));
+      setOrderMarkerOverlays(buildOrderMarkerOverlays(orderMarkers, chart, series));
     };
 
     const renderChart = async () => {
@@ -1425,10 +1456,11 @@ function MarketChart({
       chart?.remove();
       averageSeries = [];
       setOrderBlockOverlays([]);
+      setOrderMarkerOverlays([]);
       series = null;
       chart = null;
     };
-  }, [candles]);
+  }, [candles, orders, selectedRun, symbol, timeframe]);
 
   return (
     <section className="chart-panel" aria-label={`${symbol} ${timeframe} 가격 차트`}>
@@ -1458,6 +1490,14 @@ function MarketChart({
               <b className="legend-zone bearish" />
               Bear OB
             </span>
+            <span>
+              <b className="legend-order buy" />
+              BUY
+            </span>
+            <span>
+              <b className="legend-order sell" />
+              SELL
+            </span>
           </div>
         </div>
       </div>
@@ -1470,6 +1510,14 @@ function MarketChart({
               style={zone.style}
             >
               <small>{zone.label}</small>
+            </span>
+          ))}
+        </div>
+        <div className="order-marker-layer" aria-label="주문 마커">
+          {orderMarkerOverlays.map((marker) => (
+            <span className={`order-marker ${marker.side}`} key={marker.id} style={marker.style}>
+              <b>{marker.side.toUpperCase()}</b>
+              <small>{marker.label}</small>
             </span>
           ))}
         </div>
@@ -3254,6 +3302,95 @@ function buildOrderBlockOverlays(
       },
     ];
   });
+}
+
+function buildOrderMarkers(
+  orders: unknown[],
+  {
+    selectedRun,
+    symbol,
+    timeframe,
+  }: {
+    selectedRun?: RunSummary | null;
+    symbol: string;
+    timeframe: string;
+  },
+) {
+  if (!selectedRun || selectedRun.mode !== "backtest") {
+    return [];
+  }
+  const runSymbol = selectedRun.config?.symbols?.[0];
+  if (runSymbol && runSymbol !== symbol) {
+    return [];
+  }
+  if (selectedRun.config?.timeframe && selectedRun.config.timeframe !== timeframe) {
+    return [];
+  }
+
+  return orders.flatMap((order, index) => {
+    const record = asRecord(order);
+    const side = normalizeOrderMarkerSide(recordText(record, ["side"], ""));
+    const timeValue = recordText(record, ["filled_at", "updated_at", "created_at"], null);
+    const date = timeValue ? new Date(timeValue) : null;
+    if (!side || !date || Number.isNaN(date.getTime())) {
+      return [];
+    }
+    const price = recordNumber(record, ["average_fill_price", "avg_price", "requested_price", "price"]);
+    return [
+      {
+        id: recordText(record, ["order_id"], `order-${index}`),
+        label: shortId(recordText(record, ["order_id"], `ORD-${index + 1}`)),
+        price: Number.isFinite(price) ? price : null,
+        side,
+        time: Math.floor(date.getTime() / 1000) as UTCTimestamp,
+      },
+    ];
+  });
+}
+
+function buildOrderMarkerOverlays(
+  markers: ReturnType<typeof buildOrderMarkers>,
+  chart: IChartApi,
+  series: ISeriesApi<"Candlestick">,
+): OrderMarkerOverlay[] {
+  const visibleRange = chart.timeScale().getVisibleRange();
+  const visibleStart = visibleRange ? timeToUnixSeconds(visibleRange.from) : null;
+  const visibleEnd = visibleRange ? timeToUnixSeconds(visibleRange.to) : null;
+  return markers.flatMap((marker) => {
+    if (
+      (visibleStart !== null && marker.time < visibleStart) ||
+      (visibleEnd !== null && marker.time > visibleEnd)
+    ) {
+      return [];
+    }
+    const x = chart.timeScale().timeToCoordinate(marker.time);
+    const y = marker.price === null ? null : series.priceToCoordinate(marker.price);
+    if (x === null || y === null) {
+      return [];
+    }
+    return [
+      {
+        id: marker.id,
+        label: marker.label,
+        side: marker.side,
+        style: {
+          left: `${x}px`,
+          top: `${y}px`,
+        },
+      },
+    ];
+  });
+}
+
+function normalizeOrderMarkerSide(side: string) {
+  const normalized = side.toLowerCase();
+  if (normalized === "buy" || normalized === "long") {
+    return "buy" as const;
+  }
+  if (normalized === "sell" || normalized === "short") {
+    return "sell" as const;
+  }
+  return null;
 }
 
 function candleTimestamp(candle?: Candle) {
