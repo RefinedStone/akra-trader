@@ -1265,7 +1265,15 @@ function MarketChart({
           borderColor: "rgba(46, 62, 91, 0.8)",
           scaleMargins: {
             top: 0.05,
-            bottom: 0.3,
+            bottom: 0.08,
+          },
+        },
+        leftPriceScale: {
+          visible: true,
+          borderColor: "rgba(46, 62, 91, 0.8)",
+          scaleMargins: {
+            top: 0.05,
+            bottom: 0.08,
           },
         },
         timeScale: {
@@ -1306,9 +1314,15 @@ function MarketChart({
         color: rsiIndicator.color,
         lineWidth: rsiIndicator.width,
         priceLineVisible: false,
-        lastValueVisible: false,
+        lastValueVisible: true,
         crosshairMarkerVisible: true,
-        priceScaleId: "rsi",
+        priceScaleId: "left",
+        autoscaleInfoProvider: () => ({
+          priceRange: {
+            minValue: 0,
+            maxValue: 100,
+          },
+        }),
       });
       rsiSeries.setData(toRsiSeriesData(candles, rsiIndicator.period));
       rsiSeries.createPriceLine({
@@ -1331,13 +1345,6 @@ function MarketChart({
         lineStyle: LineStyle.Dashed,
         lineWidth: 1,
         axisLabelVisible: false,
-      });
-      chart.priceScale("rsi").applyOptions({
-        visible: false,
-        scaleMargins: {
-          top: 0.76,
-          bottom: 0.06,
-        },
       });
       const savedRange = visibleRangeRef.current;
       if (savedRange && timeRangeOverlapsCandles(savedRange, candles)) {
