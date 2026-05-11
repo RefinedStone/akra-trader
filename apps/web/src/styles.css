@@ -547,6 +547,35 @@ textarea {
   color: var(--muted);
 }
 
+.chart-heading-meta {
+  display: grid;
+  gap: 7px;
+  justify-items: end;
+}
+
+.ma-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px 10px;
+}
+
+.ma-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ma-legend b {
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+}
+
 .market-chart {
   position: relative;
   min-height: 280px;

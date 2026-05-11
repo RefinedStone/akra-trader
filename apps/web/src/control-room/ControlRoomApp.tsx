@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import type { AreaData, IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
+import type { AreaData, IChartApi, ISeriesApi, LineData, UTCTimestamp } from "lightweight-charts";
 
 type SectionId = "data" | "backtest" | "sandbox" | "live" | "logs" | "llm";
 type DetailTabId = "overview" | "orders" | "positions" | "metrics" | "logs";
@@ -146,6 +146,13 @@ const detailTabs: Array<{ id: DetailTabId; label: string }> = [
   { id: "metrics", label: "지표" },
   { id: "logs", label: "로그" },
 ];
+
+const movingAverageLines = [
+  { period: 5, label: "MA5", color: "#4d8dff", width: 1 },
+  { period: 20, label: "MA20 황금선", color: "#f0c43c", width: 2 },
+  { period: 60, label: "MA60", color: "#31d17d", width: 1 },
+  { period: 120, label: "MA120", color: "#ff7a7a", width: 1 },
+] as const;
 
 const defaultRunForm: RunFormState = {
   strategy_id: "ma_cross_v1",
@@ -783,11 +790,12 @@ function MarketChart({
 
     let chart: IChartApi | null = null;
     let series: ISeriesApi<"Area"> | null = null;
+    let averageSeries: Array<ISeriesApi<"Line">> = [];
     let resizeObserver: ResizeObserver | null = null;
     let disposed = false;
 
     const renderChart = async () => {
-      const { AreaSeries, ColorType, createChart } = await import("lightweight-charts");
+      const { AreaSeries, ColorType, LineSeries, createChart } = await import("lightweight-charts");
       if (disposed || !containerRef.current) {
         return;
       }
@@ -828,6 +836,17 @@ function MarketChart({
         lastValueVisible: true,
       });
       series.setData(toAreaSeriesData(candles));
+      averageSeries = movingAverageLines.map((average) => {
+        const line = chart!.addSeries(LineSeries, {
+          color: average.color,
+          lineWidth: average.width,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+        });
+        line.setData(toMovingAverageSeriesData(candles, average.period));
+        return line;
+      });
       chart.timeScale().fitContent();
 
       const resize = () => {
@@ -848,6 +867,7 @@ function MarketChart({
       disposed = true;
       resizeObserver?.disconnect();
       chart?.remove();
+      averageSeries = [];
       series = null;
       chart = null;
     };
@@ -860,7 +880,17 @@ function MarketChart({
           <strong>{symbol}</strong>
           <span>{timeframe} 가격 추이</span>
         </div>
-        <small>캔들 {candles.length}개</small>
+        <div className="chart-heading-meta">
+          <small>캔들 {candles.length}개</small>
+          <div className="ma-legend" aria-label="moving average legend">
+            {movingAverageLines.map((average) => (
+              <span key={average.period}>
+                <b style={{ backgroundColor: average.color }} />
+                {average.label}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="market-chart" ref={containerRef}>
         {candles.length === 0 ? <span className="chart-empty">불러온 캔들 데이터가 없습니다</span> : null}
@@ -1549,4 +1579,29 @@ function toAreaSeriesData(candles: Candle[]): AreaData[] {
   return [...byTime.entries()]
     .sort(([left], [right]) => left - right)
     .map(([, value]) => value);
+}
+
+function toMovingAverageSeriesData(candles: Candle[], period: number): LineData[] {
+  const sortedCandles = [...candles].sort(
+    (left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime(),
+  );
+  const values: LineData[] = [];
+  let rollingSum = 0;
+  for (let index = 0; index < sortedCandles.length; index += 1) {
+    rollingSum += sortedCandles[index].close;
+    if (index >= period) {
+      rollingSum -= sortedCandles[index - period].close;
+    }
+    if (index < period - 1) {
+      continue;
+    }
+    const timestamp = Math.floor(new Date(sortedCandles[index].timestamp).getTime() / 1000);
+    if (Number.isFinite(timestamp)) {
+      values.push({
+        time: timestamp as UTCTimestamp,
+        value: Number((rollingSum / period).toFixed(8)),
+      });
+    }
+  }
+  return values;
 }
