@@ -4,32 +4,23 @@
 
 ## Goal
 
-Make live candidacy a gated safety program, not an execution shortcut, by requiring audit coverage,
-operator events, risk controls, kill switch behavior, and reconciliation before any venue-backed
-live path is treated as operationally ready.
+Keep live readiness gated by configuration, audit, operator events, kill switch, reconciliation,
+recovery, and venue lifecycle evidence.
 
-## Current status on April 22, 2026
+## Current status on May 11, 2026
 
-- focused on venue lifecycle completeness, candidacy rules, drills, and deployment discipline
+- Guarded-live control-plane coverage is real.
+- Full venue-native lifecycle recovery, deployment discipline, and validated drills remain open.
 
 ## Immediate gaps
 
-- broader venue-native lifecycle recovery
-- clearer guarded-live drill and candidacy rules
-- deployment and credential discipline
-- fuller order-management posture
-- close remaining audit and operator-event gaps across live-affecting actions
+- explicit recovery scope per venue
+- reconciliation and kill-switch drills validated through product UX
+- deployment, backup, and credential-governance discipline
+- clearer order-management posture beyond cancel/replace
 
 ## Linked docs
 
 - `docs/status/current-state.md`
-- `docs/roadmap/next-wave-plan.md`
-- `docs/blueprint/platform-program.md`
-
-## Success criteria
-
-- live-affecting actions are blocked unless safety configuration, audit capture, and operator event
-  logging are present
-- reconciliation and emergency-stop drills are first-class product flows rather than ad hoc procedures
-- live candidacy is explicit and distinct from sandbox worker readiness, with promotion blocked until
-  safety gates pass
+- `docs/roadmap/README.md`
+- `docs/operations/runbooks-overview.md`

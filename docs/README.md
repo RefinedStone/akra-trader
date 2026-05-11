@@ -1,82 +1,34 @@
-# Documentation Index
+# Documentation
 
-This directory is organized around one rule:
+`docs/status/current-state.md` is the source of truth for what exists now. Other docs should stay
+short and should not repeat implementation logs.
 
-- `docs/status/current-state.md` is the single source of truth for what is implemented now.
+## Read These
 
-Everything else should either explain the current system, describe the remaining work, or define the
-longer-horizon blueprint.
-
-## Reading Order
-
-1. [Status: Current State](status/current-state.md)
-2. [Status: Product Position](status/product-position.md)
-3. [Roadmap Overview](roadmap/README.md)
-4. [Roadmap: Next Wave Plan](roadmap/next-wave-plan.md)
-5. [Roadmap: Directions Execution Board](roadmap/directions-execution-board.md)
-6. [Architecture](architecture.md)
-7. [LLM Sensitivity](architecture-llm-sensitivity.md)
-8. [Backend Architecture Target](architecture-backend-target.md)
-9. [Frontend Architecture Target](architecture-frontend-target.md)
-10. [Architecture Refactor Stages](architecture-refactor-stages.md)
-11. [Blueprint](blueprint/README.md)
-12. [Operations: Runbooks Overview](operations/runbooks-overview.md)
-13. [ADR Index](adr/README.md)
+1. [Current State](status/current-state.md)
+2. [Architecture](architecture.md)
+3. [Roadmap](roadmap/README.md)
+4. [Operations](operations/runbooks-overview.md)
+5. [Blueprint](blueprint/README.md)
+6. [ADR Index](adr/README.md)
 
 ## Document Roles
 
-### Status
-
-- `status/current-state.md`
-  - canonical statement of implemented capability, partial areas, and missing work
-- `status/product-position.md`
-  - clarifies what product this is today and what it is not
-
-### Roadmap
-
-- `roadmap/*`
-  - remaining work after the current-state baseline
-  - near-term delivery waves, epics, and technical priorities
-  - `roadmap/directions-execution-board.md` is the execution-oriented view that turns roadmap and
-    internal directions into one ordered delivery board
-
-### Architecture
-
-- `architecture.md`
-  - current boundary rules and the live refactor baseline
-- `architecture-llm-sensitivity.md`
-  - the practical definition of LLM sensitivity, anti-patterns, and review questions
-- `architecture-backend-target.md`
-  - backend target structure, boundary rules, and first-wave move map
-- `architecture-frontend-target.md`
-  - frontend target structure, route/shell split, and remaining pressure points
-- `architecture-refactor-stages.md`
-  - staged execution order and exit criteria for the architecture reset
-
-### Blueprint
-
-- `blueprint/*`
-  - 6-9 month intent, gating logic, operating model, and risk documents
-  - these documents must not be used as the source of truth for implementation status
-
-### Operations
-
-- `operations/*`
-  - operator workflows, runbooks, checklists, and discipline documents
-
-## Internal Planning Directions
-
-The internal planning directions also participate in the documentation contract:
-
-- `.codex-exec-loop/planning/directions/*.md`
-
-Those files should stay aligned with `status`, `roadmap`, and `blueprint`. They are short direction
-documents, not substitutes for the canonical status docs.
+- `status/current-state.md`: implemented capability, known gaps, and next priorities.
+- `architecture.md`: current module boundaries, decomposition rules, and active pressure points.
+- `roadmap/README.md`: remaining work only. Completed delivery logs do not belong here.
+- `operations/runbooks-overview.md`: one-page operator checklist and escalation rules.
+- `blueprint/README.md`: durable product principles and non-goals. It is not an execution board.
+- `adr/*`: historical decisions. ADR bodies may describe old context; read `current-state` first.
 
 ## Maintenance Rule
 
-Whenever a meaningful feature changes, update:
+When a meaningful feature changes:
 
-1. `status/current-state.md`
-2. at least one relevant roadmap or operations document
-3. blueprint wording only if the long-horizon intent or gate changed
+1. Update `status/current-state.md`.
+2. Update `roadmap/README.md` or `operations/runbooks-overview.md` only if the remaining work or
+   operator workflow changed.
+3. Update `architecture.md` only if ownership boundaries changed.
+4. Update `blueprint/README.md` only if a durable principle or non-goal changed.
+
+Delete or merge documents that become historical policy, execution logs, or duplicate status.

@@ -4,31 +4,23 @@
 
 ## Goal
 
-Convert the existing sandbox worker substrate into clear continuous runtime operations with one
-control room that reflects real active execution rather than only previews and history.
+Make sandbox and paper operation reflect active execution state, not only launch forms and history.
 
-## Current status on April 22, 2026
+## Current status on May 11, 2026
 
-- focused on productizing active-session workflows rather than first-time worker creation
+- Workers persist heartbeat, progress, and recovery state.
+- The main gap is operator clarity around active sessions, decisions, lag, positions, fills, and
+  stop/hold actions.
 
 ## Immediate gaps
 
-- active-session-first UX
-- clearer lag, positions, fills, and recent-decision surfaces
-- simpler operator guidance around runtime actions and stop rules
-- further control-room decomposition away from dense feature-local state
+- active-session-first workspace views
+- clearer lag, position, fill, and recent-decision surfaces
+- simpler stop/hold/rerun/compare guidance
+- continued control-room flow decomposition
 
 ## Linked docs
 
 - `docs/status/current-state.md`
-- `docs/roadmap/product-roadmap.md`
-- `docs/blueprint/platform-program.md`
-
-## Success criteria
-
-- preview/history runs and active worker sessions are modeled and surfaced separately in backend and
-  operator-facing views
-- sandbox workers report heartbeat, recoverable state, recent decisions, lag, positions, and fills
-  through one operator surface
-- alerts connect stale data, worker failure, and runtime health to actionable operator state rather
-  than raw background logs
+- `docs/roadmap/README.md`
+- `docs/operations/runbooks-overview.md`

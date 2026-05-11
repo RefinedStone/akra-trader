@@ -1,109 +1,57 @@
 # Architecture
 
-Updated for the repository state as of April 22, 2026.
+Current boundary summary as of May 11, 2026.
 
 ## Core Rule
 
-The repository must be understandable in smaller units than it is today.
+One behavior should be understandable from one entrypoint and a small set of nearby collaborators.
+Compatibility files may exist, but they should delegate or re-export rather than own feature logic.
 
-- domain and application code must not know about FastAPI, SQLAlchemy, ccxt, Freqtrade, or
-  provider-specific transport details
-- route/shell code must not own dense feature logic forever
-- provider/plugin dispatch must not grow through giant condition chains
+## Backend Shape
 
-## LLM Sensitivity
+- `domain/*`: pure models and services.
+- `domain/model_types/*`: bounded model families behind `domain/models.py`.
+- `port_contracts/*`: protocol definitions behind the compatibility `ports.py` barrel.
+- `application.py`: compatibility facade composed from mixins and flow classes.
+- `application_flows/*`: use-case flow owners.
+- `application_support/*`: shared helpers, serialization, policies, and orchestration support.
+- `adapters/*`: storage, venues, market data, and operator-delivery implementations.
+- `api.py`, `api_*`, `main.py`: HTTP shape and dependency wiring.
 
-In this repository, "LLM sensitivity" means the codebase is shaped so an AI agent can understand and
-change one flow without loading unrelated flows.
+## Frontend Shape
 
-This is a structure rule, not a prompt trick.
+- `src/App.tsx`: compatibility entrypoint to the control room.
+- `src/app/*`: workspace route state, shell, and workspace metadata.
+- `src/routes/*`: route-owned workspace composition.
+- `src/features/*`: feature-owned flows such as query-builder and run-history.
+- `src/controlRoomApi/*`: transport helpers behind `controlRoomApi.ts`.
+- `src/controlRoomDefinitions/*`: type families behind `controlRoomDefinitions.ts`.
+- `src/control-room/*`: current control-room panels and shared sections.
 
-- one primary behavior should have one entry module and a small set of direct collaborators
-- a route, use case, or provider should usually be understandable from the entrypoint plus 2 to 4
-  directly related modules
-- feature entry modules should stay tiny and mostly re-export or compose smaller modules
-- shell, route, and adapter-facade files must not silently absorb parser, storage, policy, or dense
-  rendering logic
-- when one feature starts mixing model, storage, transport, governance, and view logic in one
-  place, it must split by those concerns before new work continues there
+## Decomposition Rules
 
-The goal is not only smaller files. The goal is bounded reading context, so both humans and agents
-can modify one behavior without reopening the rest of the product.
+- Do not add new behavior to compatibility barrels when a bounded module can own it.
+- Keep provider routing registry-driven instead of adding large dispatch branches.
+- Keep request parsing out of domain and adapters.
+- Split a module when it combines state, transport, policy, serialization, and dense rendering for
+  unrelated flows.
+- Preserve public API paths and payload compatibility unless the feature explicitly requires a
+  contract change.
 
-Use [LLM Sensitivity](architecture-llm-sensitivity.md) for the full definition, anti-patterns,
-review questions, and repository-specific examples.
+## Current Pressure Points
 
-## Current Refactor Baseline
+- Provider-provenance scheduler/governance flows are split, but several mixins and support modules
+  remain large.
+- Operator-delivery support has registries and grouped provider modules, but provider families still
+  need smaller ownership boundaries.
+- Control-room panels are route-aware, but large status/catalog/live/provider-provenance sections
+  still carry dense JSX and state.
+- Runtime and guarded-live operator flows need clearer active-session ownership before more UI is
+  added.
 
-The first architecture-reset wave is now partially implemented:
+## Done Criteria For New Work
 
-- port contracts are split under `apps/api/src/akra_trader/port_contracts/*`
-- `apps/api/src/akra_trader/ports.py` is now a compatibility re-export layer
-- shared application fallback adapters and comparison policy moved under
-  `apps/api/src/akra_trader/application_support/*`
-- comparison serialization helpers now live under
-  `apps/api/src/akra_trader/application_support/comparison_serialization.py`
-- provider-provenance domain records now live under
-  `apps/api/src/akra_trader/domain/model_types/provider_provenance.py`
-- incident-delivery aliasing and provider dispatch now flow through
-  `apps/api/src/akra_trader/adapters/operator_delivery_registry.py`
-- frontend workspace routing and shell layout now live under `apps/web/src/app/*`
-- control-room compatibility barrels now fan out to `apps/web/src/controlRoomApi/*` and
-  `apps/web/src/controlRoomDefinitions/*`
-
-The product is still not fully decomposed. `application.py`, `operator_delivery.py`, and
-`App.tsx` remain the main pressure points.
-
-## Target Documents
-
-- [LLM Sensitivity](architecture-llm-sensitivity.md)
-- [Backend Architecture Target](architecture-backend-target.md)
-- [Frontend Architecture Target](architecture-frontend-target.md)
-- [Architecture Refactor Stages](architecture-refactor-stages.md)
-
-## Current Stable Boundaries
-
-- `domain/*`
-  - pure models and pure services
-- `runtime.py`
-  - execution-loop primitives and state helpers
-- `port_contracts/*`
-  - split external-system contracts by concern
-- `ports.py`
-  - compatibility shim only
-- `adapters/*`
-  - infrastructure and provider implementations
-- `application.py`
-  - temporary orchestration facade that still needs decomposition
-- `domain/model_types/*`
-  - extracted bounded model families behind `domain/models.py` compatibility imports
-- `apps/web/src/app/*`
-  - workspace route state, shell composition, and workspace metadata
-- `apps/web/src/controlRoomApi/*`
-  - feature-scoped transport helpers behind the compatibility barrel
-- `apps/web/src/controlRoomDefinitions/*`
-  - feature-scoped type families behind the compatibility barrel
-
-## Pressure Points Still Open
-
-- `application.py` still mixes too many use cases in one module
-- `operator_delivery.py` still contains too many provider implementation bodies in one file
-- `domain/models.py` is broader than one bounded feature area should be
-- `App.tsx` still holds too much feature state and JSX even after shell extraction
-- standalone surface binding catalogs are now isolated from the executor, but the catalog itself is
-  still broad and should split by bounded flow
-- `operator_delivery.py` now delegates the busiest provider family to a separate mixin, but the
-  long tail of provider modules is still concentrated
-- `llm-sensitivity-decomposition` is now an active cross-cutting lane and should land with feature
-  work rather than after it
-
-## Operational Rule
-
-New work should reinforce the split, not re-expand the monoliths.
-
-- add new protocols under `port_contracts/*`
-- add new provider routing through the registry layer
-- add new workspace-level navigation under `apps/web/src/app/*`
-- prefer support/use-case modules over adding more policy to `application.py`
-- when a module can no longer be understood as one flow with a few direct collaborators, split it
-  before adding more behavior
+- New backend behavior lands in a flow/support/adapter/domain module with a clear owner.
+- New frontend behavior lands behind a route or feature owner, not in the shell.
+- Tests cover the route, flow, or adapter boundary being changed.
+- Documentation updates `current-state`, `roadmap`, or `operations` only when the meaning changed.

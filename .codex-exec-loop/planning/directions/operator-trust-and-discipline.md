@@ -4,32 +4,23 @@
 
 ## Goal
 
-Make the control room, alerts, operator events, runbooks, and documentation strong enough for
-single-operator daily use, incident response, and promotion decisions without depending on shell
-knowledge or drifting docs.
+Make the control room, alerts, incidents, and docs sufficient for single-operator daily use without
+shell knowledge or drifting policy docs.
 
-## Current status on April 22, 2026
+## Current status on May 11, 2026
 
-- focused on active-session clarity, runbook-linked actionability, and operational discipline
+- Baseline operator visibility and compact operations docs exist.
+- Active-session clarity, deployment discipline, and product-native drill coverage remain open.
 
 ## Immediate gaps
 
-- active-session-first control-room clarity
-- runbook-linked action guidance in product surfaces
-- deployment, backup, and credential runbooks
-- keep completed work out of `directions` and compacted in status/roadmap docs
+- active-session-first runtime and guarded-live UX
+- deployment, backup, and credential-governance procedures
+- provider-owned incident ownership semantics
+- drill evidence fully represented in product UX
 
 ## Linked docs
 
 - `docs/status/current-state.md`
 - `docs/operations/runbooks-overview.md`
-- `docs/blueprint/operating-model.md`
-
-## Success criteria
-
-- the control room can answer what is running, what changed, why it changed, whether it is safe, and
-  what the operator should do next
-- daily, weekly, and incident workflows from the operating model are supported by product surfaces and
-  durable operator-visible records
-- current-state, roadmap, blueprint, and operational docs stay aligned as implementation changes over
-  time
+- `docs/roadmap/README.md`

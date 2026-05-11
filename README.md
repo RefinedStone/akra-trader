@@ -1,34 +1,33 @@
 # Akra Trader
 
-Python-first trading research workstation for a single operator.
+Single-operator trading research workstation.
 
-`akra-trader` combines durable research runs, benchmark comparison, sandbox worker supervision,
-and guarded-live safety surfaces behind one control room. The repository is crypto-first today and
-keeps extension paths open for additional venues and future intelligence-assisted research.
+`akra-trader` is crypto-first today. It combines durable research runs, market-data lineage,
+benchmark comparison, sandbox workers, and guarded-live control surfaces in one control room.
 
-## Current Product Position
+## Product Read
 
-Updated for the repository state as of April 21, 2026.
+Implemented:
 
-The project is no longer only a backtest playground. It already includes:
+- native strategy catalog, backtests, run history, rerun boundaries, presets, and comparisons
+- market-data sync status, lineage history, gap/failure visibility, and drill evidence exports
+- sandbox and paper sessions with persisted heartbeat, progress, and recovery state
+- guarded-live gates, kill switch, reconciliation, recovery, order cancel/replace, incidents, and
+  delivery history
+- route-aware React control room with split API/type barrels and feature-owned query/run-history
+  modules
 
-- durable native backtests with dataset lineage and rerun boundaries
-- native benchmark comparison with stored provenance
-- experiment presets, richer query/filter surfaces, and replay-link audit utilities
-- supervised sandbox worker sessions with heartbeat and restart recovery
-- guarded-live kill switch, reconciliation, recovery, and venue-backed launch gates
-- operator visibility, incident history, delivery history, and guarded-live control surfaces
+Still incomplete:
 
-The project is not yet:
-
-- a fully productized live trading workstation
-- a multi-user or RBAC-enabled platform
-- a complete experiment OS with durable custom strategy registration and rich artifact storage
-- a traceable LLM research lane with replay, fallback, and provider adapters
+- durable custom strategy lifecycle and promotion workflow
+- normalized experiment artifact/export storage for every common query path
+- full venue-native live lifecycle recovery and deployment/secret governance
+- simpler active-session operator UX across all runtime and live workflows
+- traceable LLM research infrastructure beyond the current port/interface shape
 
 ## Run Locally
 
-### API
+API:
 
 ```bash
 cd apps/api
@@ -37,7 +36,7 @@ python3 -m venv .venv
 .venv/bin/uvicorn akra_trader.main:app --reload
 ```
 
-### Web
+Web:
 
 ```bash
 cd apps/web
@@ -45,23 +44,20 @@ npm install
 npm run dev
 ```
 
-### Docker Compose
+Docker Compose:
 
 ```bash
 docker compose up --build
 ```
 
-API default: `http://localhost:8000`
+Default URLs:
 
-Web default: `http://localhost:5173`
+- API: `http://localhost:8000`
+- Web: `http://localhost:5173`
+- Compose API: `http://localhost:47680`
+- Compose Web: `http://localhost:47613`
 
-Docker Compose host ports:
-
-- API: `http://localhost:47680`
-- Web: `http://localhost:47613`
-- Postgres: not exposed on the host; services use `postgres:5432` inside Compose.
-
-## Tests
+## Checks
 
 ```bash
 cd apps/api
@@ -73,16 +69,12 @@ cd apps/web
 npm run typecheck
 ```
 
-## Repository Guide
+## Documentation
 
-- [docs/README.md](docs/README.md): documentation index and reading order
-- [docs/status/current-state.md](docs/status/current-state.md): canonical current-state document
-- [docs/status/product-position.md](docs/status/product-position.md): what product this is today
-- [docs/roadmap/README.md](docs/roadmap/README.md): remaining work overview
-- [docs/roadmap/next-wave-plan.md](docs/roadmap/next-wave-plan.md): detailed next-wave execution plan
-- [docs/architecture.md](docs/architecture.md): architectural shape and boundary rules
-- [docs/blueprint/README.md](docs/blueprint/README.md): longer-horizon blueprint and gate documents
-
-## Application Code
-
-Native strategy and runtime code lives in the application packages under `apps/`.
+- [docs/README.md](docs/README.md): compact documentation map
+- [Current State](docs/status/current-state.md): canonical implementation snapshot
+- [Architecture](docs/architecture.md): current boundaries and pressure points
+- [Roadmap](docs/roadmap/README.md): remaining work
+- [Operations](docs/operations/runbooks-overview.md): compact operator checklist
+- [Blueprint](docs/blueprint/README.md): long-horizon principles only
+- [ADR Index](docs/adr/README.md): historical decisions

@@ -1,62 +1,47 @@
-# Runbooks Overview
+# Operations
 
-Updated for the repository state as of April 24, 2026.
+Compact single-operator checklist as of May 11, 2026.
 
-This folder is the entry point for day-2 operator discipline. The current repository has many
-runtime and guarded-live features, but its runbook coverage is still incomplete. This document
-defines the minimum set that should exist as the platform matures.
+## Daily Start
 
-## Required Runbook Set
+1. Check market-data freshness, gaps, backfill state, and recent sync failures.
+2. Check active sandbox, paper, and guarded-live sessions.
+3. Review open incidents, failed delivery attempts, unresolved acknowledgments, and remediation
+   state.
+4. Confirm guarded-live blockers, kill-switch state, reconciliation status, and open-order snapshots.
+5. Record material operator decisions in product surfaces where possible.
 
-| Runbook | Purpose | Current status |
-| --- | --- | --- |
-| [Daily operations checklist](daily-operations-checklist.md) | What to inspect before and after normal use | baseline implemented |
-| [Data incident response](data-incident-response.md) | Stale sync, repeated failures, gap escalation | baseline implemented |
-| [Operator lineage guidance](operator-lineage-guidance.md) | Dataset-boundary action guidance, retention policy, and drill validation evidence | baseline implemented |
-| [Sandbox runtime incident](sandbox-runtime-incident.md) | Worker failure, heartbeat loss, unexplained drift | baseline implemented |
-| [Guarded-live reconciliation drill](guarded-live-reconciliation-drill.md) | How to verify venue state and respond to mismatches | baseline implemented |
-| [Kill-switch procedure](kill-switch-procedure.md) | When and how to engage, verify, and release emergency stop | baseline implemented |
-| [Release and docs checklist](release-and-docs-checklist.md) | How to keep docs aligned with feature changes | baseline implemented |
+## Incident Triage
 
-## Minimum Daily Checklist
+- Data incident: stop promotion, inspect lineage history and ingestion jobs, export drill evidence
+  when the issue can affect rerun claims or guarded-live candidacy.
+- Sandbox incident: stop or hold the session when heartbeat, lag, fills, or decisions cannot be
+  trusted; compare against run history before promotion.
+- Guarded-live incident: prefer kill switch and reconciliation over manual continuation when venue
+  state, local state, or operator intent diverges.
+- Delivery incident: treat provider fanout as a visibility aid until provider-owned incident
+  ownership is explicit for that destination.
 
-1. Review market-data freshness, recent failures, and active gap windows.
-2. Review active sandbox and guarded-live sessions.
-3. Review recent incidents, delivery failures, and unresolved acknowledgments.
-4. Confirm whether any strategy or runtime state requires stop, hold, rerun, or compare actions.
-5. Record notable operator decisions in durable product surfaces where possible.
+## Guarded-Live Rules
 
-## Runbook Design Rules
+- Do not launch live unless configuration, market data, reconciliation, recovery, and audit gates
+  are green.
+- Engage kill switch when order state, venue state, or operator intent is ambiguous.
+- Release kill switch only after reconciliation confirms local and venue state are aligned.
+- Keep venue-specific lifecycle gaps visible in roadmap/status docs until tested through product UX.
 
-- prefer operator-visible product actions over shell-only instructions
-- record what to inspect, what actions are allowed, and what must be escalated
-- link each runbook to the relevant product surface and blocking condition
-- keep guarded-live procedures stricter than sandbox procedures
+## Release And Docs Rule
 
-## Current Baseline
+For meaningful feature changes:
 
-The required runbook set now exists as a baseline package under `docs/operations/*`.
+1. Update [Current State](../status/current-state.md).
+2. Update [Roadmap](../roadmap/README.md) if remaining work changed.
+3. Update this file if operator actions or escalation rules changed.
+4. Update [Architecture](../architecture.md) if ownership boundaries changed.
 
-What this baseline is good enough for:
+## Known Operational Gaps
 
-- single-operator daily inspection
-- first-pass incident triage
-- guarded-live reconciliation and stop discipline
-- lineage posture interpretation, evidence retention, and drill validation
-- release-time documentation alignment
-
-What is still not complete:
-
-- deployment and backup runbooks
-- secret rotation and credential-governance procedures
-- venue-specific live drills beyond the current guarded-live baseline
-- evidence that every runbook step is fully represented by product UX without fallback shell work
-- first-class promotion-review artifacts and provider-owned escalation automation for linked
-  lineage drill evidence packs
-
-## Related Docs
-
-- [Current State](../status/current-state.md)
-- [Product Position](../status/product-position.md)
-- [Next Wave Plan](../roadmap/next-wave-plan.md)
-- [Operating Model](../blueprint/operating-model.md)
+- deployment and backup runbooks are not product-grade
+- credential rotation and secret governance are incomplete
+- drill validation is not fully represented in product UX
+- provider-owned incident ownership and policy management are incomplete

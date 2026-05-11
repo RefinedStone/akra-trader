@@ -1,59 +1,46 @@
 # Roadmap
 
-This folder describes the remaining work after the repository state captured on April 22, 2026.
+Remaining work from the May 11, 2026 implementation snapshot.
 
-Use [Current State](../status/current-state.md) first. The roadmap starts from that baseline and
-describes what still needs to be finished, hardened, or productized.
+## Next Priorities
 
-## Current Read
+1. Durable strategy lifecycle
+   - persist custom registrations across restarts
+   - add lifecycle and promotion records
+   - expose lifecycle state in filters and audit views
 
-What is already materially present:
-
-- durable native research runs with provenance and rerun boundaries
-- canonical dataset-boundary contracts, claim-aware rerun validation, and lineage-history query
-  surfaces
-- experiment presets, query/filter surfaces, and native-vs-reference comparison
-- sandbox worker sessions with heartbeat and restart recovery
-- guarded-live control surfaces with kill switch, reconciliation, recovery, incidents, and venue
-  launch gates
-- a broad operator visibility and delivery substrate
-
-What still defines the roadmap:
-
-- promotion-review artifact modeling and provider-owned escalation automation on top of documented
-  lineage guidance, TTL-enforced retention, product-native drill evidence exports, and baseline
-  workflow deep links
-- durable strategy registry and promotion workflow
-- normalized experiment query, artifact, and export posture
-- control-room productization and operator workflow clarity
-- fuller guarded-live venue lifecycle handling, deployment, and runbooks
-- isolated intelligence research infrastructure
-
-## Execution Order
-
-1. Research Core hardening
 2. Experiment OS completion
-3. Control Room and Runtime Ops productization
-4. Guarded Live safety completion
-5. Intelligence Research lane foundation
+   - normalize common experiment summaries
+   - define artifact and export registry paths
+   - reduce payload-only scans for common query surfaces
 
-Documentation and operator discipline remain cross-cutting across every wave.
+3. Runtime and control-room productization
+   - make active sessions the first runtime view
+   - clarify lag, positions, fills, recent decisions, stop/hold/rerun/compare actions
+   - keep decomposing large control-room sections by operator flow
 
-## Stage Read
+4. Guarded-live safety completion
+   - make venue lifecycle recovery scope explicit per venue
+   - validate reconciliation and kill-switch drills against product UX
+   - add deployment, backup, and credential-governance discipline
 
-- Stage 0: complete
-- Stage 1: largely complete
-- Stage 2: materially underway
-- Stage 3: partially complete
-- Stage 4: early but real
-- Stage 5: contract only
+5. Provider and incident ownership
+   - continue splitting provider-delivery families
+   - clarify which providers are operationally supported versus adapter-compatible
+   - add provider-owned incident ownership semantics where needed
 
-## Documents
+6. Intelligence research lane
+   - add prompt registry, raw trace storage, replay harness, evaluation, and fallback/review controls
+   - keep this lane isolated from sandbox/live promotion until those controls exist
 
-- [Product Roadmap](product-roadmap.md)
-- [Technical Roadmap](technical-roadmap.md)
-- [Epic Backlog](epic-backlog.md)
-- [Directions Execution Board](directions-execution-board.md)
-- [Next Wave Plan](next-wave-plan.md)
-- [Blueprint](../blueprint/README.md)
-- [Architecture](../architecture.md)
+## Non-Goals For This Horizon
+
+- multi-user RBAC
+- unattended autonomous live trading
+- distributed/multi-node execution
+- LLM-driven live decisioning
+
+## Documentation Rule
+
+This roadmap lists only unfinished work. Completed delivery notes belong in commit history, not in
+roadmap files.

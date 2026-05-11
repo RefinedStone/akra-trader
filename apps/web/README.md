@@ -2,27 +2,23 @@
 
 React + TypeScript control room for `akra-trader`.
 
-Updated for the repository state as of April 21, 2026.
+## Scope
 
-## Current Scope
+Implemented:
 
-The web app already covers more than a backtest launcher.
+- workspace shell and route-owned overview, market, research, runtime, and guarded-live sections
+- strategy catalog, reference catalog, benchmark context, run launch, run history, comparison, and
+  query-builder flows
+- market-data health, gap, backfill, lineage, and incident views
+- sandbox, paper, and guarded-live launch/control panels
+- guarded-live alerts, delivery history, kill switch, reconciliation, recovery, and incidents
+- split control-room API/type barrels plus feature-owned query-builder and run-history modules
 
-Implemented now:
+Still incomplete:
 
-- strategy catalog grouped by runtime lane
-- reference catalog and benchmark context
-- market-data health, gap, backfill, and sync summaries
-- backtest, sandbox, and guarded-live launch flows
-- separate histories for backtest, sandbox, paper, and live modes
-- side-by-side comparison and benchmark narratives
-- guarded-live alerts, incidents, delivery history, kill switch, reconciliation, and recovery panels
-- replay-link alias governance and audit administration surfaces
-
-Current product limit:
-
-- the control room is still a large single-screen application and needs clearer decomposition into
-  research, active-runtime, and guarded-live workflows
+- active-session-first runtime UX is not consistently simple yet
+- several control-room panels remain large and need flow-level decomposition
+- guarded-live and provider-provenance workflows need clearer operator affordances
 
 ## Run
 

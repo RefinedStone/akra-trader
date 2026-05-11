@@ -4,33 +4,22 @@
 
 ## Goal
 
-Turn run history into a durable experiment operating system with strategy lifecycle, presets, tags,
-benchmark packs, and queryable metadata that support promotion decisions instead of one-off
-inspection.
+Move from run archive to durable experiment operating system: strategy lifecycle, promotion records,
+artifact/export registry, and queryable metadata.
 
-## Current status on April 22, 2026
+## Current status on May 11, 2026
 
-- main remaining blocker inside `Batch 1`
-- focused on durable strategy registration, lifecycle durability, and normalized experiment storage
+- Runs, presets, comparisons, rerun boundaries, and query surfaces exist.
+- Durable strategy lifecycle and normalized artifact/export storage are still the main blockers.
 
 ## Immediate gaps
 
-- durable custom strategy registry
-- normalized experiment summaries for common query paths
-- promotion/lifecycle workflow durability
-- artifact and export registry
-- benchmark-pack and promotion-review model
+- durable custom strategy registry lifecycle
+- promotion workflow and audit records
+- normalized experiment summaries
+- artifact and export registry paths
 
 ## Linked docs
 
 - `docs/status/current-state.md`
-- `docs/roadmap/product-roadmap.md`
-- `docs/roadmap/technical-roadmap.md`
-
-## Success criteria
-
-- strategy registration and lifecycle state are durable and queryable across restarts
-- runs can be filtered and compared by dataset, preset, tag, benchmark family, and strategy version
-  without relying on payload-only scans for common paths
-- native and reference runs share one experiment model with consistent provenance, artifact, and
-  export posture
+- `docs/roadmap/README.md`

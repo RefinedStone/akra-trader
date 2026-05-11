@@ -4,29 +4,22 @@
 
 ## Goal
 
-Harden the data plane so every run points to a stable dataset boundary, market-data freshness and
-failures are operator-visible, and crypto-first ingestion can expand without weakening provenance.
+Keep every research and promotion decision tied to inspectable market-data freshness, dataset
+boundaries, lineage history, and drill evidence.
 
-## Current status on April 22, 2026
+## Current status on May 11, 2026
 
-- narrowed to operator guidance, retention, escalation, and drill discipline on top of the
-  implemented data-trust baseline
+- Core lineage, ingestion history, mismatch summaries, TTL floors, and drill exports exist.
+- Remaining work is productizing review artifacts and provider escalation ownership.
 
 ## Immediate gaps
 
-- operator-facing lineage action guidance and escalation rules
-- retention policy for lineage-history and ingestion-job review
-- drill and runbook validation for data-boundary incidents
+- first-class promotion-review artifacts
+- provider-owned escalation automation for lineage evidence packs
+- simpler operator UX for deciding whether a mismatch blocks promotion
 
 ## Linked docs
 
 - `docs/status/current-state.md`
-- `docs/roadmap/technical-roadmap.md`
-- `docs/blueprint/platform-program.md`
-
-## Success criteria
-
-- runs carry stable dataset or sync-checkpoint identity strong enough to validate rerun boundaries
-- market-data status exposes freshness, gap, and failure history in a way the operator can act on
-  without shell access
-- read-side market access and write-side synchronization stay separated behind ports and adapters
+- `docs/roadmap/README.md`
+- `docs/operations/runbooks-overview.md`
