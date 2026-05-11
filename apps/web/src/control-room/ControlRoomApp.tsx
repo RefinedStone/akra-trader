@@ -1391,7 +1391,23 @@ function formatTimestamp(value?: string | null) {
   if (!value) {
     return "-";
   }
-  return new Date(value).toLocaleString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const parts = new Intl.DateTimeFormat("en", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Seoul",
+    year: "2-digit",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "00";
+  return `${part("hour")}:${part("minute")} ${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function toApiDateTime(value: string) {
