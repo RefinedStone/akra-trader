@@ -171,7 +171,6 @@ type OrderBlockOverlay = {
 
 type OrderMarkerOverlay = {
   id: string;
-  label: string;
   side: "buy" | "sell";
   style: {
     left: string;
@@ -1517,7 +1516,6 @@ function MarketChart({
           {orderMarkerOverlays.map((marker) => (
             <span className={`order-marker ${marker.side}`} key={marker.id} style={marker.style}>
               <b>{marker.side.toUpperCase()}</b>
-              <small>{marker.label}</small>
             </span>
           ))}
         </div>
@@ -1972,6 +1970,7 @@ function RunMetricsDetail({ metrics }: { metrics: Record<string, number | string
 
 function OrdersDetail({ orders }: { orders: unknown[] }) {
   const records = orders.map(asRecord);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const filled = records.filter((order) => isOrderStatus(order, ["filled", "closed", "complete", "completed"])).length;
   const open = records.filter((order) => isOrderStatus(order, ["open", "pending", "submitted", "partially_filled"])).length;
   const canceled = records.filter((order) => isOrderStatus(order, ["canceled", "cancelled", "rejected", "failed"])).length;
@@ -2004,25 +2003,38 @@ function OrdersDetail({ orders }: { orders: unknown[] }) {
                 </tr>
               </thead>
               <tbody>
-                {records.map((order, index) => (
-                  <tr key={recordText(order, ["order_id"], `order-${index}`)}>
-                    <td>{shortId(recordText(order, ["order_id"], "-"))}</td>
-                    <td>{formatInstrument(recordText(order, ["instrument_id", "symbol"], "-"))}</td>
-                    <td>{formatOrderType(recordText(order, ["order_type", "type"], "-"))}</td>
-                    <td>
-                      <span className={`side-pill ${sideClass(recordText(order, ["side"], ""))}`}>
-                        {formatOrderSide(recordText(order, ["side"], "-"))}
-                      </span>
-                    </td>
-                    <td>{formatMetricValue(recordNumber(order, ["filled_quantity", "quantity"]))}</td>
-                    <td>{formatMetricValue(recordNumber(order, ["requested_price", "price"]))}</td>
-                    <td>{formatMetricValue(recordNumber(order, ["average_fill_price", "avg_price"]))}</td>
-                    <td>
-                      <StatusPill value={recordText(order, ["status"], "-")} />
-                    </td>
-                    <td>{formatTimestamp(recordText(order, ["filled_at", "updated_at", "created_at"], null))}</td>
-                  </tr>
-                ))}
+                {records.map((order, index) => {
+                  const orderId = recordText(order, ["order_id"], `order-${index}`);
+                  const isSelected = selectedOrderId === orderId;
+                  return (
+                    <tr key={orderId}>
+                      <td className={isSelected ? "is-selected-cell" : ""}>
+                        <button
+                          aria-pressed={isSelected}
+                          className="order-id-button"
+                          onClick={() => setSelectedOrderId(orderId)}
+                          type="button"
+                        >
+                          {shortId(orderId)}
+                        </button>
+                      </td>
+                      <td>{formatInstrument(recordText(order, ["instrument_id", "symbol"], "-"))}</td>
+                      <td>{formatOrderType(recordText(order, ["order_type", "type"], "-"))}</td>
+                      <td>
+                        <span className={`side-pill ${sideClass(recordText(order, ["side"], ""))}`}>
+                          {formatOrderSide(recordText(order, ["side"], "-"))}
+                        </span>
+                      </td>
+                      <td>{formatMetricValue(recordNumber(order, ["filled_quantity", "quantity"]))}</td>
+                      <td>{formatMetricValue(recordNumber(order, ["requested_price", "price"]))}</td>
+                      <td>{formatMetricValue(recordNumber(order, ["average_fill_price", "avg_price"]))}</td>
+                      <td>
+                        <StatusPill value={recordText(order, ["status"], "-")} />
+                      </td>
+                      <td>{formatTimestamp(recordText(order, ["filled_at", "updated_at", "created_at"], null))}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -3371,7 +3383,6 @@ function buildOrderMarkerOverlays(
     return [
       {
         id: marker.id,
-        label: marker.label,
         side: marker.side,
         style: {
           left: `${x}px`,

@@ -469,6 +469,8 @@ describe("ControlRoomApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "주문" }));
     expect(screen.getByText("총 주문")).toBeInTheDocument();
     expect(screen.getByText("주문 활동 타임라인")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "order-1" }));
+    expect(screen.getByRole("button", { name: "order-1" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByText("BUY").length).toBeGreaterThan(0);
     expect(screen.getAllByText("체결").length).toBeGreaterThan(0);
 

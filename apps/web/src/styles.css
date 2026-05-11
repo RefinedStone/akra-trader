@@ -1120,13 +1120,6 @@ textarea {
   color: #ff514f;
 }
 
-.order-marker small {
-  max-width: 64px;
-  overflow: hidden;
-  color: var(--muted-strong);
-  text-overflow: ellipsis;
-}
-
 .chart-loading {
   position: absolute;
   z-index: 4;
@@ -1432,10 +1425,31 @@ td {
   background: rgba(124, 77, 255, 0.13);
 }
 
+.detail-table td.is-selected-cell {
+  background: rgba(124, 77, 255, 0.22);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
 .detail-table td:last-child {
   max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.order-id-button {
+  justify-content: flex-start;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  font-weight: 800;
+}
+
+.order-id-button:hover,
+.order-id-button[aria-pressed="true"] {
+  color: var(--accent);
 }
 
 .status-pill,
