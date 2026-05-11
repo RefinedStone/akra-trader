@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import type { AreaData, IChartApi, ISeriesApi, LineData, UTCTimestamp } from "lightweight-charts";
+import type { CandlestickData, IChartApi, ISeriesApi, LineData, Time, UTCTimestamp } from "lightweight-charts";
 
 type SectionId = "data" | "backtest" | "sandbox" | "live" | "logs" | "llm";
 type DetailTabId = "overview" | "orders" | "positions" | "metrics" | "logs";
@@ -788,13 +788,13 @@ function MarketChart({
     }
 
     let chart: IChartApi | null = null;
-    let series: ISeriesApi<"Area"> | null = null;
+    let series: ISeriesApi<"Candlestick"> | null = null;
     let averageSeries: Array<ISeriesApi<"Line">> = [];
     let resizeObserver: ResizeObserver | null = null;
     let disposed = false;
 
     const renderChart = async () => {
-      const { AreaSeries, ColorType, LineSeries, createChart } = await import("lightweight-charts");
+      const { CandlestickSeries, ColorType, LineSeries, createChart } = await import("lightweight-charts");
       if (disposed || !containerRef.current) {
         return;
       }
@@ -808,6 +808,9 @@ function MarketChart({
           fontFamily: "Roboto, Noto Sans KR, sans-serif",
           fontSize: 12,
         },
+        localization: {
+          timeFormatter: formatChartTime,
+        },
         grid: {
           vertLines: { color: "rgba(46, 62, 91, 0.28)" },
           horzLines: { color: "rgba(46, 62, 91, 0.45)" },
@@ -819,6 +822,7 @@ function MarketChart({
           borderColor: "rgba(46, 62, 91, 0.8)",
           timeVisible: true,
           secondsVisible: false,
+          tickMarkFormatter: (time: Time) => formatChartTime(time),
         },
         crosshair: {
           vertLine: { color: "rgba(159, 122, 255, 0.48)" },
@@ -826,15 +830,17 @@ function MarketChart({
         },
       });
 
-      series = chart.addSeries(AreaSeries, {
-        lineColor: "#9f7aff",
-        topColor: "rgba(124, 77, 255, 0.48)",
-        bottomColor: "rgba(124, 77, 255, 0.02)",
-        lineWidth: 2,
+      series = chart.addSeries(CandlestickSeries, {
+        upColor: "#31d17d",
+        downColor: "#ff514f",
+        borderUpColor: "#31d17d",
+        borderDownColor: "#ff514f",
+        wickUpColor: "#31d17d",
+        wickDownColor: "#ff514f",
         priceLineVisible: false,
         lastValueVisible: true,
       });
-      series.setData(toAreaSeriesData(candles));
+      series.setData(toCandlestickSeriesData(candles));
       averageSeries = movingAverageLines.map((average) => {
         const line = chart!.addSeries(LineSeries, {
           color: average.color,
@@ -1395,6 +1401,21 @@ function formatTimestamp(value?: string | null) {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
+  return formatKstDate(date);
+}
+
+function formatChartTime(time: Time) {
+  if (typeof time === "number") {
+    return formatKstDate(new Date(time * 1000));
+  }
+  if (typeof time === "string") {
+    const date = new Date(time);
+    return Number.isNaN(date.getTime()) ? time : formatKstDate(date);
+  }
+  return formatKstDate(new Date(Date.UTC(time.year, time.month - 1, time.day)));
+}
+
+function formatKstDate(date: Date) {
   const parts = new Intl.DateTimeFormat("en", {
     day: "2-digit",
     hour: "2-digit",
@@ -1580,14 +1601,17 @@ function uniqueOptions(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
-function toAreaSeriesData(candles: Candle[]): AreaData[] {
-  const byTime = new Map<number, AreaData>();
+function toCandlestickSeriesData(candles: Candle[]): CandlestickData[] {
+  const byTime = new Map<number, CandlestickData>();
   for (const candle of candles) {
     const timestamp = Math.floor(new Date(candle.timestamp).getTime() / 1000);
     if (Number.isFinite(timestamp)) {
       byTime.set(timestamp, {
         time: timestamp as UTCTimestamp,
-        value: candle.close,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
       });
     }
   }
