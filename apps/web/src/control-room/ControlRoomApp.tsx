@@ -173,6 +173,7 @@ type DataLoadingMode = "idle" | "loading" | "appending";
 const apiBase = "/api";
 const defaultCandleQueryLimit = 500;
 const maxCandleQueryLimit = 5000;
+const baseTimeframeOptions = ["1m", "5m"] as const;
 
 const sections: Array<{ id: SectionId; label: string; eyebrow: string; mark: string; path: string }> = [
   { id: "data", label: "데이터", eyebrow: "수집 현황", mark: "D", path: "/data" },
@@ -313,6 +314,7 @@ export default function App() {
   const timeframeOptions = useMemo(
     () =>
       uniqueOptions([
+        ...baseTimeframeOptions,
         ...(marketStatus?.instruments.map((instrument) => instrument.timeframe) ?? []),
         dataQuery.timeframe,
         form.timeframe,

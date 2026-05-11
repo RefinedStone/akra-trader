@@ -269,6 +269,7 @@ describe("ControlRoomApp", () => {
     expect(screen.getByRole("button", { name: /성과/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /로그/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /LLM 전략/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "1m" })).toBeInTheDocument();
     expect(screen.getByText("MA5")).toBeInTheDocument();
     expect(screen.getByText("MA20 황금선")).toBeInTheDocument();
     expect(screen.getByText("MA60")).toBeInTheDocument();
