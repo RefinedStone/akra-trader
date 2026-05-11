@@ -32,6 +32,14 @@ class RunCreateRequest(BaseModel):
   end_at: datetime | None = None
 
 
+class MarketDataSyncRequest(BaseModel):
+  symbol: str = Field(default="BTC/USDT", min_length=1)
+  timeframe: str = Field(default="5m", min_length=1)
+  start_at: datetime | None = None
+  end_at: datetime | None = None
+  limit: int | None = Field(default=None, ge=1, le=200_000)
+
+
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -174,6 +182,24 @@ def create_router(container: Container) -> APIRouter:
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
     return _to_json(app.get_market_data_status(timeframe=timeframe.strip()))
+
+  @router.post("/market-data/sync")
+  def sync_market_data(
+    request: MarketDataSyncRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return _to_json(
+        app.sync_market_data(
+          symbol=request.symbol.strip(),
+          timeframe=request.timeframe.strip(),
+          start_at=_ensure_utc(request.start_at),
+          end_at=_ensure_utc(request.end_at),
+          limit=request.limit,
+        )
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
 
   @router.get("/logs")
   def list_logs(

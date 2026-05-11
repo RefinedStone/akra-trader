@@ -50,6 +50,21 @@ type MarketStatus = {
   }>;
 };
 
+type MarketDataSyncResult = {
+  provider: string;
+  venue: string;
+  symbol: string;
+  timeframe: string;
+  status: string;
+  requested_start_at?: string | null;
+  requested_end_at?: string | null;
+  requested_limit?: number | null;
+  effective_start_at?: string | null;
+  effective_end_at?: string | null;
+  candle_count: number;
+  issues: string[];
+};
+
 type HealthStatus = {
   status: string;
   market_data_provider: string;
@@ -76,7 +91,17 @@ type RunFormState = {
   fee_rate: string;
   slippage_bps: string;
   replay_bars: string;
+  start_at: string;
+  end_at: string;
   parameters: string;
+};
+
+type DataSyncFormState = {
+  symbol: string;
+  timeframe: string;
+  start_at: string;
+  end_at: string;
+  limit: string;
 };
 
 const apiBase = "/api";
@@ -98,7 +123,17 @@ const defaultRunForm: RunFormState = {
   fee_rate: "0.001",
   slippage_bps: "5",
   replay_bars: "96",
+  start_at: "",
+  end_at: "",
   parameters: '{\n  "short_window": 8,\n  "long_window": 21\n}',
+};
+
+const defaultDataSyncForm: DataSyncFormState = {
+  symbol: "BTC/USDT",
+  timeframe: "5m",
+  start_at: "",
+  end_at: "",
+  limit: "2000",
 };
 
 function sectionFromPath(pathname: string): SectionId {
@@ -135,6 +170,8 @@ export default function App() {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [form, setForm] = useState<RunFormState>(defaultRunForm);
   const [dataQuery, setDataQuery] = useState({ symbol: "BTC/USDT", timeframe: "5m", limit: "80" });
+  const [dataSyncForm, setDataSyncForm] = useState<DataSyncFormState>(defaultDataSyncForm);
+  const [dataSyncResult, setDataSyncResult] = useState<MarketDataSyncResult | null>(null);
   const [logFilter, setLogFilter] = useState({ mode: "", severity: "" });
   const [statusText, setStatusText] = useState("불러오는 중");
   const [error, setError] = useState<string | null>(null);
@@ -176,9 +213,10 @@ export default function App() {
       uniqueOptions([
         ...(marketStatus?.instruments.map((instrument) => toSymbol(instrument.instrument_id)) ?? []),
         dataQuery.symbol,
+        dataSyncForm.symbol,
         form.symbol,
       ]),
-    [dataQuery.symbol, form.symbol, marketStatus],
+    [dataQuery.symbol, dataSyncForm.symbol, form.symbol, marketStatus],
   );
 
   const timeframeOptions = useMemo(
@@ -186,9 +224,10 @@ export default function App() {
       uniqueOptions([
         ...(marketStatus?.instruments.map((instrument) => instrument.timeframe) ?? []),
         dataQuery.timeframe,
+        dataSyncForm.timeframe,
         form.timeframe,
       ]),
-    [dataQuery.timeframe, form.timeframe, marketStatus],
+    [dataQuery.timeframe, dataSyncForm.timeframe, form.timeframe, marketStatus],
   );
 
   const refresh = async () => {
@@ -260,6 +299,8 @@ export default function App() {
       fee_rate: Number(form.fee_rate),
       slippage_bps: Number(form.slippage_bps),
       replay_bars: Number(form.replay_bars),
+      start_at: toApiDateTime(form.start_at),
+      end_at: toApiDateTime(form.end_at),
       parameters,
     };
     try {
@@ -298,14 +339,41 @@ export default function App() {
     setPositions(positionResponse.positions);
   };
 
-  const loadCandles = async () => {
+  const loadCandles = async (queryState = dataQuery) => {
     const query = new URLSearchParams({
-      symbol: dataQuery.symbol,
-      timeframe: dataQuery.timeframe,
-      limit: dataQuery.limit,
+      symbol: queryState.symbol,
+      timeframe: queryState.timeframe,
+      limit: queryState.limit,
     });
     const response = await fetchJson<{ candles: Candle[] }>(`/market-data/candles?${query}`);
     setCandles(response.candles);
+  };
+
+  const syncMarketData = async () => {
+    setError(null);
+    const payload = {
+      symbol: dataSyncForm.symbol,
+      timeframe: dataSyncForm.timeframe,
+      start_at: toApiDateTime(dataSyncForm.start_at),
+      end_at: toApiDateTime(dataSyncForm.end_at),
+      limit: dataSyncForm.limit ? Number(dataSyncForm.limit) : null,
+    };
+    try {
+      const result = await fetchJson<MarketDataSyncResult>("/market-data/sync", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setDataSyncResult(result);
+      setDataQuery({
+        symbol: result.symbol,
+        timeframe: result.timeframe,
+        limit: dataQuery.limit,
+      });
+      await refresh();
+      await loadCandles({ symbol: result.symbol, timeframe: result.timeframe, limit: dataQuery.limit });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "데이터 적재 요청에 실패했습니다.");
+    }
   };
 
   const loadLogs = async () => {
@@ -395,9 +463,13 @@ export default function App() {
             <DataSection
               candles={candles}
               dataQuery={dataQuery}
+              dataSyncForm={dataSyncForm}
+              dataSyncResult={dataSyncResult}
               marketStatus={marketStatus}
               onLoadCandles={() => void loadCandles()}
+              onSyncData={() => void syncMarketData()}
               setDataQuery={setDataQuery}
+              setDataSyncForm={setDataSyncForm}
               symbolOptions={symbolOptions}
               timeframeOptions={timeframeOptions}
             />
@@ -480,21 +552,33 @@ export default function App() {
 function DataSection({
   candles,
   dataQuery,
+  dataSyncForm,
+  dataSyncResult,
   marketStatus,
   onLoadCandles,
+  onSyncData,
   setDataQuery,
+  setDataSyncForm,
   symbolOptions,
   timeframeOptions,
 }: {
   candles: Candle[];
   dataQuery: { symbol: string; timeframe: string; limit: string };
+  dataSyncForm: DataSyncFormState;
+  dataSyncResult: MarketDataSyncResult | null;
   marketStatus: MarketStatus | null;
   onLoadCandles: () => void;
+  onSyncData: () => void;
   setDataQuery: (value: { symbol: string; timeframe: string; limit: string }) => void;
+  setDataSyncForm: (value: DataSyncFormState) => void;
   symbolOptions: string[];
   timeframeOptions: string[];
 }) {
   const latest = candles[candles.length - 1];
+  const submitSync = (event: FormEvent) => {
+    event.preventDefault();
+    onSyncData();
+  };
   return (
     <section className="core-panel core-panel-main">
       <div className="panel-heading">
@@ -542,6 +626,77 @@ function DataSection({
           />
         </label>
       </div>
+      <form className="sync-panel" onSubmit={submitSync}>
+        <div className="sync-panel-heading">
+          <div>
+            <p className="core-eyebrow">데이터 적재</p>
+            <h3>REST 백필</h3>
+          </div>
+          <button type="submit">동기화</button>
+        </div>
+        <div className="form-grid sync-grid">
+          <label>
+            심볼
+            <select
+              value={dataSyncForm.symbol}
+              onChange={(event) => setDataSyncForm({ ...dataSyncForm, symbol: event.target.value })}
+            >
+              {symbolOptions.map((symbol) => (
+                <option key={symbol} value={symbol}>
+                  {symbol}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            타임프레임
+            <select
+              value={dataSyncForm.timeframe}
+              onChange={(event) => setDataSyncForm({ ...dataSyncForm, timeframe: event.target.value })}
+            >
+              {timeframeOptions.map((timeframe) => (
+                <option key={timeframe} value={timeframe}>
+                  {timeframe}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            시작일
+            <input
+              type="datetime-local"
+              value={dataSyncForm.start_at}
+              onChange={(event) => setDataSyncForm({ ...dataSyncForm, start_at: event.target.value })}
+            />
+          </label>
+          <label>
+            종료일
+            <input
+              type="datetime-local"
+              value={dataSyncForm.end_at}
+              onChange={(event) => setDataSyncForm({ ...dataSyncForm, end_at: event.target.value })}
+            />
+          </label>
+          <label>
+            적재 개수
+            <input
+              min="1"
+              type="number"
+              value={dataSyncForm.limit}
+              onChange={(event) => setDataSyncForm({ ...dataSyncForm, limit: event.target.value })}
+            />
+          </label>
+        </div>
+        {dataSyncResult ? (
+          <div className="sync-result" role="status">
+            <span>{formatDataStatus(dataSyncResult.status)}</span>
+            <strong>{dataSyncResult.candle_count}개</strong>
+            <small>
+              {formatTimestamp(dataSyncResult.effective_start_at)} - {formatTimestamp(dataSyncResult.effective_end_at)}
+            </small>
+          </div>
+        ) : null}
+      </form>
       <div className="metric-grid">
         <Metric label="제공자" value={marketStatus?.provider ?? "-"} />
         <Metric label="거래소" value={marketStatus?.venue ?? "-"} />
@@ -801,6 +956,22 @@ function RunLaunchSection({
               onChange={(event) => setForm({ ...form, replay_bars: event.target.value })}
             />
           </label>
+          <label>
+            시작일
+            <input
+              type="datetime-local"
+              value={form.start_at}
+              onChange={(event) => setForm({ ...form, start_at: event.target.value })}
+            />
+          </label>
+          <label>
+            종료일
+            <input
+              type="datetime-local"
+              value={form.end_at}
+              onChange={(event) => setForm({ ...form, end_at: event.target.value })}
+            />
+          </label>
         </div>
         <label>
           전략 파라미터
@@ -1040,6 +1211,13 @@ function formatTimestamp(value?: string | null) {
     return "-";
   }
   return new Date(value).toLocaleString();
+}
+
+function toApiDateTime(value: string) {
+  if (!value) {
+    return null;
+  }
+  return new Date(value).toISOString();
 }
 
 function formatNumber(value: number) {

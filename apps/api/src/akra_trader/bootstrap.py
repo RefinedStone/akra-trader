@@ -13,6 +13,7 @@ from akra_trader.adapters.venue_execution_seeded_adapter import SeededVenueExecu
 from akra_trader.application import TradingApplication
 from akra_trader.config import Settings
 from akra_trader.guarded_live_workers import GuardedLiveWorkerSessionsJob
+from akra_trader.market_data_sync import MarketDataSyncJob
 from akra_trader.sandbox_workers import SandboxWorkerSessionsJob
 
 
@@ -115,6 +116,15 @@ def build_container(settings: Settings | None = None) -> Container:
       interval_seconds=app_settings.guarded_live_worker_heartbeat_interval_seconds,
     ),
   ]
+  if app_settings.market_data_provider.strip().lower() == "binance":
+    background_jobs.insert(
+      0,
+      MarketDataSyncJob(
+        market_data,
+        timeframes=app_settings.market_data_sync_timeframes,
+        interval_seconds=app_settings.market_data_sync_interval_seconds,
+      ),
+    )
   return Container(app=app, background_jobs=tuple(background_jobs))
 
 

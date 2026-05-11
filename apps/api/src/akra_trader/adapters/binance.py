@@ -39,6 +39,7 @@ from akra_trader.domain.models import MarketDataIngestionJobRecord
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import MarketDataRemediationResult
+from akra_trader.domain.models import MarketDataSyncResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.domain.models import SyncCheckpoint
@@ -196,6 +197,82 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
         )
       )
     return MarketDataStatus(provider=self._provider, venue=self._venue, instruments=instruments)
+
+  def ensure_candles(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ) -> MarketDataSyncResult:
+    requested_start_at = self._ensure_utc(start_at)
+    requested_end_at = self._ensure_utc(end_at)
+    requested_limit = limit
+    sync_succeeded = False
+    issues: list[str] = []
+    try:
+      self._timeframe_delta(timeframe)
+      sync_limit = self._resolve_ensure_sync_limit(
+        timeframe=timeframe,
+        start_at=requested_start_at,
+        end_at=requested_end_at,
+        limit=limit,
+      )
+      if requested_start_at is not None or requested_end_at is not None:
+        sync_succeeded = self._sync_range(
+          symbol=symbol,
+          timeframe=timeframe,
+          start_at=requested_start_at,
+          end_at=requested_end_at,
+          limit=sync_limit,
+        )
+      else:
+        target = sync_limit or self._historical_candle_limit
+        sync_succeeded = self._sync_recent(symbol=symbol, timeframe=timeframe, required_count=target)
+        if sync_succeeded:
+          sync_succeeded = self._backfill_history(
+            symbol=symbol,
+            timeframe=timeframe,
+            target_candle_count=target,
+          )
+    except Exception as exc:
+      issues.append(f"ensure_candles_failed:{exc}")
+
+    candles = self.get_candles(
+      symbol=symbol,
+      timeframe=timeframe,
+      start_at=requested_start_at,
+      end_at=requested_end_at,
+      limit=requested_limit if requested_start_at is None and requested_end_at is None else None,
+    )
+    lineage = self.describe_lineage(
+      symbol=symbol,
+      timeframe=timeframe,
+      candles=candles,
+      start_at=requested_start_at,
+      end_at=requested_end_at,
+      limit=requested_limit,
+    )
+    issues.extend(lineage.issues)
+    status = "synced" if sync_succeeded else "failed"
+    if lineage.sync_status == "error":
+      status = "failed"
+    return MarketDataSyncResult(
+      provider=self._provider,
+      venue=self._venue,
+      symbol=symbol,
+      timeframe=timeframe,
+      status=status,
+      requested_start_at=requested_start_at,
+      requested_end_at=requested_end_at,
+      requested_limit=requested_limit,
+      effective_start_at=candles[0].timestamp if candles else None,
+      effective_end_at=candles[-1].timestamp if candles else None,
+      candle_count=len(candles),
+      issues=tuple(dict.fromkeys(issues)),
+    )
 
   def list_lineage_history(
     self,
@@ -399,6 +476,14 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     issues = list(quality.issues)
     if limit is not None and len(candles) < limit:
       issues.append("insufficient_candle_coverage")
+    issues.extend(
+      self._build_requested_range_issues(
+        candles=candles,
+        timeframe=timeframe,
+        start_at=start_at,
+        end_at=end_at,
+      )
+    )
     dataset_identity = None
     reproducibility_state = "range_only"
     if candles:
@@ -427,6 +512,55 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
       last_sync_at=quality.sync_state.last_sync_at if quality.sync_state is not None else None,
       issues=tuple(issues),
     )
+
+  def _resolve_ensure_sync_limit(
+    self,
+    *,
+    timeframe: str,
+    start_at: datetime | None,
+    end_at: datetime | None,
+    limit: int | None,
+  ) -> int | None:
+    if start_at is None and end_at is None:
+      return limit or self._historical_candle_limit
+    if start_at is None:
+      return limit
+    end_boundary = end_at or self._clock()
+    estimated = self._estimate_bar_count(
+      start_at=start_at,
+      end_at=end_boundary,
+      timeframe=timeframe,
+    )
+    if limit is None:
+      return estimated
+    return max(limit, estimated)
+
+  def _build_requested_range_issues(
+    self,
+    *,
+    candles: list[Candle],
+    timeframe: str,
+    start_at: datetime | None,
+    end_at: datetime | None,
+  ) -> tuple[str, ...]:
+    if not candles:
+      if start_at is not None or end_at is not None:
+        return ("requested_range_empty",)
+      return ()
+
+    timeframe_delta = self._timeframe_delta(timeframe)
+    issues: list[str] = []
+    first_timestamp = candles[0].timestamp
+    last_timestamp = candles[-1].timestamp
+    if start_at is not None and first_timestamp > start_at:
+      issues.append("requested_start_missing")
+    if end_at is not None and last_timestamp + timeframe_delta <= end_at:
+      issues.append("requested_end_missing")
+    for previous, current in zip(candles, candles[1:]):
+      if current.timestamp - previous.timestamp > timeframe_delta:
+        issues.append("requested_range_gap")
+        break
+    return tuple(issues)
 
   def _build_instrument(self, symbol: str) -> Instrument:
     base_currency, quote_currency = symbol.split("/")

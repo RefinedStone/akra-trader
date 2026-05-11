@@ -66,6 +66,28 @@ const sandboxRun = {
   notes: [],
 };
 
+const backtestRun = {
+  ...sandboxRun,
+  run_id: "run-backtest",
+  mode: "backtest",
+  status: "completed",
+};
+
+const syncResult = {
+  provider: "seeded",
+  venue: "binance",
+  symbol: "BTC/USDT",
+  timeframe: "5m",
+  status: "fixture",
+  requested_start_at: "2025-01-01T00:00:00Z",
+  requested_end_at: "2025-01-01T00:20:00Z",
+  requested_limit: 2000,
+  effective_start_at: "2025-01-01T00:00:00Z",
+  effective_end_at: "2025-01-01T00:20:00Z",
+  candle_count: 5,
+  issues: [],
+};
+
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return Promise.resolve({
     ok,
@@ -104,6 +126,13 @@ describe("ControlRoomApp", () => {
           runs = [sandboxRun];
           return jsonResponse(sandboxRun);
         }
+        if (url.endsWith("/api/runs/backtests") && init?.method === "POST") {
+          runs = [backtestRun];
+          return jsonResponse(backtestRun);
+        }
+        if (url.endsWith("/api/market-data/sync") && init?.method === "POST") {
+          return jsonResponse(syncResult);
+        }
         if (url.endsWith("/api/runs/run-1/orders")) {
           return jsonResponse({ orders: [{ order_id: "order-1" }] });
         }
@@ -112,6 +141,15 @@ describe("ControlRoomApp", () => {
         }
         if (url.endsWith("/api/runs/run-1")) {
           return jsonResponse(sandboxRun);
+        }
+        if (url.endsWith("/api/runs/run-backtest/orders")) {
+          return jsonResponse({ orders: [] });
+        }
+        if (url.endsWith("/api/runs/run-backtest/positions")) {
+          return jsonResponse({ positions: [] });
+        }
+        if (url.endsWith("/api/runs/run-backtest")) {
+          return jsonResponse(backtestRun);
         }
         if (url.endsWith("/api/runs")) {
           return jsonResponse({ runs });
@@ -158,5 +196,60 @@ describe("ControlRoomApp", () => {
 
     expect(screen.getByText("DecisionEnginePort")).toBeInTheDocument();
     expect(screen.getByText("인터페이스만 유지")).toBeInTheDocument();
+  });
+
+  it("submits manual market-data sync and refreshes candles", async () => {
+    render(<App />);
+
+    expect(await screen.findByText("REST 백필")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("시작일"), { target: { value: "2025-01-01T00:00" } });
+    fireEvent.change(screen.getByLabelText("종료일"), { target: { value: "2025-01-01T00:20" } });
+    fireEvent.click(screen.getByRole("button", { name: "동기화" }));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/market-data/sync",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    const syncCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) =>
+      String(url).endsWith("/api/market-data/sync"),
+    );
+    expect(JSON.parse(String(syncCall?.[1]?.body))).toMatchObject({
+      symbol: "BTC/USDT",
+      timeframe: "5m",
+      limit: 2000,
+    });
+    await waitFor(() => {
+      expect(screen.getByText("5개")).toBeInTheDocument();
+    });
+    expect(
+      vi.mocked(globalThis.fetch).mock.calls.filter(([url]) =>
+        String(url).includes("/api/market-data/candles"),
+      ).length,
+    ).toBeGreaterThan(1);
+  });
+
+  it("includes backtest start and end datetimes in the run payload", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /백테스트/ }));
+    fireEvent.change(screen.getByLabelText("시작일"), { target: { value: "2025-01-01T00:00" } });
+    fireEvent.change(screen.getByLabelText("종료일"), { target: { value: "2025-01-02T00:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/runs/backtests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    const runCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) =>
+      String(url).endsWith("/api/runs/backtests"),
+    );
+    expect(JSON.parse(String(runCall?.[1]?.body))).toMatchObject({
+      start_at: new Date("2025-01-01T00:00").toISOString(),
+      end_at: new Date("2025-01-02T00:00").toISOString(),
+    });
   });
 });

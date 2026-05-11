@@ -348,13 +348,19 @@ button:disabled {
 }
 
 h1,
-h2 {
+h2,
+h3 {
   margin: 0;
   letter-spacing: 0;
 }
 
 h2 {
   font-size: 20px;
+  line-height: 1.25;
+}
+
+h3 {
+  font-size: 15px;
   line-height: 1.25;
 }
 
@@ -393,6 +399,10 @@ h2 {
   margin-bottom: 16px;
 }
 
+.form-grid.sync-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -429,6 +439,51 @@ textarea {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.sync-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(8, 17, 31, 0.58);
+}
+
+.sync-panel-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sync-panel-heading button {
+  min-height: 36px;
+  min-width: 104px;
+  padding: 0 16px;
+  border-color: rgba(49, 209, 125, 0.55);
+}
+
+.sync-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid rgba(49, 209, 125, 0.28);
+  border-radius: 6px;
+  background: rgba(49, 209, 125, 0.08);
+}
+
+.sync-result span {
+  color: var(--green);
+  font-weight: 800;
+}
+
+.sync-result small {
+  color: var(--muted);
 }
 
 .summary-grid {
@@ -748,7 +803,8 @@ td {
   .core-header,
   .metric-grid,
   .form-grid,
-  .form-grid.compact {
+  .form-grid.compact,
+  .form-grid.sync-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -759,6 +815,7 @@ td {
   .metric-grid,
   .form-grid,
   .form-grid.compact,
+  .form-grid.sync-grid,
   .run-row,
   .log-list article {
     grid-template-columns: 1fr;

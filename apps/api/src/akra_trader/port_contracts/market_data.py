@@ -9,6 +9,7 @@ from akra_trader.domain.models import MarketDataIngestionJobRecord
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import MarketDataRemediationResult
+from akra_trader.domain.models import MarketDataSyncResult
 from akra_trader.domain.models import MarketDataStatus
 
 
@@ -24,6 +25,16 @@ class MarketDataPort(Protocol):
     end_at: datetime | None = None,
     limit: int | None = None,
   ) -> list[Candle]: ...
+
+  def ensure_candles(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ) -> MarketDataSyncResult: ...
 
   def describe_lineage(
     self,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 from typing import Any
 from typing import Callable
 from uuid import uuid4
@@ -35,6 +36,7 @@ from akra_trader.runtime import ExecutionEngine
 from akra_trader.runtime import ExecutionModeService
 from akra_trader.runtime import RunSupervisor
 from akra_trader.runtime import StateCache
+from akra_trader.runtime import candles_to_frame
 from akra_trader.strategies.llm import ExternalDecisionStrategy
 
 
@@ -354,6 +356,37 @@ class TradingApplication:
     )
     return candles
 
+  def sync_market_data(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ):
+    result = self._market_data.ensure_candles(
+      symbol=symbol,
+      timeframe=timeframe,
+      start_at=start_at,
+      end_at=end_at,
+      limit=limit,
+    )
+    self._record_log(
+      layer="data",
+      event_type="market_data_sync_requested",
+      message=f"Market data sync {result.status} for {symbol} on {timeframe}.",
+      severity="info" if result.status in {"synced", "fixture"} else "warning",
+      payload={
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "status": result.status,
+        "candle_count": result.candle_count,
+        "issues": list(result.issues),
+      },
+    )
+    return result
+
   def maintain_sandbox_worker_sessions(
     self,
     *,
@@ -418,6 +451,20 @@ class TradingApplication:
       start_at=start_at,
       end_at=end_at,
     )
+    required_bars = max(strategy.warmup_spec().required_bars, 2)
+    ensure_limit = self._resolve_run_ensure_limit(
+      active_bars=active_bars,
+      required_bars=required_bars,
+      start_at=start_at,
+      end_at=end_at,
+    )
+    ensure_result = self._market_data.ensure_candles(
+      symbol=symbol,
+      timeframe=timeframe,
+      start_at=start_at,
+      end_at=end_at,
+      limit=ensure_limit,
+    )
     loaded = self._data_engine.load_frame(config=config, active_bars=active_bars)
     run = RunRecord(
       config=config,
@@ -430,12 +477,20 @@ class TradingApplication:
       ),
     )
     data = loaded.frame
-    if data.empty:
-      self._fail_run(run, "No candles available for the requested range.")
+    data_issue = self._validate_loaded_market_data(
+      data=data,
+      config=config,
+      required_bars=required_bars,
+    )
+    if data_issue is not None:
+      self._fail_run(run, data_issue)
+      if ensure_result.status == "failed":
+        run.notes.append(
+          f"Market data sync failed before execution: {', '.join(ensure_result.issues) or 'unknown'}."
+        )
       return run
 
     enriched = strategy.build_feature_frame(data, config.parameters)
-    required_bars = max(strategy.warmup_spec().required_bars, 2)
     if len(enriched) < required_bars:
       self._fail_run(
         run,
@@ -563,6 +618,17 @@ class TradingApplication:
     for run in self._runs.list_runs(mode.value):
       if run.status != RunStatus.RUNNING:
         continue
+      processed_candles = 0
+      try:
+        processed_candles = self._poll_worker_market_data(run=run, mode=mode)
+      except Exception as exc:
+        self._append_run_note(
+          run,
+          layer=mode.value,
+          event_type="worker_market_data_poll_failed",
+          message=f"{mode.value} worker market-data polling failed: {exc}",
+          severity="warning",
+        )
       if force_recovery or self._run_supervisor.needs_worker_recovery(run=run, now=current_time):
         self._run_supervisor.recover_worker_session(
           run=run,
@@ -590,8 +656,194 @@ class TradingApplication:
       else:
         self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
         heartbeated += 1
+      if processed_candles > 0:
+        self._append_run_note(
+          run,
+          layer=mode.value,
+          event_type="worker_candles_processed",
+          message=f"{mode.value} worker processed {processed_candles} closed candles.",
+          payload={"processed_candles": processed_candles},
+        )
       self._runs.save_run(run)
     return {"heartbeated": heartbeated, "recovered": recovered}
+
+  def _resolve_run_ensure_limit(
+    self,
+    *,
+    active_bars: int | None,
+    required_bars: int,
+    start_at: datetime | None,
+    end_at: datetime | None,
+  ) -> int | None:
+    if active_bars is not None:
+      return max(active_bars, required_bars)
+    if start_at is not None or end_at is not None:
+      return required_bars
+    return None
+
+  def _validate_loaded_market_data(
+    self,
+    *,
+    data: pd.DataFrame,
+    config: RunConfig,
+    required_bars: int,
+  ) -> str | None:
+    if data.empty:
+      return "No candles available for the requested range."
+    if len(data) < required_bars:
+      return f"Strategy requires at least {required_bars} candles; received {len(data)}."
+
+    timestamps = sorted(
+      _ensure_utc_datetime(_row_timestamp(value))
+      for value in data["timestamp"].tolist()
+    )
+    timeframe_delta = _timeframe_delta(config.timeframe)
+    requested_start_at = _ensure_utc_datetime(config.start_at) if config.start_at is not None else None
+    requested_end_at = _ensure_utc_datetime(config.end_at) if config.end_at is not None else None
+    if requested_start_at is not None and timestamps[0] > requested_start_at:
+      return (
+        "Market data does not cover the requested start: "
+        f"{timestamps[0].isoformat()} > {requested_start_at.isoformat()}."
+      )
+    if requested_end_at is not None and timestamps[-1] + timeframe_delta <= requested_end_at:
+      return (
+        "Market data does not cover the requested end: "
+        f"{timestamps[-1].isoformat()} < {requested_end_at.isoformat()}."
+      )
+    for previous, current in zip(timestamps, timestamps[1:]):
+      if current - previous > timeframe_delta:
+        missing = int((current - previous).total_seconds() // timeframe_delta.total_seconds()) - 1
+        return (
+          "Market data has a gap in the requested range: "
+          f"{previous.isoformat()} to {current.isoformat()} ({missing} missing candles)."
+        )
+    return None
+
+  def _poll_worker_market_data(self, *, run: RunRecord, mode: RunMode) -> int:
+    if not run.config.symbols:
+      return 0
+    session = run.provenance.runtime_session
+    if session is None:
+      return 0
+    symbol = run.config.symbols[0]
+    timeframe = run.config.timeframe
+    timeframe_delta = _timeframe_delta(timeframe)
+    closed_until = _latest_closed_candle_at(self._clock(), timeframe)
+    requested_end_at = (
+      _ensure_utc_datetime(run.config.end_at) if run.config.end_at is not None else None
+    )
+    if requested_end_at is not None and requested_end_at < closed_until:
+      closed_until = requested_end_at
+    last_processed_at = session.last_processed_candle_at
+    if last_processed_at is None and run.equity_curve:
+      last_processed_at = run.equity_curve[-1].timestamp
+    if last_processed_at is not None:
+      last_processed_at = (
+        last_processed_at.astimezone(UTC)
+        if last_processed_at.tzinfo
+        else last_processed_at.replace(tzinfo=UTC)
+      )
+    if last_processed_at is not None and closed_until <= last_processed_at:
+      return 0
+
+    start_at = last_processed_at + timeframe_delta if last_processed_at is not None else None
+    self._market_data.ensure_candles(
+      symbol=symbol,
+      timeframe=timeframe,
+      start_at=start_at,
+      end_at=closed_until,
+      limit=None,
+    )
+    candles = self._market_data.get_candles(
+      symbol=symbol,
+      timeframe=timeframe,
+      start_at=start_at,
+      end_at=closed_until,
+      limit=None,
+    )
+    new_candles = [
+      candle
+      for candle in candles
+      if last_processed_at is None or candle.timestamp > last_processed_at
+    ]
+    if not new_candles:
+      return 0
+
+    strategy = self._strategies.load(run.config.strategy_id)
+    required_bars = max(strategy.warmup_spec().required_bars, 2)
+    cache = self._restore_state_cache(run)
+    processed = 0
+    last_processed_candle_at = None
+    for candle in sorted(new_candles, key=lambda item: item.timestamp):
+      history_candles = self._market_data.get_candles(
+        symbol=symbol,
+        timeframe=timeframe,
+        end_at=candle.timestamp,
+        limit=required_bars,
+      )
+      if len(history_candles) < required_bars:
+        continue
+      history = strategy.build_feature_frame(
+        candles_to_frame(history_candles),
+        run.config.parameters,
+      )
+      if len(history) < required_bars:
+        continue
+      latest = history.iloc[-1]
+      if pd.isna(latest["close"]):
+        continue
+      timestamp = _row_timestamp(latest["timestamp"])
+      state = cache.snapshot(timestamp=timestamp, parameters=run.config.parameters)
+      decision = strategy.evaluate(history, run.config.parameters, state)
+      self._execution_engine.apply_decision(
+        run=run,
+        config=run.config,
+        decision=decision,
+        cache=cache,
+        market_price=float(latest["close"]),
+      )
+      processed += 1
+      last_processed_candle_at = candle.timestamp
+
+    if processed == 0:
+      return 0
+
+    run.metrics = summarize_performance(
+      initial_cash=run.config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    self._run_supervisor.record_worker_market_progress(
+      run=run,
+      last_seen_candle_at=new_candles[-1].timestamp,
+      last_processed_candle_at=last_processed_candle_at,
+      processed_tick_count_increment=processed,
+    )
+    lineage_candles = self._market_data.get_candles(
+      symbol=symbol,
+      timeframe=timeframe,
+      limit=max(session.primed_candle_count, required_bars, processed),
+    )
+    lineage = self._market_data.describe_lineage(
+      symbol=symbol,
+      timeframe=timeframe,
+      candles=lineage_candles,
+      limit=len(lineage_candles),
+    )
+    run.provenance.market_data = lineage
+    run.provenance.market_data_by_symbol = {symbol: lineage}
+    if mode == RunMode.LIVE:
+      run.notes.append(
+        f"{self._clock().isoformat()} | live_data_poll | evaluated closed candles without venue order submission."
+      )
+    return processed
+
+  def _restore_state_cache(self, run: RunRecord) -> StateCache:
+    instrument_id = f"{run.config.venue}:{run.config.symbols[0]}"
+    cash = run.equity_curve[-1].cash if run.equity_curve else run.config.initial_cash
+    cache = StateCache(instrument_id=instrument_id, cash=cash)
+    cache.apply(cash=cash, position=run.positions.get(instrument_id))
+    return cache
 
   def _fail_run(self, run: RunRecord, message: str) -> None:
     run.status = RunStatus.FAILED
@@ -674,3 +926,35 @@ def _row_timestamp(value: Any) -> datetime:
   if isinstance(value, datetime):
     return value
   return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+def _ensure_utc_datetime(value: datetime) -> datetime:
+  if value.tzinfo is None:
+    return value.replace(tzinfo=UTC)
+  return value.astimezone(UTC)
+
+
+def _latest_closed_candle_at(now: datetime, timeframe: str) -> datetime:
+  current = now.astimezone(UTC) if now.tzinfo else now.replace(tzinfo=UTC)
+  seconds = _timeframe_seconds(timeframe)
+  epoch_seconds = int(current.timestamp())
+  floor_seconds = epoch_seconds - (epoch_seconds % seconds)
+  return datetime.fromtimestamp(floor_seconds, tz=UTC) - timedelta(seconds=seconds)
+
+
+def _timeframe_delta(timeframe: str) -> timedelta:
+  return timedelta(seconds=_timeframe_seconds(timeframe))
+
+
+def _timeframe_seconds(timeframe: str) -> int:
+  if not timeframe:
+    raise ValueError("Timeframe is required.")
+  amount = int(timeframe[:-1])
+  unit = timeframe[-1]
+  if unit == "m":
+    return amount * 60
+  if unit == "h":
+    return amount * 60 * 60
+  if unit == "d":
+    return amount * 24 * 60 * 60
+  raise ValueError(f"Unsupported timeframe: {timeframe}")

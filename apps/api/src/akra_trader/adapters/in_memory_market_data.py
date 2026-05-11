@@ -14,6 +14,7 @@ from akra_trader.domain.models import MarketDataIngestionJobRecord
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataLineageHistoryRecord
 from akra_trader.domain.models import MarketDataRemediationResult
+from akra_trader.domain.models import MarketDataSyncResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.ports import MarketDataPort
@@ -88,6 +89,50 @@ class SeededMarketDataAdapter(MarketDataPort):
     if limit is not None:
       candles = candles[-limit:]
     return candles
+
+  def ensure_candles(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ) -> MarketDataSyncResult:
+    candles = self.get_candles(
+      symbol=symbol,
+      timeframe=timeframe,
+      start_at=start_at,
+      end_at=end_at,
+      limit=limit if start_at is None and end_at is None else None,
+    )
+    issues: list[str] = []
+    if limit is not None and len(candles) < limit:
+      issues.append("insufficient_fixture_coverage")
+    if symbol not in self._candles:
+      issues.append("fixture_symbol_unavailable")
+    issues.extend(
+      _build_requested_range_issues(
+        candles=candles,
+        timeframe=timeframe,
+        start_at=start_at,
+        end_at=end_at,
+      )
+    )
+    return MarketDataSyncResult(
+      provider="seeded",
+      venue=self._venue,
+      symbol=symbol,
+      timeframe=timeframe,
+      status="fixture",
+      requested_start_at=start_at,
+      requested_end_at=end_at,
+      requested_limit=limit,
+      effective_start_at=candles[0].timestamp if candles else None,
+      effective_end_at=candles[-1].timestamp if candles else None,
+      candle_count=len(candles),
+      issues=tuple(issues),
+    )
 
   def get_status(self, timeframe: str) -> MarketDataStatus:
     instruments = []
@@ -205,6 +250,14 @@ class SeededMarketDataAdapter(MarketDataPort):
     issues: list[str] = []
     if limit is not None and len(candles) < limit:
       issues.append("insufficient_fixture_coverage")
+    issues.extend(
+      _build_requested_range_issues(
+        candles=candles,
+        timeframe=timeframe,
+        start_at=start_at,
+        end_at=end_at,
+      )
+    )
     dataset_identity = None
     reproducibility_state = "range_only"
     if candles:
@@ -267,3 +320,39 @@ def candles_to_frame(candles: list[Candle]) -> pd.DataFrame:
       for candle in candles
     ]
   )
+
+
+def _build_requested_range_issues(
+  *,
+  candles: list[Candle],
+  timeframe: str,
+  start_at: datetime | None,
+  end_at: datetime | None,
+) -> tuple[str, ...]:
+  if not candles:
+    if start_at is not None or end_at is not None:
+      return ("requested_range_empty",)
+    return ()
+  timeframe_delta = _timeframe_delta(timeframe)
+  issues: list[str] = []
+  if start_at is not None and candles[0].timestamp > start_at:
+    issues.append("requested_start_missing")
+  if end_at is not None and candles[-1].timestamp + timeframe_delta <= end_at:
+    issues.append("requested_end_missing")
+  for previous, current in zip(candles, candles[1:]):
+    if current.timestamp - previous.timestamp > timeframe_delta:
+      issues.append("requested_range_gap")
+      break
+  return tuple(issues)
+
+
+def _timeframe_delta(timeframe: str) -> timedelta:
+  unit = timeframe[-1:]
+  amount = int(timeframe[:-1])
+  if unit == "m":
+    return timedelta(minutes=amount)
+  if unit == "h":
+    return timedelta(hours=amount)
+  if unit == "d":
+    return timedelta(days=amount)
+  return timedelta(minutes=5)

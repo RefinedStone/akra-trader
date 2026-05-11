@@ -33,6 +33,21 @@ class MarketDataStatus:
   instruments: list[InstrumentStatus]
 
 @dataclass(frozen=True)
+class MarketDataSyncResult:
+  provider: str
+  venue: str
+  symbol: str
+  timeframe: str
+  status: str
+  requested_start_at: datetime | None = None
+  requested_end_at: datetime | None = None
+  requested_limit: int | None = None
+  effective_start_at: datetime | None = None
+  effective_end_at: datetime | None = None
+  candle_count: int = 0
+  issues: tuple[str, ...] = ()
+
+@dataclass(frozen=True)
 class GapWindow:
   start_at: datetime
   end_at: datetime
