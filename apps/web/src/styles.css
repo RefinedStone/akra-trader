@@ -1120,6 +1120,13 @@ textarea {
   color: #ff514f;
 }
 
+.order-marker.is-selected {
+  z-index: 1;
+  padding: 3px 7px;
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 2px;
+}
+
 .chart-loading {
   position: absolute;
   z-index: 4;

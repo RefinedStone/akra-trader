@@ -171,11 +171,19 @@ type OrderBlockOverlay = {
 
 type OrderMarkerOverlay = {
   id: string;
+  selected: boolean;
   side: "buy" | "sell";
   style: {
     left: string;
     top: string;
   };
+};
+
+type OrderMarker = {
+  id: string;
+  price: number;
+  side: "buy" | "sell";
+  time: UTCTimestamp;
 };
 
 type RunFormState = {
@@ -289,6 +297,7 @@ export default function App() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<RunSummary | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [orders, setOrders] = useState<unknown[]>([]);
   const [positions, setPositions] = useState<unknown[]>([]);
   const [logs, setLogs] = useState<OperationLog[]>([]);
@@ -391,6 +400,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    setSelectedOrderId(null);
     if (!selectedRunId) {
       setSelectedRun(null);
       setOrders([]);
@@ -603,6 +613,7 @@ export default function App() {
               onLoadCandles={() => void loadCandles()}
               onLoadOlderCandles={() => void loadOlderCandles()}
               orders={orders}
+              selectedOrderId={selectedOrderId}
               selectedRun={selectedRun}
               setDataQuery={setDataQuery}
               symbolOptions={symbolOptions}
@@ -681,6 +692,8 @@ export default function App() {
               orders={orders}
               positions={positions}
               run={selectedRun}
+              selectedOrderId={selectedOrderId}
+              setSelectedOrderId={setSelectedOrderId}
               onStop={stopSelectedRun}
             />
           ) : null}
@@ -1059,6 +1072,7 @@ function DataSection({
   onLoadCandles,
   onLoadOlderCandles,
   orders,
+  selectedOrderId,
   selectedRun,
   setDataQuery,
   symbolOptions,
@@ -1072,6 +1086,7 @@ function DataSection({
   onLoadCandles: () => void;
   onLoadOlderCandles: () => void;
   orders: unknown[];
+  selectedOrderId: string | null;
   selectedRun: RunSummary | null;
   setDataQuery: (value: DataQueryState) => void;
   symbolOptions: string[];
@@ -1202,6 +1217,7 @@ function DataSection({
         loading={isLoading}
         loadingText={dataLoadingMessage(dataLoadingMode)}
         orders={orders}
+        selectedOrderId={selectedOrderId}
         selectedRun={selectedRun}
         symbol={dataQuery.symbol}
         timeframe={dataQuery.timeframe}
@@ -1249,6 +1265,7 @@ function MarketChart({
   loading = false,
   loadingText = "불러오는 중",
   orders = [],
+  selectedOrderId,
   selectedRun,
   symbol,
   timeframe,
@@ -1257,6 +1274,7 @@ function MarketChart({
   loading?: boolean;
   loadingText?: string;
   orders?: unknown[];
+  selectedOrderId?: string | null;
   selectedRun?: RunSummary | null;
   symbol: string;
   timeframe: string;
@@ -1282,6 +1300,7 @@ function MarketChart({
 
     const orderBlocks = detectOrderBlocks(candles);
     const orderMarkers = buildOrderMarkers(orders, {
+      candles,
       selectedRun,
       symbol,
       timeframe,
@@ -1305,7 +1324,7 @@ function MarketChart({
         return;
       }
       setOrderBlockOverlays(buildOrderBlockOverlays(orderBlocks, chart, series, containerRef.current));
-      setOrderMarkerOverlays(buildOrderMarkerOverlays(orderMarkers, chart, series));
+      setOrderMarkerOverlays(buildOrderMarkerOverlays(orderMarkers, chart, series, selectedOrderId));
     };
 
     const renderChart = async () => {
@@ -1415,8 +1434,15 @@ function MarketChart({
         lineWidth: 1,
         axisLabelVisible: false,
       });
+      const selectedMarker = orderMarkers.find((marker) => marker.id === selectedOrderId);
       const savedRange = visibleRangeRef.current;
-      if (savedRange && timeRangeOverlapsCandles(savedRange, candles)) {
+      if (selectedMarker) {
+        const seconds = timeframeToSeconds(timeframe) ?? 300;
+        chart.timeScale().setVisibleRange({
+          from: Math.max(0, selectedMarker.time - seconds * 20) as UTCTimestamp,
+          to: (selectedMarker.time + seconds * 20) as UTCTimestamp,
+        });
+      } else if (savedRange && timeRangeOverlapsCandles(savedRange, candles)) {
         chart.timeScale().setVisibleRange(savedRange);
       } else {
         chart.timeScale().fitContent();
@@ -1459,7 +1485,7 @@ function MarketChart({
       series = null;
       chart = null;
     };
-  }, [candles, orders, selectedRun, symbol, timeframe]);
+  }, [candles, orders, selectedOrderId, selectedRun, symbol, timeframe]);
 
   return (
     <section className="chart-panel" aria-label={`${symbol} ${timeframe} 가격 차트`}>
@@ -1514,7 +1540,11 @@ function MarketChart({
         </div>
         <div className="order-marker-layer" aria-label="주문 마커">
           {orderMarkerOverlays.map((marker) => (
-            <span className={`order-marker ${marker.side}`} key={marker.id} style={marker.style}>
+            <span
+              className={`order-marker ${marker.side}${marker.selected ? " is-selected" : ""}`}
+              key={marker.id}
+              style={marker.style}
+            >
               <b>{marker.side.toUpperCase()}</b>
             </span>
           ))}
@@ -1815,12 +1845,16 @@ function RunDetailPanel({
   orders,
   positions,
   run,
+  selectedOrderId,
+  setSelectedOrderId,
 }: {
   logs: OperationLog[];
   onStop: () => void;
   orders: unknown[];
   positions: unknown[];
   run: RunSummary | null;
+  selectedOrderId: string | null;
+  setSelectedOrderId: (orderId: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<DetailTabId>("overview");
 
@@ -1861,7 +1895,13 @@ function RunDetailPanel({
             ))}
           </div>
           {activeTab === "overview" ? <RunOverview run={run} /> : null}
-          {activeTab === "orders" ? <OrdersDetail orders={orders} /> : null}
+          {activeTab === "orders" ? (
+            <OrdersDetail
+              orders={orders}
+              selectedOrderId={selectedOrderId}
+              setSelectedOrderId={setSelectedOrderId}
+            />
+          ) : null}
           {activeTab === "positions" ? <PositionsDetail positions={positions} /> : null}
           {activeTab === "metrics" ? <RunMetricsDetail metrics={run.metrics} /> : null}
           {activeTab === "logs" ? <RunLogsDetail logs={logs} /> : null}
@@ -1968,9 +2008,16 @@ function RunMetricsDetail({ metrics }: { metrics: Record<string, number | string
   );
 }
 
-function OrdersDetail({ orders }: { orders: unknown[] }) {
+function OrdersDetail({
+  orders,
+  selectedOrderId,
+  setSelectedOrderId,
+}: {
+  orders: unknown[];
+  selectedOrderId: string | null;
+  setSelectedOrderId: (orderId: string) => void;
+}) {
   const records = orders.map(asRecord);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const filled = records.filter((order) => isOrderStatus(order, ["filled", "closed", "complete", "completed"])).length;
   const open = records.filter((order) => isOrderStatus(order, ["open", "pending", "submitted", "partially_filled"])).length;
   const canceled = records.filter((order) => isOrderStatus(order, ["canceled", "cancelled", "rejected", "failed"])).length;
@@ -3319,15 +3366,17 @@ function buildOrderBlockOverlays(
 function buildOrderMarkers(
   orders: unknown[],
   {
+    candles,
     selectedRun,
     symbol,
     timeframe,
   }: {
+    candles: Candle[];
     selectedRun?: RunSummary | null;
     symbol: string;
     timeframe: string;
   },
-) {
+): OrderMarker[] {
   if (!selectedRun || selectedRun.mode !== "backtest") {
     return [];
   }
@@ -3338,6 +3387,9 @@ function buildOrderMarkers(
   if (selectedRun.config?.timeframe && selectedRun.config.timeframe !== timeframe) {
     return [];
   }
+  const sortedCandles = [...candles].sort(
+    (left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime(),
+  );
 
   return orders.flatMap((order, index) => {
     const record = asRecord(order);
@@ -3347,23 +3399,28 @@ function buildOrderMarkers(
     if (!side || !date || Number.isNaN(date.getTime())) {
       return [];
     }
+    const candle = findCandleForOrderTime(date, sortedCandles, timeframe);
+    const candleTime = candleTimestamp(candle ?? undefined);
+    if (!candle || candleTime === null) {
+      return [];
+    }
     const price = recordNumber(record, ["average_fill_price", "avg_price", "requested_price", "price"]);
     return [
       {
         id: recordText(record, ["order_id"], `order-${index}`),
-        label: shortId(recordText(record, ["order_id"], `ORD-${index + 1}`)),
-        price: Number.isFinite(price) ? price : null,
+        price: typeof price === "number" && Number.isFinite(price) ? price : candle.close,
         side,
-        time: Math.floor(date.getTime() / 1000) as UTCTimestamp,
+        time: candleTime,
       },
     ];
   });
 }
 
 function buildOrderMarkerOverlays(
-  markers: ReturnType<typeof buildOrderMarkers>,
+  markers: OrderMarker[],
   chart: IChartApi,
   series: ISeriesApi<"Candlestick">,
+  selectedOrderId?: string | null,
 ): OrderMarkerOverlay[] {
   const visibleRange = chart.timeScale().getVisibleRange();
   const visibleStart = visibleRange ? timeToUnixSeconds(visibleRange.from) : null;
@@ -3383,6 +3440,7 @@ function buildOrderMarkerOverlays(
     return [
       {
         id: marker.id,
+        selected: marker.id === selectedOrderId,
         side: marker.side,
         style: {
           left: `${x}px`,
@@ -3391,6 +3449,24 @@ function buildOrderMarkerOverlays(
       },
     ];
   });
+}
+
+function findCandleForOrderTime(date: Date, candles: Candle[], timeframe: string) {
+  const orderTimestamp = date.getTime();
+  const fallbackInterval = (timeframeToSeconds(timeframe) ?? 60) * 1000;
+  for (let index = 0; index < candles.length; index += 1) {
+    const candle = candles[index];
+    const start = new Date(candle.timestamp).getTime();
+    if (!Number.isFinite(start)) {
+      continue;
+    }
+    const nextStart = index + 1 < candles.length ? new Date(candles[index + 1].timestamp).getTime() : NaN;
+    const end = Number.isFinite(nextStart) && nextStart > start ? nextStart : start + fallbackInterval;
+    if (orderTimestamp >= start && orderTimestamp < end) {
+      return candle;
+    }
+  }
+  return null;
 }
 
 function normalizeOrderMarkerSide(side: string) {
