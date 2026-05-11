@@ -1401,12 +1401,12 @@ function formatTimestamp(value?: string | null) {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return formatKstDate(date);
+  return formatKstDateTime(date);
 }
 
 function formatChartTime(time: Time) {
   const date = timeToDate(time);
-  return date === null ? String(time) : formatKstDate(date);
+  return date === null ? String(time) : formatKstChartDate(date);
 }
 
 function formatChartAxisTick(time: Time) {
@@ -1421,9 +1421,14 @@ function formatChartAxisTick(time: Time) {
   return `${parts.hour}:${parts.minute}`;
 }
 
-function formatKstDate(date: Date) {
+function formatKstChartDate(date: Date) {
   const parts = getKstDateParts(date);
-  return `${parts.hour}:${parts.minute} ${parts.year}-${parts.month}-${parts.day}`;
+  return `${parts.hour}:${parts.minute} ${parts.shortYear}-${parts.month}-${parts.day}`;
+}
+
+function formatKstDateTime(date: Date) {
+  const parts = getKstDateParts(date);
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 function getKstDateParts(date: Date) {
@@ -1434,17 +1439,21 @@ function getKstDateParts(date: Date) {
     hourCycle: "h23",
     minute: "2-digit",
     month: "2-digit",
+    second: "2-digit",
     timeZone: "Asia/Seoul",
-    year: "2-digit",
+    year: "numeric",
   }).formatToParts(date);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((item) => item.type === type)?.value ?? "00";
+  const year = part("year");
   return {
     day: part("day"),
     hour: part("hour"),
     minute: part("minute"),
     month: part("month"),
-    year: part("year"),
+    second: part("second"),
+    shortYear: year.slice(-2),
+    year,
   };
 }
 
