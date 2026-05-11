@@ -157,6 +157,15 @@ describe("ControlRoomApp", () => {
           return jsonResponse(marketStatus);
         }
         if (url.includes("/api/market-data/candles")) {
+          const params = new URLSearchParams(url.split("?")[1] ?? "");
+          const endAt = params.get("end_at");
+          if (endAt && new Date(endAt).getTime() < new Date("2025-01-01T00:00:00Z").getTime()) {
+            return jsonResponse({
+              candles: [
+                { timestamp: "2024-12-31T23:55:00Z", open: 1, high: 2, low: 1, close: 1.5, volume: 10 },
+              ],
+            });
+          }
           return jsonResponse({
             candles: [{ timestamp: "2025-01-01T00:00:00Z", open: 1, high: 2, low: 1, close: 2, volume: 10 }],
           });
@@ -244,13 +253,17 @@ describe("ControlRoomApp", () => {
     expect(screen.getByText("인터페이스만 유지")).toBeInTheDocument();
   });
 
-  it("submits manual market-data sync and refreshes candles", async () => {
+  it("loads market data through one sync-backed query flow", async () => {
     render(<App />);
 
-    expect(await screen.findByText("REST 백필")).toBeInTheDocument();
+    expect(await screen.findByText("캔들 조회")).toBeInTheDocument();
+    await screen.findByRole("button", { name: "조회" });
+    vi.mocked(globalThis.fetch).mockClear();
+
     fireEvent.change(screen.getByLabelText("시작일"), { target: { value: "2025-01-01T00:00" } });
     fireEvent.change(screen.getByLabelText("종료일"), { target: { value: "2025-01-01T00:20" } });
-    fireEvent.click(screen.getByRole("button", { name: "동기화" }));
+    fireEvent.change(screen.getByLabelText("조회 개수"), { target: { value: "2000" } });
+    fireEvent.click(screen.getByRole("button", { name: "조회" }));
 
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -264,16 +277,50 @@ describe("ControlRoomApp", () => {
     expect(JSON.parse(String(syncCall?.[1]?.body))).toMatchObject({
       symbol: "BTC/USDT",
       timeframe: "5m",
+      start_at: new Date("2025-01-01T00:00").toISOString(),
+      end_at: new Date("2025-01-01T00:20").toISOString(),
       limit: 2000,
     });
+    const candleCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) =>
+      String(url).includes("/api/market-data/candles"),
+    );
+    const candleParams = new URLSearchParams(String(candleCall?.[0]).split("?")[1] ?? "");
+    expect(candleParams.get("symbol")).toBe("BTC/USDT");
+    expect(candleParams.get("timeframe")).toBe("5m");
+    expect(candleParams.get("start_at")).toBe(new Date("2025-01-01T00:00").toISOString());
+    expect(candleParams.get("end_at")).toBe(new Date("2025-01-01T00:20").toISOString());
+    expect(candleParams.get("limit")).toBe("2000");
     await waitFor(() => {
       expect(screen.getByText("5개")).toBeInTheDocument();
     });
-    expect(
-      vi.mocked(globalThis.fetch).mock.calls.filter(([url]) =>
-        String(url).includes("/api/market-data/candles"),
-      ).length,
-    ).toBeGreaterThan(1);
+  });
+
+  it("pages older market data before the current earliest candle", async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "이전 구간 더 보기" })).not.toBeDisabled();
+    });
+    vi.mocked(globalThis.fetch).mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "이전 구간 더 보기" }));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/market-data/sync",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    const syncCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) =>
+      String(url).endsWith("/api/market-data/sync"),
+    );
+    expect(JSON.parse(String(syncCall?.[1]?.body))).toMatchObject({
+      start_at: null,
+      end_at: "2024-12-31T23:59:59.999Z",
+      limit: 500,
+    });
+    await waitFor(() => {
+      expect(screen.getByText("2025-01-01 08:55:00 - 2025-01-01 09:00:00")).toBeInTheDocument();
+    });
   });
 
   it("includes backtest start and end datetimes in the run payload", async () => {

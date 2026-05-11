@@ -120,7 +120,7 @@ type RunFormState = {
   parameters: string;
 };
 
-type DataSyncFormState = {
+type DataQueryState = {
   symbol: string;
   timeframe: string;
   start_at: string;
@@ -128,7 +128,11 @@ type DataSyncFormState = {
   limit: string;
 };
 
+type DataLoadingMode = "idle" | "loading" | "appending";
+
 const apiBase = "/api";
+const defaultCandleQueryLimit = 500;
+const maxCandleQueryLimit = 5000;
 
 const sections: Array<{ id: SectionId; label: string; eyebrow: string; mark: string; path: string }> = [
   { id: "data", label: "데이터", eyebrow: "수집 현황", mark: "D", path: "/data" },
@@ -166,12 +170,12 @@ const defaultRunForm: RunFormState = {
   parameters: '{\n  "short_window": 8,\n  "long_window": 21\n}',
 };
 
-const defaultDataSyncForm: DataSyncFormState = {
+const defaultDataQuery: DataQueryState = {
   symbol: "BTC/USDT",
   timeframe: "5m",
   start_at: "",
   end_at: "",
-  limit: "2000",
+  limit: String(defaultCandleQueryLimit),
 };
 
 function sectionFromPath(pathname: string): SectionId {
@@ -207,8 +211,8 @@ export default function App() {
   const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [form, setForm] = useState<RunFormState>(defaultRunForm);
-  const [dataQuery, setDataQuery] = useState({ symbol: "BTC/USDT", timeframe: "5m", limit: "80" });
-  const [dataSyncForm, setDataSyncForm] = useState<DataSyncFormState>(defaultDataSyncForm);
+  const [dataQuery, setDataQuery] = useState<DataQueryState>(defaultDataQuery);
+  const [dataLoadingMode, setDataLoadingMode] = useState<DataLoadingMode>("idle");
   const [dataSyncResult, setDataSyncResult] = useState<MarketDataSyncResult | null>(null);
   const [logFilter, setLogFilter] = useState({ mode: "", severity: "" });
   const [statusText, setStatusText] = useState("불러오는 중");
@@ -251,10 +255,9 @@ export default function App() {
       uniqueOptions([
         ...(marketStatus?.instruments.map((instrument) => toSymbol(instrument.instrument_id)) ?? []),
         dataQuery.symbol,
-        dataSyncForm.symbol,
         form.symbol,
       ]),
-    [dataQuery.symbol, dataSyncForm.symbol, form.symbol, marketStatus],
+    [dataQuery.symbol, form.symbol, marketStatus],
   );
 
   const timeframeOptions = useMemo(
@@ -262,10 +265,9 @@ export default function App() {
       uniqueOptions([
         ...(marketStatus?.instruments.map((instrument) => instrument.timeframe) ?? []),
         dataQuery.timeframe,
-        dataSyncForm.timeframe,
         form.timeframe,
       ]),
-    [dataQuery.timeframe, dataSyncForm.timeframe, form.timeframe, marketStatus],
+    [dataQuery.timeframe, form.timeframe, marketStatus],
   );
 
   const refresh = async () => {
@@ -377,41 +379,50 @@ export default function App() {
     setPositions(positionResponse.positions);
   };
 
-  const loadCandles = async (queryState = dataQuery) => {
-    const query = new URLSearchParams({
-      symbol: queryState.symbol,
-      timeframe: queryState.timeframe,
-      limit: queryState.limit,
-    });
-    const response = await fetchJson<{ candles: Candle[] }>(`/market-data/candles?${query}`);
-    setCandles(response.candles);
-  };
-
-  const syncMarketData = async () => {
+  const loadCandles = async (
+    queryState = dataQuery,
+    options: { appendOlder?: boolean; endAtOverride?: string | null; startAtOverride?: string | null } = {},
+  ) => {
     setError(null);
-    const payload = {
-      symbol: dataSyncForm.symbol,
-      timeframe: dataSyncForm.timeframe,
-      start_at: toApiDateTime(dataSyncForm.start_at),
-      end_at: toApiDateTime(dataSyncForm.end_at),
-      limit: dataSyncForm.limit ? Number(dataSyncForm.limit) : null,
-    };
+    setDataLoadingMode(options.appendOlder ? "appending" : "loading");
     try {
+      const payload = buildMarketDataPayload(queryState, options);
       const result = await fetchJson<MarketDataSyncResult>("/market-data/sync", {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      const response = await fetchJson<{ candles: Candle[] }>(
+        `/market-data/candles?${buildMarketDataQuery(queryState, options)}`,
+      );
       setDataSyncResult(result);
       setDataQuery({
         symbol: result.symbol,
         timeframe: result.timeframe,
-        limit: dataQuery.limit,
+        start_at: queryState.start_at,
+        end_at: queryState.end_at,
+        limit: String(payload.limit),
       });
+      setCandles((current) =>
+        options.appendOlder ? mergeCandles(response.candles, current) : mergeCandles(response.candles),
+      );
       await refresh();
-      await loadCandles({ symbol: result.symbol, timeframe: result.timeframe, limit: dataQuery.limit });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "데이터 적재 요청에 실패했습니다.");
+      setError(caught instanceof Error ? caught.message : "시장 데이터 요청에 실패했습니다.");
+    } finally {
+      setDataLoadingMode("idle");
     }
+  };
+
+  const loadOlderCandles = async () => {
+    const earliestCandleAt = getEarliestCandleTimestamp(candles);
+    if (!earliestCandleAt || dataLoadingMode !== "idle") {
+      return;
+    }
+    await loadCandles(dataQuery, {
+      appendOlder: true,
+      endAtOverride: new Date(earliestCandleAt.getTime() - 1).toISOString(),
+      startAtOverride: null,
+    });
   };
 
   const loadLogs = async () => {
@@ -501,13 +512,12 @@ export default function App() {
             <DataSection
               candles={candles}
               dataQuery={dataQuery}
-              dataSyncForm={dataSyncForm}
+              dataLoadingMode={dataLoadingMode}
               dataSyncResult={dataSyncResult}
               marketStatus={marketStatus}
               onLoadCandles={() => void loadCandles()}
-              onSyncData={() => void syncMarketData()}
+              onLoadOlderCandles={() => void loadOlderCandles()}
               setDataQuery={setDataQuery}
-              setDataSyncForm={setDataSyncForm}
               symbolOptions={symbolOptions}
               timeframeOptions={timeframeOptions}
             />
@@ -590,32 +600,32 @@ export default function App() {
 function DataSection({
   candles,
   dataQuery,
-  dataSyncForm,
+  dataLoadingMode,
   dataSyncResult,
   marketStatus,
   onLoadCandles,
-  onSyncData,
+  onLoadOlderCandles,
   setDataQuery,
-  setDataSyncForm,
   symbolOptions,
   timeframeOptions,
 }: {
   candles: Candle[];
-  dataQuery: { symbol: string; timeframe: string; limit: string };
-  dataSyncForm: DataSyncFormState;
+  dataQuery: DataQueryState;
+  dataLoadingMode: DataLoadingMode;
   dataSyncResult: MarketDataSyncResult | null;
   marketStatus: MarketStatus | null;
   onLoadCandles: () => void;
-  onSyncData: () => void;
-  setDataQuery: (value: { symbol: string; timeframe: string; limit: string }) => void;
-  setDataSyncForm: (value: DataSyncFormState) => void;
+  onLoadOlderCandles: () => void;
+  setDataQuery: (value: DataQueryState) => void;
   symbolOptions: string[];
   timeframeOptions: string[];
 }) {
+  const isLoading = dataLoadingMode !== "idle";
+  const earliest = candles[0];
   const latest = candles[candles.length - 1];
-  const submitSync = (event: FormEvent) => {
+  const submitLoad = (event: FormEvent) => {
     event.preventDefault();
-    onSyncData();
+    onLoadCandles();
   };
   return (
     <section className="core-panel core-panel-main">
@@ -624,60 +634,24 @@ function DataSection({
           <p className="core-eyebrow">데이터</p>
           <h2>시장 데이터</h2>
         </div>
-        <button type="button" onClick={onLoadCandles}>
-          캔들 불러오기
-        </button>
       </div>
-      <div className="form-grid compact">
-        <label>
-          심볼
-          <select
-            value={dataQuery.symbol}
-            onChange={(event) => setDataQuery({ ...dataQuery, symbol: event.target.value })}
-          >
-            {symbolOptions.map((symbol) => (
-              <option key={symbol} value={symbol}>
-                {symbol}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          타임프레임
-          <select
-            value={dataQuery.timeframe}
-            onChange={(event) => setDataQuery({ ...dataQuery, timeframe: event.target.value })}
-          >
-            {timeframeOptions.map((timeframe) => (
-              <option key={timeframe} value={timeframe}>
-                {timeframe}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          조회 개수
-          <input
-            type="number"
-            value={dataQuery.limit}
-            onChange={(event) => setDataQuery({ ...dataQuery, limit: event.target.value })}
-          />
-        </label>
-      </div>
-      <form className="sync-panel" onSubmit={submitSync}>
+      <form className="sync-panel data-load-panel" onSubmit={submitLoad}>
         <div className="sync-panel-heading">
           <div>
-            <p className="core-eyebrow">데이터 적재</p>
-            <h3>REST 백필</h3>
+            <p className="core-eyebrow">데이터 로드</p>
+            <h3>캔들 조회</h3>
           </div>
-          <button type="submit">동기화</button>
+          <button disabled={isLoading} type="submit">
+            {isLoading ? "불러오는 중" : "조회"}
+          </button>
         </div>
         <div className="form-grid sync-grid">
           <label>
             심볼
             <select
-              value={dataSyncForm.symbol}
-              onChange={(event) => setDataSyncForm({ ...dataSyncForm, symbol: event.target.value })}
+              disabled={isLoading}
+              value={dataQuery.symbol}
+              onChange={(event) => setDataQuery({ ...dataQuery, symbol: event.target.value })}
             >
               {symbolOptions.map((symbol) => (
                 <option key={symbol} value={symbol}>
@@ -689,8 +663,9 @@ function DataSection({
           <label>
             타임프레임
             <select
-              value={dataSyncForm.timeframe}
-              onChange={(event) => setDataSyncForm({ ...dataSyncForm, timeframe: event.target.value })}
+              disabled={isLoading}
+              value={dataQuery.timeframe}
+              onChange={(event) => setDataQuery({ ...dataQuery, timeframe: event.target.value })}
             >
               {timeframeOptions.map((timeframe) => (
                 <option key={timeframe} value={timeframe}>
@@ -702,29 +677,39 @@ function DataSection({
           <label>
             시작일
             <input
+              disabled={isLoading}
               type="datetime-local"
-              value={dataSyncForm.start_at}
-              onChange={(event) => setDataSyncForm({ ...dataSyncForm, start_at: event.target.value })}
+              value={dataQuery.start_at}
+              onChange={(event) => setDataQuery({ ...dataQuery, start_at: event.target.value })}
             />
           </label>
           <label>
             종료일
             <input
+              disabled={isLoading}
               type="datetime-local"
-              value={dataSyncForm.end_at}
-              onChange={(event) => setDataSyncForm({ ...dataSyncForm, end_at: event.target.value })}
+              value={dataQuery.end_at}
+              onChange={(event) => setDataQuery({ ...dataQuery, end_at: event.target.value })}
             />
           </label>
           <label>
-            적재 개수
+            조회 개수
             <input
+              disabled={isLoading}
+              max="5000"
               min="1"
               type="number"
-              value={dataSyncForm.limit}
-              onChange={(event) => setDataSyncForm({ ...dataSyncForm, limit: event.target.value })}
+              value={dataQuery.limit}
+              onChange={(event) => setDataQuery({ ...dataQuery, limit: event.target.value })}
             />
           </label>
         </div>
+        {isLoading ? (
+          <div className="loading-strip" role="status">
+            <span className="loading-spinner" aria-hidden="true" />
+            <strong>{dataLoadingMessage(dataLoadingMode)}</strong>
+          </div>
+        ) : null}
         {dataSyncResult ? (
           <div className="sync-result" role="status">
             <span>{formatDataStatus(dataSyncResult.status)}</span>
@@ -741,7 +726,23 @@ function DataSection({
         <Metric label="인스트루먼트" value={String(marketStatus?.instruments.length ?? 0)} />
         <Metric label="최근 종가" value={latest ? formatNumber(latest.close) : "-"} />
       </div>
-      <MarketChart candles={candles} symbol={dataQuery.symbol} timeframe={dataQuery.timeframe} />
+      <MarketChart
+        candles={candles}
+        loading={isLoading}
+        loadingText={dataLoadingMessage(dataLoadingMode)}
+        symbol={dataQuery.symbol}
+        timeframe={dataQuery.timeframe}
+      />
+      <div className="chart-actions">
+        <button disabled={!candles.length || isLoading} onClick={onLoadOlderCandles} type="button">
+          {dataLoadingMode === "appending" ? "이어 붙이는 중" : "이전 구간 더 보기"}
+        </button>
+        <small>
+          {candles.length > 0
+            ? `${formatTimestamp(earliest?.timestamp)} - ${formatTimestamp(latest?.timestamp)}`
+            : "조회된 캔들이 없습니다"}
+        </small>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
@@ -772,10 +773,14 @@ function DataSection({
 
 function MarketChart({
   candles,
+  loading = false,
+  loadingText = "불러오는 중",
   symbol,
   timeframe,
 }: {
   candles: Candle[];
+  loading?: boolean;
+  loadingText?: string;
   symbol: string;
   timeframe: string;
 }) {
@@ -898,7 +903,13 @@ function MarketChart({
         </div>
       </div>
       <div className="market-chart" ref={containerRef}>
-        {candles.length === 0 ? <span className="chart-empty">불러온 캔들 데이터가 없습니다</span> : null}
+        {loading ? (
+          <div className="chart-loading" role="status">
+            <span className="loading-spinner" aria-hidden="true" />
+            <strong>{loadingText}</strong>
+          </div>
+        ) : null}
+        {candles.length === 0 && !loading ? <span className="chart-empty">불러온 캔들 데이터가 없습니다</span> : null}
       </div>
     </section>
   );
@@ -1475,6 +1486,46 @@ function toApiDateTime(value: string) {
   return new Date(value).toISOString();
 }
 
+function buildMarketDataPayload(
+  queryState: DataQueryState,
+  options: { endAtOverride?: string | null; startAtOverride?: string | null } = {},
+) {
+  return {
+    symbol: queryState.symbol,
+    timeframe: queryState.timeframe,
+    start_at: "startAtOverride" in options ? options.startAtOverride : toApiDateTime(queryState.start_at),
+    end_at: "endAtOverride" in options ? options.endAtOverride : toApiDateTime(queryState.end_at),
+    limit: normalizeCandleLimit(queryState.limit),
+  };
+}
+
+function buildMarketDataQuery(
+  queryState: DataQueryState,
+  options: { endAtOverride?: string | null; startAtOverride?: string | null } = {},
+) {
+  const payload = buildMarketDataPayload(queryState, options);
+  const query = new URLSearchParams({
+    symbol: payload.symbol,
+    timeframe: payload.timeframe,
+    limit: String(payload.limit),
+  });
+  if (payload.start_at) {
+    query.set("start_at", payload.start_at);
+  }
+  if (payload.end_at) {
+    query.set("end_at", payload.end_at);
+  }
+  return query;
+}
+
+function normalizeCandleLimit(value: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return defaultCandleQueryLimit;
+  }
+  return Math.min(Math.trunc(parsed), maxCandleQueryLimit);
+}
+
 function formatNumber(value: number) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
 }
@@ -1541,6 +1592,17 @@ function formatDataStatus(value?: string | null) {
       return "실패";
     default:
       return value ?? "-";
+  }
+}
+
+function dataLoadingMessage(mode: DataLoadingMode) {
+  switch (mode) {
+    case "loading":
+      return "백필 확인 후 차트를 갱신하는 중";
+    case "appending":
+      return "이전 구간을 불러와 이어 붙이는 중";
+    default:
+      return "준비됨";
   }
 }
 
@@ -1636,6 +1698,26 @@ function toSymbol(instrumentId: string) {
 
 function uniqueOptions(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function getEarliestCandleTimestamp(candles: Candle[]) {
+  const timestamps = candles
+    .map((candle) => new Date(candle.timestamp).getTime())
+    .filter((timestamp) => Number.isFinite(timestamp));
+  if (timestamps.length === 0) {
+    return null;
+  }
+  return new Date(Math.min(...timestamps));
+}
+
+function mergeCandles(...groups: Candle[][]) {
+  const byTimestamp = new Map<string, Candle>();
+  for (const candle of groups.flat()) {
+    byTimestamp.set(candle.timestamp, candle);
+  }
+  return [...byTimestamp.values()].sort(
+    (left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime(),
+  );
 }
 
 function toCandlestickSeriesData(candles: Candle[]): CandlestickData[] {
