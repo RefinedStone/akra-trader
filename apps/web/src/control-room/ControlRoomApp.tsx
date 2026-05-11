@@ -198,6 +198,9 @@ const movingAverageLines = [
   { period: 60, label: "MA60", color: "#31d17d", width: 1 },
 ] as const;
 
+const rsiIndicator = { period: 14, label: "RSI14", color: "#ff8f3d", width: 1 } as const;
+const marketChartHeight = 340;
+
 const performanceModeMeta: Record<RunSummary["mode"], { color: string; label: string }> = {
   backtest: { color: "#9f7aff", label: "백테스트" },
   sandbox: { color: "#4d8dff", label: "샌드박스" },
@@ -1237,14 +1240,14 @@ function MarketChart({
     };
 
     const renderChart = async () => {
-      const { CandlestickSeries, ColorType, LineSeries, createChart } = await import("lightweight-charts");
+      const { CandlestickSeries, ColorType, LineSeries, LineStyle, createChart } = await import("lightweight-charts");
       if (disposed || !containerRef.current) {
         return;
       }
 
       chart = createChart(containerRef.current, {
         autoSize: false,
-        height: 280,
+        height: marketChartHeight,
         layout: {
           background: { type: ColorType.Solid, color: "transparent" },
           textColor: "#93a1b8",
@@ -1260,6 +1263,10 @@ function MarketChart({
         },
         rightPriceScale: {
           borderColor: "rgba(46, 62, 91, 0.8)",
+          scaleMargins: {
+            top: 0.05,
+            bottom: 0.3,
+          },
         },
         timeScale: {
           borderColor: "rgba(46, 62, 91, 0.8)",
@@ -1295,6 +1302,43 @@ function MarketChart({
         line.setData(toMovingAverageSeriesData(candles, average.period));
         return line;
       });
+      const rsiSeries = chart.addSeries(LineSeries, {
+        color: rsiIndicator.color,
+        lineWidth: rsiIndicator.width,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: true,
+        priceScaleId: "rsi",
+      });
+      rsiSeries.setData(toRsiSeriesData(candles, rsiIndicator.period));
+      rsiSeries.createPriceLine({
+        price: 70,
+        color: "rgba(255, 81, 79, 0.62)",
+        lineStyle: LineStyle.Dashed,
+        lineWidth: 1,
+        axisLabelVisible: false,
+      });
+      rsiSeries.createPriceLine({
+        price: 50,
+        color: "rgba(147, 161, 184, 0.32)",
+        lineStyle: LineStyle.Dotted,
+        lineWidth: 1,
+        axisLabelVisible: false,
+      });
+      rsiSeries.createPriceLine({
+        price: 30,
+        color: "rgba(49, 209, 125, 0.62)",
+        lineStyle: LineStyle.Dashed,
+        lineWidth: 1,
+        axisLabelVisible: false,
+      });
+      chart.priceScale("rsi").applyOptions({
+        visible: false,
+        scaleMargins: {
+          top: 0.76,
+          bottom: 0.06,
+        },
+      });
       const savedRange = visibleRangeRef.current;
       if (savedRange && timeRangeOverlapsCandles(savedRange, candles)) {
         chart.timeScale().setVisibleRange(savedRange);
@@ -1309,7 +1353,7 @@ function MarketChart({
       const resize = () => {
         const width = containerRef.current?.clientWidth ?? 0;
         if (chart && width > 0) {
-          chart.resize(width, 280);
+          chart.resize(width, marketChartHeight);
         }
       };
       resize();
@@ -1353,6 +1397,10 @@ function MarketChart({
                 {average.label}
               </span>
             ))}
+            <span>
+              <b style={{ backgroundColor: rsiIndicator.color }} />
+              {rsiIndicator.label}
+            </span>
           </div>
         </div>
       </div>
@@ -3013,5 +3061,49 @@ function toMovingAverageSeriesData(candles: Candle[], period: number): LineData[
       });
     }
   }
+  return values;
+}
+
+function toRsiSeriesData(candles: Candle[], period: number): LineData[] {
+  const sortedCandles = [...candles].sort(
+    (left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime(),
+  );
+  if (sortedCandles.length <= period) {
+    return [];
+  }
+
+  const values: LineData[] = [];
+  let averageGain = 0;
+  let averageLoss = 0;
+
+  for (let index = 1; index < sortedCandles.length; index += 1) {
+    const change = sortedCandles[index].close - sortedCandles[index - 1].close;
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+
+    if (index <= period) {
+      averageGain += gain;
+      averageLoss += loss;
+      if (index < period) {
+        continue;
+      }
+      averageGain /= period;
+      averageLoss /= period;
+    } else {
+      averageGain = (averageGain * (period - 1) + gain) / period;
+      averageLoss = (averageLoss * (period - 1) + loss) / period;
+    }
+
+    const timestamp = Math.floor(new Date(sortedCandles[index].timestamp).getTime() / 1000);
+    if (!Number.isFinite(timestamp)) {
+      continue;
+    }
+    const rsi = averageLoss === 0 ? 100 : 100 - 100 / (1 + averageGain / averageLoss);
+    values.push({
+      time: timestamp as UTCTimestamp,
+      value: Number(rsi.toFixed(4)),
+    });
+  }
+
   return values;
 }
