@@ -59,8 +59,25 @@ const sandboxRun = {
   status: "running",
   started_at: "2026-05-11T00:00:00Z",
   ended_at: null,
+  config: {
+    symbols: ["BTC/USDT"],
+    timeframe: "5m",
+    initial_cash: 10000,
+    start_at: null,
+    end_at: null,
+  },
   strategy: { name: "Moving Average Cross", strategy_id: "ma_cross_v1" },
-  metrics: { total_return_pct: 0 },
+  market_data: {
+    provider: "seeded",
+    venue: "binance",
+    timeframe: "5m",
+    effective_start_at: "2025-01-01T00:00:00Z",
+    effective_end_at: "2025-01-01T02:00:00Z",
+    candle_count: 30,
+    sync_status: "fixture",
+    issues: [],
+  },
+  metrics: { ending_equity: 10025, total_return_pct: 0.25, trade_count: 1 },
   orders_count: 1,
   positions_count: 1,
   notes: [],
@@ -71,6 +88,31 @@ const backtestRun = {
   run_id: "run-backtest",
   mode: "backtest",
   status: "completed",
+  config: {
+    symbols: ["BTC/USDT"],
+    timeframe: "5m",
+    initial_cash: 10000,
+    start_at: "2025-01-01T00:00:00Z",
+    end_at: "2025-01-02T00:00:00Z",
+  },
+  market_data: {
+    provider: "seeded",
+    venue: "binance",
+    timeframe: "5m",
+    requested_start_at: "2025-01-01T00:00:00Z",
+    requested_end_at: "2025-01-02T00:00:00Z",
+    effective_start_at: "2025-01-01T00:00:00Z",
+    effective_end_at: "2025-01-02T00:00:00Z",
+    candle_count: 289,
+    sync_status: "fixture",
+    issues: [],
+  },
+  metrics: {
+    ending_equity: 10250,
+    total_return_pct: 2.5,
+    max_drawdown_pct: 1.1,
+    trade_count: 3,
+  },
 };
 
 const syncResult = {
@@ -97,7 +139,7 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
 }
 
 describe("ControlRoomApp", () => {
-  let runs = [] as typeof sandboxRun[];
+  let runs: Array<typeof sandboxRun | typeof backtestRun> = [];
 
   beforeEach(() => {
     runs = [];
@@ -251,5 +293,27 @@ describe("ControlRoomApp", () => {
       start_at: new Date("2025-01-01T00:00").toISOString(),
       end_at: new Date("2025-01-02T00:00").toISOString(),
     });
+  });
+
+  it("shows clickable run detail tabs and backtest results", async () => {
+    runs = [backtestRun];
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /백테스트/ }));
+    await waitFor(() => {
+      expect(screen.getByText("10,250")).toBeInTheDocument();
+      expect(screen.getByText("2.5%")).toBeInTheDocument();
+      expect(screen.getByText("289")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "지표" }));
+    expect(screen.getByText("총수익률")).toBeInTheDocument();
+    expect(screen.getByText("최대 낙폭")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "주문" }));
+    expect(screen.getByText("주문이 없습니다.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "결과" }));
+    expect(screen.getByText("데이터 상태")).toBeInTheDocument();
   });
 });

@@ -2,6 +2,29 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { AreaData, IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 
 type SectionId = "data" | "backtest" | "sandbox" | "live" | "logs" | "llm";
+type DetailTabId = "overview" | "orders" | "positions" | "metrics" | "logs";
+
+type RunConfigSummary = {
+  symbols?: string[];
+  timeframe?: string;
+  initial_cash?: number;
+  start_at?: string | null;
+  end_at?: string | null;
+  parameters?: Record<string, unknown>;
+};
+
+type RunMarketDataSummary = {
+  provider?: string;
+  venue?: string;
+  timeframe?: string;
+  requested_start_at?: string | null;
+  requested_end_at?: string | null;
+  effective_start_at?: string | null;
+  effective_end_at?: string | null;
+  candle_count?: number;
+  sync_status?: string;
+  issues?: string[];
+};
 
 type RunSummary = {
   run_id: string;
@@ -9,8 +32,9 @@ type RunSummary = {
   status: string;
   started_at: string;
   ended_at: string | null;
-  config?: { symbols?: string[]; timeframe?: string };
+  config?: RunConfigSummary;
   strategy: { name?: string; strategy_id?: string } | null;
+  market_data?: RunMarketDataSummary | null;
   metrics: Record<string, number | string>;
   orders_count: number;
   positions_count: number;
@@ -113,6 +137,14 @@ const sections: Array<{ id: SectionId; label: string; eyebrow: string; mark: str
   { id: "live", label: "실전 매매", eyebrow: "가드드 라이브", mark: "L", path: "/live" },
   { id: "logs", label: "로그", eyebrow: "운영 기록", mark: "O", path: "/logs" },
   { id: "llm", label: "LLM 전략", eyebrow: "격리 계층", mark: "A", path: "/llm-strategy" },
+];
+
+const detailTabs: Array<{ id: DetailTabId; label: string }> = [
+  { id: "overview", label: "결과" },
+  { id: "orders", label: "주문" },
+  { id: "positions", label: "포지션" },
+  { id: "metrics", label: "지표" },
+  { id: "logs", label: "로그" },
 ];
 
 const defaultRunForm: RunFormState = {
@@ -1114,6 +1146,12 @@ function RunDetailPanel({
   positions: unknown[];
   run: RunSummary | null;
 }) {
+  const [activeTab, setActiveTab] = useState<DetailTabId>("overview");
+
+  useEffect(() => {
+    setActiveTab("overview");
+  }, [run?.run_id]);
+
   return (
     <aside className="core-panel detail-panel">
       <div className="panel-heading">
@@ -1128,25 +1166,139 @@ function RunDetailPanel({
       {run ? (
         <>
           <div className="detail-tabs" aria-label="run detail tabs">
-            <span className="is-active">개요</span>
-            <span>주문</span>
-            <span>포지션</span>
-            <span>지표</span>
-            <span>로그</span>
+            {detailTabs.map((tab) => (
+              <button
+                aria-pressed={activeTab === tab.id}
+                className={activeTab === tab.id ? "is-active" : ""}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                type="button"
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-          <div className="metric-grid two">
-            <Metric label="상태" value={formatRunStatus(run.status)} />
-            <Metric label="주문" value={String(run.orders_count)} />
-            <Metric label="포지션" value={String(run.positions_count)} />
-            <Metric label="수익률" value={String(run.metrics.total_return_pct ?? "-")} />
-          </div>
-          <pre className="json-panel">{JSON.stringify({ orders, positions }, null, 2)}</pre>
-          <LogList logs={logs} compact />
+          {activeTab === "overview" ? <RunOverview run={run} /> : null}
+          {activeTab === "orders" ? <JsonDetail title="주문" value={orders} emptyText="주문이 없습니다." /> : null}
+          {activeTab === "positions" ? (
+            <JsonDetail title="포지션" value={positions} emptyText="포지션이 없습니다." />
+          ) : null}
+          {activeTab === "metrics" ? <RunMetricsDetail metrics={run.metrics} /> : null}
+          {activeTab === "logs" ? <RunLogsDetail logs={logs} /> : null}
         </>
       ) : (
         <p className="muted">백테스트, 샌드박스, 실전 매매에서 실행을 선택하세요.</p>
       )}
     </aside>
+  );
+}
+
+function RunOverview({ run }: { run: RunSummary }) {
+  const marketData = run.market_data;
+  const symbol = run.config?.symbols?.[0] ?? "-";
+  return (
+    <div className="detail-section">
+      <div className="metric-grid two">
+        <Metric label="상태" value={formatRunStatus(run.status)} />
+        <Metric label="종료 자산" value={formatMetricValue(run.metrics.ending_equity)} />
+        <Metric
+          label="수익률"
+          value={formatMetricValue(run.metrics.total_return_pct, "%")}
+          tone={Number(run.metrics.total_return_pct ?? 0) >= 0 ? "positive" : "negative"}
+        />
+        <Metric label="거래 수" value={formatMetricValue(run.metrics.trade_count ?? run.orders_count)} />
+      </div>
+      <div className="detail-list">
+        <DetailLine label="전략" value={run.strategy?.name ?? "-"} />
+        <DetailLine label="심볼" value={symbol} />
+        <DetailLine label="타임프레임" value={run.config?.timeframe ?? marketData?.timeframe ?? "-"} />
+        <DetailLine label="요청 기간" value={formatRange(run.config?.start_at, run.config?.end_at)} />
+        <DetailLine
+          label="데이터 범위"
+          value={formatRange(marketData?.effective_start_at, marketData?.effective_end_at)}
+        />
+        <DetailLine label="캔들 수" value={formatMetricValue(marketData?.candle_count)} />
+        <DetailLine label="데이터 상태" value={formatDataStatus(marketData?.sync_status ?? "-")} />
+      </div>
+      {marketData?.issues?.length ? (
+        <div className="detail-issues">
+          {marketData.issues.map((issue) => (
+            <span key={issue}>{issue}</span>
+          ))}
+        </div>
+      ) : null}
+      <RecentNotes notes={run.notes} />
+    </div>
+  );
+}
+
+function RunMetricsDetail({ metrics }: { metrics: Record<string, number | string> }) {
+  const entries = Object.entries(metrics);
+  return (
+    <div className="detail-section">
+      {entries.length > 0 ? (
+        <div className="detail-list">
+          {entries.map(([key, value]) => (
+            <DetailLine key={key} label={formatMetricLabel(key)} value={formatMetricValue(value)} />
+          ))}
+        </div>
+      ) : (
+        <p className="muted">지표가 없습니다.</p>
+      )}
+      <pre className="json-panel">{JSON.stringify(metrics, null, 2)}</pre>
+    </div>
+  );
+}
+
+function JsonDetail({
+  emptyText,
+  title,
+  value,
+}: {
+  emptyText: string;
+  title: string;
+  value: unknown[];
+}) {
+  return (
+    <div className="detail-section">
+      <div className="run-list-header inline">
+        <strong>{title}</strong>
+        <span>{value.length}개</span>
+      </div>
+      {value.length === 0 ? <p className="muted">{emptyText}</p> : null}
+      <pre className="json-panel">{JSON.stringify(value, null, 2)}</pre>
+    </div>
+  );
+}
+
+function RunLogsDetail({ logs }: { logs: OperationLog[] }) {
+  return (
+    <div className="detail-section">
+      {logs.length === 0 ? <p className="muted">이 실행에 연결된 로그가 없습니다.</p> : null}
+      <LogList logs={logs} compact />
+    </div>
+  );
+}
+
+function DetailLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="detail-line">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function RecentNotes({ notes }: { notes: string[] }) {
+  if (notes.length === 0) {
+    return null;
+  }
+  return (
+    <div className="notes-list">
+      {notes.slice(-4).map((note) => (
+        <p key={note}>{note}</p>
+      ))}
+    </div>
   );
 }
 
@@ -1222,6 +1374,44 @@ function toApiDateTime(value: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatMetricValue(value: unknown, suffix = "") {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+  if (typeof value === "number") {
+    return `${formatNumber(value)}${suffix}`;
+  }
+  return `${value}${suffix}`;
+}
+
+function formatMetricLabel(value: string) {
+  switch (value) {
+    case "initial_cash":
+      return "초기 자본";
+    case "ending_equity":
+      return "종료 자산";
+    case "total_return_pct":
+      return "총수익률";
+    case "max_drawdown_pct":
+      return "최대 낙폭";
+    case "trade_count":
+      return "거래 수";
+    case "win_rate_pct":
+      return "승률";
+    case "exposure_pct":
+      return "노출";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function formatRange(start?: string | null, end?: string | null) {
+  if (!start && !end) {
+    return "-";
+  }
+  return `${formatTimestamp(start)} - ${formatTimestamp(end)}`;
 }
 
 function formatHealthStatus(value?: string | null) {
