@@ -4,6 +4,7 @@ from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 
+import pandas as pd
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -17,11 +18,13 @@ from akra_trader.application import HoldDecisionEngine
 from akra_trader.bootstrap import Container
 from akra_trader.config import Settings
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import LlmFunctionLayer
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import StrategyDecisionContext
 from akra_trader.domain.models import StrategyExecutionState
 from akra_trader.main import create_app
 from akra_trader.strategies.llm import ExternalDecisionStrategy
+from akra_trader.strategies.quant_examples import RsiAtrTrendPullbackStrategy
 
 
 def build_client(tmp_path, *, live_enabled: bool = False) -> TestClient:
@@ -111,7 +114,19 @@ def test_health_and_strategy_surface(tmp_path):
 
   strategies = client.get("/api/strategies").json()
   strategy_ids = {strategy["strategy_id"] for strategy in strategies["strategies"]}
-  assert {"ma_cross_v1", "external_decision_template"}.issubset(strategy_ids)
+  assert {
+    "ma_cross_v1",
+    "rsi_atr_trend_pullback_v1",
+    "external_decision_template",
+  }.issubset(strategy_ids)
+  quant_strategy = next(
+    strategy
+    for strategy in strategies["strategies"]
+    if strategy["strategy_id"] == "rsi_atr_trend_pullback_v1"
+  )
+  assert quant_strategy["runtime"] == "native_composable"
+  assert quant_strategy["catalog_semantics"]["strategy_kind"] == "composable_quant"
+  assert "risk_fraction" in quant_strategy["parameter_schema"]
   assert strategies["llm_strategy"]["provider_adapter"] is None
   assert "paper" not in {mode.value for mode in RunMode}
 
@@ -140,6 +155,32 @@ def test_backtest_create_list_detail_metrics_and_logs(tmp_path):
   assert client.get(f"/api/runs/{run_id}").json()["run_id"] == run_id
   assert "ending_equity" in client.get(f"/api/runs/{run_id}/metrics").json()["metrics"]
   assert client.get(f"/api/runs/{run_id}/logs").json()["logs"][0]["event_type"] == "backtest_completed"
+
+
+def test_composable_quant_strategy_runs_as_builtin_sample(tmp_path):
+  client = build_client(tmp_path)
+
+  response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "rsi_atr_trend_pullback_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "parameters": {
+        "fast_ema_window": 8,
+        "slow_ema_window": 21,
+        "rsi_window": 8,
+        "atr_window": 8,
+        "use_llm_regime_hint": False,
+      },
+    },
+  )
+
+  assert response.status_code == 200
+  run = response.json()
+  assert run["strategy"]["strategy_id"] == "rsi_atr_trend_pullback_v1"
+  assert run["strategy"]["parameter_snapshot"]["resolved"]["fast_ema_window"] == 8
+  assert run["status"] == "completed"
 
 
 def test_run_request_datetimes_align_to_timeframe(tmp_path):
@@ -494,6 +535,54 @@ def test_live_worker_polls_data_without_venue_order_submission():
     2025, 1, 1, 20, 0, tzinfo=UTC
   )
   assert any("without venue order submission" in note for note in refreshed.notes)
+
+
+def test_composable_strategy_exposes_trace_layers_and_llm_function():
+  strategy = RsiAtrTrendPullbackStrategy()
+  timestamp = datetime(2026, 5, 11, tzinfo=UTC)
+  rows = []
+  for index in range(80):
+    close = 100 + index * 0.5
+    rows.append(
+      {
+        "timestamp": timestamp + timedelta(minutes=5 * index),
+        "open": close - 0.2,
+        "high": close + 1.0,
+        "low": close - 1.0,
+        "close": close,
+        "volume": 1000 + index,
+      }
+    )
+  parameters = {
+    "fast_ema_window": 8,
+    "slow_ema_window": 21,
+    "rsi_window": 8,
+    "atr_window": 8,
+  }
+  enriched = strategy.build_feature_frame(pd.DataFrame(rows), parameters)
+  state = StrategyExecutionState(
+    timestamp=rows[-1]["timestamp"],
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters=parameters,
+  )
+
+  context = strategy.build_decision_context(enriched, parameters, state)
+  fallback_result = context.llm.function(
+    "arbitrary_research_call",
+    {"close": context.market["close"]},
+    fallback={"allow": True},
+  )
+  envelope = strategy.evaluate(enriched, parameters, state)
+
+  assert isinstance(context.llm, LlmFunctionLayer)
+  assert fallback_result.output == {"allow": True}
+  assert fallback_result.used_fallback is True
+  assert "feature_pipeline" in envelope.trace["architecture"]["layers"]
+  assert "llm_function_layer" in envelope.trace["architecture"]["layers"]
+  assert envelope.trace["regime"]["trace"]["regimes"][1]["provider"] == "disabled"
 
 
 def test_external_decision_strategy_keeps_trace_envelope():

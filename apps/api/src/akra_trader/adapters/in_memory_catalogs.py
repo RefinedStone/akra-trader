@@ -12,12 +12,13 @@ from akra_trader.domain.models import StrategyRegistration
 from akra_trader.ports import StrategyCatalogPort
 from akra_trader.strategies.base import Strategy
 from akra_trader.strategies.examples import MovingAverageCrossStrategy
+from akra_trader.strategies.quant_examples import RsiAtrTrendPullbackStrategy
 
 
 class LocalStrategyCatalog(StrategyCatalogPort):
   def __init__(self, builtins: Iterable[type[Strategy]] | None = None) -> None:
     self._builtins: dict[str, type[Strategy]] = {}
-    for strategy_type in builtins or (MovingAverageCrossStrategy,):
+    for strategy_type in builtins or (MovingAverageCrossStrategy, RsiAtrTrendPullbackStrategy):
       metadata = strategy_type().describe()
       self._builtins[metadata.strategy_id] = strategy_type
     self._registrations: dict[str, StrategyRegistration] = {}

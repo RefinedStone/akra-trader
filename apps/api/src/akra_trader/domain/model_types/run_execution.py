@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 from uuid import uuid4
 
 from akra_trader.domain.model_types.sync_lineage import MarketDataLineage
@@ -26,6 +26,8 @@ __all__ = [
   "Instrument",
   "Candle",
   "WarmupSpec",
+  "LlmFunctionResult",
+  "LlmFunctionLayer",
   "SignalDecision",
   "ExecutionPlan",
   "StrategyExecutionState",
@@ -124,6 +126,99 @@ class WarmupSpec:
 
 
 @dataclass(frozen=True)
+class LlmFunctionResult:
+  name: str
+  output: dict[str, Any] = field(default_factory=dict)
+  provider: str = "disabled"
+  model: str | None = None
+  confidence: float = 0.0
+  used_fallback: bool = True
+  trace: dict[str, Any] = field(default_factory=dict)
+
+
+class LlmFunctionLayer:
+  def __init__(
+    self,
+    *,
+    provider: str = "disabled",
+    model: str | None = None,
+    functions: Mapping[str, Callable[[dict[str, Any]], LlmFunctionResult | Mapping[str, Any]]] | None = None,
+  ) -> None:
+    self._provider = provider
+    self._model = model
+    self._functions = dict(functions or {})
+
+  @classmethod
+  def disabled(cls) -> "LlmFunctionLayer":
+    return cls(provider="disabled")
+
+  @property
+  def provider(self) -> str:
+    return self._provider
+
+  @property
+  def model(self) -> str | None:
+    return self._model
+
+  def function(
+    self,
+    name: str,
+    payload: Mapping[str, Any] | None = None,
+    *,
+    fallback: Mapping[str, Any] | None = None,
+    schema: Mapping[str, Any] | None = None,
+  ) -> LlmFunctionResult:
+    normalized_payload = dict(payload or {})
+    fallback_output = dict(fallback or {})
+    function = self._functions.get(name)
+    if function is None:
+      return LlmFunctionResult(
+        name=name,
+        output=fallback_output,
+        provider=self._provider,
+        model=self._model,
+        used_fallback=True,
+        trace={
+          "status": "fallback_no_provider_function",
+          "payload_keys": tuple(sorted(normalized_payload)),
+          "schema_keys": tuple(sorted(schema or {})),
+        },
+      )
+
+    try:
+      result = function(normalized_payload)
+    except Exception as exc:  # pragma: no cover - provider failures are surfaced as trace.
+      return LlmFunctionResult(
+        name=name,
+        output=fallback_output,
+        provider=self._provider,
+        model=self._model,
+        used_fallback=True,
+        trace={
+          "status": "fallback_after_provider_error",
+          "error": str(exc),
+          "payload_keys": tuple(sorted(normalized_payload)),
+        },
+      )
+
+    if isinstance(result, LlmFunctionResult):
+      return result
+    return LlmFunctionResult(
+      name=name,
+      output=dict(result),
+      provider=self._provider,
+      model=self._model,
+      confidence=1.0,
+      used_fallback=False,
+      trace={
+        "status": "completed",
+        "payload_keys": tuple(sorted(normalized_payload)),
+        "schema_keys": tuple(sorted(schema or {})),
+      },
+    )
+
+
+@dataclass(frozen=True)
 class SignalDecision:
   timestamp: datetime
   action: SignalAction
@@ -163,6 +258,7 @@ class StrategyDecisionContext:
   features: dict[str, Any]
   market: dict[str, Any]
   state: StrategyExecutionState
+  llm: LlmFunctionLayer = field(default_factory=LlmFunctionLayer.disabled)
 
 
 @dataclass(frozen=True)
