@@ -375,6 +375,10 @@ h3 {
 }
 
 .run-form button[type="submit"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   justify-self: end;
   min-width: 160px;
   border-color: rgba(124, 77, 255, 0.72);

@@ -217,6 +217,7 @@ type DataQueryState = {
 };
 
 type DataLoadingMode = "idle" | "loading" | "appending";
+type RunSubmitMode = "backtests" | "sandbox" | "live";
 
 const apiBase = "/api";
 const defaultCandleQueryLimit = 500;
@@ -320,6 +321,7 @@ export default function App() {
   const [logFilter, setLogFilter] = useState({ mode: "", severity: "" });
   const [statusText, setStatusText] = useState("불러오는 중");
   const [error, setError] = useState<string | null>(null);
+  const [submittingRunMode, setSubmittingRunMode] = useState<RunSubmitMode | null>(null);
 
   const runCounts = useMemo(
     () => ({
@@ -427,7 +429,10 @@ export default function App() {
     }
   };
 
-  const submitRun = async (mode: "backtests" | "sandbox" | "live") => {
+  const submitRun = async (mode: RunSubmitMode) => {
+    if (submittingRunMode) {
+      return;
+    }
     setError(null);
     let parameters: Record<string, unknown>;
     try {
@@ -447,6 +452,8 @@ export default function App() {
       ...buildAlignedDateRange(form.start_at, form.end_at, form.timeframe),
       parameters,
     };
+    setSubmittingRunMode(mode);
+    setStatusText(`${formatRunSubmitMode(mode)} 실행 중`);
     try {
       const run = await fetchJson<RunSummary>(`/runs/${mode}`, {
         method: "POST",
@@ -455,7 +462,10 @@ export default function App() {
       setSelectedRunId(run.run_id);
       await refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "실행 요청에 실패했습니다.");
+      setStatusText("오류");
+      setError(`실행 실패: ${caught instanceof Error ? caught.message : "실행 요청에 실패했습니다."}`);
+    } finally {
+      setSubmittingRunMode(null);
     }
   };
 
@@ -639,6 +649,7 @@ export default function App() {
               onSubmit={submitRun}
               selectedRunId={selectedRunId}
               setForm={setForm}
+              submitting={submittingRunMode === "backtests"}
               strategies={strategies}
               symbolOptions={symbolOptions}
               timeframeOptions={timeframeOptions}
@@ -655,6 +666,7 @@ export default function App() {
               onSubmit={submitRun}
               selectedRunId={selectedRunId}
               setForm={setForm}
+              submitting={submittingRunMode === "sandbox"}
               strategies={strategies}
               symbolOptions={symbolOptions}
               timeframeOptions={timeframeOptions}
@@ -671,6 +683,7 @@ export default function App() {
               onSubmit={submitRun}
               selectedRunId={selectedRunId}
               setForm={setForm}
+              submitting={submittingRunMode === "live"}
               strategies={strategies}
               symbolOptions={symbolOptions}
               timeframeOptions={timeframeOptions}
@@ -1571,6 +1584,7 @@ function RunLaunchSection({
   onSubmit,
   selectedRunId,
   setForm,
+  submitting,
   strategies,
   symbolOptions,
   timeframeOptions,
@@ -1578,11 +1592,12 @@ function RunLaunchSection({
 }: {
   activeRuns: RunSummary[];
   form: RunFormState;
-  mode: "backtests" | "sandbox" | "live";
+  mode: RunSubmitMode;
   onSelectRun: (runId: string) => void;
-  onSubmit: (mode: "backtests" | "sandbox" | "live") => Promise<void>;
+  onSubmit: (mode: RunSubmitMode) => Promise<void>;
   selectedRunId: string | null;
   setForm: (value: RunFormState) => void;
+  submitting: boolean;
   strategies: Strategy[];
   symbolOptions: string[];
   timeframeOptions: string[];
@@ -1618,7 +1633,7 @@ function RunLaunchSection({
         <Metric label="거래 수" value={String(latestRun?.orders_count ?? 0)} />
         <Metric label="상태" value={formatRunStatus(latestRun?.status)} tone={latestRun?.status === "running" ? "positive" : "neutral"} />
       </div>
-      <form className="run-form" onSubmit={submit}>
+      <form aria-busy={submitting} className="run-form" onSubmit={submit}>
         <div className="form-grid">
           <label>
             전략
@@ -1728,7 +1743,16 @@ function RunLaunchSection({
           strategy={selectedStrategy}
           setParameters={(parameters) => setForm({ ...form, parameters })}
         />
-        <button type="submit">{title} 실행</button>
+        <button disabled={submitting} type="submit">
+          {submitting ? (
+            <>
+              <span className="loading-spinner" aria-hidden="true" />
+              {title} 실행 중
+            </>
+          ) : (
+            `${title} 실행`
+          )}
+        </button>
       </form>
       <RunList activeRuns={activeRuns} onSelectRun={onSelectRun} selectedRunId={selectedRunId} />
     </section>
@@ -3190,6 +3214,19 @@ function formatMode(value?: string | null) {
       return "실전 매매";
     default:
       return "대기";
+  }
+}
+
+function formatRunSubmitMode(value: RunSubmitMode) {
+  switch (value) {
+    case "backtests":
+      return "백테스트";
+    case "sandbox":
+      return "샌드박스";
+    case "live":
+      return "실전 매매";
+    default:
+      return "실행";
   }
 }
 

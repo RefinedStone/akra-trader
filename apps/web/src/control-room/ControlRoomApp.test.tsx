@@ -218,9 +218,11 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
 
 describe("ControlRoomApp", () => {
   let runs: Array<typeof sandboxRun | typeof backtestRun> = [];
+  let backtestCreateResponse: Promise<Response> | null = null;
 
   beforeEach(() => {
     runs = [];
+    backtestCreateResponse = null;
     vi.stubGlobal(
       "fetch",
       vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -256,6 +258,9 @@ describe("ControlRoomApp", () => {
           return jsonResponse(sandboxRun);
         }
         if (url.endsWith("/api/runs/backtests") && init?.method === "POST") {
+          if (backtestCreateResponse) {
+            return backtestCreateResponse;
+          }
           runs = [backtestRun];
           return jsonResponse(backtestRun);
         }
@@ -512,6 +517,35 @@ describe("ControlRoomApp", () => {
         use_llm_regime_hint: false,
       },
     });
+  });
+
+  it("shows a loading state while a backtest submit is pending", async () => {
+    let resolveBacktest: (response: Response) => void = () => undefined;
+    backtestCreateResponse = new Promise((resolve) => {
+      resolveBacktest = resolve;
+    });
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /백테스트/ }));
+    fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
+
+    expect(screen.getByRole("button", { name: "백테스트 실행 중" })).toBeDisabled();
+
+    resolveBacktest(await jsonResponse(backtestRun));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "백테스트 실행" })).not.toBeDisabled();
+    });
+  });
+
+  it("surfaces server errors when a backtest submit fails", async () => {
+    backtestCreateResponse = jsonResponse({}, false, 500);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /백테스트/ }));
+    fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
+
+    expect(await screen.findByText("실행 실패: 요청 실패: 500")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "백테스트 실행" })).not.toBeDisabled();
   });
 
   it("aligns backtest datetimes to the selected timeframe before submit", async () => {
