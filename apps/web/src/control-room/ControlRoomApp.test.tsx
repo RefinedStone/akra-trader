@@ -269,7 +269,9 @@ describe("ControlRoomApp", () => {
     expect(screen.getByRole("button", { name: /성과/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /로그/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /LLM 전략/ })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "1m" })).toBeInTheDocument();
+    for (const timeframe of ["1m", "3m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"]) {
+      expect(screen.getByRole("option", { name: timeframe })).toBeInTheDocument();
+    }
     expect(screen.getByText("MA5")).toBeInTheDocument();
     expect(screen.getByText("MA20 황금선")).toBeInTheDocument();
     expect(screen.getByText("MA60")).toBeInTheDocument();

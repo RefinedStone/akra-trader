@@ -173,7 +173,7 @@ type DataLoadingMode = "idle" | "loading" | "appending";
 const apiBase = "/api";
 const defaultCandleQueryLimit = 500;
 const maxCandleQueryLimit = 5000;
-const baseTimeframeOptions = ["1m", "5m"] as const;
+const baseTimeframeOptions = ["1m", "3m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"] as const;
 
 const sections: Array<{ id: SectionId; label: string; eyebrow: string; mark: string; path: string }> = [
   { id: "data", label: "데이터", eyebrow: "수집 현황", mark: "D", path: "/data" },
@@ -2496,6 +2496,12 @@ function snapDateTimeInput(value: string, timeframe: string, boundary: TimeBound
 }
 
 function alignDateToTimeframe(date: Date, timeframe?: string, boundary: TimeBoundary = "start") {
+  if (/^\d+w$/.test(timeframe?.trim() ?? "")) {
+    return alignDateToWeekBoundary(date, timeframe, boundary);
+  }
+  if (/^\d+M$/.test(timeframe?.trim() ?? "")) {
+    return alignDateToMonthBoundary(date, timeframe, boundary);
+  }
   const seconds = timeframeToSeconds(timeframe);
   if (!seconds) {
     return date;
@@ -2509,12 +2515,50 @@ function alignDateToTimeframe(date: Date, timeframe?: string, boundary: TimeBoun
   return new Date(boundary === "start" ? timestamp + interval - remainder : timestamp - remainder);
 }
 
+function alignDateToWeekBoundary(date: Date, timeframe: string | undefined, boundary: TimeBoundary) {
+  const amount = timeframeAmount(timeframe);
+  if (!amount) {
+    return date;
+  }
+  const interval = amount * 7 * 24 * 60 * 60 * 1000;
+  const epoch = Date.UTC(1970, 0, 5);
+  const timestamp = date.getTime();
+  const remainder = ((timestamp - epoch) % interval + interval) % interval;
+  if (remainder === 0) {
+    return date;
+  }
+  return new Date(boundary === "start" ? timestamp + interval - remainder : timestamp - remainder);
+}
+
+function alignDateToMonthBoundary(date: Date, timeframe: string | undefined, boundary: TimeBoundary) {
+  const amount = timeframeAmount(timeframe);
+  if (!amount) {
+    return date;
+  }
+  const monthIndex = date.getUTCFullYear() * 12 + date.getUTCMonth();
+  const bucketIndex = monthIndex - (monthIndex % amount);
+  const bucketStart = Date.UTC(Math.floor(bucketIndex / 12), bucketIndex % 12, 1);
+  if (date.getTime() === bucketStart) {
+    return date;
+  }
+  if (boundary === "start") {
+    const nextBucketIndex = bucketIndex + amount;
+    return new Date(Date.UTC(Math.floor(nextBucketIndex / 12), nextBucketIndex % 12, 1));
+  }
+  return new Date(bucketStart);
+}
+
+function timeframeAmount(timeframe?: string) {
+  const amount = Number(timeframe?.slice(0, -1));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
 function timeframeStepSeconds(timeframe: string) {
   return timeframeToSeconds(timeframe) ?? 60;
 }
 
 function timeframeToSeconds(timeframe?: string) {
-  const match = /^(\d+)([mhd])$/.exec(timeframe?.trim() ?? "");
+  const match = /^(\d+)([mhdwM])$/.exec(timeframe?.trim() ?? "");
   if (!match) {
     return null;
   }
@@ -2529,6 +2573,10 @@ function timeframeToSeconds(timeframe?: string) {
       return amount * 60 * 60;
     case "d":
       return amount * 24 * 60 * 60;
+    case "w":
+      return amount * 7 * 24 * 60 * 60;
+    case "M":
+      return amount * 30 * 24 * 60 * 60;
     default:
       return null;
   }

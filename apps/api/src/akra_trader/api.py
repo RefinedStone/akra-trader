@@ -305,6 +305,10 @@ def _align_datetime_to_timeframe(
 ) -> datetime | None:
   if value is None:
     return None
+  if timeframe.endswith("M"):
+    return _align_datetime_to_month_boundary(value, timeframe=timeframe, boundary=boundary)
+  if timeframe.endswith("w"):
+    return _align_datetime_to_week_boundary(value, timeframe=timeframe, boundary=boundary)
   seconds = _timeframe_seconds(timeframe)
   if seconds is None:
     return value
@@ -317,6 +321,49 @@ def _align_datetime_to_timeframe(
   if boundary == "start":
     return value + (interval - remainder)
   return value - remainder
+
+
+def _align_datetime_to_week_boundary(value: datetime, *, timeframe: str, boundary: str) -> datetime:
+  amount = _timeframe_amount(timeframe)
+  if amount is None:
+    return value
+  value = value.astimezone(UTC)
+  epoch = datetime(1970, 1, 5, tzinfo=UTC)
+  interval = timedelta(weeks=amount)
+  remainder = (value - epoch) % interval
+  if remainder == timedelta(0):
+    return value
+  if boundary == "start":
+    return value + (interval - remainder)
+  return value - remainder
+
+
+def _align_datetime_to_month_boundary(value: datetime, *, timeframe: str, boundary: str) -> datetime:
+  amount = _timeframe_amount(timeframe)
+  if amount is None:
+    return value
+  value = value.astimezone(UTC)
+  month_index = value.year * 12 + value.month - 1
+  bucket_index = month_index - (month_index % amount)
+  bucket_start = datetime(bucket_index // 12, bucket_index % 12 + 1, 1, tzinfo=UTC)
+  if value == bucket_start:
+    return value
+  if boundary == "start":
+    return _add_months(bucket_start, amount)
+  return bucket_start
+
+
+def _add_months(value: datetime, amount: int) -> datetime:
+  month_index = value.year * 12 + value.month - 1 + amount
+  return datetime(month_index // 12, month_index % 12 + 1, 1, tzinfo=UTC)
+
+
+def _timeframe_amount(timeframe: str) -> int | None:
+  try:
+    amount = int(timeframe[:-1])
+  except ValueError:
+    return None
+  return amount if amount > 0 else None
 
 
 def _timeframe_seconds(timeframe: str) -> int | None:
@@ -335,6 +382,10 @@ def _timeframe_seconds(timeframe: str) -> int | None:
     return amount * 60 * 60
   if unit == "d":
     return amount * 24 * 60 * 60
+  if unit == "w":
+    return amount * 7 * 24 * 60 * 60
+  if unit == "M":
+    return amount * 30 * 24 * 60 * 60
   return None
 
 

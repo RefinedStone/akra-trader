@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
@@ -697,7 +698,6 @@ class TradingApplication:
       _ensure_utc_datetime(_row_timestamp(value))
       for value in data["timestamp"].tolist()
     )
-    timeframe_delta = _timeframe_delta(config.timeframe)
     requested_start_at = _ensure_utc_datetime(config.start_at) if config.start_at is not None else None
     requested_end_at = _ensure_utc_datetime(config.end_at) if config.end_at is not None else None
     if requested_start_at is not None and timestamps[0] > requested_start_at:
@@ -705,14 +705,16 @@ class TradingApplication:
         "Market data does not cover the requested start: "
         f"{timestamps[0].isoformat()} > {requested_start_at.isoformat()}."
       )
-    if requested_end_at is not None and timestamps[-1] + timeframe_delta <= requested_end_at:
+    if requested_end_at is not None and _shift_timeframe_timestamp(timestamps[-1], config.timeframe, 1) <= requested_end_at:
       return (
         "Market data does not cover the requested end: "
         f"{timestamps[-1].isoformat()} < {requested_end_at.isoformat()}."
       )
     for previous, current in zip(timestamps, timestamps[1:]):
-      if current - previous > timeframe_delta:
-        missing = int((current - previous).total_seconds() // timeframe_delta.total_seconds()) - 1
+      expected = _shift_timeframe_timestamp(previous, config.timeframe, 1)
+      if current > expected:
+        timeframe_delta = _timeframe_delta(config.timeframe)
+        missing = max(int((current - previous).total_seconds() // timeframe_delta.total_seconds()) - 1, 1)
         return (
           "Market data has a gap in the requested range: "
           f"{previous.isoformat()} to {current.isoformat()} ({missing} missing candles)."
@@ -946,6 +948,21 @@ def _timeframe_delta(timeframe: str) -> timedelta:
   return timedelta(seconds=_timeframe_seconds(timeframe))
 
 
+def _shift_timeframe_timestamp(timestamp: datetime, timeframe: str, steps: int) -> datetime:
+  if timeframe.endswith("M"):
+    amount = int(timeframe[:-1])
+    return _add_months(timestamp, amount * steps)
+  return timestamp + _timeframe_delta(timeframe) * steps
+
+
+def _add_months(value: datetime, months: int) -> datetime:
+  month_index = value.year * 12 + value.month - 1 + months
+  year = month_index // 12
+  month = month_index % 12 + 1
+  day = min(value.day, calendar.monthrange(year, month)[1])
+  return value.replace(year=year, month=month, day=day)
+
+
 def _timeframe_seconds(timeframe: str) -> int:
   if not timeframe:
     raise ValueError("Timeframe is required.")
@@ -957,4 +974,8 @@ def _timeframe_seconds(timeframe: str) -> int:
     return amount * 60 * 60
   if unit == "d":
     return amount * 24 * 60 * 60
+  if unit == "w":
+    return amount * 7 * 24 * 60 * 60
+  if unit == "M":
+    return amount * 30 * 24 * 60 * 60
   raise ValueError(f"Unsupported timeframe: {timeframe}")

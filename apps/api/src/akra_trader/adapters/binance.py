@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import calendar
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
@@ -548,16 +549,15 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
         return ("requested_range_empty",)
       return ()
 
-    timeframe_delta = self._timeframe_delta(timeframe)
     issues: list[str] = []
     first_timestamp = candles[0].timestamp
     last_timestamp = candles[-1].timestamp
     if start_at is not None and first_timestamp > start_at:
       issues.append("requested_start_missing")
-    if end_at is not None and last_timestamp + timeframe_delta <= end_at:
+    if end_at is not None and self._shift_candle_timestamp(last_timestamp, timeframe, 1) <= end_at:
       issues.append("requested_end_missing")
     for previous, current in zip(candles, candles[1:]):
-      if current.timestamp - previous.timestamp > timeframe_delta:
+      if current.timestamp > self._shift_candle_timestamp(previous.timestamp, timeframe, 1):
         issues.append("requested_range_gap")
         break
     return tuple(issues)
@@ -578,6 +578,12 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     _, _, symbol = instrument_id.partition(":")
     return symbol or instrument_id
 
+  def _shift_candle_timestamp(self, timestamp: datetime, timeframe: str, steps: int) -> datetime:
+    if timeframe.endswith("M"):
+      amount = int(timeframe[:-1])
+      return _add_months(timestamp, amount * steps)
+    return timestamp + self._timeframe_delta(timeframe) * steps
+
   def _sync_recent(
     self,
     *,
@@ -586,11 +592,10 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     required_count: int | None = None,
   ) -> bool:
     coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
-    timeframe_delta = self._timeframe_delta(timeframe)
     requested_count = required_count or self._default_candle_limit
     if coverage.last_timestamp is None or coverage.candle_count < requested_count:
       lookback_count = max(requested_count, self._default_candle_limit)
-      start_at = self._clock() - (timeframe_delta * max(lookback_count - 1, 1))
+      start_at = self._shift_candle_timestamp(self._clock(), timeframe, -max(lookback_count - 1, 1))
       return self._sync_range(
         symbol=symbol,
         timeframe=timeframe,
@@ -604,7 +609,7 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
       raw = self._exchange.fetch_ohlcv(
         symbol=symbol,
         timeframe=timeframe,
-        since=self._to_exchange_milliseconds(coverage.last_timestamp + timeframe_delta),
+        since=self._to_exchange_milliseconds(self._shift_candle_timestamp(coverage.last_timestamp, timeframe, 1)),
         limit=self._exchange_batch_limit,
       )
       candles = self._normalize_ohlcv(raw)
@@ -624,7 +629,7 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
         status="succeeded",
         started_at=started_at,
         finished_at=self._clock(),
-        requested_start_at=coverage.last_timestamp + timeframe_delta,
+        requested_start_at=self._shift_candle_timestamp(coverage.last_timestamp, timeframe, 1),
         requested_end_at=None,
         requested_limit=self._exchange_batch_limit,
         fetched_candle_count=len(candles),
@@ -652,7 +657,7 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
         status="failed",
         started_at=started_at,
         finished_at=self._clock(),
-        requested_start_at=coverage.last_timestamp + timeframe_delta,
+        requested_start_at=self._shift_candle_timestamp(coverage.last_timestamp, timeframe, 1),
         requested_end_at=None,
         requested_limit=self._exchange_batch_limit,
         fetched_candle_count=0,
@@ -669,9 +674,8 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     end_at: datetime | None,
     limit: int | None,
   ) -> bool:
-    timeframe_delta = self._timeframe_delta(timeframe)
     if start_at is None:
-      start_at = self._clock() - (timeframe_delta * max((limit or self._default_candle_limit) - 1, 1))
+      start_at = self._shift_candle_timestamp(self._clock(), timeframe, -max((limit or self._default_candle_limit) - 1, 1))
     end_boundary = end_at or self._clock()
     remaining = limit or self._estimate_bar_count(
       start_at=start_at,
@@ -700,7 +704,7 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
           break
         fetched_candle_count += len(candles)
         self._upsert_candles(symbol=symbol, timeframe=timeframe, candles=candles)
-        next_cursor = candles[-1].timestamp + timeframe_delta
+        next_cursor = self._shift_candle_timestamp(candles[-1].timestamp, timeframe, 1)
         remaining -= len(candles)
         if next_cursor <= cursor:
           break
@@ -768,16 +772,19 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     if coverage.first_timestamp is None or coverage.candle_count >= target_candle_count:
       return True
 
-    timeframe_delta = self._timeframe_delta(timeframe)
     started_at = self._clock()
     job_id = self._new_ingestion_job_id()
     fetched_candle_count = 0
-    requested_end_at = coverage.first_timestamp - timeframe_delta if coverage.first_timestamp is not None else None
+    requested_end_at = (
+      self._shift_candle_timestamp(coverage.first_timestamp, timeframe, -1)
+      if coverage.first_timestamp is not None
+      else None
+    )
     try:
       while coverage.first_timestamp is not None and coverage.candle_count < target_candle_count:
         remaining = target_candle_count - coverage.candle_count
         batch_limit = min(max(remaining, 1), self._exchange_batch_limit)
-        start_at = coverage.first_timestamp - (timeframe_delta * batch_limit)
+        start_at = self._shift_candle_timestamp(coverage.first_timestamp, timeframe, -batch_limit)
         raw = self._exchange.fetch_ohlcv(
           symbol=symbol,
           timeframe=timeframe,
@@ -874,5 +881,14 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
         updated = connection.execute(update(market_candles).where(key_filter).values(**row))
         if updated.rowcount == 0:
           connection.execute(insert(market_candles).values(**row))
+
+
+def _add_months(value: datetime, months: int) -> datetime:
+  month_index = value.year * 12 + value.month - 1 + months
+  year = month_index // 12
+  month = month_index % 12 + 1
+  day = min(value.day, calendar.monthrange(year, month)[1])
+  return value.replace(year=year, month=month, day=day)
+
 
 BinanceMarketDataAdapter = CcxtMarketDataAdapter

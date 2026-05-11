@@ -355,4 +355,8 @@ def _timeframe_delta(timeframe: str) -> timedelta:
     return timedelta(hours=amount)
   if unit == "d":
     return timedelta(days=amount)
+  if unit == "w":
+    return timedelta(weeks=amount)
+  if unit == "M":
+    return timedelta(days=30 * amount)
   return timedelta(minutes=5)

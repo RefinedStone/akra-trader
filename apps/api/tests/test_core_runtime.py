@@ -276,6 +276,61 @@ def test_binance_sync_endpoint_fetches_and_upserts_ohlcv(tmp_path):
   assert jobs[0].fetched_candle_count == 5
 
 
+def test_binance_sync_accepts_weekly_and_monthly_ohlcv(tmp_path):
+  for timeframe, start_at, candle_times in (
+    (
+      "1w",
+      datetime(2026, 1, 5, tzinfo=UTC),
+      (
+        datetime(2026, 1, 5, tzinfo=UTC),
+        datetime(2026, 1, 12, tzinfo=UTC),
+        datetime(2026, 1, 19, tzinfo=UTC),
+      ),
+    ),
+    (
+      "1M",
+      datetime(2026, 1, 1, tzinfo=UTC),
+      (
+        datetime(2026, 1, 1, tzinfo=UTC),
+        datetime(2026, 2, 1, tzinfo=UTC),
+        datetime(2026, 3, 1, tzinfo=UTC),
+      ),
+    ),
+  ):
+    exchange = FakeOhlcvExchange(start_at=start_at, candle_count=3)
+    for index, candle_at in enumerate(candle_times):
+      exchange.rows[index][0] = int(candle_at.timestamp() * 1000)
+    market_data = CcxtMarketDataAdapter(
+      database_url=f"sqlite:///{tmp_path / f'market_{timeframe}.sqlite3'}",
+      tracked_symbols=("BTC/USDT",),
+      exchange_batch_limit=2,
+      exchange=exchange,
+      clock=lambda: candle_times[-1] + timedelta(days=1),
+    )
+    app = TradingApplication(
+      market_data=market_data,
+      strategies=LocalStrategyCatalog(),
+      runs=InMemoryCoreRepository(),
+    )
+    client = build_application_client(app)
+
+    response = client.post(
+      "/api/market-data/sync",
+      json={
+        "symbol": "BTC/USDT",
+        "timeframe": timeframe,
+        "start_at": start_at.isoformat().replace("+00:00", "Z"),
+        "end_at": candle_times[-1].isoformat().replace("+00:00", "Z"),
+        "limit": 5,
+      },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "synced"
+    assert exchange.calls[0]["timeframe"] == timeframe
+    assert len(market_data.get_candles(symbol="BTC/USDT", timeframe=timeframe)) == 3
+
+
 def test_backtest_backfills_requested_range_before_loading(tmp_path):
   start_at = datetime(2026, 5, 1, tzinfo=UTC)
   exchange = FakeOhlcvExchange(start_at=start_at, candle_count=30)

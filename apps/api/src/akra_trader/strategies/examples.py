@@ -58,7 +58,7 @@ class MovingAverageCrossStrategy(PolicyBackedStrategy):
       version="1.0.0",
       runtime="native",
       asset_types=(AssetType.CRYPTO,),
-      supported_timeframes=("5m", "1h"),
+      supported_timeframes=("1m", "3m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"),
       parameter_schema={
         "short_window": {
           "type": "integer",
@@ -85,7 +85,7 @@ class MovingAverageCrossStrategy(PolicyBackedStrategy):
     )
 
   def warmup_spec(self) -> WarmupSpec:
-    return WarmupSpec(required_bars=21, timeframes=("5m",))
+    return WarmupSpec(required_bars=21, timeframes=("1m", "3m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"))
 
   def build_feature_frame(self, candles: pd.DataFrame, parameters: dict) -> pd.DataFrame:
     short_window = int(parameters.get("short_window", 8))

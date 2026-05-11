@@ -621,6 +621,8 @@ def _timeframe_to_timedelta(timeframe: str) -> timedelta | None:
     return timedelta(days=amount)
   if unit == "w":
     return timedelta(weeks=amount)
+  if unit == "M":
+    return timedelta(days=30 * amount)
   return None
 
 
@@ -629,7 +631,7 @@ def _timeframe_to_minutes(timeframe: str) -> int | None:
   if delta is None:
     return None
   total_minutes = int(delta.total_seconds() // 60)
-  supported_minutes = {1, 5, 15, 30, 60, 240, 1440, 10080, 21600}
+  supported_minutes = {1, 3, 5, 15, 30, 60, 240, 1440, 10080, 43200}
   if total_minutes not in supported_minutes:
     return None
   return total_minutes
