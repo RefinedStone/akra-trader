@@ -130,6 +130,40 @@ const syncResult = {
   issues: [],
 };
 
+const orderFixture = {
+  order_id: "order-1",
+  instrument_id: "binance:BTC/USDT",
+  side: "buy",
+  quantity: 0.25,
+  filled_quantity: 0.25,
+  requested_price: 81200,
+  average_fill_price: 81210,
+  order_type: "market",
+  status: "filled",
+  created_at: "2026-05-11T00:10:00Z",
+  filled_at: "2026-05-11T00:10:01Z",
+};
+
+const positionFixture = {
+  instrument_id: "binance:BTC/USDT",
+  quantity: 0.25,
+  average_price: 81210,
+  realized_pnl: 126.5,
+  opened_at: "2026-05-11T00:10:01Z",
+  updated_at: "2026-05-11T00:15:00Z",
+};
+
+const logFixture = {
+  log_id: "log-1",
+  recorded_at: "2026-05-11T00:16:00Z",
+  layer: "engine",
+  event_type: "worker_candles_processed",
+  message: "Processed closed candle for BTC/USDT.",
+  severity: "info",
+  run_id: "run-1",
+  mode: "sandbox",
+};
+
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return Promise.resolve({
     ok,
@@ -171,7 +205,7 @@ describe("ControlRoomApp", () => {
           });
         }
         if (url.endsWith("/api/logs?limit=100") || url.includes("/api/logs?")) {
-          return jsonResponse({ logs: [] });
+          return jsonResponse({ logs: [logFixture] });
         }
         if (url.endsWith("/api/runs/sandbox") && init?.method === "POST") {
           runs = [sandboxRun];
@@ -185,10 +219,10 @@ describe("ControlRoomApp", () => {
           return jsonResponse(syncResult);
         }
         if (url.endsWith("/api/runs/run-1/orders")) {
-          return jsonResponse({ orders: [{ order_id: "order-1" }] });
+          return jsonResponse({ orders: [orderFixture] });
         }
         if (url.endsWith("/api/runs/run-1/positions")) {
-          return jsonResponse({ positions: [{ instrument_id: "binance:BTC/USDT" }] });
+          return jsonResponse({ positions: [positionFixture] });
         }
         if (url.endsWith("/api/runs/run-1")) {
           return jsonResponse(sandboxRun);
@@ -344,6 +378,30 @@ describe("ControlRoomApp", () => {
       start_at: new Date("2025-01-01T00:00").toISOString(),
       end_at: new Date("2025-01-02T00:00").toISOString(),
     });
+  });
+
+  it("renders operational detail tabs with summarized orders, positions, and logs", async () => {
+    runs = [sandboxRun];
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /샌드박스/ }));
+    await waitFor(() => {
+      expect(screen.getAllByText("Moving Average Cross").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "주문" }));
+    expect(screen.getByText("총 주문")).toBeInTheDocument();
+    expect(screen.getByText("주문 활동 타임라인")).toBeInTheDocument();
+    expect(screen.getAllByText("BUY").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("체결").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "포지션" }));
+    expect(screen.getByText("선택 포지션 상세")).toBeInTheDocument();
+    expect(screen.getByText("노출 분포")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "로그" }));
+    expect(screen.getByText("선택 로그 상세")).toBeInTheDocument();
+    expect(screen.getAllByText("Processed closed candle for BTC/USDT.").length).toBeGreaterThan(0);
   });
 
   it("shows clickable run detail tabs and backtest results", async () => {

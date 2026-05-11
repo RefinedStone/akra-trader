@@ -107,6 +107,8 @@ type Candle = {
   volume: number;
 };
 
+type UnknownRecord = Record<string, unknown>;
+
 type RunFormState = {
   strategy_id: string;
   symbol: string;
@@ -1203,7 +1205,13 @@ function RunDetailPanel({
       <div className="panel-heading">
         <div>
           <p className="core-eyebrow">실행 상세</p>
-          <h2>{run ? formatMode(run.mode) : "선택된 실행 없음"}</h2>
+          <h2>{run ? `${formatMode(run.mode)} · ${shortId(run.run_id)}` : "선택된 실행 없음"}</h2>
+          {run ? (
+            <div className="detail-heading-meta">
+              <StatusPill value={run.status} />
+              <span>{run.strategy?.name ?? "전략 미지정"}</span>
+            </div>
+          ) : null}
         </div>
         <button disabled={!run || run.status !== "running"} onClick={onStop} type="button">
           중지
@@ -1225,10 +1233,8 @@ function RunDetailPanel({
             ))}
           </div>
           {activeTab === "overview" ? <RunOverview run={run} /> : null}
-          {activeTab === "orders" ? <JsonDetail title="주문" value={orders} emptyText="주문이 없습니다." /> : null}
-          {activeTab === "positions" ? (
-            <JsonDetail title="포지션" value={positions} emptyText="포지션이 없습니다." />
-          ) : null}
+          {activeTab === "orders" ? <OrdersDetail orders={orders} /> : null}
+          {activeTab === "positions" ? <PositionsDetail positions={positions} /> : null}
           {activeTab === "metrics" ? <RunMetricsDetail metrics={run.metrics} /> : null}
           {activeTab === "logs" ? <RunLogsDetail logs={logs} /> : null}
         </>
@@ -1242,33 +1248,42 @@ function RunDetailPanel({
 function RunOverview({ run }: { run: RunSummary }) {
   const marketData = run.market_data;
   const symbol = run.config?.symbols?.[0] ?? "-";
+  const returnValue = Number(run.metrics.total_return_pct ?? 0);
+  const dataIssues = marketData?.issues ?? [];
   return (
     <div className="detail-section">
-      <div className="metric-grid two">
-        <Metric label="상태" value={formatRunStatus(run.status)} />
-        <Metric label="종료 자산" value={formatMetricValue(run.metrics.ending_equity)} />
-        <Metric
+      <div className="detail-stat-grid">
+        <DetailStat label="상태" value={formatRunStatus(run.status)} />
+        <DetailStat label="종료 자산" value={formatMetricValue(run.metrics.ending_equity)} />
+        <DetailStat
           label="수익률"
+          tone={returnValue >= 0 ? "positive" : "negative"}
           value={formatMetricValue(run.metrics.total_return_pct, "%")}
-          tone={Number(run.metrics.total_return_pct ?? 0) >= 0 ? "positive" : "negative"}
         />
-        <Metric label="거래 수" value={formatMetricValue(run.metrics.trade_count ?? run.orders_count)} />
+        <DetailStat label="거래 수" value={formatMetricValue(run.metrics.trade_count ?? run.orders_count)} />
+        <DetailStat label="캔들 수" value={formatMetricValue(marketData?.candle_count)} />
+        <DetailStat label="데이터" value={formatDataStatus(marketData?.sync_status ?? "-")} />
       </div>
-      <div className="detail-list">
-        <DetailLine label="전략" value={run.strategy?.name ?? "-"} />
-        <DetailLine label="심볼" value={symbol} />
-        <DetailLine label="타임프레임" value={run.config?.timeframe ?? marketData?.timeframe ?? "-"} />
-        <DetailLine label="요청 기간" value={formatRange(run.config?.start_at, run.config?.end_at)} />
-        <DetailLine
-          label="데이터 범위"
-          value={formatRange(marketData?.effective_start_at, marketData?.effective_end_at)}
-        />
-        <DetailLine label="캔들 수" value={formatMetricValue(marketData?.candle_count)} />
-        <DetailLine label="데이터 상태" value={formatDataStatus(marketData?.sync_status ?? "-")} />
+      <div className="detail-card">
+        <div className="detail-card-heading">
+          <strong>실행 컨텍스트</strong>
+          <small>{formatRange(run.started_at, run.ended_at)}</small>
+        </div>
+        <div className="detail-list flush">
+          <DetailLine label="전략" value={run.strategy?.name ?? "-"} />
+          <DetailLine label="심볼" value={symbol} />
+          <DetailLine label="타임프레임" value={run.config?.timeframe ?? marketData?.timeframe ?? "-"} />
+          <DetailLine label="요청 기간" value={formatRange(run.config?.start_at, run.config?.end_at)} />
+          <DetailLine
+            label="데이터 범위"
+            value={formatRange(marketData?.effective_start_at, marketData?.effective_end_at)}
+          />
+          <DetailLine label="데이터 상태" value={formatDataStatus(marketData?.sync_status ?? "-")} />
+        </div>
       </div>
-      {marketData?.issues?.length ? (
+      {dataIssues.length ? (
         <div className="detail-issues">
-          {marketData.issues.map((issue) => (
+          {dataIssues.map((issue) => (
             <span key={issue}>{issue}</span>
           ))}
         </div>
@@ -1280,48 +1295,307 @@ function RunOverview({ run }: { run: RunSummary }) {
 
 function RunMetricsDetail({ metrics }: { metrics: Record<string, number | string> }) {
   const entries = Object.entries(metrics);
+  const headlineKeys = ["ending_equity", "total_return_pct", "max_drawdown_pct", "trade_count", "win_rate_pct", "exposure_pct"];
+  const headlineEntries = headlineKeys
+    .filter((key) => metrics[key] !== undefined)
+    .map((key) => [key, metrics[key]] as const);
+  const tableEntries = entries.filter(([key]) => !headlineKeys.includes(key));
   return (
     <div className="detail-section">
-      {entries.length > 0 ? (
-        <div className="detail-list">
-          {entries.map(([key, value]) => (
-            <DetailLine key={key} label={formatMetricLabel(key)} value={formatMetricValue(value)} />
+      {headlineEntries.length > 0 ? (
+        <div className="detail-stat-grid">
+          {headlineEntries.map(([key, value]) => (
+            <DetailStat
+              key={key}
+              label={formatMetricLabel(key)}
+              tone={metricTone(key, value)}
+              value={formatMetricDisplay(key, value)}
+            />
           ))}
         </div>
       ) : (
         <p className="muted">지표가 없습니다.</p>
       )}
-      <pre className="json-panel">{JSON.stringify(metrics, null, 2)}</pre>
+      {tableEntries.length > 0 ? (
+        <div className="detail-table-wrap">
+          <table className="detail-table">
+            <thead>
+              <tr>
+                <th>지표</th>
+                <th>값</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableEntries.map(([key, value]) => (
+                <tr key={key}>
+                  <td>{formatMetricLabel(key)}</td>
+                  <td>{formatMetricDisplay(key, value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function JsonDetail({
-  emptyText,
-  title,
-  value,
-}: {
-  emptyText: string;
-  title: string;
-  value: unknown[];
-}) {
+function OrdersDetail({ orders }: { orders: unknown[] }) {
+  const records = orders.map(asRecord);
+  const filled = records.filter((order) => isOrderStatus(order, ["filled", "closed", "complete", "completed"])).length;
+  const open = records.filter((order) => isOrderStatus(order, ["open", "pending", "submitted", "partially_filled"])).length;
+  const canceled = records.filter((order) => isOrderStatus(order, ["canceled", "cancelled", "rejected", "failed"])).length;
+  const latestOrders = [...records].sort(compareRecordTimestamp("created_at")).slice(0, 6);
   return (
     <div className="detail-section">
-      <div className="run-list-header inline">
-        <strong>{title}</strong>
-        <span>{value.length}개</span>
+      <div className="detail-stat-grid">
+        <DetailStat label="총 주문" value={formatNumber(records.length)} />
+        <DetailStat label="체결" tone="positive" value={formatNumber(filled)} />
+        <DetailStat label="대기" value={formatNumber(open)} />
+        <DetailStat label="취소/실패" tone={canceled > 0 ? "negative" : "neutral"} value={formatNumber(canceled)} />
       </div>
-      {value.length === 0 ? <p className="muted">{emptyText}</p> : null}
-      <pre className="json-panel">{JSON.stringify(value, null, 2)}</pre>
+      {records.length === 0 ? (
+        <EmptyDetailState message="주문이 없습니다." />
+      ) : (
+        <>
+          <div className="detail-table-wrap">
+            <table className="detail-table">
+              <thead>
+                <tr>
+                  <th>주문 ID</th>
+                  <th>심볼</th>
+                  <th>유형</th>
+                  <th>방향</th>
+                  <th>수량</th>
+                  <th>주문가</th>
+                  <th>체결가</th>
+                  <th>상태</th>
+                  <th>시간</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((order, index) => (
+                  <tr key={recordText(order, ["order_id"], `order-${index}`)}>
+                    <td>{shortId(recordText(order, ["order_id"], "-"))}</td>
+                    <td>{formatInstrument(recordText(order, ["instrument_id", "symbol"], "-"))}</td>
+                    <td>{formatOrderType(recordText(order, ["order_type", "type"], "-"))}</td>
+                    <td>
+                      <span className={`side-pill ${sideClass(recordText(order, ["side"], ""))}`}>
+                        {formatOrderSide(recordText(order, ["side"], "-"))}
+                      </span>
+                    </td>
+                    <td>{formatMetricValue(recordNumber(order, ["filled_quantity", "quantity"]))}</td>
+                    <td>{formatMetricValue(recordNumber(order, ["requested_price", "price"]))}</td>
+                    <td>{formatMetricValue(recordNumber(order, ["average_fill_price", "avg_price"]))}</td>
+                    <td>
+                      <StatusPill value={recordText(order, ["status"], "-")} />
+                    </td>
+                    <td>{formatTimestamp(recordText(order, ["filled_at", "updated_at", "created_at"], null))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="detail-card">
+            <div className="detail-card-heading">
+              <strong>주문 활동 타임라인</strong>
+              <small>최근 {latestOrders.length}건</small>
+            </div>
+            <div className="detail-timeline">
+              {latestOrders.map((order, index) => (
+                <article key={`${recordText(order, ["order_id"], "order")}-${index}`}>
+                  <span>{formatTimestamp(recordText(order, ["created_at", "updated_at", "filled_at"], null))}</span>
+                  <strong>
+                    {formatInstrument(recordText(order, ["instrument_id", "symbol"], "-"))} ·{" "}
+                    {formatOrderSide(recordText(order, ["side"], "-"))}
+                  </strong>
+                  <small>
+                    {formatOrderStatus(recordText(order, ["status"], "-"))} · 수량{" "}
+                    {formatMetricValue(recordNumber(order, ["filled_quantity", "quantity"]))}
+                  </small>
+                </article>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PositionsDetail({ positions }: { positions: unknown[] }) {
+  const records = positions.map(asRecord);
+  const openPositions = records.filter((position) => Math.abs(recordNumber(position, ["quantity"]) ?? 0) > 0);
+  const realizedPnl = records.reduce((sum, position) => sum + (recordNumber(position, ["realized_pnl", "pnl"]) ?? 0), 0);
+  const notionals = records.map((position) => ({
+    instrument: formatInstrument(recordText(position, ["instrument_id", "symbol"], "-")),
+    notional: Math.abs((recordNumber(position, ["quantity"]) ?? 0) * (recordNumber(position, ["average_price", "entry_price"]) ?? 0)),
+  }));
+  const totalNotional = notionals.reduce((sum, item) => sum + item.notional, 0);
+  const selectedPosition = openPositions[0] ?? records[0];
+  return (
+    <div className="detail-section">
+      <div className="detail-stat-grid">
+        <DetailStat label="총 포지션" value={formatNumber(records.length)} />
+        <DetailStat label="오픈" tone={openPositions.length > 0 ? "positive" : "neutral"} value={formatNumber(openPositions.length)} />
+        <DetailStat label="실현 손익" tone={realizedPnl >= 0 ? "positive" : "negative"} value={formatMetricValue(realizedPnl)} />
+        <DetailStat label="노출 금액" value={formatMetricValue(totalNotional)} />
+      </div>
+      {records.length === 0 ? (
+        <EmptyDetailState message="포지션이 없습니다." />
+      ) : (
+        <>
+          <div className="detail-table-wrap">
+            <table className="detail-table">
+              <thead>
+                <tr>
+                  <th>심볼</th>
+                  <th>수량</th>
+                  <th>평균가</th>
+                  <th>노출</th>
+                  <th>실현 손익</th>
+                  <th>업데이트</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((position, index) => {
+                  const quantity = recordNumber(position, ["quantity"]) ?? 0;
+                  const averagePrice = recordNumber(position, ["average_price", "entry_price"]) ?? 0;
+                  return (
+                    <tr key={`${recordText(position, ["instrument_id", "symbol"], "position")}-${index}`}>
+                      <td>{formatInstrument(recordText(position, ["instrument_id", "symbol"], "-"))}</td>
+                      <td>{formatMetricValue(quantity)}</td>
+                      <td>{formatMetricValue(averagePrice)}</td>
+                      <td>{formatMetricValue(Math.abs(quantity * averagePrice))}</td>
+                      <td>{formatMetricValue(recordNumber(position, ["realized_pnl", "pnl"]))}</td>
+                      <td>{formatTimestamp(recordText(position, ["updated_at", "opened_at"], null))}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="detail-split">
+            <div className="detail-card">
+              <div className="detail-card-heading">
+                <strong>선택 포지션 상세</strong>
+                <small>{selectedPosition ? formatInstrument(recordText(selectedPosition, ["instrument_id", "symbol"], "-")) : "-"}</small>
+              </div>
+              {selectedPosition ? (
+                <div className="detail-list flush">
+                  <DetailLine label="수량" value={formatMetricValue(recordNumber(selectedPosition, ["quantity"]))} />
+                  <DetailLine label="평균가" value={formatMetricValue(recordNumber(selectedPosition, ["average_price", "entry_price"]))} />
+                  <DetailLine label="실현 손익" value={formatMetricValue(recordNumber(selectedPosition, ["realized_pnl", "pnl"]))} />
+                  <DetailLine label="오픈 시각" value={formatTimestamp(recordText(selectedPosition, ["opened_at"], null))} />
+                </div>
+              ) : null}
+            </div>
+            <div className="detail-card">
+              <div className="detail-card-heading">
+                <strong>노출 분포</strong>
+                <small>{formatMetricValue(totalNotional)}</small>
+              </div>
+              <div className="exposure-list">
+                {notionals.map((item) => (
+                  <div key={item.instrument}>
+                    <span>{item.instrument}</span>
+                    <b>
+                      <i style={{ width: `${totalNotional > 0 ? Math.max((item.notional / totalNotional) * 100, 3) : 0}%` }} />
+                    </b>
+                    <em>{formatMetricValue(item.notional)}</em>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 function RunLogsDetail({ logs }: { logs: OperationLog[] }) {
+  const selectedLog = logs.find((log) => log.severity === "error") ?? logs[0];
   return (
     <div className="detail-section">
-      {logs.length === 0 ? <p className="muted">이 실행에 연결된 로그가 없습니다.</p> : null}
-      <LogList logs={logs} compact />
+      <div className="detail-stat-grid">
+        <DetailStat label="전체" value={formatNumber(logs.length)} />
+        <DetailStat label="오류" tone={logs.some((log) => log.severity === "error") ? "negative" : "neutral"} value={formatNumber(logs.filter((log) => log.severity === "error").length)} />
+        <DetailStat label="경고" value={formatNumber(logs.filter((log) => log.severity === "warning").length)} />
+        <DetailStat label="정보" value={formatNumber(logs.filter((log) => log.severity === "info").length)} />
+      </div>
+      {logs.length === 0 ? (
+        <EmptyDetailState message="이 실행에 연결된 로그가 없습니다." />
+      ) : (
+        <div className="detail-split logs-split">
+          <div className="detail-table-wrap">
+            <table className="detail-table">
+              <thead>
+                <tr>
+                  <th>시간</th>
+                  <th>심각도</th>
+                  <th>소스</th>
+                  <th>메시지</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr className={selectedLog?.log_id === log.log_id ? "is-selected" : ""} key={log.log_id}>
+                    <td>{formatTimestamp(log.recorded_at)}</td>
+                    <td><span className={`severity ${log.severity}`}>{formatSeverity(log.severity)}</span></td>
+                    <td>{log.layer}</td>
+                    <td>{log.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {selectedLog ? (
+            <div className="detail-card">
+              <div className="detail-card-heading">
+                <strong>선택 로그 상세</strong>
+                <span className={`severity ${selectedLog.severity}`}>{formatSeverity(selectedLog.severity)}</span>
+              </div>
+              <div className="detail-list flush">
+                <DetailLine label="시간" value={formatTimestamp(selectedLog.recorded_at)} />
+                <DetailLine label="소스" value={selectedLog.layer} />
+                <DetailLine label="이벤트" value={formatEventType(selectedLog.event_type)} />
+                <DetailLine label="메시지" value={selectedLog.message} />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailStat({
+  label,
+  tone = "neutral",
+  value,
+}: {
+  label: string;
+  tone?: "neutral" | "positive" | "negative";
+  value: string;
+}) {
+  return (
+    <article className={`detail-stat ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function StatusPill({ value }: { value?: string | null }) {
+  const status = String(value ?? "-");
+  return <span className={`status-pill ${status.toLowerCase()}`}>{formatStatusLabel(status)}</span>;
+}
+
+function EmptyDetailState({ message }: { message: string }) {
+  return (
+    <div className="empty-detail">
+      <strong>{message}</strong>
     </div>
   );
 }
@@ -1540,6 +1814,24 @@ function formatMetricValue(value: unknown, suffix = "") {
   return `${value}${suffix}`;
 }
 
+function formatMetricDisplay(key: string, value: unknown) {
+  return formatMetricValue(value, key.endsWith("_pct") ? "%" : "");
+}
+
+function metricTone(key: string, value: unknown) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return "neutral";
+  }
+  if (key.includes("drawdown")) {
+    return numericValue > 0 ? "negative" : "neutral";
+  }
+  if (key.includes("return") || key.includes("pnl") || key.includes("equity")) {
+    return numericValue >= 0 ? "positive" : "negative";
+  }
+  return "neutral";
+}
+
 function formatMetricLabel(value: string) {
   switch (value) {
     case "initial_cash":
@@ -1636,6 +1928,36 @@ function formatRunStatus(value?: string | null) {
   }
 }
 
+function formatStatusLabel(value?: string | null) {
+  const normalized = String(value ?? "").toLowerCase();
+  switch (normalized) {
+    case "pending":
+    case "submitted":
+    case "open":
+      return "대기";
+    case "running":
+      return "실행 중";
+    case "completed":
+    case "complete":
+      return "완료";
+    case "filled":
+      return "체결";
+    case "partially_filled":
+    case "partial":
+      return "부분 체결";
+    case "failed":
+    case "rejected":
+      return "실패";
+    case "stopped":
+      return "중지됨";
+    case "canceled":
+    case "cancelled":
+      return "취소";
+    default:
+      return value ?? "-";
+  }
+}
+
 function formatSeverity(value?: string | null) {
   switch (value) {
     case "error":
@@ -1690,6 +2012,96 @@ function formatEventType(value: string) {
     default:
       return value.replaceAll("_", " ");
   }
+}
+
+function asRecord(value: unknown): UnknownRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as UnknownRecord) : {};
+}
+
+function recordText(record: UnknownRecord, keys: string[], fallback: string): string;
+function recordText(record: UnknownRecord, keys: string[], fallback: null): string | null;
+function recordText(record: UnknownRecord, keys: string[], fallback: string | null = "-") {
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== null && value !== undefined && value !== "") {
+      return String(value);
+    }
+  }
+  return fallback;
+}
+
+function recordNumber(record: UnknownRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+function compareRecordTimestamp(key: string) {
+  return (left: UnknownRecord, right: UnknownRecord) => {
+    const leftTime = new Date(recordText(left, [key], null) ?? "").getTime();
+    const rightTime = new Date(recordText(right, [key], null) ?? "").getTime();
+    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+  };
+}
+
+function isOrderStatus(order: UnknownRecord, statuses: string[]) {
+  const status = recordText(order, ["status"], "").toLowerCase();
+  return statuses.includes(status);
+}
+
+function formatInstrument(value: string) {
+  return toSymbol(value);
+}
+
+function formatOrderSide(value: string) {
+  switch (value.toLowerCase()) {
+    case "buy":
+      return "BUY";
+    case "sell":
+      return "SELL";
+    case "long":
+      return "LONG";
+    case "short":
+      return "SHORT";
+    default:
+      return value.toUpperCase();
+  }
+}
+
+function sideClass(value: string) {
+  const normalized = value.toLowerCase();
+  if (normalized === "buy" || normalized === "long") {
+    return "positive";
+  }
+  if (normalized === "sell" || normalized === "short") {
+    return "negative";
+  }
+  return "neutral";
+}
+
+function formatOrderType(value: string) {
+  switch (value.toLowerCase()) {
+    case "market":
+      return "시장가";
+    case "limit":
+      return "지정가";
+    default:
+      return value === "-" ? value : value.toUpperCase();
+  }
+}
+
+function formatOrderStatus(value: string) {
+  return formatStatusLabel(value);
 }
 
 function toSymbol(instrumentId: string) {
