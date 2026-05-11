@@ -1,33 +1,36 @@
 from __future__ import annotations
 
-import inspect
+from dataclasses import fields
+from dataclasses import is_dataclass
 from datetime import UTC
 from datetime import datetime
+from enum import Enum
 from typing import Any
 
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import FastAPI
-from fastapi import Header
 from fastapi import HTTPException
 from fastapi import Query
-from fastapi import Request
+from pydantic import BaseModel
+from pydantic import Field
 
-from akra_trader.application import execute_standalone_surface_binding
-from akra_trader.application import list_standalone_surface_runtime_bindings
-from akra_trader.application import StandaloneSurfaceRuntimeBinding
 from akra_trader.application import TradingApplication
 from akra_trader.bootstrap import Container
-from akra_trader.domain.models import RunSurfaceCapabilities
-from akra_trader.api_filter_helpers import *
-from akra_trader.api_filter_helpers import _build_filter_expression_query_default
-from akra_trader.api_filter_helpers import _build_header_alias
-from akra_trader.api_filter_helpers import _build_query_default
-from akra_trader.api_filter_helpers import _build_route_openapi_extra
-from akra_trader.api_filter_helpers import _build_runtime_query_filters
-from akra_trader.api_filter_helpers import _build_sort_query_default
-from akra_trader.api_provider_provenance_routes import register_provider_provenance_explicit_routes
-from akra_trader.api_request_payload_models import REQUEST_PAYLOAD_MODELS
+
+
+class RunCreateRequest(BaseModel):
+  strategy_id: str = Field(default="ma_cross_v1", min_length=1)
+  symbol: str = Field(default="BTC/USDT", min_length=1)
+  timeframe: str = Field(default="5m", min_length=1)
+  initial_cash: float = Field(default=10_000.0, gt=0)
+  fee_rate: float = Field(default=0.001, ge=0)
+  slippage_bps: float = Field(default=5.0, ge=0)
+  parameters: dict[str, Any] = Field(default_factory=dict)
+  replay_bars: int | None = Field(default=96, ge=2, le=5_000)
+  start_at: datetime | None = None
+  end_at: datetime | None = None
+
 
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
@@ -35,225 +38,226 @@ def create_router(container: Container) -> APIRouter:
   def get_app() -> TradingApplication:
     return container.app
 
-  def get_route_run_surface_capabilities() -> RunSurfaceCapabilities:
-    get_capabilities = getattr(get_app(), "get_run_surface_capabilities", None)
-    if callable(get_capabilities):
-      return get_capabilities()
-    return RunSurfaceCapabilities()
+  @router.get("/health")
+  def health(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    return app.health()
 
-  def parse_market_data_datetime(value: str | None, *, field_name: str) -> datetime | None:
-    if value is None or not value.strip():
-      return None
+  @router.get("/strategies")
+  def list_strategies(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    return {
+      "strategies": [_to_json(strategy) for strategy in app.list_strategies()],
+      "llm_strategy": app.get_llm_strategy_interface(),
+    }
+
+  @router.get("/runs")
+  def list_runs(
+    mode: str | None = Query(default=None, pattern="^(backtest|sandbox|live)$"),
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return {"runs": [serialize_run(run) for run in app.list_runs(mode)]}
+
+  @router.get("/runs/{run_id}")
+  def get_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    run = app.get_run(run_id)
+    if run is None:
+      raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+    return serialize_run(run)
+
+  @router.post("/runs/backtests")
+  def create_backtest(
+    request: RunCreateRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
     try:
-      parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+      run = app.run_backtest(**_run_request_kwargs(request, include_replay_bars=False))
     except ValueError as exc:
-      raise HTTPException(
-        status_code=400,
-        detail=f"{field_name} must be an ISO-8601 datetime",
-      ) from exc
-    if parsed.tzinfo is None:
-      return parsed.replace(tzinfo=UTC)
-    return parsed
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_run(run)
 
-  def serialize_market_data_timestamp(value: datetime) -> str:
-    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+  @router.post("/runs/sandbox")
+  def create_sandbox(
+    request: RunCreateRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      run = app.start_sandbox_run(**_run_request_kwargs(request, include_replay_bars=True))
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_run(run)
+
+  @router.post("/runs/live")
+  def create_live(
+    request: RunCreateRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      run = app.start_live_run(**_run_request_kwargs(request, include_replay_bars=True))
+    except PermissionError as exc:
+      raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_run(run)
+
+  @router.post("/runs/{run_id}/stop")
+  def stop_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    try:
+      return serialize_run(app.stop_run(run_id))
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+  @router.get("/runs/{run_id}/orders")
+  def get_run_orders(
+    run_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return {"run_id": run_id, "orders": _to_json(app.get_run_orders(run_id))}
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+  @router.get("/runs/{run_id}/positions")
+  def get_run_positions(
+    run_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return {"run_id": run_id, "positions": _to_json(app.get_run_positions(run_id))}
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+  @router.get("/runs/{run_id}/metrics")
+  def get_run_metrics(
+    run_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return {"run_id": run_id, "metrics": _to_json(app.get_run_metrics(run_id))}
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+  @router.get("/runs/{run_id}/logs")
+  def get_run_logs(
+    run_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return {"run_id": run_id, "logs": _to_json(app.get_run_logs(run_id))}
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
 
   @router.get("/market-data/candles")
   def list_market_data_candles(
     symbol: str = Query(..., min_length=1),
     timeframe: str = Query("5m", min_length=1),
-    start_at: str | None = None,
-    end_at: str | None = None,
-    limit: int = Query(500, ge=1, le=5000),
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int = Query(500, ge=1, le=5_000),
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    normalized_symbol = symbol.strip()
-    normalized_timeframe = timeframe.strip()
     candles = app.get_market_data_candles(
-      symbol=normalized_symbol,
-      timeframe=normalized_timeframe,
-      start_at=parse_market_data_datetime(start_at, field_name="start_at"),
-      end_at=parse_market_data_datetime(end_at, field_name="end_at"),
+      symbol=symbol.strip(),
+      timeframe=timeframe.strip(),
+      start_at=_ensure_utc(start_at),
+      end_at=_ensure_utc(end_at),
       limit=limit,
     )
     return {
-      "symbol": normalized_symbol,
-      "timeframe": normalized_timeframe,
+      "symbol": symbol.strip(),
+      "timeframe": timeframe.strip(),
       "limit": limit,
-      "candles": [
-        {
-          "timestamp": serialize_market_data_timestamp(candle.timestamp),
-          "open": candle.open,
-          "high": candle.high,
-          "low": candle.low,
-          "close": candle.close,
-          "volume": candle.volume,
-        }
-        for candle in candles
-      ],
+      "candles": _to_json(candles),
     }
 
-  def dispatch_standalone_binding(
-    *,
-    binding: StandaloneSurfaceRuntimeBinding,
-    app: TradingApplication,
-    run_id: str | None = None,
-    filters: dict[str, Any] | None = None,
-    request_payload: dict[str, Any] | None = None,
-    path_params: dict[str, Any] | None = None,
-    headers: dict[str, Any] | None = None,
+  @router.get("/market-data/status")
+  def get_market_data_status(
+    timeframe: str = Query("5m", min_length=1),
+    app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    try:
-      return execute_standalone_surface_binding(
-        binding=binding,
-        app=app,
-        run_id=run_id,
-        filters=filters,
-        request_payload=request_payload,
-        path_params=path_params,
-        headers=headers,
-      )
-    except PermissionError as exc:
-      raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except LookupError as exc:
-      raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except (ValueError, RuntimeError) as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _to_json(app.get_market_data_status(timeframe=timeframe.strip()))
 
-  def build_standalone_surface_route_handler(binding: StandaloneSurfaceRuntimeBinding):
-    def handle_surface(**kwargs: Any) -> dict[str, Any]:
-      request_payload = None
-      if binding.request_payload_kind is not None:
-        request_model = kwargs["request"]
-        _, dump_kwargs = REQUEST_PAYLOAD_MODELS[binding.request_payload_kind]
-        request_payload = request_model.model_dump(**dump_kwargs)
-      request_context = kwargs.get("request")
-      try:
-        filters = _build_runtime_query_filters(
-          binding,
-          kwargs=kwargs,
-          request=request_context,
-        )
-      except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-      return dispatch_standalone_binding(
-        binding=binding,
-        app=kwargs["app"],
-        run_id=kwargs.get("run_id"),
-        filters=filters,
-        path_params=(
-          {key: kwargs[key] for key in binding.path_param_keys}
-          if binding.path_param_keys
-          else None
-        ),
-        headers=(
-          {key: kwargs.get(key) for key in binding.header_keys}
-          if binding.header_keys
-          else None
-        ),
-        request_payload=request_payload,
-      )
-
-    parameters: list[inspect.Parameter] = []
-    if binding.scope == "run":
-      parameters.append(
-        inspect.Parameter(
-          "run_id",
-          inspect.Parameter.POSITIONAL_OR_KEYWORD,
-          annotation=str,
+  @router.get("/logs")
+  def list_logs(
+    run_id: str | None = None,
+    mode: str | None = Query(default=None, pattern="^(backtest|sandbox|live)$"),
+    severity: str | None = Query(default=None, pattern="^(info|warning|error)$"),
+    since: datetime | None = None,
+    until: datetime | None = None,
+    limit: int = Query(default=200, ge=1, le=1_000),
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return {
+      "logs": _to_json(
+        app.list_operation_logs(
+          run_id=run_id,
+          mode=mode,
+          severity=severity,
+          since=_ensure_utc(since),
+          until=_ensure_utc(until),
+          limit=limit,
         )
       )
-    for path_param_key in binding.path_param_keys:
-      parameters.append(
-        inspect.Parameter(
-          path_param_key,
-          inspect.Parameter.POSITIONAL_OR_KEYWORD,
-          annotation=str,
-        )
-      )
-    if binding.filter_param_specs or binding.sort_field_specs:
-      parameters.append(
-        inspect.Parameter(
-          "request",
-          inspect.Parameter.POSITIONAL_OR_KEYWORD,
-          annotation=Request,
-        )
-      )
-    if binding.filter_param_specs:
-      parameters.append(
-        inspect.Parameter(
-          "filter_expr",
-          inspect.Parameter.POSITIONAL_OR_KEYWORD,
-          annotation=str | None,
-          default=_build_filter_expression_query_default(),
-        )
-      )
-    for filter_spec in binding.filter_param_specs:
-      if not filter_spec.query_exposed:
-        continue
-      parameters.append(
-        inspect.Parameter(
-          filter_spec.key,
-          inspect.Parameter.POSITIONAL_OR_KEYWORD,
-          annotation=filter_spec.annotation,
-          default=_build_query_default(filter_spec),
-        )
-      )
-    if binding.sort_field_specs:
-      parameters.append(
-        inspect.Parameter(
-          "sort",
-          inspect.Parameter.POSITIONAL_OR_KEYWORD,
-          annotation=list[str],
-          default=_build_sort_query_default(binding),
-        )
-      )
-    if binding.request_payload_kind is not None:
-      request_model, _ = REQUEST_PAYLOAD_MODELS[binding.request_payload_kind]
-      parameters.append(
-        inspect.Parameter(
-          "request",
-          inspect.Parameter.POSITIONAL_OR_KEYWORD,
-          annotation=request_model,
-        )
-      )
-    for header_key in binding.header_keys:
-      parameters.append(
-        inspect.Parameter(
-          header_key,
-          inspect.Parameter.POSITIONAL_OR_KEYWORD,
-          annotation=str | None,
-          default=Header(default=None, alias=_build_header_alias(header_key)),
-        )
-      )
-    parameters.append(
-      inspect.Parameter(
-        "app",
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        annotation=TradingApplication,
-        default=Depends(get_app),
-      )
-    )
-
-    handle_surface.__name__ = binding.route_name
-    handle_surface.__signature__ = inspect.Signature(
-      parameters=parameters,
-      return_annotation=Any,
-    )
-    return handle_surface
-  for binding in list_standalone_surface_runtime_bindings(get_route_run_surface_capabilities()):
-    router.add_api_route(
-      binding.route_path,
-      build_standalone_surface_route_handler(binding),
-      methods=list(binding.methods),
-      name=binding.route_name,
-      summary=binding.response_title,
-      openapi_extra=_build_route_openapi_extra(binding),
-    )
-
-  register_provider_provenance_explicit_routes(router, get_app)
+    }
 
   return router
 
+
 def include_routes(app: FastAPI, container: Container, prefix: str) -> None:
   app.include_router(create_router(container), prefix=prefix)
+
+
+def serialize_run(run) -> dict[str, Any]:
+  return {
+    "run_id": run.config.run_id,
+    "mode": run.config.mode.value,
+    "status": run.status.value,
+    "started_at": _to_json(run.started_at),
+    "ended_at": _to_json(run.ended_at),
+    "config": _to_json(run.config),
+    "strategy": _to_json(run.provenance.strategy),
+    "runtime_session": _to_json(run.provenance.runtime_session),
+    "market_data": _to_json(run.provenance.market_data),
+    "metrics": _to_json(run.metrics),
+    "orders_count": len(run.orders),
+    "positions_count": len(run.positions),
+    "notes": list(run.notes[-20:]),
+  }
+
+
+def _run_request_kwargs(
+  request: RunCreateRequest,
+  *,
+  include_replay_bars: bool,
+) -> dict[str, Any]:
+  values = request.model_dump()
+  values["start_at"] = _ensure_utc(values["start_at"])
+  values["end_at"] = _ensure_utc(values["end_at"])
+  if not include_replay_bars:
+    values.pop("replay_bars", None)
+  return values
+
+
+def _ensure_utc(value: datetime | None) -> datetime | None:
+  if value is None:
+    return None
+  if value.tzinfo is None:
+    return value.replace(tzinfo=UTC)
+  return value.astimezone(UTC)
+
+
+def _to_json(value: Any) -> Any:
+  if value is None or isinstance(value, str | int | float | bool):
+    return value
+  if isinstance(value, datetime):
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+  if isinstance(value, Enum):
+    return value.value
+  if is_dataclass(value):
+    return {
+      field.name: _to_json(getattr(value, field.name))
+      for field in fields(value)
+    }
+  if isinstance(value, dict):
+    return {str(key): _to_json(item) for key, item in value.items()}
+  if isinstance(value, (list, tuple, set)):
+    return [_to_json(item) for item in value]
+  return value

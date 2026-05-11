@@ -328,5 +328,4 @@ class GuardedLiveStatus:
   audit_events: tuple[OperatorAuditEvent, ...] = ()
   active_runtime_alert_count: int = 0
   running_sandbox_count: int = 0
-  running_paper_count: int = 0
   running_live_count: int = 0

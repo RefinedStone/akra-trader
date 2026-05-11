@@ -18,7 +18,6 @@ __all__ = [
   "StrategyMetadata",
   "StrategyParameterSnapshot",
   "StrategySnapshot",
-  "ExperimentPreset",
   "RunExperimentMetadata",
   "StrategyRegistration",
 ]
@@ -84,63 +83,8 @@ class StrategySnapshot:
 
 
 @dataclass(frozen=True)
-class ExperimentPreset:
-  @dataclass(frozen=True)
-  class Revision:
-    revision_id: str
-    actor: str
-    reason: str
-    created_at: datetime
-    action: str = "updated"
-    source_revision_id: str | None = None
-    name: str = ""
-    description: str = ""
-    strategy_id: str | None = None
-    timeframe: str | None = None
-    benchmark_family: str | None = None
-    tags: tuple[str, ...] = ()
-    parameters: dict[str, Any] = field(default_factory=dict)
-
-  @dataclass(frozen=True)
-  class LifecycleEvent:
-    action: str
-    actor: str
-    reason: str
-    occurred_at: datetime
-    from_stage: str | None = None
-    to_stage: str = "draft"
-    lineage_evidence_pack_id: str | None = None
-    lineage_evidence_retention_expires_at: datetime | None = None
-    lineage_evidence_summary: str | None = None
-
-  @dataclass(frozen=True)
-  class Lifecycle:
-    stage: str = "draft"
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_by: str = "operator"
-    last_action: str = "created"
-    history: tuple["ExperimentPreset.LifecycleEvent", ...] = ()
-
-  preset_id: str
-  name: str
-  description: str = ""
-  strategy_id: str | None = None
-  timeframe: str | None = None
-  benchmark_family: str | None = None
-  tags: tuple[str, ...] = ()
-  parameters: dict[str, Any] = field(default_factory=dict)
-  lifecycle: "ExperimentPreset.Lifecycle" = field(
-    default_factory=lambda: ExperimentPreset.Lifecycle()
-  )
-  revisions: tuple["ExperimentPreset.Revision", ...] = ()
-  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-
-
-@dataclass(frozen=True)
 class RunExperimentMetadata:
   tags: tuple[str, ...] = ()
-  preset_id: str | None = None
   benchmark_family: str | None = None
 
 

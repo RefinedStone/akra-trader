@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "akra-trader-api"
 version = "0.1.0"
-description = "Hexagonal trading platform backend for strategy research, backtesting, and paper trading."
+description = "Core trading runtime backend for backtests, sandbox runs, market data, guarded live execution, logs, and isolated LLM strategy interfaces."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

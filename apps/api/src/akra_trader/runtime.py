@@ -53,7 +53,7 @@ def candles_to_frame(candles: list[Candle]) -> pd.DataFrame:
 
 
 class ExecutionModeService:
-  _legacy_aliases = {"paper": RunMode.PAPER.value}
+  _legacy_aliases: dict[str, str] = {}
 
   def normalize(self, mode: str | None) -> str | None:
     if mode is None:
@@ -67,8 +67,6 @@ class ExecutionModeService:
         "Sandbox worker session is active on the native engine with heartbeat and recovery supervision."
         f"{suffix}"
       )
-    if mode == RunMode.PAPER:
-      return "Paper run starts from the latest simulated market snapshot and remains isolated from venue-backed live execution."
     if mode == RunMode.LIVE:
       return "Guarded-live worker is active on the venue order path with persisted safety-gate state."
     return None

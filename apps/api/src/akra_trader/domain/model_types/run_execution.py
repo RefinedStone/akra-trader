@@ -41,6 +41,7 @@ __all__ = [
   "BenchmarkArtifact",
   "RunProvenance",
   "RunRecord",
+  "OperationLog",
 ]
 
 
@@ -57,7 +58,6 @@ class MarketType(str, Enum):
 class RunMode(str, Enum):
   BACKTEST = "backtest"
   SANDBOX = "sandbox"
-  PAPER = "paper"
   LIVE = "live"
 
 
@@ -325,6 +325,20 @@ class RunRecord:
   closed_trades: list[ClosedTrade] = field(default_factory=list)
   metrics: dict[str, Any] = field(default_factory=dict)
   notes: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class OperationLog:
+  log_id: str
+  recorded_at: datetime
+  layer: str
+  event_type: str
+  message: str
+  severity: str = "info"
+  run_id: str | None = None
+  mode: RunMode | None = None
+  source: str = "runtime"
+  payload: dict[str, Any] = field(default_factory=dict)
 
 
 from akra_trader.domain.model_types.strategy_catalog import RunExperimentMetadata as RunExperimentMetadata

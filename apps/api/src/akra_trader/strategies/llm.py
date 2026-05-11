@@ -42,7 +42,7 @@ class ExternalDecisionStrategy(Strategy):
       },
       description=(
         "Isolated Future LLM research strategy. It records decision posture and keeps live "
-        "promotion outside this scaffold until trace, replay, and fallback gates are ready."
+        "promotion outside this scaffold until trace and fallback gates are ready."
       ),
       lifecycle=StrategyLifecycle(stage="experimental"),
       version_lineage=("0.1.0",),
