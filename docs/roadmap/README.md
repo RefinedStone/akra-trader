@@ -32,6 +32,8 @@ Remaining work from the May 11, 2026 implementation snapshot.
 6. Intelligence research lane
    - add prompt registry, raw trace storage, replay harness, evaluation, and fallback/review controls
    - keep this lane isolated from sandbox/live promotion until those controls exist
+   - track the first LLM judgement implementation split in
+     [LLM Judgement Parallel Task Plan](llm-judgement-parallel-tasks.md)
 
 ## Non-Goals For This Horizon
 
