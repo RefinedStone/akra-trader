@@ -504,8 +504,8 @@ describe("ControlRoomApp", () => {
       timeframe: "5m",
       start_at: new Date("2025-01-01T00:00").toISOString(),
       end_at: new Date("2025-01-01T00:20").toISOString(),
-      limit: 2000,
     });
+    expect(JSON.parse(String(syncCall?.[1]?.body))).not.toHaveProperty("limit");
     const candleCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) =>
       String(url).includes("/api/market-data/candles"),
     );
@@ -514,7 +514,7 @@ describe("ControlRoomApp", () => {
     expect(candleParams.get("timeframe")).toBe("5m");
     expect(candleParams.get("start_at")).toBe(new Date("2025-01-01T00:00").toISOString());
     expect(candleParams.get("end_at")).toBe(new Date("2025-01-01T00:20").toISOString());
-    expect(candleParams.get("limit")).toBe("2000");
+    expect(candleParams.has("limit")).toBe(false);
     await waitFor(() => {
       expect(screen.getByText("5개")).toBeInTheDocument();
     });

@@ -364,6 +364,60 @@ def test_binance_sync_endpoint_fetches_and_upserts_ohlcv(tmp_path):
   assert jobs[0].fetched_candle_count == 5
 
 
+def test_market_data_candles_explicit_start_can_return_full_range_without_limit(tmp_path):
+  start_at = datetime(2025, 5, 1, tzinfo=UTC)
+  candle_count = 6_000
+  end_at = start_at + timedelta(minutes=15 * (candle_count - 1))
+  exchange = FakeOhlcvExchange(
+    start_at=start_at,
+    candle_count=candle_count,
+    timeframe=timedelta(minutes=15),
+  )
+  market_data = CcxtMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market.sqlite3'}",
+    tracked_symbols=("BTC/USDT",),
+    default_candle_limit=500,
+    historical_candle_limit=500,
+    exchange_batch_limit=1_000,
+    exchange=exchange,
+    clock=lambda: end_at + timedelta(hours=1),
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    runs=InMemoryCoreRepository(),
+  )
+  client = build_application_client(app)
+
+  sync_response = client.post(
+    "/api/market-data/sync",
+    json={
+      "symbol": "BTC/USDT",
+      "timeframe": "15m",
+      "start_at": start_at.isoformat().replace("+00:00", "Z"),
+      "end_at": end_at.isoformat().replace("+00:00", "Z"),
+    },
+  )
+  candle_response = client.get(
+    "/api/market-data/candles",
+    params={
+      "symbol": "BTC/USDT",
+      "timeframe": "15m",
+      "start_at": start_at.isoformat().replace("+00:00", "Z"),
+      "end_at": end_at.isoformat().replace("+00:00", "Z"),
+    },
+  )
+
+  assert sync_response.status_code == 200
+  assert sync_response.json()["candle_count"] == candle_count
+  assert candle_response.status_code == 200
+  candles = candle_response.json()["candles"]
+  assert candle_response.json()["limit"] is None
+  assert len(candles) == candle_count
+  assert candles[0]["timestamp"] == start_at.isoformat().replace("+00:00", "Z")
+  assert candles[-1]["timestamp"] == end_at.isoformat().replace("+00:00", "Z")
+
+
 def test_binance_sync_accepts_weekly_and_monthly_ohlcv(tmp_path):
   for timeframe, start_at, candle_times in (
     (

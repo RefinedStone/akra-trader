@@ -539,7 +539,7 @@ export default function App() {
         timeframe: result.timeframe,
         start_at: queryState.start_at,
         end_at: queryState.end_at,
-        limit: String(payload.limit),
+        limit: String(payload.limit ?? normalizeCandleLimit(queryState.limit)),
       });
       setCandles((current) =>
         options.appendOlder ? mergeCandles(response.candles, current) : mergeCandles(response.candles),
@@ -3040,12 +3040,13 @@ function buildMarketDataPayload(
   if (startAt && endAt && new Date(endAt).getTime() < new Date(startAt).getTime()) {
     endAt = startAt;
   }
+  const limit = normalizeCandleLimit(queryState.limit);
   return {
     symbol: queryState.symbol,
     timeframe: queryState.timeframe,
     start_at: startAt,
     end_at: endAt,
-    limit: normalizeCandleLimit(queryState.limit),
+    ...(startAt ? {} : { limit }),
   };
 }
 
@@ -3057,8 +3058,10 @@ function buildMarketDataQuery(
   const query = new URLSearchParams({
     symbol: payload.symbol,
     timeframe: payload.timeframe,
-    limit: String(payload.limit),
   });
+  if (payload.limit !== undefined) {
+    query.set("limit", String(payload.limit));
+  }
   if (payload.start_at) {
     query.set("start_at", payload.start_at);
   }

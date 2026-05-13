@@ -173,7 +173,7 @@ def create_router(container: Container) -> APIRouter:
     timeframe: str = Query("5m", min_length=1),
     start_at: datetime | None = None,
     end_at: datetime | None = None,
-    limit: int = Query(500, ge=1, le=5_000),
+    limit: int | None = Query(default=None, ge=1, le=200_000),
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
     aligned_start_at, aligned_end_at = _align_time_range(
@@ -181,17 +181,20 @@ def create_router(container: Container) -> APIRouter:
       start_at=_ensure_utc(start_at),
       end_at=_ensure_utc(end_at),
     )
+    effective_limit = limit
+    if effective_limit is None and aligned_start_at is None:
+      effective_limit = 500
     candles = app.get_market_data_candles(
       symbol=symbol.strip(),
       timeframe=timeframe.strip(),
       start_at=aligned_start_at,
       end_at=aligned_end_at,
-      limit=limit,
+      limit=effective_limit,
     )
     return {
       "symbol": symbol.strip(),
       "timeframe": timeframe.strip(),
-      "limit": limit,
+      "limit": effective_limit,
       "candles": _to_json(candles),
     }
 
