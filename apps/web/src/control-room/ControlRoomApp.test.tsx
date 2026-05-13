@@ -208,6 +208,24 @@ const logFixture = {
   mode: "sandbox",
 };
 
+const llmJudgementFixture = {
+  log_id: "llm-log-1",
+  recorded_at: "2026-05-11T00:17:00Z",
+  message: "LLM judgement vetoed for binance:BTC/USDT; final action hold.",
+  severity: "info",
+  timestamp: "2026-05-11T00:15:00Z",
+  instrument_id: "binance:BTC/USDT",
+  strategy_id: "ma_cross_v1",
+  candidate: { action: "buy", confidence: 0.72, reason: "rule_entry" },
+  request: { candidate_action: "buy", selected_feature_keys: ["rsi"] },
+  response: { decision: "approve_buy", confidence: 0.9, risk_level: "low" },
+  fallback: false,
+  veto_reason: "confidence_below_threshold",
+  final_action: "hold",
+  min_confidence: 0.95,
+  status: "vetoed",
+};
+
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return Promise.resolve({
     ok,
@@ -273,6 +291,9 @@ describe("ControlRoomApp", () => {
         if (url.endsWith("/api/runs/run-1/positions")) {
           return jsonResponse({ positions: [positionFixture] });
         }
+        if (url.endsWith("/api/runs/run-1/llm-judgements")) {
+          return jsonResponse({ judgements: [llmJudgementFixture] });
+        }
         if (url.endsWith("/api/runs/run-1")) {
           return jsonResponse(sandboxRun);
         }
@@ -281,6 +302,9 @@ describe("ControlRoomApp", () => {
         }
         if (url.endsWith("/api/runs/run-backtest/positions")) {
           return jsonResponse({ positions: [] });
+        }
+        if (url.endsWith("/api/runs/run-backtest/llm-judgements")) {
+          return jsonResponse({ judgements: [] });
         }
         if (url.endsWith("/api/runs/run-backtest")) {
           return jsonResponse(backtestRun);
@@ -294,6 +318,9 @@ describe("ControlRoomApp", () => {
         }
         if (runs.some((run) => url.endsWith(`/api/runs/${run.run_id}/positions`))) {
           return jsonResponse({ positions: [] });
+        }
+        if (runs.some((run) => url.endsWith(`/api/runs/${run.run_id}/llm-judgements`))) {
+          return jsonResponse({ judgements: [] });
         }
         if (url.endsWith("/api/runs")) {
           return jsonResponse({ runs });
@@ -639,6 +666,11 @@ describe("ControlRoomApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "로그" }));
     expect(screen.getByText("선택 로그 상세")).toBeInTheDocument();
     expect(screen.getAllByText("Processed closed candle for BTC/USDT.").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "LLM" }));
+    expect(screen.getByText("최근 LLM 판정")).toBeInTheDocument();
+    expect(screen.getAllByText("confidence 미달").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("HOLD").length).toBeGreaterThan(0);
   });
 
   it("shows clickable run detail tabs and backtest results", async () => {

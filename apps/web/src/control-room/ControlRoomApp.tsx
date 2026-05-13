@@ -12,7 +12,7 @@ import type {
 } from "lightweight-charts";
 
 type SectionId = "data" | "backtest" | "sandbox" | "live" | "performance" | "logs" | "llm";
-type DetailTabId = "overview" | "orders" | "positions" | "metrics" | "logs";
+type DetailTabId = "overview" | "orders" | "positions" | "metrics" | "logs" | "llm";
 
 type RunConfigSummary = {
   symbols?: string[];
@@ -60,6 +60,24 @@ type OperationLog = {
   severity: string;
   run_id?: string | null;
   mode?: string | null;
+};
+
+type LlmJudgementTrace = {
+  log_id: string;
+  recorded_at: string;
+  message: string;
+  severity: string;
+  timestamp?: string;
+  instrument_id?: string;
+  strategy_id?: string;
+  candidate?: Record<string, unknown> | null;
+  request?: Record<string, unknown> | null;
+  response?: Record<string, unknown> | null;
+  fallback?: boolean;
+  veto_reason?: string | null;
+  final_action?: string;
+  min_confidence?: number | null;
+  status?: string;
 };
 
 type Strategy = {
@@ -240,6 +258,7 @@ const detailTabs: Array<{ id: DetailTabId; label: string }> = [
   { id: "positions", label: "포지션" },
   { id: "metrics", label: "지표" },
   { id: "logs", label: "로그" },
+  { id: "llm", label: "LLM" },
 ];
 
 const movingAverageLines = [
@@ -311,6 +330,7 @@ export default function App() {
   const [orders, setOrders] = useState<unknown[]>([]);
   const [positions, setPositions] = useState<unknown[]>([]);
   const [logs, setLogs] = useState<OperationLog[]>([]);
+  const [llmJudgements, setLlmJudgements] = useState<LlmJudgementTrace[]>([]);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -416,6 +436,7 @@ export default function App() {
       setSelectedRun(null);
       setOrders([]);
       setPositions([]);
+      setLlmJudgements([]);
       return;
     }
     void loadRunDetail(selectedRunId);
@@ -483,14 +504,16 @@ export default function App() {
   };
 
   const loadRunDetail = async (runId: string) => {
-    const [run, orderResponse, positionResponse] = await Promise.all([
+    const [run, orderResponse, positionResponse, judgementResponse] = await Promise.all([
       fetchJson<RunSummary>(`/runs/${runId}`),
       fetchJson<{ orders: unknown[] }>(`/runs/${runId}/orders`),
       fetchJson<{ positions: unknown[] }>(`/runs/${runId}/positions`),
+      fetchJson<{ judgements: LlmJudgementTrace[] }>(`/runs/${runId}/llm-judgements`),
     ]);
     setSelectedRun(run);
     setOrders(orderResponse.orders);
     setPositions(positionResponse.positions);
+    setLlmJudgements(judgementResponse.judgements);
   };
 
   const loadCandles = async (
@@ -711,6 +734,7 @@ export default function App() {
           {activeSection !== "performance" ? (
             <RunDetailPanel
               logs={logs.filter((log) => log.run_id === selectedRunId)}
+              llmJudgements={llmJudgements}
               orders={orders}
               positions={positions}
               run={selectedRun}
@@ -1979,6 +2003,7 @@ function LlmSection({
 }
 
 function RunDetailPanel({
+  llmJudgements,
   logs,
   onStop,
   orders,
@@ -1987,6 +2012,7 @@ function RunDetailPanel({
   selectedOrderId,
   setSelectedOrderId,
 }: {
+  llmJudgements: LlmJudgementTrace[];
   logs: OperationLog[];
   onStop: () => void;
   orders: unknown[];
@@ -2044,6 +2070,7 @@ function RunDetailPanel({
           {activeTab === "positions" ? <PositionsDetail positions={positions} /> : null}
           {activeTab === "metrics" ? <RunMetricsDetail metrics={run.metrics} /> : null}
           {activeTab === "logs" ? <RunLogsDetail logs={logs} /> : null}
+          {activeTab === "llm" ? <RunLlmJudgementsDetail judgements={llmJudgements} /> : null}
         </>
       ) : (
         <p className="muted">백테스트, 샌드박스, 실전 매매에서 실행을 선택하세요.</p>
@@ -2389,6 +2416,85 @@ function RunLogsDetail({ logs }: { logs: OperationLog[] }) {
                 <DetailLine label="소스" value={selectedLog.layer} />
                 <DetailLine label="이벤트" value={formatEventType(selectedLog.event_type)} />
                 <DetailLine label="메시지" value={selectedLog.message} />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RunLlmJudgementsDetail({ judgements }: { judgements: LlmJudgementTrace[] }) {
+  const vetoed = judgements.filter((item) => Boolean(item.veto_reason)).length;
+  const fallback = judgements.filter((item) => item.fallback).length;
+  const approved = judgements.filter((item) => item.status === "approved").length;
+  const selected = judgements[0];
+  return (
+    <div className="detail-section">
+      <div className="detail-stat-grid">
+        <DetailStat label="판정" value={formatNumber(judgements.length)} />
+        <DetailStat
+          label="승인"
+          tone={approved > 0 ? "positive" : "neutral"}
+          value={formatNumber(approved)}
+        />
+        <DetailStat
+          label="Veto"
+          tone={vetoed > 0 ? "negative" : "neutral"}
+          value={formatNumber(vetoed)}
+        />
+        <DetailStat
+          label="Fallback"
+          tone={fallback > 0 ? "negative" : "neutral"}
+          value={formatNumber(fallback)}
+        />
+      </div>
+      {judgements.length === 0 ? (
+        <EmptyDetailState message="LLM 판정 기록이 없습니다." />
+      ) : (
+        <div className="detail-split logs-split">
+          <div className="detail-table-wrap">
+            <table className="detail-table">
+              <thead>
+                <tr>
+                  <th>시간</th>
+                  <th>후보</th>
+                  <th>응답</th>
+                  <th>최종</th>
+                  <th>Veto 사유</th>
+                </tr>
+              </thead>
+              <tbody>
+                {judgements.map((judgement) => {
+                  const candidate = asRecord(judgement.candidate);
+                  const response = asRecord(judgement.response);
+                  return (
+                    <tr key={judgement.log_id}>
+                      <td>{formatTimestamp(judgement.timestamp ?? judgement.recorded_at)}</td>
+                      <td>{formatSignalAction(recordText(candidate, ["action"], "-"))}</td>
+                      <td>{formatLlmDecision(recordText(response, ["decision"], "-"))}</td>
+                      <td>{formatSignalAction(judgement.final_action ?? "-")}</td>
+                      <td>{formatVetoReason(judgement.veto_reason)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {selected ? (
+            <div className="detail-card">
+              <div className="detail-card-heading">
+                <strong>최근 LLM 판정</strong>
+                <small>{formatTimestamp(selected.timestamp ?? selected.recorded_at)}</small>
+              </div>
+              <div className="detail-list flush">
+                <DetailLine label="상태" value={formatLlmJudgementStatus(selected.status)} />
+                <DetailLine label="심볼" value={formatInstrument(selected.instrument_id ?? "-")} />
+                <DetailLine label="전략" value={selected.strategy_id ?? "-"} />
+                <DetailLine label="최소 confidence" value={formatMetricValue(selected.min_confidence)} />
+                <DetailLine label="Fallback" value={selected.fallback ? "사용" : "미사용"} />
+                <DetailLine label="Veto 사유" value={formatVetoReason(selected.veto_reason)} />
               </div>
             </div>
           ) : null}
@@ -3328,6 +3434,67 @@ function formatEventType(value: string) {
       return "실전 매매 실패";
     case "run_stopped":
       return "실행 중지";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function formatLlmDecision(value?: string | null) {
+  switch (value) {
+    case "approve_buy":
+      return "BUY 승인";
+    case "approve_sell":
+      return "SELL 승인";
+    case "no_trade":
+      return "거래 안 함";
+    default:
+      return value ? value.replaceAll("_", " ") : "-";
+  }
+}
+
+function formatLlmJudgementStatus(value?: string | null) {
+  switch (value) {
+    case "approved":
+      return "승인";
+    case "vetoed":
+      return "Veto";
+    case "skipped":
+      return "건너뜀";
+    default:
+      return value ? value.replaceAll("_", " ") : "-";
+  }
+}
+
+function formatSignalAction(value?: string | null) {
+  switch (value) {
+    case "buy":
+      return "BUY";
+    case "sell":
+      return "SELL";
+    case "hold":
+      return "HOLD";
+    default:
+      return value ? value.toUpperCase() : "-";
+  }
+}
+
+function formatVetoReason(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+  switch (value) {
+    case "confidence_below_threshold":
+      return "confidence 미달";
+    case "high_risk":
+      return "고위험";
+    case "stale_data":
+      return "오래된 데이터";
+    case "decision_conflict":
+      return "판정 충돌";
+    case "fallback":
+      return "fallback";
+    case "no_trade":
+      return "거래 안 함";
     default:
       return value.replaceAll("_", " ");
   }
