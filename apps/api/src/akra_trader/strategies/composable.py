@@ -56,6 +56,22 @@ class EmaFeature(Feature):
 
 
 @dataclass(frozen=True)
+class SmaFeature(Feature):
+  source: str
+  name: str
+  window_parameter: str
+  default_window: int
+
+  def apply(self, frame: pd.DataFrame, parameters: dict[str, Any]) -> pd.DataFrame:
+    window = _parameter_int(parameters, self.window_parameter, self.default_window)
+    frame[self.name] = frame[self.source].rolling(window=window, min_periods=1).mean()
+    return frame
+
+  def warmup_bars(self) -> int:
+    return self.default_window
+
+
+@dataclass(frozen=True)
 class RsiFeature(Feature):
   source: str
   name: str
