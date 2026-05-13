@@ -96,6 +96,7 @@ type StrategyParameterSpec = {
   maximum?: number;
   unit?: string;
   semantic_hint?: string;
+  description_ko?: string;
 };
 
 type MarketStatus = {
@@ -1926,7 +1927,8 @@ function StrategyParameterField({
   value: unknown;
 }) {
   const type = String(spec.type ?? typeof value);
-  const hint = [spec.semantic_hint, spec.unit ? `단위: ${spec.unit}` : ""].filter(Boolean).join(" · ");
+  const description = spec.description_ko ?? spec.semantic_hint;
+  const hint = [description, spec.unit ? `단위: ${spec.unit}` : ""].filter(Boolean).join(" · ");
   if (type === "boolean") {
     return (
       <label className="parameter-field parameter-toggle">
@@ -3216,6 +3218,7 @@ function normalizeParameterSpec(spec: unknown): StrategyParameterSpec {
     maximum: typeof record.maximum === "number" ? record.maximum : undefined,
     unit: typeof record.unit === "string" ? record.unit : undefined,
     semantic_hint: typeof record.semantic_hint === "string" ? record.semantic_hint : undefined,
+    description_ko: typeof record.description_ko === "string" ? record.description_ko : undefined,
   };
 }
 

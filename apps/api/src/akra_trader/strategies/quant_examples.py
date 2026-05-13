@@ -38,6 +38,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 2,
           "unit": "bars",
           "semantic_hint": "Fast trend leg.",
+          "description_ko": "단기 EMA 기간입니다. 값이 작을수록 최근 가격 변화에 더 빠르게 반응합니다.",
         },
         "slow_ema_window": {
           "type": "integer",
@@ -45,6 +46,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 5,
           "unit": "bars",
           "semantic_hint": "Slow trend regime baseline.",
+          "description_ko": "장기 EMA 기간입니다. 단기 EMA가 이 값보다 위에 있을 때 상승 추세로 봅니다.",
         },
         "rsi_window": {
           "type": "integer",
@@ -52,6 +54,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 2,
           "unit": "bars",
           "semantic_hint": "Momentum oscillator lookback.",
+          "description_ko": "RSI 계산 기간입니다. 가격 모멘텀과 눌림 회복 여부를 판단하는 기준입니다.",
         },
         "atr_window": {
           "type": "integer",
@@ -59,6 +62,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 2,
           "unit": "bars",
           "semantic_hint": "Volatility risk lookback.",
+          "description_ko": "ATR 변동성 계산 기간입니다. 손절, 익절, 포지션 크기 산정에 사용됩니다.",
         },
         "rsi_entry_level": {
           "type": "number",
@@ -66,6 +70,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 0,
           "maximum": 100,
           "semantic_hint": "RSI must cross above this level to enter.",
+          "description_ko": "진입 RSI 기준선입니다. RSI가 이 값을 아래에서 위로 돌파해야 매수 후보가 됩니다.",
         },
         "rsi_overheat_level": {
           "type": "number",
@@ -73,6 +78,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 0,
           "maximum": 100,
           "semantic_hint": "Blocks fresh entries when momentum is overheated.",
+          "description_ko": "과열 차단 기준입니다. RSI가 이 값 이상이면 신규 진입을 막습니다.",
         },
         "rsi_exit_level": {
           "type": "number",
@@ -80,6 +86,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 0,
           "maximum": 100,
           "semantic_hint": "RSI cross below this level exits an open position.",
+          "description_ko": "청산 RSI 기준선입니다. 보유 중 RSI가 이 값을 아래로 이탈하면 청산 후보가 됩니다.",
         },
         "risk_fraction": {
           "type": "number",
@@ -87,6 +94,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 0,
           "maximum": 1,
           "semantic_hint": "Portfolio risk budget per trade.",
+          "description_ko": "거래 1회당 감수할 포트폴리오 위험 비율입니다. 0.01은 1% 위험 예산입니다.",
         },
         "max_position_fraction": {
           "type": "number",
@@ -94,23 +102,27 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 0,
           "maximum": 1,
           "semantic_hint": "Maximum notional allocation for this strategy.",
+          "description_ko": "전략이 사용할 수 있는 최대 포지션 비중입니다. 0.5는 자산의 50% 한도입니다.",
         },
         "atr_stop_multiple": {
           "type": "number",
           "default": 2.0,
           "minimum": 0.1,
           "semantic_hint": "ATR multiple used for stop distance.",
+          "description_ko": "손절 거리에 곱할 ATR 배수입니다. 값이 클수록 손절 폭이 넓어집니다.",
         },
         "atr_take_profit_multiple": {
           "type": "number",
           "default": 3.0,
           "minimum": 0.1,
           "semantic_hint": "ATR multiple used for take-profit distance.",
+          "description_ko": "익절 거리에 곱할 ATR 배수입니다. 값이 클수록 목표 수익 폭이 넓어집니다.",
         },
         "use_llm_regime_hint": {
           "type": "boolean",
           "default": True,
           "semantic_hint": "Calls context.llm.function() as an optional regime overlay.",
+          "description_ko": "LLM 시장 국면 힌트를 보조 필터로 사용할지 여부입니다. 실패하면 deterministic 규칙으로 되돌아갑니다.",
         },
       },
       description=(

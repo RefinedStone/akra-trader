@@ -42,6 +42,7 @@ const strategyResponse = {
           minimum: 2,
           unit: "bars",
           semantic_hint: "Fast trend leg.",
+          description_ko: "단기 EMA 기간입니다. 값이 작을수록 최근 가격 변화에 더 빠르게 반응합니다.",
         },
         risk_fraction: {
           type: "number",
@@ -49,11 +50,13 @@ const strategyResponse = {
           minimum: 0,
           maximum: 1,
           semantic_hint: "Portfolio risk budget per trade.",
+          description_ko: "거래 1회당 감수할 포트폴리오 위험 비율입니다. 0.01은 1% 위험 예산입니다.",
         },
         use_llm_regime_hint: {
           type: "boolean",
           default: true,
           semantic_hint: "Calls context.llm.function() as an optional regime overlay.",
+          description_ko: "LLM 시장 국면 힌트를 보조 필터로 사용할지 여부입니다.",
         },
       },
     },
@@ -521,6 +524,8 @@ describe("ControlRoomApp", () => {
     expect(screen.getByLabelText(/fast_ema_window/)).toHaveValue(20);
     expect(screen.getByLabelText(/risk_fraction/)).toHaveValue(0.01);
     expect(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ })).toBeChecked();
+    expect(screen.getByText(/단기 EMA 기간입니다/)).toBeInTheDocument();
+    expect(screen.getByText(/거래 1회당 감수할 포트폴리오 위험 비율/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/fast_ema_window/), { target: { value: "12" } });
     fireEvent.change(screen.getByLabelText(/risk_fraction/), { target: { value: "0.02" } });

@@ -127,6 +127,7 @@ def test_health_and_strategy_surface(tmp_path):
   assert quant_strategy["runtime"] == "native_composable"
   assert quant_strategy["catalog_semantics"]["strategy_kind"] == "composable_quant"
   assert "risk_fraction" in quant_strategy["parameter_schema"]
+  assert "포트폴리오 위험 비율" in quant_strategy["parameter_schema"]["risk_fraction"]["description_ko"]
   assert strategies["llm_strategy"]["provider_adapter"] is None
   assert "paper" not in {mode.value for mode in RunMode}
 
