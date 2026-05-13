@@ -30,8 +30,8 @@ const strategyResponse = {
       },
     },
     {
-      strategy_id: "rsi_atr_trend_pullback_v1",
-      name: "RSI ATR Trend Pullback",
+      strategy_id: "rsi_atr_oversold_peak_turn_v1",
+      name: "RSI ATR Oversold Peak Turn",
       runtime: "native_composable",
       lifecycle: { stage: "experimental" },
       supported_timeframes: ["5m"],
@@ -43,6 +43,14 @@ const strategyResponse = {
           unit: "bars",
           semantic_hint: "Fast trend leg.",
           description_ko: "단기 EMA 기간입니다. 값이 작을수록 최근 가격 변화에 더 빠르게 반응합니다.",
+        },
+        rsi_oversold_level: {
+          type: "number",
+          default: 30,
+          minimum: 0,
+          maximum: 100,
+          semantic_hint: "Previous RSI peak must be below this oversold ceiling.",
+          description_ko: "과매도 기준선입니다. 직전 RSI 고점이 이 값보다 낮은 과매도 구간 안에 있을 때만 매수 후보가 됩니다.",
         },
         risk_fraction: {
           type: "number",
@@ -518,13 +526,15 @@ describe("ControlRoomApp", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /백테스트/ }));
     fireEvent.change(screen.getByRole("combobox", { name: "전략" }), {
-      target: { value: "rsi_atr_trend_pullback_v1" },
+      target: { value: "rsi_atr_oversold_peak_turn_v1" },
     });
 
     expect(screen.getByLabelText(/fast_ema_window/)).toHaveValue(20);
+    expect(screen.getByLabelText(/rsi_oversold_level/)).toHaveValue(30);
     expect(screen.getByLabelText(/risk_fraction/)).toHaveValue(0.01);
     expect(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ })).toBeChecked();
     expect(screen.getByText(/단기 EMA 기간입니다/)).toBeInTheDocument();
+    expect(screen.getByText(/직전 RSI 고점/)).toBeInTheDocument();
     expect(screen.getByText(/거래 1회당 감수할 포트폴리오 위험 비율/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/fast_ema_window/), { target: { value: "12" } });
@@ -542,7 +552,7 @@ describe("ControlRoomApp", () => {
       String(url).endsWith("/api/runs/backtests"),
     );
     expect(JSON.parse(String(runCall?.[1]?.body))).toMatchObject({
-      strategy_id: "rsi_atr_trend_pullback_v1",
+      strategy_id: "rsi_atr_oversold_peak_turn_v1",
       parameters: {
         fast_ema_window: 12,
         risk_fraction: 0.02,

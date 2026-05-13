@@ -10,7 +10,6 @@ from akra_trader.strategies.composable import AnyOf
 from akra_trader.strategies.composable import AtrFeature
 from akra_trader.strategies.composable import AtrRiskSizing
 from akra_trader.strategies.composable import ComposableStrategy
-from akra_trader.strategies.composable import CrossAbove
 from akra_trader.strategies.composable import CrossBelow
 from akra_trader.strategies.composable import EmaFeature
 from akra_trader.strategies.composable import GreaterThan
@@ -22,11 +21,11 @@ from akra_trader.strategies.composable import StrategySpec
 from akra_trader.strategies.composable import TrendRegime
 
 
-class RsiAtrTrendPullbackStrategy(ComposableStrategy):
+class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
   spec = StrategySpec(
     metadata=StrategyMetadata(
-      strategy_id="rsi_atr_trend_pullback_v1",
-      name="RSI ATR Trend Pullback",
+      strategy_id="rsi_atr_oversold_peak_turn_v1",
+      name="RSI ATR Oversold Peak Turn",
       version="1.0.0",
       runtime="native_composable",
       asset_types=(AssetType.CRYPTO,),
@@ -54,7 +53,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "minimum": 2,
           "unit": "bars",
           "semantic_hint": "Momentum oscillator lookback.",
-          "description_ko": "RSI 계산 기간입니다. 가격 모멘텀과 눌림 회복 여부를 판단하는 기준입니다.",
+          "description_ko": "RSI 계산 기간입니다. 과매도 구간과 RSI 고점 꺾임을 판단하는 기준입니다.",
         },
         "atr_window": {
           "type": "integer",
@@ -64,21 +63,13 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "semantic_hint": "Volatility risk lookback.",
           "description_ko": "ATR 변동성 계산 기간입니다. 손절, 익절, 포지션 크기 산정에 사용됩니다.",
         },
-        "rsi_entry_level": {
+        "rsi_oversold_level": {
           "type": "number",
-          "default": 50,
+          "default": 30,
           "minimum": 0,
           "maximum": 100,
-          "semantic_hint": "RSI must cross above this level to enter.",
-          "description_ko": "진입 RSI 기준선입니다. RSI가 이 값을 아래에서 위로 돌파해야 매수 후보가 됩니다.",
-        },
-        "rsi_overheat_level": {
-          "type": "number",
-          "default": 70,
-          "minimum": 0,
-          "maximum": 100,
-          "semantic_hint": "Blocks fresh entries when momentum is overheated.",
-          "description_ko": "과열 차단 기준입니다. RSI가 이 값 이상이면 신규 진입을 막습니다.",
+          "semantic_hint": "Previous RSI peak must be below this oversold ceiling.",
+          "description_ko": "과매도 기준선입니다. 직전 RSI 고점이 이 값보다 낮은 과매도 구간 안에 있을 때만 매수 후보가 됩니다.",
         },
         "rsi_exit_level": {
           "type": "number",
@@ -126,7 +117,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
         },
       },
       description=(
-        "Composable sample strategy: EMA trend regime, RSI pullback trigger, ATR risk sizing, "
+        "Composable sample strategy: EMA uptrend regime, RSI oversold peak turn-down entry, ATR risk sizing, "
         "and an optional llm.function() regime hint."
       ),
       lifecycle=StrategyLifecycle(stage="experimental"),
@@ -137,14 +128,14 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
           "The strategy logic is declarative and composed from SDK primitives."
         ),
         parameter_contract="Typed parameter schema drives defaults, runtime overrides, and future UI controls.",
-        source_descriptor="akra_trader.strategies.quant_examples:RsiAtrTrendPullbackStrategy",
+        source_descriptor="akra_trader.strategies.quant_examples:RsiAtrOversoldPeakTurnStrategy",
         operator_notes=(
-          "Sample strategy for architecture validation, not a production alpha claim.",
+          "Long entry requires EMA uptrend plus a local RSI peak that forms below the oversold ceiling and then turns down.",
           "LLM hints are optional overlays and fall back to deterministic systematic rules.",
         ),
       ),
       version_lineage=("1.0.0",),
-      entrypoint="akra_trader.strategies.quant_examples:RsiAtrTrendPullbackStrategy",
+      entrypoint="akra_trader.strategies.quant_examples:RsiAtrOversoldPeakTurnStrategy",
     ),
     features=(
       EmaFeature("close", "ema_fast", "fast_ema_window", 20),
@@ -161,8 +152,9 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
     entry=AllOf(
       (
         GreaterThan("ema_fast", "ema_slow"),
-        CrossAbove("rsi", ParameterRef("rsi_entry_level", 50)),
-        LessThan("rsi", ParameterRef("rsi_overheat_level", 70)),
+        LessThan("previous_rsi", ParameterRef("rsi_oversold_level", 30)),
+        GreaterThan("previous_rsi", "previous2_rsi"),
+        GreaterThan("previous_rsi", "rsi"),
       )
     ),
     exit=AnyOf(
@@ -179,3 +171,7 @@ class RsiAtrTrendPullbackStrategy(ComposableStrategy):
       max_position_fraction=ParameterRef("max_position_fraction", 0.5),
     ),
   )
+
+
+class RsiAtrTrendPullbackStrategy(RsiAtrOversoldPeakTurnStrategy):
+  """Backward-compatible import alias for the renamed built-in strategy."""

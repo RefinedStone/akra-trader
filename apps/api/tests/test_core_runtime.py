@@ -20,11 +20,12 @@ from akra_trader.config import Settings
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import LlmFunctionLayer
 from akra_trader.domain.models import RunMode
+from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import StrategyDecisionContext
 from akra_trader.domain.models import StrategyExecutionState
 from akra_trader.main import create_app
 from akra_trader.strategies.llm import ExternalDecisionStrategy
-from akra_trader.strategies.quant_examples import RsiAtrTrendPullbackStrategy
+from akra_trader.strategies.quant_examples import RsiAtrOversoldPeakTurnStrategy
 
 
 def build_client(tmp_path, *, live_enabled: bool = False) -> TestClient:
@@ -116,16 +117,19 @@ def test_health_and_strategy_surface(tmp_path):
   strategy_ids = {strategy["strategy_id"] for strategy in strategies["strategies"]}
   assert {
     "ma_cross_v1",
-    "rsi_atr_trend_pullback_v1",
+    "rsi_atr_oversold_peak_turn_v1",
     "external_decision_template",
   }.issubset(strategy_ids)
   quant_strategy = next(
     strategy
     for strategy in strategies["strategies"]
-    if strategy["strategy_id"] == "rsi_atr_trend_pullback_v1"
+    if strategy["strategy_id"] == "rsi_atr_oversold_peak_turn_v1"
   )
   assert quant_strategy["runtime"] == "native_composable"
+  assert quant_strategy["name"] == "RSI ATR Oversold Peak Turn"
   assert quant_strategy["catalog_semantics"]["strategy_kind"] == "composable_quant"
+  assert "rsi_oversold_level" in quant_strategy["parameter_schema"]
+  assert "과매도 기준선" in quant_strategy["parameter_schema"]["rsi_oversold_level"]["description_ko"]
   assert "risk_fraction" in quant_strategy["parameter_schema"]
   assert "포트폴리오 위험 비율" in quant_strategy["parameter_schema"]["risk_fraction"]["description_ko"]
   assert strategies["llm_strategy"]["provider_adapter"] is None
@@ -164,7 +168,7 @@ def test_composable_quant_strategy_runs_as_builtin_sample(tmp_path):
   response = client.post(
     "/api/runs/backtests",
     json={
-      "strategy_id": "rsi_atr_trend_pullback_v1",
+      "strategy_id": "rsi_atr_oversold_peak_turn_v1",
       "symbol": "BTC/USDT",
       "timeframe": "5m",
       "parameters": {
@@ -179,7 +183,7 @@ def test_composable_quant_strategy_runs_as_builtin_sample(tmp_path):
 
   assert response.status_code == 200
   run = response.json()
-  assert run["strategy"]["strategy_id"] == "rsi_atr_trend_pullback_v1"
+  assert run["strategy"]["strategy_id"] == "rsi_atr_oversold_peak_turn_v1"
   assert run["strategy"]["parameter_snapshot"]["resolved"]["fast_ema_window"] == 8
   assert run["status"] == "completed"
 
@@ -539,7 +543,7 @@ def test_live_worker_polls_data_without_venue_order_submission():
 
 
 def test_composable_strategy_exposes_trace_layers_and_llm_function():
-  strategy = RsiAtrTrendPullbackStrategy()
+  strategy = RsiAtrOversoldPeakTurnStrategy()
   timestamp = datetime(2026, 5, 11, tzinfo=UTC)
   rows = []
   for index in range(80):
@@ -584,6 +588,66 @@ def test_composable_strategy_exposes_trace_layers_and_llm_function():
   assert "feature_pipeline" in envelope.trace["architecture"]["layers"]
   assert "llm_function_layer" in envelope.trace["architecture"]["layers"]
   assert envelope.trace["regime"]["trace"]["regimes"][1]["provider"] == "disabled"
+
+
+def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_peak_rolls_over():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_peak_turn_frame((24.0, 28.0, 26.0))
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.trace["entry"]["matched"] is True
+  assert envelope.context.features["previous2_rsi"] == 24.0
+  assert envelope.context.features["previous_rsi"] == 28.0
+
+
+def test_rsi_atr_oversold_peak_turn_holds_without_oversold_peak():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_peak_turn_frame((24.0, 32.0, 28.0))
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.HOLD
+  assert envelope.trace["entry"]["matched"] is False
+
+
+def _rsi_peak_turn_frame(rsi_values: tuple[float, float, float]) -> pd.DataFrame:
+  timestamp = datetime(2026, 5, 11, tzinfo=UTC)
+  closes = (100.0, 101.0, 100.5)
+  return pd.DataFrame(
+    [
+      {
+        "timestamp": timestamp + timedelta(minutes=5 * index),
+        "open": close - 0.5,
+        "high": close + 1.0,
+        "low": close - 1.0,
+        "close": close,
+        "volume": 1000.0 + index,
+        "ema_fast": 101.0 + index * 0.25,
+        "ema_slow": 99.0 + index * 0.25,
+        "rsi": rsi,
+        "atr": 2.0,
+      }
+      for index, (close, rsi) in enumerate(zip(closes, rsi_values, strict=True))
+    ]
+  )
 
 
 def test_external_decision_strategy_keeps_trace_envelope():

@@ -374,6 +374,9 @@ class ComposableStrategy(Strategy):
     previous = candles.iloc[-2]
     features = _row_features(latest)
     features.update({f"previous_{key}": value for key, value in _row_features(previous).items()})
+    if len(candles) >= 3:
+      previous2 = candles.iloc[-3]
+      features.update({f"previous2_{key}": value for key, value in _row_features(previous2).items()})
     return StrategyDecisionContext(
       timestamp=latest["timestamp"].to_pydatetime(),
       instrument_id=state.instrument_id,
