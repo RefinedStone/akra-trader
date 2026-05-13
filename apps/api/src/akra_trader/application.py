@@ -186,6 +186,7 @@ class TradingApplication:
       event_type="backtest_completed" if run.status == RunStatus.COMPLETED else "backtest_failed",
       message=f"Backtest {run.status.value} for {symbol} on {timeframe}.",
       severity="info" if run.status == RunStatus.COMPLETED else "error",
+      payload=self._build_run_completion_payload(run),
     )
     self._runs.save_run(run)
     return run
@@ -505,6 +506,12 @@ class TradingApplication:
       data=data,
       config=config,
       required_bars=required_bars,
+    )
+    self._record_backtest_window_validation(
+      run=run,
+      data=data,
+      required_bars=required_bars,
+      data_issue=data_issue,
     )
     if data_issue is not None:
       self._fail_run(run, data_issue)
@@ -947,6 +954,50 @@ class TradingApplication:
       payload=payload,
     )
 
+  def _record_backtest_window_validation(
+    self,
+    *,
+    run: RunRecord,
+    data: pd.DataFrame,
+    required_bars: int,
+    data_issue: str | None,
+  ) -> None:
+    if run.config.mode != RunMode.BACKTEST:
+      return
+
+    payload = _build_window_payload(
+      run=run,
+      data=data,
+      required_bars=required_bars,
+      validation_status="failed" if data_issue else "valid",
+      validation_message=data_issue,
+    )
+    event_type = (
+      "backtest_window_validation_failed"
+      if data_issue
+      else "backtest_window_validated"
+    )
+    self._record_log(
+      layer="backtest",
+      event_type=event_type,
+      message=_backtest_window_message(run=run, payload=payload, data_issue=data_issue),
+      severity="error" if data_issue else "info",
+      run_id=run.config.run_id,
+      mode=run.config.mode,
+      payload=payload,
+    )
+
+  def _build_run_completion_payload(self, run: RunRecord) -> dict[str, Any]:
+    return {
+      "status": run.status.value,
+      "metrics": dict(run.metrics),
+      "orders_count": len(run.orders),
+      "fills_count": len(run.fills),
+      "positions_count": len(run.positions),
+      "closed_trades_count": len(run.closed_trades),
+      "market_data": _lineage_payload(run),
+    }
+
   def _record_log(
     self,
     *,
@@ -977,6 +1028,127 @@ class TradingApplication:
     if run is None:
       raise LookupError(f"Run not found: {run_id}")
     return run
+
+
+def _build_window_payload(
+  *,
+  run: RunRecord,
+  data: pd.DataFrame,
+  required_bars: int,
+  validation_status: str,
+  validation_message: str | None,
+) -> dict[str, Any]:
+  expected_candle_count = _expected_candle_count(
+    start_at=run.config.start_at,
+    end_at=run.config.end_at,
+    timeframe=run.config.timeframe,
+  )
+  candle_count = len(data)
+  return {
+    "validation_status": validation_status,
+    "validation_message": validation_message,
+    "symbol": run.config.symbols[0] if run.config.symbols else None,
+    "timeframe": run.config.timeframe,
+    "requested_start_at": _serialize_optional_datetime(run.config.start_at),
+    "requested_end_at": _serialize_optional_datetime(run.config.end_at),
+    "effective_start_at": _effective_start_at(run=run, data=data),
+    "effective_end_at": _effective_end_at(run=run, data=data),
+    "candle_count": candle_count,
+    "expected_candle_count": expected_candle_count,
+    "candle_count_matches_expected": (
+      candle_count == expected_candle_count
+      if expected_candle_count is not None
+      else None
+    ),
+    "required_bars": required_bars,
+    "first_strategy_evaluation_at": _frame_timestamp_at(data, required_bars - 1),
+    "last_strategy_evaluation_at": _frame_timestamp_at(data, candle_count - 1),
+    "expected_evaluated_bars": max(candle_count - required_bars + 1, 0),
+    "market_data": _lineage_payload(run),
+  }
+
+
+def _lineage_payload(run: RunRecord) -> dict[str, Any] | None:
+  lineage = run.provenance.market_data
+  if lineage is None:
+    return None
+  return {
+    "provider": lineage.provider,
+    "venue": lineage.venue,
+    "symbols": list(lineage.symbols),
+    "timeframe": lineage.timeframe,
+    "requested_start_at": _serialize_optional_datetime(lineage.requested_start_at),
+    "requested_end_at": _serialize_optional_datetime(lineage.requested_end_at),
+    "effective_start_at": _serialize_optional_datetime(lineage.effective_start_at),
+    "effective_end_at": _serialize_optional_datetime(lineage.effective_end_at),
+    "candle_count": lineage.candle_count,
+    "sync_status": lineage.sync_status,
+    "reproducibility_state": lineage.reproducibility_state,
+    "dataset_identity": lineage.dataset_identity,
+    "sync_checkpoint_id": lineage.sync_checkpoint_id,
+    "issues": list(lineage.issues),
+  }
+
+
+def _backtest_window_message(
+  *,
+  run: RunRecord,
+  payload: dict[str, Any],
+  data_issue: str | None,
+) -> str:
+  symbol = run.config.symbols[0] if run.config.symbols else "unknown"
+  if data_issue:
+    return (
+      f"Backtest data window validation failed for {symbol} "
+      f"on {run.config.timeframe}: {data_issue}"
+    )
+  return (
+    f"Backtest data window validated for {symbol} on {run.config.timeframe}: "
+    f"{payload['candle_count']} candles from {payload['effective_start_at']} "
+    f"to {payload['effective_end_at']}."
+  )
+
+
+def _expected_candle_count(
+  *,
+  start_at: datetime | None,
+  end_at: datetime | None,
+  timeframe: str,
+) -> int | None:
+  if start_at is None or end_at is None or timeframe.endswith("M"):
+    return None
+  start = _ensure_utc_datetime(start_at)
+  end = _ensure_utc_datetime(end_at)
+  if end < start:
+    return 0
+  timeframe_seconds = _timeframe_seconds(timeframe)
+  return int((end - start).total_seconds() // timeframe_seconds) + 1
+
+
+def _effective_start_at(*, run: RunRecord, data: pd.DataFrame) -> str | None:
+  lineage = run.provenance.market_data
+  if lineage is not None and lineage.effective_start_at is not None:
+    return _serialize_optional_datetime(lineage.effective_start_at)
+  return _frame_timestamp_at(data, 0)
+
+
+def _effective_end_at(*, run: RunRecord, data: pd.DataFrame) -> str | None:
+  lineage = run.provenance.market_data
+  if lineage is not None and lineage.effective_end_at is not None:
+    return _serialize_optional_datetime(lineage.effective_end_at)
+  return _frame_timestamp_at(data, len(data) - 1)
+
+
+def _frame_timestamp_at(data: pd.DataFrame, index: int) -> str | None:
+  if data.empty or index < 0 or index >= len(data):
+    return None
+  return _serialize_optional_datetime(_row_timestamp(data.iloc[index]["timestamp"]))
+
+
+def _serialize_optional_datetime(value: datetime | None) -> str | None:
+  if value is None:
+    return None
+  return _ensure_utc_datetime(value).isoformat().replace("+00:00", "Z")
 
 
 def _resolve_parameters(metadata: StrategyMetadata, requested: dict[str, Any]) -> dict[str, Any]:

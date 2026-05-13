@@ -178,7 +178,13 @@ def test_backtest_create_list_detail_metrics_and_logs(tmp_path):
   assert client.get("/api/runs", params={"mode": "backtest"}).json()["runs"][0]["run_id"] == run_id
   assert client.get(f"/api/runs/{run_id}").json()["run_id"] == run_id
   assert "ending_equity" in client.get(f"/api/runs/{run_id}/metrics").json()["metrics"]
-  assert client.get(f"/api/runs/{run_id}/logs").json()["logs"][0]["event_type"] == "backtest_completed"
+  logs = client.get(f"/api/runs/{run_id}/logs").json()["logs"]
+  assert logs[0]["event_type"] == "backtest_completed"
+  assert logs[0]["payload"]["market_data"]["candle_count"] == run["market_data"]["candle_count"]
+  window_log = next(log for log in logs if log["event_type"] == "backtest_window_validated")
+  assert window_log["payload"]["validation_status"] == "valid"
+  assert window_log["payload"]["candle_count"] == run["market_data"]["candle_count"]
+  assert window_log["payload"]["first_strategy_evaluation_at"] is not None
 
 
 def test_composable_quant_strategy_runs_as_builtin_sample(tmp_path):
@@ -227,6 +233,10 @@ def test_run_request_datetimes_align_to_timeframe(tmp_path):
   assert run["config"]["start_at"] == "2025-01-01T00:20:00Z"
   assert run["config"]["end_at"] == "2025-01-01T02:15:00Z"
   assert run["status"] == "completed"
+  logs = client.get(f"/api/runs/{run['run_id']}/logs").json()["logs"]
+  window_log = next(log for log in logs if log["event_type"] == "backtest_window_validated")
+  assert window_log["payload"]["expected_candle_count"] == 24
+  assert window_log["payload"]["candle_count_matches_expected"] is True
 
 
 def test_sandbox_create_heartbeat_stop_and_log_filters(tmp_path):
