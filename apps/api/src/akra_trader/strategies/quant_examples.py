@@ -95,14 +95,20 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
         },
         "entry_min_trend_spread_atr": {
           "type": "number",
-          "default": 0.25,
+          "default": 0.5,
           "minimum": 0,
           "semantic_hint": "Minimum fast/slow EMA spread measured in ATR units for BUY.",
           "description_ko": "매수 추세 강도 최소값입니다. 단기 EMA와 장기 EMA 간격이 ATR의 이 배수 이상일 때만 매수합니다.",
         },
-        "entry_require_price_above_slow_ema": {
+        "entry_enable_rsi_recovery": {
           "type": "boolean",
           "default": True,
+          "semantic_hint": "Allows BUY when RSI rebounds from below the oversold level.",
+          "description_ko": "RSI가 과매도권에서 반등할 때도 매수를 허용합니다. 매수 기회를 늘리는 진입 패턴입니다.",
+        },
+        "entry_require_price_above_slow_ema": {
+          "type": "boolean",
+          "default": False,
           "semantic_hint": "Requires close to stay above the slow EMA before BUY.",
           "description_ko": "매수 전 현재가가 장기 EMA 위에 있어야 하는지 여부입니다. 약한 추세에서의 조기 진입을 줄입니다.",
         },
@@ -165,8 +171,8 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
         parameter_contract="Typed parameter schema drives defaults, runtime overrides, and future UI controls.",
         source_descriptor="akra_trader.strategies.quant_examples:RsiAtrOversoldPeakTurnStrategy",
         operator_notes=(
-          "Long entry requires EMA uptrend, enough EMA spread versus ATR, "
-          "price above the slow EMA, and an oversold RSI peak turn.",
+          "Long entry supports oversold RSI peak-turn and oversold RSI recovery patterns, "
+          "with optional trend-strength filters.",
           "LLM hints are optional overlays and fall back to deterministic systematic rules.",
         ),
       ),
@@ -297,16 +303,49 @@ def _rsi_atr_entry_evaluation(
   ema_fast = _feature_value(context, "ema_fast")
   ema_slow = _feature_value(context, "ema_slow")
   atr = _feature_value(context, "atr")
+  rsi = _feature_value(context, "rsi")
+  previous_rsi = _feature_value(context, "previous_rsi")
+  rsi_oversold_level = _clamped_parameter(
+    context,
+    "rsi_oversold_level",
+    30.0,
+    minimum=0.0,
+    maximum=100.0,
+  )
   min_spread_atr = _clamped_parameter(
     context,
     "entry_min_trend_spread_atr",
-    0.25,
+    0.5,
     minimum=0.0,
     maximum=10.0,
   )
+  recovery_enabled = bool(context.state.parameters.get("entry_enable_rsi_recovery", True))
   require_price_above_slow = bool(
-    context.state.parameters.get("entry_require_price_above_slow_ema", True)
+    context.state.parameters.get("entry_require_price_above_slow_ema", False)
   )
+  recovery_matched = (
+    recovery_enabled
+    and previous_rsi is not None
+    and rsi is not None
+    and previous_rsi < rsi_oversold_level
+    and rsi > previous_rsi
+  )
+  patterns = {
+    "oversold_peak_turn": {
+      "matched": rule_matched,
+      "rsi": rsi,
+      "previous_rsi": previous_rsi,
+      "rsi_oversold_level": rsi_oversold_level,
+    },
+    "rsi_recovery": {
+      "matched": recovery_matched,
+      "enabled": recovery_enabled,
+      "rsi": rsi,
+      "previous_rsi": previous_rsi,
+      "rsi_oversold_level": rsi_oversold_level,
+    },
+  }
+  pattern_matched = any(bool(details["matched"]) for details in patterns.values())
   trend_spread = (
     ema_fast - ema_slow
     if ema_fast is not None and ema_slow is not None
@@ -345,21 +384,25 @@ def _rsi_atr_entry_evaluation(
   failed_filters = tuple(
     name for name, details in filters.items() if not bool(details["passed"])
   )
-  matched = regime_allowed and rule_matched and not failed_filters
+  matched = regime_allowed and pattern_matched and not failed_filters
   if not regime_allowed:
     reason = "entry_regime_blocked"
-  elif not rule_matched:
-    reason = "entry_base_rule_not_matched"
+  elif not pattern_matched:
+    reason = "entry_pattern_not_matched"
   elif failed_filters:
     reason = f"entry_filters_failed:{','.join(failed_filters)}"
   else:
-    reason = "entry_conditions_met"
+    matched_patterns = ",".join(
+      name for name, details in patterns.items() if bool(details["matched"])
+    )
+    reason = f"entry_conditions_met:{matched_patterns}"
   return {
     "matched": matched,
     "reason": reason,
-    "rule_matched": rule_matched,
+    "rule_matched": pattern_matched,
     "regime_allowed": regime_allowed,
     "rule": rule,
+    "patterns": patterns,
     "filters": filters,
   }
 

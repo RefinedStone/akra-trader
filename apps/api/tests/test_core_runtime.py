@@ -146,12 +146,13 @@ def test_health_and_strategy_surface(tmp_path):
   assert "과매도 기준선" in quant_strategy["parameter_schema"]["rsi_oversold_level"]["description_ko"]
   assert "risk_fraction" in quant_strategy["parameter_schema"]
   assert "포트폴리오 위험 비율" in quant_strategy["parameter_schema"]["risk_fraction"]["description_ko"]
-  assert quant_strategy["parameter_schema"]["entry_min_trend_spread_atr"]["default"] == 0.25
+  assert quant_strategy["parameter_schema"]["entry_min_trend_spread_atr"]["default"] == 0.5
   assert (
     "매수 추세 강도"
     in quant_strategy["parameter_schema"]["entry_min_trend_spread_atr"]["description_ko"]
   )
-  assert quant_strategy["parameter_schema"]["entry_require_price_above_slow_ema"]["default"] is True
+  assert quant_strategy["parameter_schema"]["entry_enable_rsi_recovery"]["default"] is True
+  assert quant_strategy["parameter_schema"]["entry_require_price_above_slow_ema"]["default"] is False
   assert quant_strategy["parameter_schema"]["exit_score_threshold"]["default"] == 0.75
   assert (
     "SELL 점수 임계값"
@@ -715,6 +716,25 @@ def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_peak_rolls_over():
   assert envelope.context.features["previous_rsi"] == 28.0
 
 
+def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_recovers():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_peak_turn_frame((24.0, 26.0, 31.0))
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.trace["entry"]["patterns"]["rsi_recovery"]["matched"] is True
+  assert envelope.trace["entry"]["reason"] == "entry_conditions_met:rsi_recovery"
+
+
 def test_rsi_atr_oversold_peak_turn_holds_without_oversold_peak():
   strategy = RsiAtrOversoldPeakTurnStrategy()
   frame = _rsi_peak_turn_frame((24.0, 32.0, 28.0))
@@ -724,7 +744,11 @@ def test_rsi_atr_oversold_peak_turn_holds_without_oversold_peak():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_enable_rsi_recovery": False,
+      "use_llm_regime_hint": False,
+    },
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -747,7 +771,11 @@ def test_rsi_atr_oversold_peak_turn_rejects_buy_when_price_is_below_slow_ema():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_require_price_above_slow_ema": True,
+      "use_llm_regime_hint": False,
+    },
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -762,7 +790,7 @@ def test_rsi_atr_oversold_peak_turn_rejects_buy_when_trend_spread_is_too_weak():
   frame = _rsi_peak_turn_frame(
     (24.0, 28.0, 26.0),
     closes=(100.0, 101.0, 101.0),
-    ema_fast=(100.2, 100.2, 100.2),
+    ema_fast=(100.1, 100.1, 100.1),
     ema_slow=(100.0, 100.0, 100.0),
     atr=2.0,
   )
@@ -779,7 +807,7 @@ def test_rsi_atr_oversold_peak_turn_rejects_buy_when_trend_spread_is_too_weak():
 
   assert envelope.signal.action == SignalAction.HOLD
   assert envelope.trace["entry"]["reason"] == "entry_filters_failed:trend_spread_strength"
-  assert envelope.trace["entry"]["filters"]["trend_spread_strength"]["value"] == pytest.approx(0.1)
+  assert envelope.trace["entry"]["filters"]["trend_spread_strength"]["value"] == pytest.approx(0.05)
 
 
 def test_rsi_atr_oversold_peak_turn_sells_immediately_on_hard_stop():

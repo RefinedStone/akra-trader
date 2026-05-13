@@ -69,14 +69,20 @@ const strategyResponse = {
         },
         entry_min_trend_spread_atr: {
           type: "number",
-          default: 0.25,
+          default: 0.5,
           minimum: 0,
           semantic_hint: "Minimum fast/slow EMA spread measured in ATR units for BUY.",
           description_ko: "매수 추세 강도 최소값입니다. 단기 EMA와 장기 EMA 간격이 ATR의 이 배수 이상일 때만 매수합니다.",
         },
-        entry_require_price_above_slow_ema: {
+        entry_enable_rsi_recovery: {
           type: "boolean",
           default: true,
+          semantic_hint: "Allows BUY when RSI rebounds from below the oversold level.",
+          description_ko: "RSI가 과매도권에서 반등할 때도 매수를 허용합니다.",
+        },
+        entry_require_price_above_slow_ema: {
+          type: "boolean",
+          default: false,
           semantic_hint: "Requires close to stay above the slow EMA before BUY.",
           description_ko: "매수 전 현재가가 장기 EMA 위에 있어야 하는지 여부입니다.",
         },
@@ -561,10 +567,11 @@ describe("ControlRoomApp", () => {
     expect(screen.getByLabelText(/rsi_oversold_level/)).toHaveValue(30);
     expect(screen.getByLabelText(/rsi_timeframe/)).toHaveValue("base");
     expect(screen.getByLabelText(/risk_fraction/)).toHaveValue(0.01);
-    expect(screen.getByLabelText(/entry_min_trend_spread_atr/)).toHaveValue(0.25);
+    expect(screen.getByLabelText(/entry_min_trend_spread_atr/)).toHaveValue(0.5);
+    expect(screen.getByRole("checkbox", { name: /entry_enable_rsi_recovery/ })).toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: /entry_require_price_above_slow_ema/ }),
-    ).toBeChecked();
+    ).not.toBeChecked();
     expect(screen.getByLabelText(/exit_score_threshold/)).toHaveValue(0.75);
     expect(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ })).toBeChecked();
     expect(screen.getByText(/단기 EMA 기간입니다/)).toBeInTheDocument();
@@ -579,6 +586,7 @@ describe("ControlRoomApp", () => {
     fireEvent.change(screen.getByLabelText(/entry_min_trend_spread_atr/), {
       target: { value: "0.4" },
     });
+    fireEvent.click(screen.getByRole("checkbox", { name: /entry_enable_rsi_recovery/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /entry_require_price_above_slow_ema/ }));
     fireEvent.change(screen.getByLabelText(/exit_score_threshold/), { target: { value: "0.8" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ }));
@@ -600,7 +608,8 @@ describe("ControlRoomApp", () => {
         rsi_timeframe: "15m",
         risk_fraction: 0.02,
         entry_min_trend_spread_atr: 0.4,
-        entry_require_price_above_slow_ema: false,
+        entry_enable_rsi_recovery: false,
+        entry_require_price_above_slow_ema: true,
         exit_score_threshold: 0.8,
         use_llm_regime_hint: false,
       },
