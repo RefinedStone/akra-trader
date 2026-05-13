@@ -2363,6 +2363,14 @@ function PositionsDetail({ positions }: { positions: unknown[] }) {
                 <div className="detail-list flush">
                   <DetailLine label="수량" value={formatMetricValue(recordNumber(selectedPosition, ["quantity"]))} />
                   <DetailLine label="평균가" value={formatMetricValue(recordNumber(selectedPosition, ["average_price", "entry_price"]))} />
+                  <DetailLine
+                    label="손절가"
+                    value={formatMetricValue(recordNumber(selectedPosition, ["stop_loss_price"]))}
+                  />
+                  <DetailLine
+                    label="익절 기준가"
+                    value={formatMetricValue(recordNumber(selectedPosition, ["take_profit_price"]))}
+                  />
                   <DetailLine label="실현 손익" value={formatMetricValue(recordNumber(selectedPosition, ["realized_pnl", "pnl"]))} />
                   <DetailLine label="오픈 시각" value={formatTimestamp(recordText(selectedPosition, ["opened_at"], null))} />
                 </div>

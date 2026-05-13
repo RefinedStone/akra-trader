@@ -248,7 +248,11 @@ class StrategyExecutionState:
   has_position: bool
   cash: float
   position_size: float
-  parameters: dict[str, Any]
+  position_average_price: float | None = None
+  position_opened_at: datetime | None = None
+  position_stop_loss_price: float | None = None
+  position_take_profit_price: float | None = None
+  parameters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -307,6 +311,8 @@ class Position:
   realized_pnl: float = 0.0
   opened_at: datetime | None = None
   updated_at: datetime | None = None
+  stop_loss_price: float | None = None
+  take_profit_price: float | None = None
 
   @property
   def is_open(self) -> bool:

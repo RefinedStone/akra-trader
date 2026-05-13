@@ -67,6 +67,14 @@ const strategyResponse = {
           semantic_hint: "Portfolio risk budget per trade.",
           description_ko: "거래 1회당 감수할 포트폴리오 위험 비율입니다. 0.01은 1% 위험 예산입니다.",
         },
+        exit_score_threshold: {
+          type: "number",
+          default: 0.75,
+          minimum: 0,
+          maximum: 1,
+          semantic_hint: "SELL score threshold for full-position exits.",
+          description_ko: "SELL 점수 임계값입니다. 하드스톱이 아닌 청산은 점수가 이 값 이상일 때 전량 SELL합니다.",
+        },
         use_llm_regime_hint: {
           type: "boolean",
           default: true,
@@ -540,14 +548,17 @@ describe("ControlRoomApp", () => {
     expect(screen.getByLabelText(/rsi_oversold_level/)).toHaveValue(30);
     expect(screen.getByLabelText(/rsi_timeframe/)).toHaveValue("base");
     expect(screen.getByLabelText(/risk_fraction/)).toHaveValue(0.01);
+    expect(screen.getByLabelText(/exit_score_threshold/)).toHaveValue(0.75);
     expect(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ })).toBeChecked();
     expect(screen.getByText(/단기 EMA 기간입니다/)).toBeInTheDocument();
     expect(screen.getByText(/직전 RSI 고점/)).toBeInTheDocument();
     expect(screen.getByText(/거래 1회당 감수할 포트폴리오 위험 비율/)).toBeInTheDocument();
+    expect(screen.getByText(/SELL 점수 임계값/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/fast_ema_window/), { target: { value: "12" } });
     fireEvent.change(screen.getByLabelText(/rsi_timeframe/), { target: { value: "15m" } });
     fireEvent.change(screen.getByLabelText(/risk_fraction/), { target: { value: "0.02" } });
+    fireEvent.change(screen.getByLabelText(/exit_score_threshold/), { target: { value: "0.8" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ }));
     fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
 
@@ -566,6 +577,7 @@ describe("ControlRoomApp", () => {
         fast_ema_window: 12,
         rsi_timeframe: "15m",
         risk_fraction: 0.02,
+        exit_score_threshold: 0.8,
         use_llm_regime_hint: false,
       },
     });

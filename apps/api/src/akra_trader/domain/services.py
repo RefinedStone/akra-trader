@@ -75,6 +75,8 @@ def apply_signal(
         average_price=executed_price,
         opened_at=signal.timestamp,
         updated_at=signal.timestamp,
+        stop_loss_price=_stop_loss_price(executed_price, plan.stop_loss_pct),
+        take_profit_price=_take_profit_price(executed_price, plan.take_profit_pct),
       )
     else:
       total_quantity = active_position.quantity + quantity
@@ -86,6 +88,16 @@ def apply_signal(
         quantity=total_quantity,
         average_price=average_price,
         updated_at=signal.timestamp,
+        stop_loss_price=(
+          _stop_loss_price(average_price, plan.stop_loss_pct)
+          if plan.stop_loss_pct is not None
+          else active_position.stop_loss_price
+        ),
+        take_profit_price=(
+          _take_profit_price(average_price, plan.take_profit_pct)
+          if plan.take_profit_pct is not None
+          else active_position.take_profit_price
+        ),
       )
     return cash - gross_cost - fee_paid, new_position, order, fill, None
 
@@ -139,10 +151,26 @@ def apply_signal(
       quantity=0.0 if isclose(remaining_quantity, 0.0) else remaining_quantity,
       updated_at=signal.timestamp,
       realized_pnl=active_position.realized_pnl + pnl,
+      stop_loss_price=None if isclose(remaining_quantity, 0.0) else active_position.stop_loss_price,
+      take_profit_price=(
+        None if isclose(remaining_quantity, 0.0) else active_position.take_profit_price
+      ),
     )
     return cash + proceeds, closed_position, order, fill, closed_trade
 
   return cash, active_position, None, None, None
+
+
+def _stop_loss_price(entry_price: float, stop_loss_pct: float | None) -> float | None:
+  if stop_loss_pct is None:
+    return None
+  return entry_price * (1 - min(max(stop_loss_pct, 0.0), 1.0))
+
+
+def _take_profit_price(entry_price: float, take_profit_pct: float | None) -> float | None:
+  if take_profit_pct is None:
+    return None
+  return entry_price * (1 + max(take_profit_pct, 0.0))
 
 
 def build_equity_point(

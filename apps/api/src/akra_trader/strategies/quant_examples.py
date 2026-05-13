@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+from math import isfinite
+from typing import Any
+
 from akra_trader.domain.models import AssetType
+from akra_trader.domain.models import SignalAction
+from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyCatalogSemantics
+from akra_trader.domain.models import StrategyDecisionContext
+from akra_trader.domain.models import StrategyDecisionEnvelope
 from akra_trader.domain.models import StrategyLifecycle
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.strategies.composable import AllOf
@@ -83,8 +90,16 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
           "default": 45,
           "minimum": 0,
           "maximum": 100,
-          "semantic_hint": "RSI cross below this level exits an open position.",
+          "semantic_hint": "RSI weakness level used by the scored exit model.",
           "description_ko": "청산 RSI 기준선입니다. 보유 중 RSI가 이 값을 아래로 이탈하면 청산 후보가 됩니다.",
+        },
+        "exit_score_threshold": {
+          "type": "number",
+          "default": 0.75,
+          "minimum": 0,
+          "maximum": 1,
+          "semantic_hint": "SELL score threshold for full-position exits.",
+          "description_ko": "SELL 점수 임계값입니다. 하드스톱이 아닌 청산은 점수가 이 값 이상일 때 전량 SELL합니다.",
         },
         "risk_fraction": {
           "type": "number",
@@ -186,6 +201,280 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
     ),
   )
 
+  def decide(self, context: StrategyDecisionContext) -> StrategyDecisionEnvelope:
+    regime = self.spec.regime.evaluate(context)
+    entry_match = regime.allowed and self.spec.entry.evaluate(context)
+    exit_evaluation = _rsi_atr_exit_evaluation(context)
+    exit_match = bool(exit_evaluation["matched"])
+
+    if context.state.has_position and exit_match:
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.SELL,
+        confidence=max(0.72, float(exit_evaluation["score"])),
+        tags=("composable", "exit", str(exit_evaluation["reason"])),
+        reason=str(exit_evaluation["reason"]),
+      )
+    elif not context.state.has_position and entry_match:
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.BUY,
+        confidence=0.72,
+        tags=("composable", "entry"),
+        reason="composable_entry_rule_matched",
+      )
+    else:
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.HOLD,
+        confidence=0.55,
+        tags=("composable", "idle"),
+        reason="composable_conditions_not_met",
+      )
+
+    execution = self.spec.sizing.build(context, signal)
+    return StrategyDecisionEnvelope(
+      signal=signal,
+      rationale=_rsi_atr_rationale(
+        signal,
+        regime_label=regime.label,
+        entry_match=entry_match,
+        exit_evaluation=exit_evaluation,
+      ),
+      context=context,
+      execution=execution,
+      trace={
+        "architecture": {
+          "layers": (
+            "feature_pipeline",
+            "regime_filter",
+            "signal_policy",
+            "sizing_model",
+            "execution_plan",
+            "llm_function_layer",
+          )
+        },
+        "regime": {"allowed": regime.allowed, "label": regime.label, "trace": regime.trace},
+        "entry": {"matched": entry_match, "rule": self.spec.entry.describe()},
+        "exit": exit_evaluation,
+        "execution_tags": execution.tags,
+      },
+    )
+
 
 class RsiAtrTrendPullbackStrategy(RsiAtrOversoldPeakTurnStrategy):
   """Backward-compatible import alias for the renamed built-in strategy."""
+
+
+def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]:
+  threshold = _clamped_parameter(context, "exit_score_threshold", 0.75, minimum=0.0, maximum=1.0)
+  close = _feature_or_market(context, "close")
+  hard_stop_price = _finite_number(context.state.position_stop_loss_price)
+  take_profit_price = _finite_number(context.state.position_take_profit_price)
+  components: dict[str, dict[str, Any]] = {}
+
+  if not context.state.has_position:
+    return {
+      "matched": False,
+      "score": 0.0,
+      "threshold": threshold,
+      "reason": "no_position",
+      "components": components,
+      "hard_stop_price": hard_stop_price,
+      "take_profit_price": take_profit_price,
+    }
+  if close is None:
+    return {
+      "matched": False,
+      "score": 0.0,
+      "threshold": threshold,
+      "reason": "close_unavailable",
+      "components": components,
+      "hard_stop_price": hard_stop_price,
+      "take_profit_price": take_profit_price,
+    }
+  if hard_stop_price is not None and close <= hard_stop_price:
+    components["hard_stop"] = _exit_component(
+      True,
+      1.0,
+      close=close,
+      stop_loss_price=hard_stop_price,
+    )
+    return {
+      "matched": True,
+      "score": 1.0,
+      "threshold": threshold,
+      "reason": "hard_stop",
+      "components": components,
+      "hard_stop_price": hard_stop_price,
+      "take_profit_price": take_profit_price,
+    }
+
+  ema_fast = _feature_value(context, "ema_fast")
+  ema_slow = _feature_value(context, "ema_slow")
+  previous_ema_fast = _feature_value(context, "previous_ema_fast")
+  previous_ema_slow = _feature_value(context, "previous_ema_slow")
+  rsi = _feature_value(context, "rsi")
+  previous_rsi = _feature_value(context, "previous_rsi")
+  atr = _feature_value(context, "atr")
+  entry_price = _finite_number(context.state.position_average_price)
+  rsi_exit_level = _clamped_parameter(context, "rsi_exit_level", 45.0, minimum=0.0, maximum=100.0)
+
+  current_spread = (
+    ema_fast - ema_slow
+    if ema_fast is not None and ema_slow is not None
+    else None
+  )
+  previous_spread = (
+    previous_ema_fast - previous_ema_slow
+    if previous_ema_fast is not None and previous_ema_slow is not None
+    else None
+  )
+  trend_break = current_spread is not None and current_spread < 0
+  trend_decay = (
+    current_spread is not None
+    and previous_spread is not None
+    and current_spread < previous_spread
+  )
+  rsi_failure = (
+    rsi is not None
+    and previous_rsi is not None
+    and rsi < rsi_exit_level
+    and rsi < previous_rsi
+  )
+  adverse_move = entry_price - close if entry_price is not None else None
+  adverse_atr_multiple = (
+    adverse_move / atr
+    if adverse_move is not None and adverse_move > 0 and atr is not None and atr > 0
+    else None
+  )
+  adverse_price = adverse_atr_multiple is not None and adverse_atr_multiple >= 0.25
+  profit_protection = (
+    take_profit_price is not None
+    and close >= take_profit_price * 0.98
+    and rsi is not None
+    and previous_rsi is not None
+    and rsi < previous_rsi
+  )
+
+  components["trend_break"] = _exit_component(
+    trend_break,
+    0.35,
+    ema_fast=ema_fast,
+    ema_slow=ema_slow,
+    spread=current_spread,
+  )
+  components["trend_decay"] = _exit_component(
+    trend_decay,
+    0.15,
+    spread=current_spread,
+    previous_spread=previous_spread,
+  )
+  components["rsi_failure"] = _exit_component(
+    rsi_failure,
+    0.25,
+    rsi=rsi,
+    previous_rsi=previous_rsi,
+    rsi_exit_level=rsi_exit_level,
+  )
+  components["adverse_price"] = _exit_component(
+    adverse_price,
+    0.20,
+    close=close,
+    entry_price=entry_price,
+    atr=atr,
+    adverse_atr_multiple=adverse_atr_multiple,
+  )
+  components["profit_protection"] = _exit_component(
+    profit_protection,
+    0.15,
+    close=close,
+    take_profit_price=take_profit_price,
+    rsi=rsi,
+    previous_rsi=previous_rsi,
+  )
+
+  score = round(min(sum(component["score"] for component in components.values()), 1.0), 4)
+  active_reasons = tuple(
+    name for name, component in components.items() if bool(component["active"])
+  )
+  matched = score >= threshold
+  reason = (
+    f"exit_score_threshold_met:{','.join(active_reasons)}"
+    if matched
+    else "exit_score_below_threshold"
+  )
+  return {
+    "matched": matched,
+    "score": score,
+    "threshold": threshold,
+    "reason": reason,
+    "components": components,
+    "hard_stop_price": hard_stop_price,
+    "take_profit_price": take_profit_price,
+  }
+
+
+def _exit_component(active: bool, weight: float, **details: Any) -> dict[str, Any]:
+  return {
+    "active": active,
+    "score": weight if active else 0.0,
+    "weight": weight,
+    **details,
+  }
+
+
+def _rsi_atr_rationale(
+  signal: SignalDecision,
+  *,
+  regime_label: str,
+  entry_match: bool,
+  exit_evaluation: dict[str, Any],
+) -> str:
+  score = float(exit_evaluation["score"])
+  threshold = float(exit_evaluation["threshold"])
+  active_components = [
+    name
+    for name, component in exit_evaluation["components"].items()
+    if bool(component.get("active"))
+  ]
+  component_summary = ",".join(active_components) if active_components else "none"
+  return (
+    f"Composable strategy signal={signal.action.value}; "
+    f"regime={regime_label}; entry={entry_match}; exit={exit_evaluation['matched']}; "
+    f"exit_score={score:.2f}/{threshold:.2f}; "
+    f"exit_reason={exit_evaluation['reason']}; exit_components={component_summary}."
+  )
+
+
+def _feature_or_market(context: StrategyDecisionContext, key: str) -> float | None:
+  feature_value = _feature_value(context, key)
+  if feature_value is not None:
+    return feature_value
+  return _finite_number(context.market.get(key))
+
+
+def _feature_value(context: StrategyDecisionContext, key: str) -> float | None:
+  return _finite_number(context.features.get(key))
+
+
+def _clamped_parameter(
+  context: StrategyDecisionContext,
+  key: str,
+  default: float,
+  *,
+  minimum: float,
+  maximum: float,
+) -> float:
+  value = _finite_number(context.state.parameters.get(key, default))
+  if value is None:
+    value = default
+  return min(max(value, minimum), maximum)
+
+
+def _finite_number(value: Any) -> float | None:
+  try:
+    number = float(value)
+  except (TypeError, ValueError):
+    return None
+  return number if isfinite(number) else None

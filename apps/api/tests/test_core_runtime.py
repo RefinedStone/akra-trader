@@ -19,12 +19,16 @@ from akra_trader.application import HoldDecisionEngine
 from akra_trader.bootstrap import Container
 from akra_trader.config import Settings
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import ExecutionPlan
 from akra_trader.domain.models import LlmFunctionLayer
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import SignalAction
+from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionContext
 from akra_trader.domain.models import StrategyExecutionState
+from akra_trader.domain.services import apply_signal
 from akra_trader.main import create_app
+from akra_trader.runtime import StateCache
 from akra_trader.strategies.composable import RsiFeature
 from akra_trader.strategies.llm import ExternalDecisionStrategy
 from akra_trader.strategies.quant_examples import RsiAtrOversoldPeakTurnStrategy
@@ -142,6 +146,11 @@ def test_health_and_strategy_surface(tmp_path):
   assert "과매도 기준선" in quant_strategy["parameter_schema"]["rsi_oversold_level"]["description_ko"]
   assert "risk_fraction" in quant_strategy["parameter_schema"]
   assert "포트폴리오 위험 비율" in quant_strategy["parameter_schema"]["risk_fraction"]["description_ko"]
+  assert quant_strategy["parameter_schema"]["exit_score_threshold"]["default"] == 0.75
+  assert (
+    "SELL 점수 임계값"
+    in quant_strategy["parameter_schema"]["exit_score_threshold"]["description_ko"]
+  )
   assert strategies["llm_strategy"]["provider_adapter"] is None
   assert "paper" not in {mode.value for mode in RunMode}
 
@@ -641,6 +650,33 @@ def test_rsi_feature_can_align_higher_timeframe_values_to_base_candles():
   assert enriched.iloc[8]["rsi_previous"] == 50.0
 
 
+def test_buy_execution_stores_fixed_stop_loss_and_take_profit_prices():
+  timestamp = datetime(2026, 5, 11, tzinfo=UTC)
+
+  _, position, _, _, _ = apply_signal(
+    run_id="run-1",
+    instrument_id="binance:BTC/USDT",
+    signal=SignalDecision(timestamp=timestamp, action=SignalAction.BUY),
+    execution=ExecutionPlan(size_fraction=0.5, stop_loss_pct=0.10, take_profit_pct=0.25),
+    market_price=100.0,
+    position=None,
+    cash=10_000.0,
+    fee_rate=0.0,
+    slippage_bps=0.0,
+  )
+
+  assert position is not None
+  assert position.average_price == pytest.approx(100.0)
+  assert position.stop_loss_price == pytest.approx(90.0)
+  assert position.take_profit_price == pytest.approx(125.0)
+  cache = StateCache(instrument_id="binance:BTC/USDT", cash=5_000.0)
+  cache.apply(cash=5_000.0, position=position)
+  snapshot = cache.snapshot(timestamp=timestamp, parameters={})
+  assert snapshot.position_average_price == pytest.approx(100.0)
+  assert snapshot.position_stop_loss_price == pytest.approx(90.0)
+  assert snapshot.position_take_profit_price == pytest.approx(125.0)
+
+
 def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_peak_rolls_over():
   strategy = RsiAtrOversoldPeakTurnStrategy()
   frame = _rsi_peak_turn_frame((24.0, 28.0, 26.0))
@@ -679,6 +715,76 @@ def test_rsi_atr_oversold_peak_turn_holds_without_oversold_peak():
   assert envelope.trace["entry"]["matched"] is False
 
 
+def test_rsi_atr_oversold_peak_turn_sells_immediately_on_hard_stop():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_exit_frame(
+    closes=(100.0, 99.0, 94.0),
+    ema_fast=(102.0, 101.0, 100.0),
+    ema_slow=(100.0, 100.5, 99.0),
+    rsi=(60.0, 58.0, 57.0),
+  )
+  state = _open_rsi_position_state(
+    frame,
+    position_average_price=100.0,
+    stop_loss_price=95.0,
+    take_profit_price=110.0,
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.SELL
+  assert envelope.trace["exit"]["reason"] == "hard_stop"
+  assert envelope.trace["exit"]["score"] == 1.0
+
+
+def test_rsi_atr_oversold_peak_turn_holds_on_ema_cross_alone():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_exit_frame(
+    closes=(100.0, 101.0, 102.0),
+    ema_fast=(102.0, 101.0, 99.9),
+    ema_slow=(100.0, 100.0, 100.0),
+    rsi=(58.0, 60.0, 62.0),
+  )
+  state = _open_rsi_position_state(
+    frame,
+    position_average_price=100.0,
+    stop_loss_price=90.0,
+    take_profit_price=112.0,
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.HOLD
+  assert envelope.trace["exit"]["score"] == pytest.approx(0.50)
+  assert envelope.trace["exit"]["components"]["trend_break"]["active"] is True
+  assert envelope.trace["exit"]["reason"] == "exit_score_below_threshold"
+
+
+def test_rsi_atr_oversold_peak_turn_sells_when_exit_score_reaches_threshold():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_exit_frame(
+    closes=(100.0, 99.0, 96.0),
+    ema_fast=(102.0, 101.0, 98.0),
+    ema_slow=(100.0, 100.0, 100.0),
+    rsi=(55.0, 50.0, 40.0),
+    atr=2.0,
+  )
+  state = _open_rsi_position_state(
+    frame,
+    position_average_price=100.0,
+    stop_loss_price=90.0,
+    take_profit_price=112.0,
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.SELL
+  assert envelope.trace["exit"]["score"] == pytest.approx(0.95)
+  assert envelope.trace["exit"]["components"]["rsi_failure"]["active"] is True
+  assert envelope.trace["exit"]["components"]["adverse_price"]["active"] is True
+  assert "exit_score=0.95/0.75" in envelope.rationale
+
+
 def _rsi_peak_turn_frame(rsi_values: tuple[float, float, float]) -> pd.DataFrame:
   timestamp = datetime(2026, 5, 11, tzinfo=UTC)
   closes = (100.0, 101.0, 100.5)
@@ -700,6 +806,59 @@ def _rsi_peak_turn_frame(rsi_values: tuple[float, float, float]) -> pd.DataFrame
       }
       for index, (close, rsi) in enumerate(zip(closes, rsi_values, strict=True))
     ]
+  )
+
+
+def _rsi_exit_frame(
+  *,
+  closes: tuple[float, float, float],
+  ema_fast: tuple[float, float, float],
+  ema_slow: tuple[float, float, float],
+  rsi: tuple[float, float, float],
+  atr: float = 2.0,
+) -> pd.DataFrame:
+  timestamp = datetime(2026, 5, 11, tzinfo=UTC)
+  return pd.DataFrame(
+    [
+      {
+        "timestamp": timestamp + timedelta(minutes=5 * index),
+        "open": close - 0.5,
+        "high": close + 1.0,
+        "low": close - 1.0,
+        "close": close,
+        "volume": 1000.0 + index,
+        "ema_fast": fast,
+        "ema_slow": slow,
+        "rsi": rsi_value,
+        "rsi_previous": rsi[index - 1] if index >= 1 else 50.0,
+        "rsi_previous2": rsi[index - 2] if index >= 2 else 50.0,
+        "atr": atr,
+      }
+      for index, (close, fast, slow, rsi_value) in enumerate(
+        zip(closes, ema_fast, ema_slow, rsi, strict=True)
+      )
+    ]
+  )
+
+
+def _open_rsi_position_state(
+  frame: pd.DataFrame,
+  *,
+  position_average_price: float,
+  stop_loss_price: float,
+  take_profit_price: float,
+) -> StrategyExecutionState:
+  return StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=True,
+    cash=9_000.0,
+    position_size=1.0,
+    position_average_price=position_average_price,
+    position_opened_at=frame.iloc[0]["timestamp"].to_pydatetime(),
+    position_stop_loss_price=stop_loss_price,
+    position_take_profit_price=take_profit_price,
+    parameters={"rsi_exit_level": 45, "exit_score_threshold": 0.75, "use_llm_regime_hint": False},
   )
 
 

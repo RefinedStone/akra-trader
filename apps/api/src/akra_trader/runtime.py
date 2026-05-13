@@ -211,12 +211,17 @@ class StateCache:
     self.last_price = market_price
 
   def snapshot(self, *, timestamp: datetime, parameters: dict) -> StrategyExecutionState:
+    active_position = self.position if self.position and self.position.is_open else None
     return StrategyExecutionState(
       timestamp=timestamp,
       instrument_id=self.instrument_id,
-      has_position=self.position is not None and self.position.is_open,
+      has_position=active_position is not None,
       cash=self.cash,
-      position_size=self.position.quantity if self.position else 0.0,
+      position_size=active_position.quantity if active_position else 0.0,
+      position_average_price=active_position.average_price if active_position else None,
+      position_opened_at=active_position.opened_at if active_position else None,
+      position_stop_loss_price=active_position.stop_loss_price if active_position else None,
+      position_take_profit_price=active_position.take_profit_price if active_position else None,
       parameters=parameters,
     )
 
