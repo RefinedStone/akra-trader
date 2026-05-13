@@ -317,6 +317,23 @@ class TradingApplication:
     self._require_run(run_id)
     return self.list_operation_logs(run_id=run_id)
 
+  def get_run_llm_judgements(self, run_id: str) -> list[dict[str, Any]]:
+    self._require_run(run_id)
+    judgements: list[dict[str, Any]] = []
+    for log in self.list_operation_logs(run_id=run_id, limit=1_000):
+      if log.event_type != "llm_judgement_recorded":
+        continue
+      judgements.append(
+        {
+          "log_id": log.log_id,
+          "recorded_at": log.recorded_at,
+          "message": log.message,
+          "severity": log.severity,
+          **log.payload,
+        }
+      )
+    return judgements
+
   def list_operation_logs(
     self,
     *,

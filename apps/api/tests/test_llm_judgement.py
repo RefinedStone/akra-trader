@@ -6,12 +6,16 @@ import json
 
 import pandas as pd
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from pydantic import TypeAdapter
 
 from akra_trader.adapters.core_storage import InMemoryCoreRepository
 from akra_trader.adapters.in_memory_market_data import SeededMarketDataAdapter
 from akra_trader.adapters.mock_llm_judgement import MockLlmJudgementClient
+from akra_trader.api import include_routes
 from akra_trader.application import TradingApplication
+from akra_trader.bootstrap import Container
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import ExecutionPlan
 from akra_trader.domain.models import LlmCandidateSignal
@@ -248,6 +252,15 @@ def test_application_can_opt_into_mock_backtest_judgement_without_provider_sdk()
   assert payload["fallback"] is False
   assert payload["veto_reason"] == "confidence_below_threshold"
   assert payload["final_action"] == "hold"
+  assert app.get_run_llm_judgements(run.config.run_id)[0]["final_action"] == "hold"
+
+  fastapi_app = FastAPI()
+  include_routes(fastapi_app, Container(app=app), "/api")
+  response = TestClient(fastapi_app).get(f"/api/runs/{run.config.run_id}/llm-judgements")
+  assert response.status_code == 200
+  judgements = response.json()["judgements"]
+  assert judgements[0]["veto_reason"] == "confidence_below_threshold"
+  assert judgements[0]["final_action"] == "hold"
 
 
 class _FixedCandidateStrategy(Strategy):

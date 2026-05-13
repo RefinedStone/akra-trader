@@ -154,6 +154,19 @@ def create_router(container: Container) -> APIRouter:
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+  @router.get("/runs/{run_id}/llm-judgements")
+  def get_run_llm_judgements(
+    run_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      return {
+        "run_id": run_id,
+        "judgements": _to_json(app.get_run_llm_judgements(run_id)),
+      }
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+
   @router.get("/market-data/candles")
   def list_market_data_candles(
     symbol: str = Query(..., min_length=1),
