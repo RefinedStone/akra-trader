@@ -61,14 +61,25 @@ class RsiFeature(Feature):
   name: str
   window_parameter: str
   default_window: int
+  timeframe_parameter: str | None = None
+  default_timeframe: str = "base"
 
   def apply(self, frame: pd.DataFrame, parameters: dict[str, Any]) -> pd.DataFrame:
     window = _parameter_int(parameters, self.window_parameter, self.default_window)
-    delta = frame[self.source].diff()
-    gain = delta.clip(lower=0).rolling(window=window).mean()
-    loss = (-delta.clip(upper=0)).rolling(window=window).mean()
-    relative_strength = gain / loss.mask(loss == 0)
-    frame[self.name] = (100 - (100 / (1 + relative_strength))).fillna(50.0).astype(float)
+    timeframe = _parameter_str(parameters, self.timeframe_parameter, self.default_timeframe)
+    source_frame = _feature_source_frame(frame, source=self.source, timeframe=timeframe)
+    rsi = _wilder_rsi(source_frame[self.source], window)
+    feature_values = pd.DataFrame(
+      {
+        "timestamp": source_frame["timestamp"],
+        self.name: rsi,
+        f"{self.name}_previous": rsi.shift(1),
+        f"{self.name}_previous2": rsi.shift(2),
+      }
+    )
+    aligned = _align_feature_values(frame, feature_values)
+    for column in (self.name, f"{self.name}_previous", f"{self.name}_previous2"):
+      frame[column] = aligned[column].fillna(50.0).astype(float)
     return frame
 
   def warmup_bars(self) -> int:
@@ -449,6 +460,127 @@ class ComposableStrategy(Strategy):
 def _parameter_int(parameters: dict[str, Any], key: str, default: int) -> int:
   value = parameters.get(key, default)
   return max(1, int(value))
+
+
+def _parameter_str(parameters: dict[str, Any], key: str | None, default: str) -> str:
+  if key is None:
+    return default
+  value = parameters.get(key, default)
+  return str(value or default)
+
+
+def _feature_source_frame(frame: pd.DataFrame, *, source: str, timeframe: str) -> pd.DataFrame:
+  if _is_base_timeframe(timeframe):
+    return frame[["timestamp", source]].copy()
+  target_delta = _parse_timeframe_delta(timeframe)
+  if target_delta is None:
+    raise ValueError(f"Unsupported feature timeframe: {timeframe}")
+  base_delta = _infer_frame_delta(frame)
+  if base_delta is None:
+    raise ValueError("At least two candles are required for timeframed feature calculation.")
+  if target_delta < base_delta:
+    raise ValueError(
+      f"Cannot calculate {timeframe} feature from base candles spaced {base_delta} apart."
+    )
+  ratio = target_delta / base_delta
+  if ratio != int(ratio):
+    raise ValueError(
+      f"Feature timeframe {timeframe} must be an exact multiple of base candle spacing {base_delta}."
+    )
+  ratio_int = max(1, int(ratio))
+  if ratio_int == 1:
+    return frame[["timestamp", source]].copy()
+
+  working = frame[["timestamp", source]].copy()
+  working["timestamp"] = pd.to_datetime(working["timestamp"], utc=True)
+  working = working.sort_values("timestamp").reset_index(drop=True)
+  working["__feature_group"] = working.index // ratio_int
+  return (
+    working.groupby("__feature_group", as_index=False)
+    .agg(timestamp=("timestamp", "last"), **{source: (source, "last")})
+    [["timestamp", source]]
+  )
+
+
+def _wilder_rsi(values: pd.Series, window: int) -> pd.Series:
+  delta = values.astype(float).diff()
+  gain = delta.clip(lower=0)
+  loss = -delta.clip(upper=0)
+  average_gain = _wilder_average(gain, window)
+  average_loss = _wilder_average(loss, window)
+  relative_strength = average_gain / average_loss.mask(average_loss == 0)
+  rsi = 100 - (100 / (1 + relative_strength))
+  rsi = rsi.mask((average_loss == 0) & (average_gain > 0), 100.0)
+  rsi = rsi.mask((average_loss == 0) & (average_gain == 0), 50.0)
+  return rsi.fillna(50.0).astype(float)
+
+
+def _wilder_average(values: pd.Series, window: int) -> pd.Series:
+  result = pd.Series(index=values.index, dtype=float)
+  if len(values) <= window:
+    return result
+  initial_average = values.iloc[1 : window + 1].mean()
+  result.iloc[window] = initial_average
+  previous_average = initial_average
+  for position in range(window + 1, len(values)):
+    current = values.iloc[position]
+    if pd.isna(current):
+      result.iloc[position] = previous_average
+      continue
+    previous_average = ((previous_average * (window - 1)) + current) / window
+    result.iloc[position] = previous_average
+  return result
+
+
+def _align_feature_values(frame: pd.DataFrame, feature_values: pd.DataFrame) -> pd.DataFrame:
+  base = frame[["timestamp"]].copy()
+  base["__row_index"] = range(len(base))
+  base["timestamp"] = pd.to_datetime(base["timestamp"], utc=True)
+  values = feature_values.copy()
+  values["timestamp"] = pd.to_datetime(values["timestamp"], utc=True)
+  aligned = pd.merge_asof(
+    base.sort_values("timestamp"),
+    values.sort_values("timestamp"),
+    on="timestamp",
+    direction="backward",
+  )
+  return aligned.sort_values("__row_index").reset_index(drop=True)
+
+
+def _is_base_timeframe(timeframe: str) -> bool:
+  return timeframe.strip().lower() in {"", "base", "native", "run"}
+
+
+def _parse_timeframe_delta(timeframe: str) -> pd.Timedelta | None:
+  value = timeframe.strip()
+  if not value or value == "1M":
+    return None
+  amount_text = value[:-1]
+  unit = value[-1]
+  if not amount_text.isdigit():
+    return None
+  amount = int(amount_text)
+  if amount <= 0:
+    return None
+  if unit == "m":
+    return pd.Timedelta(minutes=amount)
+  if unit == "h":
+    return pd.Timedelta(hours=amount)
+  if unit == "d":
+    return pd.Timedelta(days=amount)
+  if unit == "w":
+    return pd.Timedelta(weeks=amount)
+  return None
+
+
+def _infer_frame_delta(frame: pd.DataFrame) -> pd.Timedelta | None:
+  if len(frame) < 2:
+    return None
+  timestamps = pd.to_datetime(frame["timestamp"], utc=True).sort_values()
+  deltas = timestamps.diff().dropna()
+  if deltas.empty:
+    return None
+  return deltas.value_counts().index[0]
 
 
 def _resolve_parameter(context: StrategyDecisionContext, parameter: ParameterRef) -> float:

@@ -52,8 +52,15 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
           "default": 14,
           "minimum": 2,
           "unit": "bars",
-          "semantic_hint": "Momentum oscillator lookback.",
-          "description_ko": "RSI 계산 기간입니다. 과매도 구간과 RSI 고점 꺾임을 판단하는 기준입니다.",
+          "semantic_hint": "Wilder/RMA RSI oscillator lookback.",
+          "description_ko": "Wilder/RMA 방식 RSI 계산 기간입니다. 과매도 구간과 RSI 고점 꺾임을 판단하는 기준입니다.",
+        },
+        "rsi_timeframe": {
+          "type": "string",
+          "default": "base",
+          "enum": ["base", "5m", "15m", "1h", "4h", "1d"],
+          "semantic_hint": "Timeframe used for RSI calculation.",
+          "description_ko": "RSI를 계산할 봉 기준입니다. base는 백테스트/실행 봉과 같은 기준이며, 15m처럼 실행 봉보다 큰 기준은 내부에서 리샘플링해 계산합니다.",
         },
         "atr_window": {
           "type": "integer",
@@ -140,7 +147,14 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
     features=(
       EmaFeature("close", "ema_fast", "fast_ema_window", 20),
       EmaFeature("close", "ema_slow", "slow_ema_window", 60),
-      RsiFeature("close", "rsi", "rsi_window", 14),
+      RsiFeature(
+        "close",
+        "rsi",
+        "rsi_window",
+        14,
+        timeframe_parameter="rsi_timeframe",
+        default_timeframe="base",
+      ),
       AtrFeature("atr", "atr_window", 14),
     ),
     regime=AllRegimes(
@@ -152,9 +166,9 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
     entry=AllOf(
       (
         GreaterThan("ema_fast", "ema_slow"),
-        LessThan("previous_rsi", ParameterRef("rsi_oversold_level", 30)),
-        GreaterThan("previous_rsi", "previous2_rsi"),
-        GreaterThan("previous_rsi", "rsi"),
+        LessThan("rsi_previous", ParameterRef("rsi_oversold_level", 30)),
+        GreaterThan("rsi_previous", "rsi_previous2"),
+        GreaterThan("rsi_previous", "rsi"),
       )
     ),
     exit=AnyOf(

@@ -95,6 +95,7 @@ type StrategyParameterSpec = {
   minimum?: number;
   maximum?: number;
   unit?: string;
+  enum?: unknown[];
   semantic_hint?: string;
   description_ko?: string;
 };
@@ -1962,6 +1963,26 @@ function StrategyParameterField({
       </label>
     );
   }
+  if (spec.enum && spec.enum.length > 0) {
+    return (
+      <label className="parameter-field">
+        <span>
+          <b>{name}</b>
+          {hint ? <small>{hint}</small> : null}
+        </span>
+        <select
+          onChange={(event) => onChange(event.target.value)}
+          value={String(value ?? spec.default ?? "")}
+        >
+          {spec.enum.map((option) => (
+            <option key={String(option)} value={String(option)}>
+              {String(option)}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
   return (
     <label className="parameter-field">
       <span>
@@ -3217,6 +3238,7 @@ function normalizeParameterSpec(spec: unknown): StrategyParameterSpec {
     minimum: typeof record.minimum === "number" ? record.minimum : undefined,
     maximum: typeof record.maximum === "number" ? record.maximum : undefined,
     unit: typeof record.unit === "string" ? record.unit : undefined,
+    enum: Array.isArray(record.enum) ? record.enum : undefined,
     semantic_hint: typeof record.semantic_hint === "string" ? record.semantic_hint : undefined,
     description_ko: typeof record.description_ko === "string" ? record.description_ko : undefined,
   };

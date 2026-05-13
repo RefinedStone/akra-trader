@@ -5,6 +5,7 @@ from datetime import datetime
 from datetime import timedelta
 
 import pandas as pd
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -24,6 +25,7 @@ from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import StrategyDecisionContext
 from akra_trader.domain.models import StrategyExecutionState
 from akra_trader.main import create_app
+from akra_trader.strategies.composable import RsiFeature
 from akra_trader.strategies.llm import ExternalDecisionStrategy
 from akra_trader.strategies.quant_examples import RsiAtrOversoldPeakTurnStrategy
 
@@ -128,6 +130,14 @@ def test_health_and_strategy_surface(tmp_path):
   assert quant_strategy["runtime"] == "native_composable"
   assert quant_strategy["name"] == "RSI ATR Oversold Peak Turn"
   assert quant_strategy["catalog_semantics"]["strategy_kind"] == "composable_quant"
+  assert quant_strategy["parameter_schema"]["rsi_timeframe"]["enum"] == [
+    "base",
+    "5m",
+    "15m",
+    "1h",
+    "4h",
+    "1d",
+  ]
   assert "rsi_oversold_level" in quant_strategy["parameter_schema"]
   assert "과매도 기준선" in quant_strategy["parameter_schema"]["rsi_oversold_level"]["description_ko"]
   assert "risk_fraction" in quant_strategy["parameter_schema"]
@@ -590,6 +600,47 @@ def test_composable_strategy_exposes_trace_layers_and_llm_function():
   assert envelope.trace["regime"]["trace"]["regimes"][1]["provider"] == "disabled"
 
 
+def test_rsi_feature_uses_wilder_smoothing():
+  frame = pd.DataFrame(
+    {
+      "timestamp": pd.date_range("2026-05-11T00:00:00Z", periods=5, freq="5min"),
+      "close": [100.0, 102.0, 101.0, 103.0, 102.0],
+    }
+  )
+  feature = RsiFeature("close", "rsi", "rsi_window", 2)
+
+  enriched = feature.apply(frame, {"rsi_window": 2})
+
+  assert enriched.iloc[2]["rsi"] == pytest.approx(66.6667, abs=0.0001)
+  assert enriched.iloc[3]["rsi"] == pytest.approx(85.7143, abs=0.0001)
+  assert enriched.iloc[4]["rsi"] == pytest.approx(54.5455, abs=0.0001)
+  assert enriched.iloc[4]["rsi_previous"] == pytest.approx(85.7143, abs=0.0001)
+  assert enriched.iloc[4]["rsi_previous2"] == pytest.approx(66.6667, abs=0.0001)
+
+
+def test_rsi_feature_can_align_higher_timeframe_values_to_base_candles():
+  frame = pd.DataFrame(
+    {
+      "timestamp": pd.date_range("2026-05-11T00:00:00Z", periods=9, freq="5min"),
+      "close": [100.0, 100.5, 100.0, 100.0, 101.0, 102.0, 102.0, 101.5, 101.0],
+    }
+  )
+  feature = RsiFeature(
+    "close",
+    "rsi",
+    "rsi_window",
+    2,
+    timeframe_parameter="rsi_timeframe",
+    default_timeframe="base",
+  )
+
+  enriched = feature.apply(frame, {"rsi_window": 2, "rsi_timeframe": "15m"})
+
+  assert enriched.iloc[7]["rsi"] == 50.0
+  assert enriched.iloc[8]["rsi"] == pytest.approx(66.6667, abs=0.0001)
+  assert enriched.iloc[8]["rsi_previous"] == 50.0
+
+
 def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_peak_rolls_over():
   strategy = RsiAtrOversoldPeakTurnStrategy()
   frame = _rsi_peak_turn_frame((24.0, 28.0, 26.0))
@@ -643,6 +694,8 @@ def _rsi_peak_turn_frame(rsi_values: tuple[float, float, float]) -> pd.DataFrame
         "ema_fast": 101.0 + index * 0.25,
         "ema_slow": 99.0 + index * 0.25,
         "rsi": rsi,
+        "rsi_previous": rsi_values[index - 1] if index >= 1 else 50.0,
+        "rsi_previous2": rsi_values[index - 2] if index >= 2 else 50.0,
         "atr": 2.0,
       }
       for index, (close, rsi) in enumerate(zip(closes, rsi_values, strict=True))

@@ -52,6 +52,13 @@ const strategyResponse = {
           semantic_hint: "Previous RSI peak must be below this oversold ceiling.",
           description_ko: "과매도 기준선입니다. 직전 RSI 고점이 이 값보다 낮은 과매도 구간 안에 있을 때만 매수 후보가 됩니다.",
         },
+        rsi_timeframe: {
+          type: "string",
+          default: "base",
+          enum: ["base", "5m", "15m", "1h", "4h", "1d"],
+          semantic_hint: "Timeframe used for RSI calculation.",
+          description_ko: "RSI를 계산할 봉 기준입니다.",
+        },
         risk_fraction: {
           type: "number",
           default: 0.01,
@@ -531,6 +538,7 @@ describe("ControlRoomApp", () => {
 
     expect(screen.getByLabelText(/fast_ema_window/)).toHaveValue(20);
     expect(screen.getByLabelText(/rsi_oversold_level/)).toHaveValue(30);
+    expect(screen.getByLabelText(/rsi_timeframe/)).toHaveValue("base");
     expect(screen.getByLabelText(/risk_fraction/)).toHaveValue(0.01);
     expect(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ })).toBeChecked();
     expect(screen.getByText(/단기 EMA 기간입니다/)).toBeInTheDocument();
@@ -538,6 +546,7 @@ describe("ControlRoomApp", () => {
     expect(screen.getByText(/거래 1회당 감수할 포트폴리오 위험 비율/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/fast_ema_window/), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText(/rsi_timeframe/), { target: { value: "15m" } });
     fireEvent.change(screen.getByLabelText(/risk_fraction/), { target: { value: "0.02" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ }));
     fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
@@ -555,6 +564,7 @@ describe("ControlRoomApp", () => {
       strategy_id: "rsi_atr_oversold_peak_turn_v1",
       parameters: {
         fast_ema_window: 12,
+        rsi_timeframe: "15m",
         risk_fraction: 0.02,
         use_llm_regime_hint: false,
       },
