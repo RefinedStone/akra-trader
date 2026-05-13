@@ -153,6 +153,12 @@ def test_health_and_strategy_surface(tmp_path):
   )
   assert quant_strategy["parameter_schema"]["entry_enable_rsi_recovery"]["default"] is True
   assert quant_strategy["parameter_schema"]["entry_require_price_above_slow_ema"]["default"] is False
+  assert quant_strategy["parameter_schema"]["entry_enable_range_oversold_recovery"]["default"] is False
+  assert quant_strategy["parameter_schema"]["entry_recovery_max_rsi"]["default"] == 38
+  assert quant_strategy["parameter_schema"]["entry_recovery_max_low_proximity_atr"]["default"] == 1.5
+  assert quant_strategy["parameter_schema"]["entry_recovery_min_trend_spread_atr"]["default"] == -2.0
+  assert quant_strategy["parameter_schema"]["entry_recovery_min_rsi_delta"]["default"] == 5.0
+  assert quant_strategy["parameter_schema"]["entry_recovery_min_close_position"]["default"] == 0.7
   assert quant_strategy["parameter_schema"]["exit_score_threshold"]["default"] == 0.75
   assert (
     "SELL 점수 임계값"
@@ -767,7 +773,12 @@ def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_peak_rolls_over():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_enable_range_oversold_recovery": True,
+      "entry_recovery_min_close_position": 0.5,
+      "use_llm_regime_hint": False,
+    },
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -789,7 +800,12 @@ def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_recovers():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_enable_range_oversold_recovery": True,
+      "entry_recovery_min_close_position": 0.5,
+      "use_llm_regime_hint": False,
+    },
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -797,6 +813,70 @@ def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_recovers():
   assert envelope.signal.action == SignalAction.BUY
   assert envelope.trace["entry"]["patterns"]["rsi_recovery"]["matched"] is True
   assert envelope.trace["entry"]["reason"] == "entry_conditions_met:rsi_recovery"
+
+
+def test_rsi_atr_oversold_peak_turn_buys_range_recovery_near_local_low():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_peak_turn_frame(
+    (32.0, 25.0, 31.0),
+    closes=(100.0, 99.6, 99.8),
+    ema_fast=(99.8, 99.7, 99.6),
+    ema_slow=(101.0, 100.9, 100.8),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_enable_range_oversold_recovery": True,
+      "entry_recovery_min_close_position": 0.5,
+      "use_llm_regime_hint": False,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.trace["regime"]["allowed"] is False
+  assert envelope.trace["entry"]["range_entry_matched"] is True
+  assert envelope.trace["entry"]["patterns"]["range_oversold_recovery"]["matched"] is True
+  assert envelope.trace["entry"]["filters"]["range_low_proximity"]["value"] == pytest.approx(1.2)
+  assert envelope.trace["entry"]["reason"] == "entry_conditions_met:range_oversold_recovery"
+
+
+def test_rsi_atr_oversold_peak_turn_rejects_range_recovery_far_from_local_low():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_peak_turn_frame(
+    (32.0, 25.0, 31.0),
+    closes=(100.0, 99.0, 103.0),
+    ema_fast=(99.8, 99.7, 99.6),
+    ema_slow=(101.0, 100.9, 100.8),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_enable_range_oversold_recovery": True,
+      "entry_recovery_min_close_position": 0.5,
+      "use_llm_regime_hint": False,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.HOLD
+  assert envelope.trace["entry"]["patterns"]["range_oversold_recovery"]["matched"] is False
+  assert envelope.trace["entry"]["filters"]["range_low_proximity"]["passed"] is False
+  assert "range_low_proximity" in envelope.trace["entry"]["reason"]
 
 
 def test_rsi_atr_oversold_peak_turn_holds_without_oversold_peak():
