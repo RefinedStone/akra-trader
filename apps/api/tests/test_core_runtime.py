@@ -31,6 +31,7 @@ from akra_trader.main import create_app
 from akra_trader.runtime import StateCache
 from akra_trader.strategies.composable import RsiFeature
 from akra_trader.strategies.llm import ExternalDecisionStrategy
+from akra_trader.strategies.quant_examples import Rsi14OversoldReversalStrategy
 from akra_trader.strategies.quant_examples import RsiAtrOversoldPeakTurnStrategy
 
 
@@ -123,9 +124,30 @@ def test_health_and_strategy_surface(tmp_path):
   strategy_ids = {strategy["strategy_id"] for strategy in strategies["strategies"]}
   assert {
     "ma_cross_v1",
+    "rsi14_oversold_reversal_v1",
     "rsi_atr_oversold_peak_turn_v1",
     "external_decision_template",
   }.issubset(strategy_ids)
+  reversal_strategy = next(
+    strategy
+    for strategy in strategies["strategies"]
+    if strategy["strategy_id"] == "rsi14_oversold_reversal_v1"
+  )
+  assert reversal_strategy["runtime"] == "native_composable"
+  assert reversal_strategy["name"] == "RSI14 Oversold Reversal"
+  assert reversal_strategy["parameter_schema"]["rsi_window"]["default"] == 14
+  assert reversal_strategy["parameter_schema"]["entry_lookback_bars"]["default"] == 5
+  assert reversal_strategy["parameter_schema"]["entry_reversal_mode"]["default"] == "balanced"
+  assert reversal_strategy["parameter_schema"]["entry_reversal_mode"]["enum"] == [
+    "aggressive",
+    "balanced",
+    "conservative",
+  ]
+  assert reversal_strategy["parameter_schema"]["entry_block_strong_downtrend"]["default"] is True
+  assert (
+    "과매도 반등"
+    in reversal_strategy["parameter_schema"]["entry_max_reversal_rsi"]["description_ko"]
+  )
   quant_strategy = next(
     strategy
     for strategy in strategies["strategies"]
@@ -229,6 +251,32 @@ def test_composable_quant_strategy_runs_as_builtin_sample(tmp_path):
   run = response.json()
   assert run["strategy"]["strategy_id"] == "rsi_atr_oversold_peak_turn_v1"
   assert run["strategy"]["parameter_snapshot"]["resolved"]["fast_ema_window"] == 8
+  assert run["status"] == "completed"
+
+
+def test_rsi14_oversold_reversal_runs_as_builtin_strategy(tmp_path):
+  client = build_client(tmp_path)
+
+  response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "rsi14_oversold_reversal_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "parameters": {
+        "fast_ema_window": 5,
+        "slow_ema_window": 10,
+        "rsi_window": 3,
+        "atr_window": 3,
+        "entry_reversal_mode": "balanced",
+      },
+    },
+  )
+
+  assert response.status_code == 200
+  run = response.json()
+  assert run["strategy"]["strategy_id"] == "rsi14_oversold_reversal_v1"
+  assert run["strategy"]["parameter_snapshot"]["resolved"]["rsi_window"] == 3
   assert run["status"] == "completed"
 
 
@@ -764,6 +812,113 @@ def test_buy_execution_stores_fixed_stop_loss_and_take_profit_prices():
   assert snapshot.position_trailing_stop_price is None
 
 
+def test_rsi14_oversold_reversal_buys_balanced_rebound():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_reversal_frame(
+    (36.0, 25.0, 31.0),
+    closes=(100.0, 98.0, 99.2),
+    ema_fast=(98.0, 98.1, 98.4),
+    ema_slow=(97.0, 97.2, 97.5),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.signal.reason == "entry_conditions_met:rsi14_oversold_reversal:balanced"
+  assert envelope.trace["entry"]["mode"] == "balanced"
+  assert envelope.trace["entry"]["filters"]["recent_oversold"]["passed"] is True
+  assert envelope.trace["entry"]["filters"]["rsi_reversal_shape"]["passed"] is True
+  assert envelope.trace["entry"]["filters"]["bullish_body"]["passed"] is True
+  assert envelope.trace["entry"]["filters"]["close_above_previous_close"]["passed"] is True
+
+
+def test_rsi14_oversold_reversal_buys_conservative_reclaim_and_breakout():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_reversal_frame(
+    (35.0, 29.0, 31.0),
+    closes=(100.0, 98.0, 100.2),
+    ema_fast=(98.0, 98.1, 98.4),
+    ema_slow=(97.0, 97.2, 97.5),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={"entry_reversal_mode": "conservative"},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.signal.reason == "entry_conditions_met:rsi14_oversold_reversal:conservative"
+  assert envelope.trace["entry"]["filters"]["rsi_reversal_shape"]["passed"] is True
+  assert envelope.trace["entry"]["filters"]["close_above_previous_high"]["passed"] is True
+
+
+def test_rsi14_oversold_reversal_blocks_strong_downtrend_without_divergence():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_reversal_frame(
+    (36.0, 25.0, 31.0),
+    closes=(100.0, 98.0, 99.2),
+    ema_fast=(101.0, 100.0, 99.0),
+    ema_slow=(103.0, 102.0, 101.0),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.HOLD
+  assert envelope.trace["entry"]["strong_downtrend"] is True
+  assert envelope.trace["entry"]["bullish_divergence"] is False
+  assert "strong_downtrend_block" in envelope.trace["entry"]["reason"]
+
+
+def test_rsi14_oversold_reversal_allows_aggressive_divergence_exception():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_reversal_frame(
+    (36.0, 24.0, 31.0),
+    closes=(101.0, 100.0, 99.5),
+    ema_fast=(101.0, 100.0, 99.0),
+    ema_slow=(103.0, 102.0, 101.0),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={"entry_reversal_mode": "aggressive"},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.trace["entry"]["strong_downtrend"] is True
+  assert envelope.trace["entry"]["bullish_divergence"] is True
+  assert envelope.trace["entry"]["filters"]["strong_downtrend_block"]["passed"] is True
+
+
 def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_peak_rolls_over():
   strategy = RsiAtrOversoldPeakTurnStrategy()
   frame = _rsi_peak_turn_frame((24.0, 28.0, 26.0))
@@ -1110,6 +1265,32 @@ def _rsi_peak_turn_frame(
       )
     ]
   )
+
+
+def _rsi14_reversal_frame(
+  rsi_values: tuple[float, float, float],
+  *,
+  closes: tuple[float, float, float],
+  ema_fast: tuple[float, float, float],
+  ema_slow: tuple[float, float, float],
+  atr: float,
+) -> pd.DataFrame:
+  frame = _rsi_peak_turn_frame(
+    rsi_values,
+    closes=closes,
+    ema_fast=ema_fast,
+    ema_slow=ema_slow,
+    atr=atr,
+  )
+  frame["rsi_recent_min"] = frame["rsi"].rolling(window=5, min_periods=1).min()
+  frame["price_recent_low"] = frame["low"].rolling(window=5, min_periods=1).min()
+  frame["previous_price_swing_low"] = (
+    frame["low"].shift(1).rolling(window=5, min_periods=1).min()
+  )
+  frame["previous_rsi_swing_low"] = (
+    frame["rsi"].shift(1).rolling(window=5, min_periods=1).min()
+  )
+  return frame
 
 
 def _rsi_exit_frame(

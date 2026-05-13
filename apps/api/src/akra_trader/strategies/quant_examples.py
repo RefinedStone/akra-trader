@@ -3,6 +3,8 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any
 
+import pandas as pd
+
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
@@ -354,6 +356,312 @@ class RsiAtrTrendPullbackStrategy(RsiAtrOversoldPeakTurnStrategy):
   """Backward-compatible import alias for the renamed built-in strategy."""
 
 
+class Rsi14OversoldReversalStrategy(ComposableStrategy):
+  spec = StrategySpec(
+    metadata=StrategyMetadata(
+      strategy_id="rsi14_oversold_reversal_v1",
+      name="RSI14 Oversold Reversal",
+      version="1.0.0",
+      runtime="native_composable",
+      asset_types=(AssetType.CRYPTO,),
+      supported_timeframes=("1m", "3m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"),
+      parameter_schema={
+        "fast_ema_window": {
+          "type": "integer",
+          "default": 20,
+          "minimum": 2,
+          "unit": "bars",
+          "semantic_hint": "Short moving average used for trend and reclaim checks.",
+          "description_ko": "단기 EMA 기간입니다. 반등 캔들의 단기 이평 회복과 하락 추세 필터에 사용합니다.",
+        },
+        "slow_ema_window": {
+          "type": "integer",
+          "default": 60,
+          "minimum": 5,
+          "unit": "bars",
+          "semantic_hint": "Long moving average used for strong downtrend filtering.",
+          "description_ko": "장기 EMA 기간입니다. 가격이 장기 EMA 아래에서 계속 밀리는 강한 하락 추세를 걸러내는 데 사용합니다.",
+        },
+        "rsi_window": {
+          "type": "integer",
+          "default": 14,
+          "minimum": 2,
+          "unit": "bars",
+          "semantic_hint": "Wilder/RMA RSI lookback for oversold reversal detection.",
+          "description_ko": "RSI 계산 기간입니다. 기본값 14로 RSI14 과매도 반등을 탐지합니다.",
+        },
+        "rsi_timeframe": {
+          "type": "string",
+          "default": "base",
+          "enum": ["base", "5m", "15m", "1h", "4h", "1d"],
+          "semantic_hint": "Timeframe used for RSI calculation.",
+          "description_ko": "RSI를 계산할 봉 기준입니다. base는 백테스트/실행 봉과 같은 기준입니다.",
+        },
+        "atr_window": {
+          "type": "integer",
+          "default": 14,
+          "minimum": 2,
+          "unit": "bars",
+          "semantic_hint": "ATR volatility lookback for risk sizing and trailing exits.",
+          "description_ko": "ATR 변동성 계산 기간입니다. 손절, 포지션 크기, 트레일링 청산에 사용합니다.",
+        },
+        "rsi_oversold_level": {
+          "type": "number",
+          "default": 30,
+          "minimum": 0,
+          "maximum": 100,
+          "semantic_hint": "RSI level defining oversold entry into the setup.",
+          "description_ko": "과매도 기준선입니다. 최근 N봉 안에 RSI가 이 값 이하로 내려간 적이 있어야 합니다.",
+        },
+        "entry_lookback_bars": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "unit": "bars",
+          "semantic_hint": "Recent bar window in which RSI must have reached oversold.",
+          "description_ko": "과매도 발생을 확인할 최근 봉 수입니다. 기본값은 최근 5봉입니다.",
+        },
+        "entry_reversal_mode": {
+          "type": "string",
+          "default": "balanced",
+          "enum": ["aggressive", "balanced", "conservative"],
+          "semantic_hint": "Aggressive buys the first RSI lift, balanced requires candle rebound, conservative waits for RSI 30 reclaim and previous-high breakout.",
+          "description_ko": "매수 진입 강도입니다. aggressive는 첫 RSI 반등, balanced는 RSI 반등과 양봉/전봉 종가 회복, conservative는 30선 재돌파와 전봉 고가 돌파를 요구합니다.",
+        },
+        "entry_max_reversal_rsi": {
+          "type": "number",
+          "default": 45,
+          "minimum": 0,
+          "maximum": 100,
+          "semantic_hint": "Maximum current RSI allowed after the oversold reversal.",
+          "description_ko": "과매도 반등 매수의 최대 RSI입니다. 너무 늦은 반등 추격 진입을 줄입니다.",
+        },
+        "entry_require_candle_confirmation": {
+          "type": "boolean",
+          "default": True,
+          "semantic_hint": "Requires a rebound candle confirmation with the RSI reversal.",
+          "description_ko": "RSI 반등과 함께 양봉, 전봉 종가/고가 돌파, 긴 아래꼬리, 단기 EMA 회복 중 캔들 반등 확인을 요구합니다.",
+        },
+        "entry_lower_wick_min_range_pct": {
+          "type": "number",
+          "default": 0.45,
+          "minimum": 0,
+          "maximum": 1,
+          "semantic_hint": "Minimum lower-wick share of the candle range for lower-wick rebound confirmation.",
+          "description_ko": "긴 아래꼬리로 인정할 최소 비율입니다. 0.45는 전체 캔들 범위의 45% 이상을 의미합니다.",
+        },
+        "entry_block_strong_downtrend": {
+          "type": "boolean",
+          "default": True,
+          "semantic_hint": "Blocks entries when price is below the slow EMA and both short/long EMA slopes are falling.",
+          "description_ko": "가격이 장기 EMA 아래이고 단기/장기 EMA 기울기가 모두 하락이면 매수를 보류합니다.",
+        },
+        "entry_enable_bullish_divergence_exception": {
+          "type": "boolean",
+          "default": True,
+          "semantic_hint": "Allows a strong downtrend exception when price makes a lower low while RSI makes a higher low.",
+          "description_ko": "가격은 저점을 낮췄지만 RSI 저점은 높아지는 상승 다이버전스가 있으면 강한 하락 추세 필터의 예외 후보로 봅니다.",
+        },
+        "trend_slope_lookback_bars": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 20,
+          "unit": "bars",
+          "semantic_hint": "Lookback used to measure EMA slope for strong downtrend filtering.",
+          "description_ko": "강한 하락 추세 필터에서 EMA 기울기를 측정할 봉 수입니다.",
+        },
+        "rsi_exit_level": {
+          "type": "number",
+          "default": 45,
+          "minimum": 0,
+          "maximum": 100,
+          "semantic_hint": "RSI weakness level used by the scored exit model.",
+          "description_ko": "청산 RSI 기준선입니다. 보유 중 RSI가 이 값을 아래로 이탈하면 청산 후보가 됩니다.",
+        },
+        "exit_score_threshold": {
+          "type": "number",
+          "default": 0.75,
+          "minimum": 0,
+          "maximum": 1,
+          "semantic_hint": "SELL score threshold for full-position exits.",
+          "description_ko": "SELL 점수 임계값입니다. 하드스톱이 아닌 청산은 점수가 이 값 이상일 때 전량 SELL합니다.",
+        },
+        "exit_trailing_activation_atr": {
+          "type": "number",
+          "default": 1.5,
+          "minimum": 0,
+          "maximum": 10,
+          "semantic_hint": "ATR profit multiple required before the trailing stop activates.",
+          "description_ko": "트레일링 활성화 수익폭입니다. 진입가 대비 ATR의 이 배수 이상 유리해지면 트레일링 스톱을 켭니다.",
+        },
+        "exit_trailing_distance_atr": {
+          "type": "number",
+          "default": 2.0,
+          "minimum": 0.1,
+          "maximum": 10,
+          "semantic_hint": "ATR distance kept below the high-watermark once trailing is active.",
+          "description_ko": "트레일링 스톱 거리입니다. 최고가에서 ATR의 이 배수만큼 되돌리면 전량 SELL합니다.",
+        },
+        "risk_fraction": {
+          "type": "number",
+          "default": 0.01,
+          "minimum": 0,
+          "maximum": 1,
+          "semantic_hint": "Portfolio risk budget per trade.",
+          "description_ko": "거래 1회당 감수할 포트폴리오 위험 비율입니다. 0.01은 1% 위험 예산입니다.",
+        },
+        "max_position_fraction": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "semantic_hint": "Maximum notional allocation for this strategy.",
+          "description_ko": "전략이 사용할 수 있는 최대 포지션 비중입니다. 0.5는 자산의 50% 한도입니다.",
+        },
+        "atr_stop_multiple": {
+          "type": "number",
+          "default": 2.0,
+          "minimum": 0.1,
+          "semantic_hint": "ATR multiple used for stop distance.",
+          "description_ko": "손절 거리에 곱할 ATR 배수입니다. 값이 클수록 손절 폭이 넓어집니다.",
+        },
+        "atr_take_profit_multiple": {
+          "type": "number",
+          "default": 3.0,
+          "minimum": 0.1,
+          "semantic_hint": "ATR multiple used for take-profit distance.",
+          "description_ko": "익절 기준가 산정에 사용할 ATR 배수입니다. 트레일링 수익 보호와 함께 사용합니다.",
+        },
+      },
+      description=(
+        "RSI14 oversold reversal setup: recent RSI oversold, RSI momentum turn-up, "
+        "rebound candle confirmation, strong-downtrend filter, and ATR risk/trailing exits."
+      ),
+      lifecycle=StrategyLifecycle(stage="experimental"),
+      catalog_semantics=StrategyCatalogSemantics(
+        strategy_kind="composable_quant",
+        execution_model=(
+          "FeaturePipeline -> RSIReversalSignalPolicy -> ATRRiskSizing -> ExecutionPlan. "
+          "The strategy targets RSI14 oversold momentum reversal rather than trend pullback."
+        ),
+        parameter_contract="Typed parameter schema exposes aggressive/balanced/conservative reversal modes.",
+        source_descriptor="akra_trader.strategies.quant_examples:Rsi14OversoldReversalStrategy",
+        operator_notes=(
+          "Default BUY: recent 5-bar RSI14 minimum <= oversold level, RSI turn-up, bullish candle, and close above previous close.",
+          "Conservative mode waits for RSI reclaim above the oversold line and close above the previous high.",
+          "A bullish RSI divergence can bypass the strong-downtrend block.",
+        ),
+      ),
+      version_lineage=("1.0.0",),
+      entrypoint="akra_trader.strategies.quant_examples:Rsi14OversoldReversalStrategy",
+    ),
+    features=(
+      EmaFeature("close", "ema_fast", "fast_ema_window", 20),
+      EmaFeature("close", "ema_slow", "slow_ema_window", 60),
+      RsiFeature(
+        "close",
+        "rsi",
+        "rsi_window",
+        14,
+        timeframe_parameter="rsi_timeframe",
+        default_timeframe="base",
+      ),
+      AtrFeature("atr", "atr_window", 14),
+    ),
+    regime=AllRegimes(()),
+    entry=AllOf(()),
+    exit=AnyOf(()),
+    sizing=AtrRiskSizing(
+      atr_feature="atr",
+      risk_fraction=ParameterRef("risk_fraction", 0.01),
+      stop_multiple=ParameterRef("atr_stop_multiple", 2.0),
+      take_profit_multiple=ParameterRef("atr_take_profit_multiple", 3.0),
+      max_position_fraction=ParameterRef("max_position_fraction", 0.5),
+    ),
+  )
+
+  def build_feature_frame(self, candles: pd.DataFrame, parameters: dict) -> pd.DataFrame:
+    frame = super().build_feature_frame(candles, parameters)
+    entry_lookback = _effective_oversold_lookback(parameters)
+    slope_lookback = _mapping_int_parameter(
+      parameters,
+      "trend_slope_lookback_bars",
+      3,
+      minimum=1,
+      maximum=20,
+    )
+    frame["rsi_recent_min"] = frame["rsi"].rolling(window=entry_lookback, min_periods=1).min()
+    frame["price_recent_low"] = frame["low"].rolling(window=entry_lookback, min_periods=1).min()
+    frame["previous_price_swing_low"] = (
+      frame["low"].shift(1).rolling(window=entry_lookback, min_periods=1).min()
+    )
+    frame["previous_rsi_swing_low"] = (
+      frame["rsi"].shift(1).rolling(window=entry_lookback, min_periods=1).min()
+    )
+    frame["ema_fast_slope"] = frame["ema_fast"] - frame["ema_fast"].shift(slope_lookback)
+    frame["ema_slow_slope"] = frame["ema_slow"] - frame["ema_slow"].shift(slope_lookback)
+    return frame
+
+  def decide(self, context: StrategyDecisionContext) -> StrategyDecisionEnvelope:
+    entry_evaluation = _rsi14_oversold_reversal_entry_evaluation(context)
+    exit_evaluation = _rsi_atr_exit_evaluation(context)
+    exit_match = bool(exit_evaluation["matched"])
+    entry_match = bool(entry_evaluation["matched"])
+
+    if context.state.has_position and exit_match:
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.SELL,
+        confidence=max(0.72, float(exit_evaluation["score"])),
+        tags=("composable", "exit", str(exit_evaluation["reason"])),
+        reason=str(exit_evaluation["reason"]),
+      )
+    elif not context.state.has_position and entry_match:
+      confidence = 0.78 if bool(entry_evaluation.get("bullish_divergence")) else 0.72
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.BUY,
+        confidence=confidence,
+        tags=("composable", "entry", str(entry_evaluation["mode"])),
+        reason=str(entry_evaluation["reason"]),
+      )
+    else:
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.HOLD,
+        confidence=0.55,
+        tags=("composable", "idle"),
+        reason="composable_conditions_not_met",
+      )
+
+    execution = self.spec.sizing.build(context, signal)
+    return StrategyDecisionEnvelope(
+      signal=signal,
+      rationale=_rsi14_oversold_reversal_rationale(
+        signal,
+        entry_evaluation=entry_evaluation,
+        exit_evaluation=exit_evaluation,
+      ),
+      context=context,
+      execution=execution,
+      trace={
+        "architecture": {
+          "layers": (
+            "feature_pipeline",
+            "rsi_reversal_signal_policy",
+            "sizing_model",
+            "execution_plan",
+          )
+        },
+        "entry": entry_evaluation,
+        "exit": exit_evaluation,
+        "execution_tags": execution.tags,
+      },
+    )
+
+
 def _rsi_atr_entry_evaluation(
   context: StrategyDecisionContext,
   *,
@@ -644,6 +952,239 @@ def _rsi_atr_entry_evaluation(
     "filters": filters,
     "trend_entry_matched": trend_entry_matched,
     "range_entry_matched": range_recovery_matched,
+  }
+
+
+def _rsi14_oversold_reversal_entry_evaluation(context: StrategyDecisionContext) -> dict[str, Any]:
+  mode = str(context.state.parameters.get("entry_reversal_mode", "balanced")).lower()
+  if mode not in {"aggressive", "balanced", "conservative"}:
+    mode = "balanced"
+  oversold_level = _clamped_parameter(
+    context,
+    "rsi_oversold_level",
+    30.0,
+    minimum=0.0,
+    maximum=100.0,
+  )
+  max_reversal_rsi = _clamped_parameter(
+    context,
+    "entry_max_reversal_rsi",
+    45.0,
+    minimum=0.0,
+    maximum=100.0,
+  )
+  lower_wick_min_range_pct = _clamped_parameter(
+    context,
+    "entry_lower_wick_min_range_pct",
+    0.45,
+    minimum=0.0,
+    maximum=1.0,
+  )
+  require_candle_confirmation = bool(
+    context.state.parameters.get("entry_require_candle_confirmation", True)
+  )
+  block_strong_downtrend = bool(
+    context.state.parameters.get("entry_block_strong_downtrend", True)
+  )
+  divergence_exception_enabled = bool(
+    context.state.parameters.get("entry_enable_bullish_divergence_exception", True)
+  )
+
+  open_price = _feature_or_market(context, "open")
+  high = _feature_or_market(context, "high")
+  low = _feature_or_market(context, "low")
+  close = _feature_or_market(context, "close")
+  previous_close = _feature_value(context, "previous_close")
+  previous_high = _feature_value(context, "previous_high")
+  rsi = _feature_value(context, "rsi")
+  previous_rsi = _feature_value(context, "previous_rsi")
+  previous2_rsi = _feature_value(context, "previous2_rsi")
+  rsi_recent_min = _feature_value(context, "rsi_recent_min")
+  ema_fast = _feature_value(context, "ema_fast")
+  ema_slow = _feature_value(context, "ema_slow")
+  previous_ema_fast = _feature_value(context, "previous_ema_fast")
+  previous_ema_slow = _feature_value(context, "previous_ema_slow")
+  ema_fast_slope = _feature_value(context, "ema_fast_slope")
+  ema_slow_slope = _feature_value(context, "ema_slow_slope")
+  previous_price_swing_low = _feature_value(context, "previous_price_swing_low")
+  previous_rsi_swing_low = _feature_value(context, "previous_rsi_swing_low")
+
+  recent_oversold = rsi_recent_min is not None and rsi_recent_min <= oversold_level
+  previous_oversold = previous_rsi is not None and previous_rsi <= oversold_level
+  rsi_turn_up = rsi is not None and previous_rsi is not None and rsi > previous_rsi
+  rsi_bottomed = (
+    rsi_turn_up
+    and previous_rsi is not None
+    and (
+      previous2_rsi is None
+      or previous_rsi <= previous2_rsi
+    )
+  )
+  rsi_crossed_oversold = previous_oversold and rsi is not None and rsi > oversold_level
+  rsi_reversal_shape = rsi_bottomed or rsi_crossed_oversold
+  rsi_ceiling = rsi is not None and rsi <= max_reversal_rsi
+
+  candle_range = high - low if high is not None and low is not None else None
+  lower_wick = (
+    min(open_price, close) - low
+    if open_price is not None and close is not None and low is not None
+    else None
+  )
+  lower_wick_ratio = (
+    lower_wick / candle_range
+    if lower_wick is not None and candle_range is not None and candle_range > 0
+    else None
+  )
+  bullish_body = close is not None and open_price is not None and close > open_price
+  close_above_previous_close = (
+    close is not None
+    and previous_close is not None
+    and close > previous_close
+  )
+  close_above_previous_high = (
+    close is not None
+    and previous_high is not None
+    and close > previous_high
+  )
+  long_lower_wick = (
+    lower_wick_ratio is not None
+    and lower_wick_ratio >= lower_wick_min_range_pct
+    and close is not None
+    and low is not None
+    and candle_range is not None
+    and close >= low + (candle_range * 0.5)
+  )
+  short_ema_reclaim = (
+    close is not None
+    and ema_fast is not None
+    and close >= ema_fast
+    and (
+      previous_close is None
+      or previous_ema_fast is None
+      or previous_close < previous_ema_fast
+    )
+  )
+  candle_confirmations = {
+    "bullish_body": bullish_body,
+    "close_above_previous_close": close_above_previous_close,
+    "close_above_previous_high": close_above_previous_high,
+    "long_lower_wick": long_lower_wick,
+    "short_ema_reclaim": short_ema_reclaim,
+  }
+  candle_reversal = any(candle_confirmations.values())
+
+  fast_slope_down = _is_falling(ema_fast_slope, ema_fast, previous_ema_fast)
+  slow_slope_down = _is_falling(ema_slow_slope, ema_slow, previous_ema_slow)
+  price_below_slow = close is not None and ema_slow is not None and close < ema_slow
+  strong_downtrend = price_below_slow and fast_slope_down and slow_slope_down
+  bullish_divergence = (
+    low is not None
+    and previous_price_swing_low is not None
+    and rsi is not None
+    and previous_rsi_swing_low is not None
+    and low < previous_price_swing_low
+    and rsi > previous_rsi_swing_low
+  )
+  trend_allowed = (
+    not block_strong_downtrend
+    or not strong_downtrend
+    or (divergence_exception_enabled and bullish_divergence)
+  )
+
+  filters = {
+    "recent_oversold": {
+      "passed": recent_oversold,
+      "rsi_recent_min": rsi_recent_min,
+      "rsi_oversold_level": oversold_level,
+    },
+    "previous_oversold": {
+      "passed": previous_oversold,
+      "previous_rsi": previous_rsi,
+      "rsi_oversold_level": oversold_level,
+    },
+    "rsi_turn_up": {
+      "passed": rsi_turn_up,
+      "rsi": rsi,
+      "previous_rsi": previous_rsi,
+    },
+    "rsi_reversal_shape": {
+      "passed": rsi_reversal_shape,
+      "rsi_bottomed": rsi_bottomed,
+      "rsi_crossed_oversold": rsi_crossed_oversold,
+      "previous2_rsi": previous2_rsi,
+    },
+    "rsi_ceiling": {
+      "passed": rsi_ceiling,
+      "rsi": rsi,
+      "maximum": max_reversal_rsi,
+    },
+    "bullish_body": {
+      "passed": bullish_body,
+      "open": open_price,
+      "close": close,
+    },
+    "close_above_previous_close": {
+      "passed": close_above_previous_close,
+      "close": close,
+      "previous_close": previous_close,
+    },
+    "close_above_previous_high": {
+      "passed": close_above_previous_high,
+      "close": close,
+      "previous_high": previous_high,
+    },
+    "candle_reversal": {
+      "passed": candle_reversal,
+      "required": require_candle_confirmation,
+      "confirmations": candle_confirmations,
+      "lower_wick_ratio": lower_wick_ratio,
+      "lower_wick_min_range_pct": lower_wick_min_range_pct,
+    },
+    "strong_downtrend_block": {
+      "passed": trend_allowed,
+      "blocked": block_strong_downtrend and strong_downtrend and not (
+        divergence_exception_enabled and bullish_divergence
+      ),
+      "strong_downtrend": strong_downtrend,
+      "price_below_slow": price_below_slow,
+      "fast_slope_down": fast_slope_down,
+      "slow_slope_down": slow_slope_down,
+      "bullish_divergence": bullish_divergence,
+      "divergence_exception_enabled": divergence_exception_enabled,
+    },
+  }
+
+  requirements = ["rsi_ceiling", "strong_downtrend_block"]
+  if mode == "aggressive":
+    requirements.extend(("previous_oversold", "rsi_turn_up"))
+    if require_candle_confirmation:
+      requirements.append("bullish_body")
+  elif mode == "conservative":
+    requirements.extend(("recent_oversold", "rsi_reversal_shape", "close_above_previous_high"))
+  else:
+    requirements.extend(("recent_oversold", "rsi_reversal_shape"))
+    if require_candle_confirmation:
+      requirements.extend(("bullish_body", "close_above_previous_close"))
+  if require_candle_confirmation and "candle_reversal" not in requirements:
+    requirements.append("candle_reversal")
+
+  failed_filters = tuple(name for name in requirements if not bool(filters[name]["passed"]))
+  matched = not failed_filters
+  reason = (
+    f"entry_conditions_met:rsi14_oversold_reversal:{mode}"
+    if matched
+    else f"entry_filters_failed:{','.join(failed_filters)}"
+  )
+  return {
+    "matched": matched,
+    "reason": reason,
+    "mode": mode,
+    "requirements": tuple(requirements),
+    "failed_filters": failed_filters,
+    "filters": filters,
+    "candle_confirmations": candle_confirmations,
+    "bullish_divergence": bullish_divergence,
+    "strong_downtrend": strong_downtrend,
   }
 
 
@@ -945,6 +1486,73 @@ def _rsi_atr_rationale(
     f"exit_reason={exit_evaluation['reason']}; exit_components={component_summary}"
     f"{trailing_summary}."
   )
+
+
+def _rsi14_oversold_reversal_rationale(
+  signal: SignalDecision,
+  *,
+  entry_evaluation: dict[str, Any],
+  exit_evaluation: dict[str, Any],
+) -> str:
+  score = float(exit_evaluation["score"])
+  threshold = float(exit_evaluation["threshold"])
+  active_confirmations = [
+    name for name, active in entry_evaluation["candle_confirmations"].items() if bool(active)
+  ]
+  confirmation_summary = ",".join(active_confirmations) if active_confirmations else "none"
+  active_exit_components = [
+    name
+    for name, component in exit_evaluation["components"].items()
+    if bool(component.get("active"))
+  ]
+  exit_component_summary = ",".join(active_exit_components) if active_exit_components else "none"
+  return (
+    f"RSI14 oversold reversal signal={signal.action.value}; "
+    f"mode={entry_evaluation['mode']}; entry={entry_evaluation['matched']}; "
+    f"entry_reason={entry_evaluation['reason']}; confirmations={confirmation_summary}; "
+    f"bullish_divergence={entry_evaluation['bullish_divergence']}; "
+    f"strong_downtrend={entry_evaluation['strong_downtrend']}; exit={exit_evaluation['matched']}; "
+    f"exit_score={score:.2f}/{threshold:.2f}; "
+    f"exit_reason={exit_evaluation['reason']}; exit_components={exit_component_summary}."
+  )
+
+
+def _effective_oversold_lookback(parameters: dict[str, Any]) -> int:
+  lookback = _mapping_int_parameter(
+    parameters,
+    "entry_lookback_bars",
+    5,
+    minimum=1,
+    maximum=20,
+  )
+  mode = str(parameters.get("entry_reversal_mode", "balanced")).lower()
+  if mode == "conservative":
+    return max(lookback, 10)
+  return lookback
+
+
+def _mapping_int_parameter(
+  parameters: dict[str, Any],
+  key: str,
+  default: int,
+  *,
+  minimum: int,
+  maximum: int,
+) -> int:
+  value = _finite_number(parameters.get(key, default))
+  if value is None:
+    value = float(default)
+  return min(max(int(value), minimum), maximum)
+
+
+def _is_falling(
+  slope: float | None,
+  current: float | None,
+  previous: float | None,
+) -> bool:
+  if slope is not None:
+    return slope < 0
+  return current is not None and previous is not None and current < previous
 
 
 def _feature_or_market(context: StrategyDecisionContext, key: str) -> float | None:
