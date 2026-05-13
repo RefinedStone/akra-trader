@@ -67,6 +67,19 @@ const strategyResponse = {
           semantic_hint: "Portfolio risk budget per trade.",
           description_ko: "거래 1회당 감수할 포트폴리오 위험 비율입니다. 0.01은 1% 위험 예산입니다.",
         },
+        entry_min_trend_spread_atr: {
+          type: "number",
+          default: 0.25,
+          minimum: 0,
+          semantic_hint: "Minimum fast/slow EMA spread measured in ATR units for BUY.",
+          description_ko: "매수 추세 강도 최소값입니다. 단기 EMA와 장기 EMA 간격이 ATR의 이 배수 이상일 때만 매수합니다.",
+        },
+        entry_require_price_above_slow_ema: {
+          type: "boolean",
+          default: true,
+          semantic_hint: "Requires close to stay above the slow EMA before BUY.",
+          description_ko: "매수 전 현재가가 장기 EMA 위에 있어야 하는지 여부입니다.",
+        },
         exit_score_threshold: {
           type: "number",
           default: 0.75,
@@ -548,16 +561,25 @@ describe("ControlRoomApp", () => {
     expect(screen.getByLabelText(/rsi_oversold_level/)).toHaveValue(30);
     expect(screen.getByLabelText(/rsi_timeframe/)).toHaveValue("base");
     expect(screen.getByLabelText(/risk_fraction/)).toHaveValue(0.01);
+    expect(screen.getByLabelText(/entry_min_trend_spread_atr/)).toHaveValue(0.25);
+    expect(
+      screen.getByRole("checkbox", { name: /entry_require_price_above_slow_ema/ }),
+    ).toBeChecked();
     expect(screen.getByLabelText(/exit_score_threshold/)).toHaveValue(0.75);
     expect(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ })).toBeChecked();
     expect(screen.getByText(/단기 EMA 기간입니다/)).toBeInTheDocument();
     expect(screen.getByText(/직전 RSI 고점/)).toBeInTheDocument();
     expect(screen.getByText(/거래 1회당 감수할 포트폴리오 위험 비율/)).toBeInTheDocument();
+    expect(screen.getByText(/매수 추세 강도 최소값/)).toBeInTheDocument();
     expect(screen.getByText(/SELL 점수 임계값/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/fast_ema_window/), { target: { value: "12" } });
     fireEvent.change(screen.getByLabelText(/rsi_timeframe/), { target: { value: "15m" } });
     fireEvent.change(screen.getByLabelText(/risk_fraction/), { target: { value: "0.02" } });
+    fireEvent.change(screen.getByLabelText(/entry_min_trend_spread_atr/), {
+      target: { value: "0.4" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: /entry_require_price_above_slow_ema/ }));
     fireEvent.change(screen.getByLabelText(/exit_score_threshold/), { target: { value: "0.8" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ }));
     fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
@@ -577,6 +599,8 @@ describe("ControlRoomApp", () => {
         fast_ema_window: 12,
         rsi_timeframe: "15m",
         risk_fraction: 0.02,
+        entry_min_trend_spread_atr: 0.4,
+        entry_require_price_above_slow_ema: false,
         exit_score_threshold: 0.8,
         use_llm_regime_hint: false,
       },

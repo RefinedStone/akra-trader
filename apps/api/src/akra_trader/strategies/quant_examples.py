@@ -93,6 +93,19 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
           "semantic_hint": "RSI weakness level used by the scored exit model.",
           "description_ko": "청산 RSI 기준선입니다. 보유 중 RSI가 이 값을 아래로 이탈하면 청산 후보가 됩니다.",
         },
+        "entry_min_trend_spread_atr": {
+          "type": "number",
+          "default": 0.25,
+          "minimum": 0,
+          "semantic_hint": "Minimum fast/slow EMA spread measured in ATR units for BUY.",
+          "description_ko": "매수 추세 강도 최소값입니다. 단기 EMA와 장기 EMA 간격이 ATR의 이 배수 이상일 때만 매수합니다.",
+        },
+        "entry_require_price_above_slow_ema": {
+          "type": "boolean",
+          "default": True,
+          "semantic_hint": "Requires close to stay above the slow EMA before BUY.",
+          "description_ko": "매수 전 현재가가 장기 EMA 위에 있어야 하는지 여부입니다. 약한 추세에서의 조기 진입을 줄입니다.",
+        },
         "exit_score_threshold": {
           "type": "number",
           "default": 0.75,
@@ -152,7 +165,8 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
         parameter_contract="Typed parameter schema drives defaults, runtime overrides, and future UI controls.",
         source_descriptor="akra_trader.strategies.quant_examples:RsiAtrOversoldPeakTurnStrategy",
         operator_notes=(
-          "Long entry requires EMA uptrend plus a local RSI peak that forms below the oversold ceiling and then turns down.",
+          "Long entry requires EMA uptrend, enough EMA spread versus ATR, "
+          "price above the slow EMA, and an oversold RSI peak turn.",
           "LLM hints are optional overlays and fall back to deterministic systematic rules.",
         ),
       ),
@@ -203,7 +217,13 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
 
   def decide(self, context: StrategyDecisionContext) -> StrategyDecisionEnvelope:
     regime = self.spec.regime.evaluate(context)
-    entry_match = regime.allowed and self.spec.entry.evaluate(context)
+    entry_evaluation = _rsi_atr_entry_evaluation(
+      context,
+      regime_allowed=regime.allowed,
+      rule_matched=self.spec.entry.evaluate(context),
+      rule=self.spec.entry.describe(),
+    )
+    entry_match = bool(entry_evaluation["matched"])
     exit_evaluation = _rsi_atr_exit_evaluation(context)
     exit_match = bool(exit_evaluation["matched"])
 
@@ -238,7 +258,7 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
       rationale=_rsi_atr_rationale(
         signal,
         regime_label=regime.label,
-        entry_match=entry_match,
+        entry_evaluation=entry_evaluation,
         exit_evaluation=exit_evaluation,
       ),
       context=context,
@@ -255,7 +275,7 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
           )
         },
         "regime": {"allowed": regime.allowed, "label": regime.label, "trace": regime.trace},
-        "entry": {"matched": entry_match, "rule": self.spec.entry.describe()},
+        "entry": entry_evaluation,
         "exit": exit_evaluation,
         "execution_tags": execution.tags,
       },
@@ -264,6 +284,84 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
 
 class RsiAtrTrendPullbackStrategy(RsiAtrOversoldPeakTurnStrategy):
   """Backward-compatible import alias for the renamed built-in strategy."""
+
+
+def _rsi_atr_entry_evaluation(
+  context: StrategyDecisionContext,
+  *,
+  regime_allowed: bool,
+  rule_matched: bool,
+  rule: dict[str, Any],
+) -> dict[str, Any]:
+  close = _feature_or_market(context, "close")
+  ema_fast = _feature_value(context, "ema_fast")
+  ema_slow = _feature_value(context, "ema_slow")
+  atr = _feature_value(context, "atr")
+  min_spread_atr = _clamped_parameter(
+    context,
+    "entry_min_trend_spread_atr",
+    0.25,
+    minimum=0.0,
+    maximum=10.0,
+  )
+  require_price_above_slow = bool(
+    context.state.parameters.get("entry_require_price_above_slow_ema", True)
+  )
+  trend_spread = (
+    ema_fast - ema_slow
+    if ema_fast is not None and ema_slow is not None
+    else None
+  )
+  trend_spread_atr = (
+    trend_spread / atr
+    if trend_spread is not None and atr is not None and atr > 0
+    else None
+  )
+  filters = {
+    "trend_spread_strength": {
+      "passed": (
+        trend_spread_atr is not None
+        and trend_spread_atr >= min_spread_atr
+      ),
+      "value": trend_spread_atr,
+      "minimum": min_spread_atr,
+      "trend_spread": trend_spread,
+      "atr": atr,
+    },
+    "price_above_slow_ema": {
+      "passed": (
+        not require_price_above_slow
+        or (
+          close is not None
+          and ema_slow is not None
+          and close >= ema_slow
+        )
+      ),
+      "required": require_price_above_slow,
+      "close": close,
+      "ema_slow": ema_slow,
+    },
+  }
+  failed_filters = tuple(
+    name for name, details in filters.items() if not bool(details["passed"])
+  )
+  matched = regime_allowed and rule_matched and not failed_filters
+  if not regime_allowed:
+    reason = "entry_regime_blocked"
+  elif not rule_matched:
+    reason = "entry_base_rule_not_matched"
+  elif failed_filters:
+    reason = f"entry_filters_failed:{','.join(failed_filters)}"
+  else:
+    reason = "entry_conditions_met"
+  return {
+    "matched": matched,
+    "reason": reason,
+    "rule_matched": rule_matched,
+    "regime_allowed": regime_allowed,
+    "rule": rule,
+    "filters": filters,
+  }
 
 
 def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]:
@@ -428,7 +526,7 @@ def _rsi_atr_rationale(
   signal: SignalDecision,
   *,
   regime_label: str,
-  entry_match: bool,
+  entry_evaluation: dict[str, Any],
   exit_evaluation: dict[str, Any],
 ) -> str:
   score = float(exit_evaluation["score"])
@@ -441,7 +539,8 @@ def _rsi_atr_rationale(
   component_summary = ",".join(active_components) if active_components else "none"
   return (
     f"Composable strategy signal={signal.action.value}; "
-    f"regime={regime_label}; entry={entry_match}; exit={exit_evaluation['matched']}; "
+    f"regime={regime_label}; entry={entry_evaluation['matched']}; "
+    f"entry_reason={entry_evaluation['reason']}; exit={exit_evaluation['matched']}; "
     f"exit_score={score:.2f}/{threshold:.2f}; "
     f"exit_reason={exit_evaluation['reason']}; exit_components={component_summary}."
   )

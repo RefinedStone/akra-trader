@@ -146,6 +146,12 @@ def test_health_and_strategy_surface(tmp_path):
   assert "과매도 기준선" in quant_strategy["parameter_schema"]["rsi_oversold_level"]["description_ko"]
   assert "risk_fraction" in quant_strategy["parameter_schema"]
   assert "포트폴리오 위험 비율" in quant_strategy["parameter_schema"]["risk_fraction"]["description_ko"]
+  assert quant_strategy["parameter_schema"]["entry_min_trend_spread_atr"]["default"] == 0.25
+  assert (
+    "매수 추세 강도"
+    in quant_strategy["parameter_schema"]["entry_min_trend_spread_atr"]["description_ko"]
+  )
+  assert quant_strategy["parameter_schema"]["entry_require_price_above_slow_ema"]["default"] is True
   assert quant_strategy["parameter_schema"]["exit_score_threshold"]["default"] == 0.75
   assert (
     "SELL 점수 임계값"
@@ -703,6 +709,8 @@ def test_rsi_atr_oversold_peak_turn_buys_when_oversold_rsi_peak_rolls_over():
 
   assert envelope.signal.action == SignalAction.BUY
   assert envelope.trace["entry"]["matched"] is True
+  assert envelope.trace["entry"]["filters"]["trend_spread_strength"]["passed"] is True
+  assert envelope.trace["entry"]["filters"]["price_above_slow_ema"]["passed"] is True
   assert envelope.context.features["previous2_rsi"] == 24.0
   assert envelope.context.features["previous_rsi"] == 28.0
 
@@ -723,6 +731,55 @@ def test_rsi_atr_oversold_peak_turn_holds_without_oversold_peak():
 
   assert envelope.signal.action == SignalAction.HOLD
   assert envelope.trace["entry"]["matched"] is False
+
+
+def test_rsi_atr_oversold_peak_turn_rejects_buy_when_price_is_below_slow_ema():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_peak_turn_frame(
+    (24.0, 28.0, 26.0),
+    closes=(100.0, 101.0, 98.0),
+    ema_fast=(101.0, 101.25, 101.5),
+    ema_slow=(99.0, 99.25, 99.5),
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.HOLD
+  assert envelope.trace["entry"]["reason"] == "entry_filters_failed:price_above_slow_ema"
+  assert envelope.trace["entry"]["filters"]["price_above_slow_ema"]["passed"] is False
+
+
+def test_rsi_atr_oversold_peak_turn_rejects_buy_when_trend_spread_is_too_weak():
+  strategy = RsiAtrOversoldPeakTurnStrategy()
+  frame = _rsi_peak_turn_frame(
+    (24.0, 28.0, 26.0),
+    closes=(100.0, 101.0, 101.0),
+    ema_fast=(100.2, 100.2, 100.2),
+    ema_slow=(100.0, 100.0, 100.0),
+    atr=2.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={"rsi_oversold_level": 30, "use_llm_regime_hint": False},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.HOLD
+  assert envelope.trace["entry"]["reason"] == "entry_filters_failed:trend_spread_strength"
+  assert envelope.trace["entry"]["filters"]["trend_spread_strength"]["value"] == pytest.approx(0.1)
 
 
 def test_rsi_atr_oversold_peak_turn_sells_immediately_on_hard_stop():
@@ -795,9 +852,17 @@ def test_rsi_atr_oversold_peak_turn_sells_when_exit_score_reaches_threshold():
   assert "exit_score=0.95/0.75" in envelope.rationale
 
 
-def _rsi_peak_turn_frame(rsi_values: tuple[float, float, float]) -> pd.DataFrame:
+def _rsi_peak_turn_frame(
+  rsi_values: tuple[float, float, float],
+  *,
+  closes: tuple[float, float, float] = (100.0, 101.0, 100.5),
+  ema_fast: tuple[float, float, float] | None = None,
+  ema_slow: tuple[float, float, float] | None = None,
+  atr: float = 2.0,
+) -> pd.DataFrame:
   timestamp = datetime(2026, 5, 11, tzinfo=UTC)
-  closes = (100.0, 101.0, 100.5)
+  fast_values = ema_fast or tuple(101.0 + index * 0.25 for index in range(3))
+  slow_values = ema_slow or tuple(99.0 + index * 0.25 for index in range(3))
   return pd.DataFrame(
     [
       {
@@ -807,14 +872,16 @@ def _rsi_peak_turn_frame(rsi_values: tuple[float, float, float]) -> pd.DataFrame
         "low": close - 1.0,
         "close": close,
         "volume": 1000.0 + index,
-        "ema_fast": 101.0 + index * 0.25,
-        "ema_slow": 99.0 + index * 0.25,
+        "ema_fast": fast,
+        "ema_slow": slow,
         "rsi": rsi,
         "rsi_previous": rsi_values[index - 1] if index >= 1 else 50.0,
         "rsi_previous2": rsi_values[index - 2] if index >= 2 else 50.0,
-        "atr": 2.0,
+        "atr": atr,
       }
-      for index, (close, rsi) in enumerate(zip(closes, rsi_values, strict=True))
+      for index, (close, fast, slow, rsi) in enumerate(
+        zip(closes, fast_values, slow_values, rsi_values, strict=True)
+      )
     ]
   )
 
