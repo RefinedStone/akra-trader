@@ -423,6 +423,15 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Recent bar window in which RSI must have reached oversold.",
           "description_ko": "과매도 발생을 확인할 최근 봉 수입니다. 기본값은 최근 10봉입니다.",
         },
+        "entry_breakout_grace_bars": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 5,
+          "unit": "bars",
+          "semantic_hint": "Bars allowed after the RSI oversold-line reclaim for the previous-high breakout confirmation.",
+          "description_ko": "RSI14가 30선을 상향 돌파한 뒤 전봉 고가 돌파를 기다릴 봉 수입니다. 2는 재돌파 후 2봉 이내 돌파를 허용합니다.",
+        },
         "swing_lookback_bars": {
           "type": "integer",
           "default": 5,
@@ -521,7 +530,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         parameter_contract="Typed parameter schema exposes oversold lookback, swing stop, R target, time stop, and cooldown controls.",
         source_descriptor="akra_trader.strategies.quant_examples:Rsi14OversoldReversalStrategy",
         operator_notes=(
-          "BUY requires RSI14 to have been oversold within 10 bars, RSI14 to cross back above 30, and close to break the previous high.",
+          "BUY requires RSI14 to have been oversold within 10 bars, RSI14 to cross back above 30, and close to break the previous high within the breakout grace window.",
           "Trend filter passes when close is above MA20, close is above MA60, or MA20 slope is non-negative.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
           "SELL uses swing-low stop, fixed 1.5 ATR stop, RSI50/R-target/MA-resistance profit exits, 7-bar no-profit time exit, and 5-bar stop cooldown.",
@@ -574,6 +583,13 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
       minimum=2,
       maximum=20,
     )
+    breakout_grace = _mapping_int_parameter(
+      parameters,
+      "entry_breakout_grace_bars",
+      2,
+      minimum=0,
+      maximum=5,
+    )
     slope_lookback = _mapping_int_parameter(
       parameters,
       "trend_slope_lookback_bars",
@@ -583,6 +599,29 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     )
     frame["bar_index"] = range(len(frame))
     frame["rsi_recent_min"] = frame["rsi"].rolling(window=entry_lookback, min_periods=1).min()
+    oversold_level = _clamped_mapping_number(
+      parameters,
+      "rsi_oversold_level",
+      30.0,
+      minimum=0.0,
+      maximum=100.0,
+    )
+    frame["rsi_crossed_oversold"] = (
+      (frame["rsi"].shift(1) <= oversold_level)
+      & (frame["rsi"] > oversold_level)
+    )
+    frame["rsi_crossed_oversold_recent"] = (
+      frame["rsi_crossed_oversold"]
+      .rolling(window=breakout_grace + 1, min_periods=1)
+      .max()
+      .fillna(False)
+      .astype(bool)
+    )
+    cross_bar_index = frame["bar_index"].where(frame["rsi_crossed_oversold"]).ffill()
+    bars_since_cross = frame["bar_index"] - cross_bar_index
+    frame["bars_since_rsi_oversold_cross"] = bars_since_cross.where(
+      bars_since_cross <= breakout_grace
+    )
     frame["previous_price_swing_low"] = (
       frame["low"].shift(1).rolling(window=swing_lookback, min_periods=1).min()
     )
@@ -982,6 +1021,15 @@ def _rsi14_oversold_reversal_entry_evaluation(
   rsi = _feature_value(context, "rsi")
   previous_rsi = _feature_value(context, "previous_rsi")
   rsi_recent_min = _feature_value(context, "rsi_recent_min")
+  rsi_crossed_oversold_recent = _feature_flag(context, "rsi_crossed_oversold_recent")
+  bars_since_rsi_oversold_cross = _feature_value(context, "bars_since_rsi_oversold_cross")
+  breakout_grace_bars = _mapping_int_parameter(
+    context.state.parameters,
+    "entry_breakout_grace_bars",
+    2,
+    minimum=0,
+    maximum=5,
+  )
   ma20 = _feature_value(context, "ma20")
   ma60 = _feature_value(context, "ma60")
   ma20_slope = _feature_value(context, "ma20_slope")
@@ -1028,6 +1076,15 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "previous_rsi": previous_rsi,
       "rsi_oversold_level": oversold_level,
     },
+    "rsi_crossed_oversold_recent": {
+      "passed": rsi_crossed_oversold_recent,
+      "current_bar_crossed": rsi_crossed_oversold,
+      "bars_since_cross": bars_since_rsi_oversold_cross,
+      "breakout_grace_bars": breakout_grace_bars,
+      "rsi": rsi,
+      "previous_rsi": previous_rsi,
+      "rsi_oversold_level": oversold_level,
+    },
     "close_above_previous_high": {
       "passed": close_above_previous_high,
       "close": close,
@@ -1060,7 +1117,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
 
   requirements = (
     "recent_oversold",
-    "rsi_crossed_oversold",
+    "rsi_crossed_oversold_recent",
     "close_above_previous_high",
     "trend_filter",
     "structural_downtrend_block",
@@ -1604,6 +1661,20 @@ def _mapping_int_parameter(
   return min(max(int(value), minimum), maximum)
 
 
+def _clamped_mapping_number(
+  parameters: dict[str, Any],
+  key: str,
+  default: float,
+  *,
+  minimum: float,
+  maximum: float,
+) -> float:
+  value = _finite_number(parameters.get(key, default))
+  if value is None:
+    value = default
+  return min(max(value, minimum), maximum)
+
+
 def _is_falling(
   slope: float | None,
   current: float | None,
@@ -1664,6 +1735,14 @@ def _feature_or_market(context: StrategyDecisionContext, key: str) -> float | No
 
 def _feature_value(context: StrategyDecisionContext, key: str) -> float | None:
   return _finite_number(context.features.get(key))
+
+
+def _feature_flag(context: StrategyDecisionContext, key: str) -> bool:
+  value = context.features.get(key)
+  if isinstance(value, bool):
+    return value
+  number = _finite_number(value)
+  return bool(number) if number is not None else False
 
 
 def _clamped_parameter(

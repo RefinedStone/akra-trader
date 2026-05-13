@@ -139,6 +139,7 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["ma60_window"]["default"] == 60
   assert reversal_strategy["parameter_schema"]["rsi_window"]["default"] == 14
   assert reversal_strategy["parameter_schema"]["entry_lookback_bars"]["default"] == 10
+  assert reversal_strategy["parameter_schema"]["entry_breakout_grace_bars"]["default"] == 2
   assert reversal_strategy["parameter_schema"]["swing_lookback_bars"]["default"] == 5
   assert reversal_strategy["parameter_schema"]["exit_rsi_profit_level"]["default"] == 50
   assert reversal_strategy["parameter_schema"]["exit_profit_r_multiple"]["default"] == 1.5
@@ -835,9 +836,36 @@ def test_rsi14_oversold_reversal_buys_escape_breakout():
   assert envelope.signal.action == SignalAction.BUY
   assert envelope.signal.reason == "entry_conditions_met:rsi14_oversold_escape_rebound"
   assert envelope.trace["entry"]["filters"]["recent_oversold"]["passed"] is True
-  assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold"]["passed"] is True
+  assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold_recent"]["passed"] is True
   assert envelope.trace["entry"]["filters"]["close_above_previous_high"]["passed"] is True
   assert envelope.trace["entry"]["filters"]["trend_filter"]["passed"] is True
+
+
+def test_rsi14_oversold_reversal_buys_breakout_after_reclaim_grace():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (25.0, 31.0, 35.0),
+    closes=(98.0, 98.2, 99.5),
+    ma20=(98.0, 98.2, 98.4),
+    ma60=(97.0, 97.2, 97.4),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold"]["passed"] is False
+  assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold_recent"]["passed"] is True
+  assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold_recent"]["bars_since_cross"] == 1
+  assert envelope.trace["entry"]["filters"]["close_above_previous_high"]["passed"] is True
 
 
 def test_rsi14_oversold_reversal_rejects_without_previous_high_breakout():
@@ -861,7 +889,7 @@ def test_rsi14_oversold_reversal_rejects_without_previous_high_breakout():
   envelope = strategy.evaluate(frame, state.parameters, state)
 
   assert envelope.signal.action == SignalAction.HOLD
-  assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold"]["passed"] is True
+  assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold_recent"]["passed"] is True
   assert envelope.trace["entry"]["filters"]["close_above_previous_high"]["passed"] is False
   assert "close_above_previous_high" in envelope.trace["entry"]["reason"]
 
@@ -1426,6 +1454,21 @@ def _rsi14_escape_frame(
   frame["ma60"] = ma60
   frame["bar_index"] = [bar_index - 2, bar_index - 1, bar_index]
   frame["rsi_recent_min"] = frame["rsi"].rolling(window=10, min_periods=1).min()
+  frame["rsi_crossed_oversold"] = (
+    (frame["rsi"].shift(1) <= 30)
+    & (frame["rsi"] > 30)
+  )
+  frame["rsi_crossed_oversold_recent"] = (
+    frame["rsi_crossed_oversold"]
+    .rolling(window=3, min_periods=1)
+    .max()
+    .fillna(False)
+    .astype(bool)
+  )
+  cross_bar_index = frame["bar_index"].where(frame["rsi_crossed_oversold"]).ffill()
+  frame["bars_since_rsi_oversold_cross"] = (frame["bar_index"] - cross_bar_index).where(
+    frame["bar_index"] - cross_bar_index <= 2
+  )
   if previous_price_swing_low is None:
     frame["previous_price_swing_low"] = (
       frame["low"].shift(1).rolling(window=5, min_periods=1).min()
