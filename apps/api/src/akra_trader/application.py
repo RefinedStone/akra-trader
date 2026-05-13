@@ -517,13 +517,14 @@ class TradingApplication:
       timestamp = _row_timestamp(latest["timestamp"])
       state = cache.snapshot(timestamp=timestamp, parameters=config.parameters)
       decision = strategy.evaluate(history, config.parameters, state)
-      self._execution_engine.apply_decision(
+      reviewed = self._execution_engine.apply_decision(
         run=run,
         config=config,
         decision=decision,
         cache=cache,
         market_price=float(latest["close"]),
       )
+      self._record_llm_judgement_trace(run=run, decision=reviewed)
 
     run.metrics = summarize_performance(
       initial_cash=config.initial_cash,
@@ -805,13 +806,14 @@ class TradingApplication:
       timestamp = _row_timestamp(latest["timestamp"])
       state = cache.snapshot(timestamp=timestamp, parameters=run.config.parameters)
       decision = strategy.evaluate(history, run.config.parameters, state)
-      self._execution_engine.apply_decision(
+      reviewed = self._execution_engine.apply_decision(
         run=run,
         config=run.config,
         decision=decision,
         cache=cache,
         market_price=float(latest["close"]),
       )
+      self._record_llm_judgement_trace(run=run, decision=reviewed)
       processed += 1
       last_processed_candle_at = candle.timestamp
 
@@ -887,6 +889,45 @@ class TradingApplication:
       run_id=run.config.run_id,
       mode=run.config.mode,
       payload=payload or {},
+    )
+
+  def _record_llm_judgement_trace(
+    self,
+    *,
+    run: RunRecord,
+    decision: StrategyDecisionEnvelope,
+  ) -> None:
+    judgement_trace = decision.trace.get("llm_judgement")
+    if not isinstance(judgement_trace, dict):
+      return
+    if judgement_trace.get("request") is None and judgement_trace.get("response") is None:
+      return
+
+    status = str(judgement_trace.get("status") or "recorded")
+    payload = {
+      "timestamp": decision.context.timestamp.isoformat(),
+      "instrument_id": decision.context.instrument_id,
+      "strategy_id": run.config.strategy_id,
+      "candidate": judgement_trace.get("candidate"),
+      "request": judgement_trace.get("request"),
+      "response": judgement_trace.get("response"),
+      "fallback": bool(judgement_trace.get("fallback")),
+      "veto_reason": judgement_trace.get("veto_reason"),
+      "final_action": decision.signal.action.value,
+      "min_confidence": judgement_trace.get("min_confidence"),
+      "status": status,
+    }
+    self._record_log(
+      layer="llm_judgement",
+      event_type="llm_judgement_recorded",
+      message=(
+        f"LLM judgement {status} for {decision.context.instrument_id}; "
+        f"final action {decision.signal.action.value}."
+      ),
+      severity="info",
+      run_id=run.config.run_id,
+      mode=run.config.mode,
+      payload=payload,
     )
 
   def _record_log(

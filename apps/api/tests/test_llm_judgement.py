@@ -235,6 +235,19 @@ def test_application_can_opt_into_mock_backtest_judgement_without_provider_sdk()
   assert run.orders == []
   assert client.requests
   assert any("LLM judgement vetoed" in note for note in run.notes)
+  judgement_logs = [
+    log
+    for log in app.get_run_logs(run.config.run_id)
+    if log.event_type == "llm_judgement_recorded"
+  ]
+  assert judgement_logs
+  payload = judgement_logs[0].payload
+  assert payload["candidate"]["action"] == "buy"
+  assert payload["request"]["candidate_action"] == "buy"
+  assert payload["response"]["decision"] == "approve_buy"
+  assert payload["fallback"] is False
+  assert payload["veto_reason"] == "confidence_below_threshold"
+  assert payload["final_action"] == "hold"
 
 
 class _FixedCandidateStrategy(Strategy):

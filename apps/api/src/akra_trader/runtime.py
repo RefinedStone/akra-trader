@@ -287,7 +287,7 @@ class ExecutionEngine:
     decision: StrategyDecisionEnvelope,
     cache: StateCache,
     market_price: float,
-  ) -> None:
+  ) -> StrategyDecisionEnvelope:
     reviewed = self.review_decision(decision)
     cash, position, order, fill, closed_trade = apply_signal(
       run_id=config.run_id,
@@ -324,6 +324,7 @@ class ExecutionEngine:
       f"{reviewed.context.timestamp.isoformat()} | "
       f"{reviewed.signal.action.value} | {reviewed.rationale}"
     )
+    return reviewed
 
 
 class RunSupervisor:
