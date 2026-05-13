@@ -120,6 +120,22 @@ class RsiAtrOversoldPeakTurnStrategy(ComposableStrategy):
           "semantic_hint": "SELL score threshold for full-position exits.",
           "description_ko": "SELL 점수 임계값입니다. 하드스톱이 아닌 청산은 점수가 이 값 이상일 때 전량 SELL합니다.",
         },
+        "exit_trailing_activation_atr": {
+          "type": "number",
+          "default": 1.5,
+          "minimum": 0,
+          "maximum": 10,
+          "semantic_hint": "ATR profit multiple required before the trailing stop activates.",
+          "description_ko": "트레일링 활성화 수익폭입니다. 진입가 대비 ATR의 이 배수 이상 유리해지면 트레일링 스톱을 켭니다.",
+        },
+        "exit_trailing_distance_atr": {
+          "type": "number",
+          "default": 2.0,
+          "minimum": 0.1,
+          "maximum": 10,
+          "semantic_hint": "ATR distance kept below the high-watermark once trailing is active.",
+          "description_ko": "트레일링 스톱 거리입니다. 최고가에서 ATR의 이 배수만큼 되돌리면 전량 SELL합니다.",
+        },
         "risk_fraction": {
           "type": "number",
           "default": 0.01,
@@ -409,9 +425,25 @@ def _rsi_atr_entry_evaluation(
 
 def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]:
   threshold = _clamped_parameter(context, "exit_score_threshold", 0.75, minimum=0.0, maximum=1.0)
+  trailing_activation_atr = _clamped_parameter(
+    context,
+    "exit_trailing_activation_atr",
+    1.5,
+    minimum=0.0,
+    maximum=10.0,
+  )
+  trailing_distance_atr = _clamped_parameter(
+    context,
+    "exit_trailing_distance_atr",
+    2.0,
+    minimum=0.1,
+    maximum=10.0,
+  )
   close = _feature_or_market(context, "close")
   hard_stop_price = _finite_number(context.state.position_stop_loss_price)
   take_profit_price = _finite_number(context.state.position_take_profit_price)
+  state_high_watermark_price = _finite_number(context.state.position_high_watermark_price)
+  previous_trailing_stop_price = _finite_number(context.state.position_trailing_stop_price)
   components: dict[str, dict[str, Any]] = {}
 
   if not context.state.has_position:
@@ -423,6 +455,12 @@ def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]
       "components": components,
       "hard_stop_price": hard_stop_price,
       "take_profit_price": take_profit_price,
+      "high_watermark_price": state_high_watermark_price,
+      "trailing_stop_price": previous_trailing_stop_price,
+      "trailing_activation_price": None,
+      "trailing_active": False,
+      "trailing_activation_atr": trailing_activation_atr,
+      "trailing_distance_atr": trailing_distance_atr,
     }
   if close is None:
     return {
@@ -433,6 +471,12 @@ def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]
       "components": components,
       "hard_stop_price": hard_stop_price,
       "take_profit_price": take_profit_price,
+      "high_watermark_price": state_high_watermark_price,
+      "trailing_stop_price": previous_trailing_stop_price,
+      "trailing_activation_price": None,
+      "trailing_active": False,
+      "trailing_activation_atr": trailing_activation_atr,
+      "trailing_distance_atr": trailing_distance_atr,
     }
   if hard_stop_price is not None and close <= hard_stop_price:
     components["hard_stop"] = _exit_component(
@@ -449,6 +493,12 @@ def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]
       "components": components,
       "hard_stop_price": hard_stop_price,
       "take_profit_price": take_profit_price,
+      "high_watermark_price": state_high_watermark_price,
+      "trailing_stop_price": previous_trailing_stop_price,
+      "trailing_activation_price": None,
+      "trailing_active": previous_trailing_stop_price is not None,
+      "trailing_activation_atr": trailing_activation_atr,
+      "trailing_distance_atr": trailing_distance_atr,
     }
 
   ema_fast = _feature_value(context, "ema_fast")
@@ -459,7 +509,34 @@ def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]
   previous_rsi = _feature_value(context, "previous_rsi")
   atr = _feature_value(context, "atr")
   entry_price = _finite_number(context.state.position_average_price)
+  current_high = _feature_or_market(context, "high")
   rsi_exit_level = _clamped_parameter(context, "rsi_exit_level", 45.0, minimum=0.0, maximum=100.0)
+  high_candidates = tuple(
+    value
+    for value in (entry_price, state_high_watermark_price, current_high, close)
+    if value is not None
+  )
+  high_watermark_price = max(high_candidates) if high_candidates else state_high_watermark_price
+  trailing_activation_price: float | None = None
+  candidate_trailing_stop_price: float | None = None
+  trailing_stop_price = previous_trailing_stop_price
+  trailing_active = previous_trailing_stop_price is not None
+  trailing_stop_hit = False
+
+  if entry_price is not None and atr is not None and atr > 0 and high_watermark_price is not None:
+    trailing_activation_price = entry_price + (trailing_activation_atr * atr)
+    trailing_active = trailing_active or high_watermark_price >= trailing_activation_price
+    if trailing_active:
+      candidate_trailing_stop_price = max(
+        entry_price,
+        high_watermark_price - (trailing_distance_atr * atr),
+      )
+      trailing_stop_price = max(
+        value
+        for value in (previous_trailing_stop_price, candidate_trailing_stop_price)
+        if value is not None
+      )
+      trailing_stop_hit = close <= trailing_stop_price
 
   current_spread = (
     ema_fast - ema_slow
@@ -490,7 +567,7 @@ def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]
     else None
   )
   adverse_price = adverse_atr_multiple is not None and adverse_atr_multiple >= 0.25
-  profit_protection = (
+  profit_pullback_warning = (
     take_profit_price is not None
     and close >= take_profit_price * 0.98
     and rsi is not None
@@ -498,6 +575,21 @@ def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]
     and rsi < previous_rsi
   )
 
+  components["trailing_stop"] = _exit_component(
+    trailing_stop_hit,
+    1.0,
+    close=close,
+    entry_price=entry_price,
+    high_watermark_price=high_watermark_price,
+    previous_trailing_stop_price=previous_trailing_stop_price,
+    candidate_trailing_stop_price=candidate_trailing_stop_price,
+    trailing_stop_price=trailing_stop_price,
+    trailing_activation_price=trailing_activation_price,
+    trailing_active=trailing_active,
+    atr=atr,
+    trailing_activation_atr=trailing_activation_atr,
+    trailing_distance_atr=trailing_distance_atr,
+  )
   components["trend_break"] = _exit_component(
     trend_break,
     0.35,
@@ -526,25 +618,53 @@ def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]
     atr=atr,
     adverse_atr_multiple=adverse_atr_multiple,
   )
-  components["profit_protection"] = _exit_component(
-    profit_protection,
-    0.15,
+  components["profit_pullback_warning"] = _exit_component(
+    profit_pullback_warning,
+    0.0,
     close=close,
     take_profit_price=take_profit_price,
     rsi=rsi,
     previous_rsi=previous_rsi,
   )
 
+  if trailing_stop_hit:
+    return {
+      "matched": True,
+      "score": 1.0,
+      "threshold": threshold,
+      "reason": "trailing_stop",
+      "components": components,
+      "hard_stop_price": hard_stop_price,
+      "take_profit_price": take_profit_price,
+      "high_watermark_price": high_watermark_price,
+      "trailing_stop_price": trailing_stop_price,
+      "trailing_activation_price": trailing_activation_price,
+      "trailing_active": trailing_active,
+      "trailing_activation_atr": trailing_activation_atr,
+      "trailing_distance_atr": trailing_distance_atr,
+    }
+
   score = round(min(sum(component["score"] for component in components.values()), 1.0), 4)
   active_reasons = tuple(
     name for name, component in components.items() if bool(component["active"])
   )
   matched = score >= threshold
-  reason = (
-    f"exit_score_threshold_met:{','.join(active_reasons)}"
-    if matched
-    else "exit_score_below_threshold"
+  trailing_holds_profit = (
+    matched
+    and trailing_active
+    and trailing_stop_price is not None
+    and entry_price is not None
+    and close > entry_price
   )
+  if trailing_holds_profit:
+    matched = False
+    reason = "trailing_active_holding_until_stop"
+  else:
+    reason = (
+      f"exit_score_threshold_met:{','.join(active_reasons)}"
+      if matched
+      else "exit_score_below_threshold"
+    )
   return {
     "matched": matched,
     "score": score,
@@ -553,6 +673,12 @@ def _rsi_atr_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]
     "components": components,
     "hard_stop_price": hard_stop_price,
     "take_profit_price": take_profit_price,
+    "high_watermark_price": high_watermark_price,
+    "trailing_stop_price": trailing_stop_price,
+    "trailing_activation_price": trailing_activation_price,
+    "trailing_active": trailing_active,
+    "trailing_activation_atr": trailing_activation_atr,
+    "trailing_distance_atr": trailing_distance_atr,
   }
 
 
@@ -580,12 +706,20 @@ def _rsi_atr_rationale(
     if bool(component.get("active"))
   ]
   component_summary = ",".join(active_components) if active_components else "none"
+  trailing_stop = _finite_number(exit_evaluation.get("trailing_stop_price"))
+  high_watermark = _finite_number(exit_evaluation.get("high_watermark_price"))
+  trailing_summary = ""
+  if trailing_stop is not None:
+    trailing_summary = f"; trailing_stop={trailing_stop:.2f}"
+    if high_watermark is not None:
+      trailing_summary = f"{trailing_summary}; high_watermark={high_watermark:.2f}"
   return (
     f"Composable strategy signal={signal.action.value}; "
     f"regime={regime_label}; entry={entry_evaluation['matched']}; "
     f"entry_reason={entry_evaluation['reason']}; exit={exit_evaluation['matched']}; "
     f"exit_score={score:.2f}/{threshold:.2f}; "
-    f"exit_reason={exit_evaluation['reason']}; exit_components={component_summary}."
+    f"exit_reason={exit_evaluation['reason']}; exit_components={component_summary}"
+    f"{trailing_summary}."
   )
 
 

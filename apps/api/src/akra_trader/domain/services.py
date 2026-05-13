@@ -77,12 +77,17 @@ def apply_signal(
         updated_at=signal.timestamp,
         stop_loss_price=_stop_loss_price(executed_price, plan.stop_loss_pct),
         take_profit_price=_take_profit_price(executed_price, plan.take_profit_pct),
+        high_watermark_price=executed_price,
       )
     else:
       total_quantity = active_position.quantity + quantity
       average_price = (
         (active_position.quantity * active_position.average_price) + (quantity * executed_price)
       ) / total_quantity
+      high_watermark_price = max(
+        active_position.high_watermark_price or active_position.average_price,
+        executed_price,
+      )
       new_position = replace(
         active_position,
         quantity=total_quantity,
@@ -98,6 +103,7 @@ def apply_signal(
           if plan.take_profit_pct is not None
           else active_position.take_profit_price
         ),
+        high_watermark_price=high_watermark_price,
       )
     return cash - gross_cost - fee_paid, new_position, order, fill, None
 
@@ -154,6 +160,12 @@ def apply_signal(
       stop_loss_price=None if isclose(remaining_quantity, 0.0) else active_position.stop_loss_price,
       take_profit_price=(
         None if isclose(remaining_quantity, 0.0) else active_position.take_profit_price
+      ),
+      high_watermark_price=(
+        None if isclose(remaining_quantity, 0.0) else active_position.high_watermark_price
+      ),
+      trailing_stop_price=(
+        None if isclose(remaining_quantity, 0.0) else active_position.trailing_stop_price
       ),
     )
     return cash + proceeds, closed_position, order, fill, closed_trade

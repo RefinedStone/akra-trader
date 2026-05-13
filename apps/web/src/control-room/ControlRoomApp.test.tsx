@@ -94,6 +94,22 @@ const strategyResponse = {
           semantic_hint: "SELL score threshold for full-position exits.",
           description_ko: "SELL 점수 임계값입니다. 하드스톱이 아닌 청산은 점수가 이 값 이상일 때 전량 SELL합니다.",
         },
+        exit_trailing_activation_atr: {
+          type: "number",
+          default: 1.5,
+          minimum: 0,
+          maximum: 10,
+          semantic_hint: "ATR profit multiple required before the trailing stop activates.",
+          description_ko: "트레일링 활성화 수익폭입니다. 진입가 대비 ATR의 이 배수 이상 유리해지면 트레일링 스톱을 켭니다.",
+        },
+        exit_trailing_distance_atr: {
+          type: "number",
+          default: 2.0,
+          minimum: 0.1,
+          maximum: 10,
+          semantic_hint: "ATR distance kept below the high-watermark once trailing is active.",
+          description_ko: "트레일링 스톱 거리입니다. 최고가에서 ATR의 이 배수만큼 되돌리면 전량 SELL합니다.",
+        },
         use_llm_regime_hint: {
           type: "boolean",
           default: true,
@@ -573,12 +589,15 @@ describe("ControlRoomApp", () => {
       screen.getByRole("checkbox", { name: /entry_require_price_above_slow_ema/ }),
     ).not.toBeChecked();
     expect(screen.getByLabelText(/exit_score_threshold/)).toHaveValue(0.75);
+    expect(screen.getByLabelText(/exit_trailing_activation_atr/)).toHaveValue(1.5);
+    expect(screen.getByLabelText(/exit_trailing_distance_atr/)).toHaveValue(2);
     expect(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ })).toBeChecked();
     expect(screen.getByText(/단기 EMA 기간입니다/)).toBeInTheDocument();
     expect(screen.getByText(/직전 RSI 고점/)).toBeInTheDocument();
     expect(screen.getByText(/거래 1회당 감수할 포트폴리오 위험 비율/)).toBeInTheDocument();
     expect(screen.getByText(/매수 추세 강도 최소값/)).toBeInTheDocument();
     expect(screen.getByText(/SELL 점수 임계값/)).toBeInTheDocument();
+    expect(screen.getByText(/트레일링 활성화 수익폭/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/fast_ema_window/), { target: { value: "12" } });
     fireEvent.change(screen.getByLabelText(/rsi_timeframe/), { target: { value: "15m" } });
@@ -589,6 +608,12 @@ describe("ControlRoomApp", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /entry_enable_rsi_recovery/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /entry_require_price_above_slow_ema/ }));
     fireEvent.change(screen.getByLabelText(/exit_score_threshold/), { target: { value: "0.8" } });
+    fireEvent.change(screen.getByLabelText(/exit_trailing_activation_atr/), {
+      target: { value: "0.75" },
+    });
+    fireEvent.change(screen.getByLabelText(/exit_trailing_distance_atr/), {
+      target: { value: "1.25" },
+    });
     fireEvent.click(screen.getByRole("checkbox", { name: /use_llm_regime_hint/ }));
     fireEvent.click(screen.getByRole("button", { name: "백테스트 실행" }));
 
@@ -611,6 +636,8 @@ describe("ControlRoomApp", () => {
         entry_enable_rsi_recovery: false,
         entry_require_price_above_slow_ema: true,
         exit_score_threshold: 0.8,
+        exit_trailing_activation_atr: 0.75,
+        exit_trailing_distance_atr: 1.25,
         use_llm_regime_hint: false,
       },
     });

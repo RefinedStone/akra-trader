@@ -252,6 +252,8 @@ class StrategyExecutionState:
   position_opened_at: datetime | None = None
   position_stop_loss_price: float | None = None
   position_take_profit_price: float | None = None
+  position_high_watermark_price: float | None = None
+  position_trailing_stop_price: float | None = None
   parameters: dict[str, Any] = field(default_factory=dict)
 
 
@@ -313,6 +315,8 @@ class Position:
   updated_at: datetime | None = None
   stop_loss_price: float | None = None
   take_profit_price: float | None = None
+  high_watermark_price: float | None = None
+  trailing_stop_price: float | None = None
 
   @property
   def is_open(self) -> bool:

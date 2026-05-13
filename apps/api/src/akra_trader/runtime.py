@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
+from math import isfinite
 from typing import NamedTuple
 
 import pandas as pd
@@ -207,8 +208,15 @@ class StateCache:
     self.position: Position | None = None
     self.last_price: float | None = None
 
-  def mark_price(self, market_price: float) -> None:
+  def mark_price(self, market_price: float, *, market_high: float | None = None) -> None:
     self.last_price = market_price
+    if self.position is None or not self.position.is_open:
+      return
+    high_price = _finite_float(market_high)
+    if high_price is None:
+      high_price = market_price
+    previous_high = self.position.high_watermark_price or self.position.average_price
+    self.position.high_watermark_price = max(previous_high, high_price)
 
   def snapshot(self, *, timestamp: datetime, parameters: dict) -> StrategyExecutionState:
     active_position = self.position if self.position and self.position.is_open else None
@@ -222,6 +230,10 @@ class StateCache:
       position_opened_at=active_position.opened_at if active_position else None,
       position_stop_loss_price=active_position.stop_loss_price if active_position else None,
       position_take_profit_price=active_position.take_profit_price if active_position else None,
+      position_high_watermark_price=(
+        active_position.high_watermark_price if active_position else None
+      ),
+      position_trailing_stop_price=active_position.trailing_stop_price if active_position else None,
       parameters=parameters,
     )
 
@@ -292,6 +304,7 @@ class ExecutionEngine:
     decision: StrategyDecisionEnvelope,
     cache: StateCache,
     market_price: float,
+    market_high: float | None = None,
   ) -> StrategyDecisionEnvelope:
     reviewed = self.review_decision(decision)
     cash, position, order, fill, closed_trade = apply_signal(
@@ -305,15 +318,16 @@ class ExecutionEngine:
       fee_rate=config.fee_rate,
       slippage_bps=config.slippage_bps,
     )
-    cache.mark_price(market_price)
     cache.apply(cash=cash, position=position)
+    cache.mark_price(market_price, market_high=market_high)
+    self._apply_position_trace_updates(cache=cache, decision=reviewed)
 
     if order is not None:
       run.orders.append(order)
     if fill is not None:
       run.fills.append(fill)
-    if position is not None:
-      run.positions[position.instrument_id] = position
+    if cache.position is not None:
+      run.positions[cache.position.instrument_id] = cache.position
     if closed_trade is not None:
       run.closed_trades.append(closed_trade)
 
@@ -330,6 +344,21 @@ class ExecutionEngine:
       f"{reviewed.signal.action.value} | {reviewed.rationale}"
     )
     return reviewed
+
+  def _apply_position_trace_updates(
+    self,
+    *,
+    cache: StateCache,
+    decision: StrategyDecisionEnvelope,
+  ) -> None:
+    if cache.position is None or not cache.position.is_open:
+      return
+    exit_trace = decision.trace.get("exit")
+    if not isinstance(exit_trace, dict):
+      return
+    trailing_stop_price = _finite_float(exit_trace.get("trailing_stop_price"))
+    if trailing_stop_price is not None:
+      cache.position.trailing_stop_price = trailing_stop_price
 
 
 class RunSupervisor:
@@ -518,3 +547,11 @@ class RunSupervisor:
     if processed_tick_count_increment > 0:
       session.processed_tick_count += processed_tick_count_increment
     return run
+
+
+def _finite_float(value: object) -> float | None:
+  try:
+    number = float(value)
+  except (TypeError, ValueError):
+    return None
+  return number if isfinite(number) else None
