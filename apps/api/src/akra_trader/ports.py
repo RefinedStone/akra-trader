@@ -1,5 +1,6 @@
 from akra_trader.port_contracts import DecisionEnginePort
 from akra_trader.port_contracts import GuardedLiveStatePort
+from akra_trader.port_contracts import LlmJudgementPort
 from akra_trader.port_contracts import MarketDataPort
 from akra_trader.port_contracts import RunRepositoryPort
 from akra_trader.port_contracts import StrategyCatalogPort
@@ -10,6 +11,7 @@ from akra_trader.port_contracts import VenueStatePort
 __all__ = [
   "DecisionEnginePort",
   "GuardedLiveStatePort",
+  "LlmJudgementPort",
   "MarketDataPort",
   "RunRepositoryPort",
   "StrategyCatalogPort",

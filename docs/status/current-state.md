@@ -14,7 +14,8 @@ yet a finished live-trading product, a multi-user platform, or an LLM-native str
 - Experiment OS: partially complete.
 - Runtime operations: real but still needs clearer active-session UX.
 - Guarded live: early but meaningful.
-- Intelligence research: interface only.
+- Intelligence research: provider-neutral judgement contract, mock client, and veto-only wrapper
+  exist; provider-backed trace/replay/evaluation controls are still incomplete.
 
 ## Implemented
 
@@ -78,7 +79,10 @@ Architecture:
 - Provider delivery coverage is broad, but provider-owned incident ownership and policy management
   remain incomplete.
 - Deployment, backup, and credential governance are not product-grade.
-- LLM work stops at `DecisionEnginePort`, template strategy shapes, and trace-capable envelopes.
+- LLM work includes provider-neutral judgement request/response contracts, `LlmJudgementPort`, a
+  deterministic mock client, and a veto-only wrapper for existing rule-based candidate signals.
+  It still has no concrete provider adapter, prompt registry, durable raw trace store, or replay
+  harness.
 - Some extracted backend/frontend modules remain large and need continued flow-level decomposition.
 
 ## Immediate Priorities
@@ -90,8 +94,8 @@ Architecture:
    discipline.
 4. Continue decomposing large provider-provenance, operator-delivery, and control-room modules by
    bounded operator flow.
-5. Keep the LLM lane isolated until prompt registry, trace storage, replay, evaluation, and
-   fallback/review controls exist.
+5. Keep the LLM lane isolated from live promotion until provider adapters, prompt registry, raw
+   trace storage, replay, evaluation, and operator review controls exist.
 
 ## Source Documents
 

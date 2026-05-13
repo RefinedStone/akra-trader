@@ -30,10 +30,10 @@ Remaining work from the May 11, 2026 implementation snapshot.
    - add provider-owned incident ownership semantics where needed
 
 6. Intelligence research lane
-   - add prompt registry, raw trace storage, replay harness, evaluation, and fallback/review controls
-   - keep this lane isolated from sandbox/live promotion until those controls exist
-   - track the first LLM judgement implementation split in
-     [LLM Judgement Parallel Task Plan](llm-judgement-parallel-tasks.md)
+   - add provider adapters, prompt registry, raw trace storage, replay harness, evaluation, and
+     operator review controls
+   - keep this lane isolated from live promotion until those controls exist
+   - harden trace retention and promotion evidence beyond the first mock-backed judgement layer
 
 ## Non-Goals For This Horizon
 

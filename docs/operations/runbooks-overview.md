@@ -30,6 +30,19 @@ Compact single-operator checklist as of May 11, 2026.
 - Release kill switch only after reconciliation confirms local and venue state are aligned.
 - Keep venue-specific lifecycle gaps visible in roadmap/status docs until tested through product UX.
 
+## LLM Judgement Shadow Rules
+
+- Use LLM judgement only for backtest, sandbox, or shadow review until provider trace storage,
+  replay, and evaluation gates are product-grade.
+- Treat fallback, schema failure, provider failure, low confidence, high risk, stale data, or
+  candidate/LLM direction conflict as HOLD.
+- Confirm traces include candidate summary, judgement request summary, response summary, fallback
+  state, and veto reason before using results for promotion evidence.
+- Retain prompt/request/response/veto traces with the run evidence needed to replay or audit the
+  decision path. Do not use judgement traces as live-promotion evidence when raw provider payloads
+  or replay inputs are missing.
+- Do not use this lane for unattended live trading.
+
 ## Release And Docs Rule
 
 For meaningful feature changes:
@@ -45,3 +58,5 @@ For meaningful feature changes:
 - credential rotation and secret governance are incomplete
 - drill validation is not fully represented in product UX
 - provider-owned incident ownership and policy management are incomplete
+- provider-backed LLM prompt registry, raw trace storage, replay, and evaluation controls are
+  incomplete

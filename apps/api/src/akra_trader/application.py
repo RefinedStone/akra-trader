@@ -29,6 +29,7 @@ from akra_trader.domain.models import StrategySnapshot
 from akra_trader.domain.models import WarmupSpec
 from akra_trader.domain.services import summarize_performance
 from akra_trader.ports import DecisionEnginePort
+from akra_trader.ports import LlmJudgementPort
 from akra_trader.ports import MarketDataPort
 from akra_trader.ports import StrategyCatalogPort
 from akra_trader.ports import VenueExecutionPort
@@ -39,6 +40,7 @@ from akra_trader.runtime import RunSupervisor
 from akra_trader.runtime import StateCache
 from akra_trader.runtime import candles_to_frame
 from akra_trader.strategies.llm import ExternalDecisionStrategy
+from akra_trader.strategies.llm import LlmJudgementVetoStrategy
 
 
 class HoldDecisionEngine(DecisionEnginePort):
@@ -72,6 +74,7 @@ class TradingApplication:
     runs: Any,
     venue_execution: VenueExecutionPort | None = None,
     decision_engine: DecisionEnginePort | None = None,
+    llm_judgement: LlmJudgementPort | None = None,
     guarded_live_venue: str = "binance",
     guarded_live_execution_enabled: bool = False,
     sandbox_worker_heartbeat_interval_seconds: int = 15,
@@ -86,6 +89,7 @@ class TradingApplication:
     self._runs = runs
     self._venue_execution = venue_execution
     self._decision_engine = decision_engine or HoldDecisionEngine()
+    self._llm_judgement = llm_judgement
     self._mode_service = ExecutionModeService()
     self._data_engine = DataEngine(market_data)
     self._execution_engine = ExecutionEngine()
@@ -134,8 +138,10 @@ class TradingApplication:
       "runtime": metadata.runtime,
       "lifecycle": metadata.lifecycle.stage,
       "decision_port": "DecisionEnginePort",
+      "judgement_port": "LlmJudgementPort",
       "provider_adapter": None,
       "isolation_state": "interface_only",
+      "judgement_state": "available" if self._llm_judgement is not None else "not_configured",
       "trace_envelope": {
         "signal": "SignalDecision",
         "rationale": "string",
@@ -537,6 +543,8 @@ class TradingApplication:
     strategy = self._strategies.load(strategy_id)
     metadata = strategy.describe()
     resolved_parameters = _resolve_parameters(metadata, parameters)
+    if self._llm_judgement is not None and resolved_parameters.get("use_llm_judgement") is True:
+      strategy = LlmJudgementVetoStrategy(strategy, self._llm_judgement)
     metadata = replace(
       metadata,
       parameter_schema=metadata.parameter_schema,

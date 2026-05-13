@@ -18,6 +18,20 @@ Compatibility files may exist, but they should delegate or re-export rather than
 - `adapters/*`: storage, venues, market data, and operator-delivery implementations.
 - `api.py`, `api_*`, `main.py`: HTTP shape and dependency wiring.
 
+## LLM Judgement Lane
+
+- `domain/model_types/llm_judgement.py` owns the provider-neutral judgement request/response
+  contract and safe fallback response shape.
+- `port_contracts/llm_judgement.py` owns `LlmJudgementPort`; concrete providers must stay behind
+  that port.
+- `adapters/mock_llm_judgement.py` is the deterministic no-network client for tests and shadow
+  experiments.
+- `strategies/llm.py` owns the veto-only wrapper that can review an existing rule-based candidate
+  signal. It may preserve an existing BUY/SELL candidate, or downgrade it to HOLD. It must not
+  create BUY/SELL signals when the rule strategy produced HOLD.
+- Runtime integration is explicit opt-in through `use_llm_judgement` with a configured
+  `LlmJudgementPort`. Default strategy execution remains deterministic and unchanged.
+
 ## Frontend Shape
 
 - `src/App.tsx`: compatibility entrypoint to the control room.
