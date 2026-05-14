@@ -122,7 +122,14 @@ Using the same current default parameters:
 - Late-guard expansion attempts:
   - `entry_enable_early_reversal=true`, `entry_trigger_mode=either` after the late rebound guard produced the same 1-year results as current default: 2023-2024 +2.13% / 66.67% / 6 trades; 2024-2025 +2.90% / 52.00% / 25 trades; 2025-2026 +11.26% / 60.71% / 28 trades.
   - `entry_trend_filter_mode=loose` after the late rebound guard made 2023-2024 -32.68%, 35.00% win rate, 140 trades.
+  - `entry_trend_filter_mode=loose`, tighter low-proximity variants in 2023-2024 still failed: close-position 0.75 / low-proximity 1.5 ATR was -3.70% with 6 trades, and low-proximity 1.8 ATR was -6.89% with 20 trades.
   - Rejected because early/either adds no trades and loose trend filtering adds many low-quality downtrend trades.
+- Monthly-12 high-frequency scalp attempts:
+  - These were tested only to audit the explicit "monthly average 12 entries" requirement against the current RSI oversold family.
+  - `entry_trend_filter_mode=loose`, 0.5R target, 4 ATR stop, 2023-2024 run `33856850-3d05-4f31-b387-1476e577d76b`: -31.88%, 61.49% win rate, 161 trades.
+  - `entry_trend_filter_mode=loose`, 0.8R target, 4 ATR stop, 2023-2024 run `37e5c78c-e30a-4a3b-957d-32157a76d76d`: -25.83%, 55.70% win rate, 149 trades.
+  - `entry_trend_filter_mode=loose`, 0.5R target, 2 ATR stop, 2023-2024 run `01bf10bf-5607-4fc9-9c0d-7cadb5fd7e24`: -40.90%, 43.50% win rate, 177 trades.
+  - Rejected because the trade-count target is reachable only by admitting many low-quality rebounds that destroy expectancy, directly conflicting with the higher reward/risk objective.
 
 ## Residual Weakness
 
