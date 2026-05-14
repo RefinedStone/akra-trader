@@ -153,6 +153,11 @@ Using the same current default parameters:
 - Calendar 2023 data-integrity check:
   - `2023-01-01T00:00:00Z` to `2024-01-01T00:00:00Z` run `dbd678bc-29a8-474e-925a-896831f8dc9e` failed before trading because market-data validation found 16 missing 5m candles from `2023-03-24T12:35:00Z` to `2023-03-24T14:00:00Z`.
   - Full-year and narrow-gap resync attempts still reported `missing_candles:16` and `requested_range_gap`, so this calendar-year result is excluded from strategy evidence until the data source can supply those candles.
+- Exit stretch attempts after 0.1% probe sizing:
+  - `exit_profit_r_multiple=2.0` improved 2025-2026 to +12.95% / 51.30% / 347 trades, but 2024-2025 dropped to +0.88% with 4.42% max drawdown, so it is not stable enough as a default.
+  - Intermediate 2024-2025 checks also failed to beat the 1.5R default: 1.6R +1.56%, 1.7R -0.77%, 1.8R -0.03%, 1.9R +0.63%.
+  - Trailing-hold variants improved 2025-2026 return but broke the win-rate gate: 1.5R activation / 1.2 ATR trail returned +9.91% with 45.24% win rate; 1.5R / 2.0 ATR returned +11.85% with 38.04% win rate; 2R target plus 2R trailing returned +14.40% with 38.04% win rate.
+  - Keep 1.5R fixed profit as the default until an exit model can improve 2024-2025 without sacrificing the 51% annual win-rate gate.
 - Shallow oversold expansion attempts:
   - `rsi_oversold_level=35`, 2023-2024 run `c7c43387-f4cf-47e3-bd1b-1ecbad5ef1e9`: +0.59%, 48.15% win rate, 27 trades.
   - `rsi_oversold_level=38`, 2023-2024 run `a26ca864-acf5-4314-bfe0-9f7b45a171c0`: -6.85%, 38.89% win rate, 36 trades.
