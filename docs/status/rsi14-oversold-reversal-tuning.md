@@ -119,6 +119,10 @@ Using the same current default parameters:
   - `entry_min_close_position=0.60`: chosen current default because it increases trades to 6 / 25 / 28 across the three 1-year windows while keeping every 1-year win rate above 51%.
   - `entry_min_close_position=0.50`: 2025-2026 had more trades at 32 but return fell to +8.72%; not chosen.
   - `entry_min_close_position=0.45`: rejected because 2024-2025 became -0.59% with 50.00% win rate despite 28 trades.
+- Late-guard expansion attempts:
+  - `entry_enable_early_reversal=true`, `entry_trigger_mode=either` after the late rebound guard produced the same 1-year results as current default: 2023-2024 +2.13% / 66.67% / 6 trades; 2024-2025 +2.90% / 52.00% / 25 trades; 2025-2026 +11.26% / 60.71% / 28 trades.
+  - `entry_trend_filter_mode=loose` after the late rebound guard made 2023-2024 -32.68%, 35.00% win rate, 140 trades.
+  - Rejected because early/either adds no trades and loose trend filtering adds many low-quality downtrend trades.
 
 ## Residual Weakness
 
