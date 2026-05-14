@@ -145,7 +145,7 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["entry_trigger_mode"]["default"] == "rsi_turn"
   assert reversal_strategy["parameter_schema"]["entry_enable_capitulation_rebound"]["default"] is True
   assert reversal_strategy["parameter_schema"]["entry_max_rsi_rebound"]["default"] == 10.0
-  assert reversal_strategy["parameter_schema"]["entry_min_close_position"]["default"] == 0.75
+  assert reversal_strategy["parameter_schema"]["entry_min_close_position"]["default"] == 0.60
   assert reversal_strategy["parameter_schema"]["entry_trend_filter_mode"]["default"] == "above60"
   assert reversal_strategy["parameter_schema"]["swing_lookback_bars"]["default"] == 80
   assert reversal_strategy["parameter_schema"]["exit_rsi_profit_level"]["default"] == 50

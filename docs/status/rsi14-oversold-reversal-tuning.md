@@ -9,17 +9,17 @@ Tune `rsi14_oversold_reversal_v1` so the RSI oversold rebound strategy keeps win
 ## Current Default
 
 - Strategy: `RSI14 과매도 탈출 반등 매수`
-- Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.75.
+- Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.60.
 - Standard late rebound guard: when a standard entry is more than 2.2 ATR above the recent low, it must either reclaim MA20 without fresh lower lows or match a deep washout recovery profile.
 - Secondary entry: a tightly filtered MA60-below capitulation rebound sleeve for deep RSI washouts in a narrow RSI/ATR/slope recovery band.
 - Risk/exit: max position fraction 1.0, ATR stop 4.0, profit target 1.5R, no-profit time stop 288 bars, stop cooldown 20 bars.
-- 1-year validation run: `5c9d90da-cf50-41b1-9a49-a98a8d96ff6f`
+- 1-year validation run: `4fe99754-7066-4be3-bcd6-0d98b3950115`
   - Window: `2025-05-13T00:00:00Z` to `2026-05-13T00:00:00Z`
   - Data: 105,121 5m candles, no market data issues
-  - Return: +10.31%
-  - Win rate: 62.50%
-  - Trades: 24
-  - Max drawdown: 4.46%
+  - Return: +11.26%
+  - Win rate: 60.71%
+  - Trades: 28
+  - Max drawdown: 4.15%
 
 ## Verified 1-Year Samples
 
@@ -27,9 +27,9 @@ Using the same current default parameters:
 
 | Window | Run | Return | Win rate | Trades | Max drawdown | Note |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
-| 2023-05-13 to 2024-05-13 | `3c850c90-7124-4b79-b6c3-9aa356e1557f` | +3.74% | 75.00% | 4 | 0.88% | Fixed the prior 2023-2024 weak result by blocking late rebounds that had not reclaimed MA20. |
-| 2024-05-13 to 2025-05-13 | `da5317d0-90c6-48ea-b9fc-5156b4eea905` | +4.50% | 56.52% | 23 | 5.22% | Positive with more trades than the over-tight low-proximity variant. |
-| 2025-05-13 to 2026-05-13 | `5c9d90da-cf50-41b1-9a49-a98a8d96ff6f` | +10.31% | 62.50% | 24 | 4.46% | Current strongest full-year validation. |
+| 2023-05-13 to 2024-05-13 | `823536f8-a55c-4358-a487-c0bca32e7ced` | +2.13% | 66.67% | 6 | 1.93% | More entries than the 0.75 close-position guard while staying above the 51% win-rate gate. |
+| 2024-05-13 to 2025-05-13 | `acd4cb1d-4272-4bde-8fef-b0b2027c2105` | +2.90% | 52.00% | 25 | 4.13% | Barely clears the win-rate gate, but keeps trade count higher. |
+| 2025-05-13 to 2026-05-13 | `4fe99754-7066-4be3-bcd6-0d98b3950115` | +11.26% | 60.71% | 28 | 4.15% | Current strongest full-year validation. |
 
 ## Verified Monthly Samples
 
@@ -37,12 +37,12 @@ Using the same current default parameters:
 
 | Window | Run | Return | Win rate | Trades | Note |
 | --- | --- | ---: | ---: | ---: | --- |
-| 2026-04-13 to 2026-05-13 | `a21a9237-0016-4a45-b674-c3599ce888c2` | +4.15% | 100.00% | 3 | Positive; capitulation sleeve caught the April/May rebound cluster while avoiding 2026-05-12. |
-| 2026-01-01 to 2026-02-01 | `684e752d-f909-4555-a1e0-6c81f85d44f4` | +0.95% | 50.00% | 4 | Positive return. |
-| 2025-09-01 to 2025-10-01 | `7adc1296-c022-42b9-a62f-4bde9a572440` | +1.41% | 50.00% | 4 | Positive return. |
-| 2025-06-01 to 2025-07-01 | `578fac33-d370-407f-a5e3-fac744914726` | +1.33% | 66.67% | 3 | Improved from the previous +0.05% weak sample. |
-| 2025-11-01 to 2025-12-01 | `307a9389-a2a9-46fd-812a-8775b1f87ab1` | +0.37% | 66.67% | 3 | Positive; deep washout quality keeps the 2025-11-26 winner. |
-| 2023-06-01 to 2023-07-01 | `b3d34cd0-18da-478f-8bb5-58dabfecb766` | +1.00% | 100.00% | 1 | Checks the older 2023 regime after adding the late rebound guard. |
+| 2026-04-13 to 2026-05-13 | `833f27b4-29cc-4a58-ab7a-b73da0d4ac2f` | +4.15% | 100.00% | 3 | Positive; capitulation sleeve caught the April/May rebound cluster while avoiding 2026-05-12. |
+| 2026-01-01 to 2026-02-01 | `545bb4c6-924c-4d89-a901-bfc30d082ad9` | +0.95% | 50.00% | 4 | Positive return. |
+| 2025-09-01 to 2025-10-01 | `3a4bd5e1-53fe-4373-b85d-4ebb1dd441de` | +1.88% | 60.00% | 5 | Improved trade count and win rate versus the 0.75 close-position guard. |
+| 2025-06-01 to 2025-07-01 | `edc9c701-3e4e-488c-8837-81615774c55f` | +1.50% | 66.67% | 3 | Improved from the previous +0.05% weak sample. |
+| 2025-11-01 to 2025-12-01 | `eec31499-28a9-4522-959f-c446f17c5bfc` | +0.37% | 66.67% | 3 | Positive; deep washout quality keeps the 2025-11-26 winner. |
+| 2023-06-01 to 2023-07-01 | `84bf5154-c16f-4db9-804c-57bbe9312f28` | +1.00% | 100.00% | 1 | Checks the older 2023 regime after adding the late rebound guard. |
 
 ## Attempts To Avoid Repeating
 
@@ -59,7 +59,7 @@ Using the same current default parameters:
   - A one-bar RSI rebound cap now blocks the 2026-05-12 overextended rebound, but shallow RSI30 entries still need close-position filtering.
 - Immediate trailing-profit default:
   - Earlier exploratory runs with trailing held winners longer but materially reduced win rate or total return in this signal family.
-  - Keep trailing optional until a verified parameter set beats the current +10.31% 1-year run and positive monthly samples.
+  - Keep trailing optional until a verified parameter set beats the current +11.26% 1-year run and positive monthly samples.
 - RSI30 macro trend filter:
   - Parameters tested: `rsi_oversold_level=30`, `entry_trend_filter_mode=macro`.
   - Recent month run `0f9e0836-fa0b-4818-9fc3-b013fb947af8`: 0.00%, 0 trades.
@@ -81,7 +81,7 @@ Using the same current default parameters:
   - `entry_min_close_position=0.65` run `7eef6f69-5ce5-424a-a0e2-8e1eb188b524`: 1-year +5.37%, 55.56% win rate, 27 trades; November +0.37%.
   - `entry_min_close_position=0.70` run `a4c8ad09-2444-4c10-8367-fca0e3d595ce`: 1-year +5.52%, 56.00% win rate, 25 trades; November +0.37%.
   - `entry_min_close_position=0.75` run `19e1fac0-1abe-48c9-9966-1f11915df539`: 1-year +5.74%, 56.52% win rate, 23 trades; June, September, November, and January sample windows stayed positive.
-  - Current default chooses 0.75 because it gives the best 1-year return among the positive-November close-position variants.
+  - At that stage 0.75 was chosen because it gave the best 1-year return among the positive-November close-position variants; later 2023-2024 validation required the late rebound guard and 0.60 trade expansion.
 - Slow local random searches:
   - Two broad Python search passes were stopped because they were too slow for interactive iteration.
   - Do not rerun broad per-candidate Python loops over 1-year data without vectorizing entries first or reducing the candidate set.
@@ -112,8 +112,14 @@ Using the same current default parameters:
   - Added as current default after the 2023-2024 weak-regime review.
   - Standard entries more than 2.2 ATR above the recent low must either reclaim MA20 without fresh lower lows, or satisfy a deep washout recovery profile: RSI recent minimum <= 18, MA20 slope <= -20, ATR percentage >= 0.25, and no fresh lower lows.
   - The deep washout exception is needed because a pure MA20-reclaim rule removed the 2025-11-26 winner and made November 2025 negative.
-  - API result: 2023-2024 +3.74% / 75.00% win rate / 4 trades; 2024-2025 +4.50% / 56.52% / 23 trades; 2025-2026 +10.31% / 62.50% / 24 trades.
+  - API result before close-position trade expansion: 2023-2024 +3.74% / 75.00% win rate / 4 trades; 2024-2025 +4.50% / 56.52% / 23 trades; 2025-2026 +10.31% / 62.50% / 24 trades.
+- Close-position trade expansion:
+  - `entry_min_close_position=0.70`: 2023-2024 +3.74% / 75.00% / 4 trades; 2024-2025 +3.23% / 54.17% / 24 trades; 2025-2026 +9.09% / 60.00% / 25 trades.
+  - `entry_min_close_position=0.65`: 2023-2024 +3.39% / 80.00% / 5 trades; 2024-2025 +3.45% / 54.17% / 24 trades; 2025-2026 +9.60% / 61.54% / 26 trades.
+  - `entry_min_close_position=0.60`: chosen current default because it increases trades to 6 / 25 / 28 across the three 1-year windows while keeping every 1-year win rate above 51%.
+  - `entry_min_close_position=0.50`: 2025-2026 had more trades at 32 but return fell to +8.72%; not chosen.
+  - `entry_min_close_position=0.45`: rejected because 2024-2025 became -0.59% with 50.00% win rate despite 28 trades.
 
 ## Residual Weakness
 
-The current default clears the 1-year win-rate and positive-return gates across three adjacent 1-year windows and has six positive 1-month samples. The weakest remaining evidence is that January 2026 and September 2025 monthly win rates are still 50%, so future work should improve those months without loosening the capitulation sleeve or removing the late rebound quality guard.
+The current default clears the 1-year win-rate and positive-return gates across three adjacent 1-year windows and has six positive 1-month samples. The weakest remaining evidence is that the 2024-2025 full-year win rate is only 52.00% and January 2026 monthly win rate is still 50%, so future work should improve those without loosening the capitulation sleeve or removing the late rebound quality guard.

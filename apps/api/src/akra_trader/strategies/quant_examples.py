@@ -469,11 +469,11 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "entry_min_close_position": {
           "type": "number",
-          "default": 0.75,
+          "default": 0.60,
           "minimum": 0,
           "maximum": 1,
           "semantic_hint": "Minimum candle close position from low to high for rebound entries.",
-          "description_ko": "반등 매수에서 요구하는 캔들 마감 위치입니다. 기본값 0.75는 봉의 저가~고가 구간 상위 25%에서 마감한 강한 반등만 허용합니다.",
+          "description_ko": "반등 매수에서 요구하는 캔들 마감 위치입니다. 기본값 0.60은 봉의 저가~고가 구간 상위 40%에서 마감한 반등을 허용합니다.",
         },
         "entry_max_low_proximity_atr": {
           "type": "number",
@@ -1174,7 +1174,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
   min_close_position = _clamped_parameter(
     context,
     "entry_min_close_position",
-    0.75,
+    0.60,
     minimum=0.0,
     maximum=1.0,
   )
