@@ -638,6 +638,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         source_descriptor="akra_trader.strategies.quant_examples:Rsi14OversoldReversalStrategy",
         operator_notes=(
           "BUY defaults to RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI30 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
+          "Standard late rebounds more than 2.2 ATR above the recent low require either an MA20 reclaim without fresh lower lows or a deep washout recovery profile.",
           "A separate capitulation rebound sleeve can buy below MA60 only when RSI/ATR/slope distances sit in a narrow post-capitulation recovery band.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
@@ -1269,6 +1270,29 @@ def _rsi14_oversold_reversal_entry_evaluation(
   low_proximity_confirmed = (
     low_proximity_atr is not None and low_proximity_atr <= max_low_proximity_atr
   )
+  standard_extension_threshold_atr = 2.2
+  extended_standard_rebound = (
+    low_proximity_atr is not None
+    and low_proximity_atr > standard_extension_threshold_atr
+  )
+  deep_standard_washout_quality = (
+    rsi_recent_min is not None
+    and rsi_recent_min <= 18.0
+    and ma20_slope is not None
+    and ma20_slope <= -20.0
+    and atr_pct is not None
+    and atr_pct >= 0.25
+    and not recent_lower_lows
+  )
+  extended_standard_rebound_quality = (
+    not extended_standard_rebound
+    or (
+      ma20_distance_atr is not None
+      and ma20_distance_atr > 0
+      and not recent_lower_lows
+    )
+    or deep_standard_washout_quality
+  )
   entry_candle_confirmed = close_position_confirmed and low_proximity_confirmed
   escape_breakout_matched = (
     rsi_crossed_oversold_recent
@@ -1331,7 +1355,12 @@ def _rsi14_oversold_reversal_entry_evaluation(
   else:
     entry_trigger_mode = "rsi_turn"
     configured_trigger_matched = rsi_turn_matched
-  entry_trigger_matched = configured_trigger_matched or capitulation_rebound_matched
+  quality_configured_trigger_matched = (
+    configured_trigger_matched and extended_standard_rebound_quality
+  )
+  entry_trigger_matched = (
+    quality_configured_trigger_matched or capitulation_rebound_matched
+  )
   above_ma20 = close is not None and ma20 is not None and close > ma20
   above_ma60 = close is not None and ma60 is not None and close > ma60
   ma20_slope_non_negative = ma20_slope is not None and ma20_slope >= 0
@@ -1387,12 +1416,27 @@ def _rsi14_oversold_reversal_entry_evaluation(
     "entry_trigger": {
       "passed": entry_trigger_matched,
       "configured_trigger_matched": configured_trigger_matched,
+      "quality_configured_trigger_matched": quality_configured_trigger_matched,
       "capitulation_rebound_matched": capitulation_rebound_matched,
       "escape_breakout_matched": escape_breakout_matched,
       "early_reversal_matched": early_reversal_matched,
       "rsi_turn_matched": rsi_turn_matched,
       "mode": entry_trigger_mode,
       "entry_candle_confirmed": entry_candle_confirmed,
+    },
+    "extended_standard_rebound_quality": {
+      "passed": extended_standard_rebound_quality or capitulation_rebound_matched,
+      "standard_passed": extended_standard_rebound_quality,
+      "capitulation_rebound_override": capitulation_rebound_matched,
+      "extended_standard_rebound": extended_standard_rebound,
+      "threshold_atr": standard_extension_threshold_atr,
+      "deep_standard_washout_quality": deep_standard_washout_quality,
+      "rsi_recent_min": rsi_recent_min,
+      "low_proximity_atr": low_proximity_atr,
+      "ma20_distance_atr": ma20_distance_atr,
+      "ma20_slope": ma20_slope,
+      "atr_pct": atr_pct,
+      "recent_lower_lows": recent_lower_lows,
     },
     "early_reversal": {
       "passed": early_reversal_matched,
@@ -1502,6 +1546,8 @@ def _rsi14_oversold_reversal_entry_evaluation(
       failed_trigger_parts.append("early_reversal")
     if entry_trigger_mode in {"rsi_turn", "either"}:
       failed_trigger_parts.append("rsi_turn")
+    if configured_trigger_matched and not extended_standard_rebound_quality:
+      failed_trigger_parts.append("extended_standard_rebound_quality")
     if capitulation_rebound_enabled:
       failed_trigger_parts.append("capitulation_rebound")
     failed_filters_list.extend(part for part in failed_trigger_parts if part not in failed_filters_list)
