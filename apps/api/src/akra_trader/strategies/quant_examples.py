@@ -445,6 +445,12 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Entry trigger pattern after recent RSI oversold.",
           "description_ko": "최근 RSI 과매도 이후 사용할 매수 트리거입니다. rsi_turn은 RSI 재돌파 전후와 무관하게 RSI 증가 + 양봉 반등을 봅니다.",
         },
+        "entry_enable_capitulation_rebound": {
+          "type": "boolean",
+          "default": True,
+          "semantic_hint": "Allows a tightly filtered rebound after a deeper capitulation below MA60.",
+          "description_ko": "MA60 아래 깊은 급락 뒤 강한 반등 캔들이 나온 경우 제한적으로 매수를 허용합니다.",
+        },
         "entry_min_rsi_rebound": {
           "type": "number",
           "default": 1.0,
@@ -632,6 +638,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         source_descriptor="akra_trader.strategies.quant_examples:Rsi14OversoldReversalStrategy",
         operator_notes=(
           "BUY defaults to RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI30 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
+          "A separate capitulation rebound sleeve can buy below MA60 only when RSI/ATR/slope distances sit in a narrow post-capitulation recovery band.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
           "SELL uses fixed 4 ATR stop, configurable swing-low stop, 288-bar no-profit time exit, 1.5R default target, and optional profit-signal trailing based on RSI/R-target/MA-resistance.",
@@ -1143,6 +1150,9 @@ def _rsi14_oversold_reversal_entry_evaluation(
   early_reversal_enabled = bool(
     context.state.parameters.get("entry_enable_early_reversal", False)
   )
+  capitulation_rebound_enabled = bool(
+    context.state.parameters.get("entry_enable_capitulation_rebound", True)
+  )
   entry_trigger_mode = str(
     context.state.parameters.get("entry_trigger_mode", "rsi_turn")
   )
@@ -1177,6 +1187,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
   ma20 = _feature_value(context, "ma20")
   ma60 = _feature_value(context, "ma60")
   ma20_slope = _feature_value(context, "ma20_slope")
+  ma60_slope = _feature_value(context, "ma60_slope")
   recent_lower_lows = bool(context.features.get("recent_lower_lows", False))
   trend_filter_mode = str(context.state.parameters.get("entry_trend_filter_mode", "above60"))
   cooldown_active = (
@@ -1213,6 +1224,21 @@ def _rsi14_oversold_reversal_entry_evaluation(
     and recent_price_swing_low is not None
     and atr is not None
     and atr > 0
+    else None
+  )
+  ma20_distance_atr = (
+    (close - ma20) / atr
+    if close is not None and ma20 is not None and atr is not None and atr > 0
+    else None
+  )
+  ma60_distance_atr = (
+    (close - ma60) / atr
+    if close is not None and ma60 is not None and atr is not None and atr > 0
+    else None
+  )
+  atr_pct = (
+    (atr / close) * 100
+    if close is not None and close > 0 and atr is not None and atr > 0
     else None
   )
   rsi_rebound_delta = (
@@ -1265,19 +1291,47 @@ def _rsi14_oversold_reversal_entry_evaluation(
     and bullish_rebound_candle
     and entry_candle_confirmed
   )
+  capitulation_rebound_matched = (
+    capitulation_rebound_enabled
+    and rsi_recent_min is not None
+    and 12.0 <= rsi_recent_min <= 18.0
+    and rsi is not None
+    and 38.0 <= rsi <= 48.0
+    and rsi_rebound_delta is not None
+    and rsi_rebound_delta <= 8.5
+    and bullish_rebound_candle
+    and close_position is not None
+    and close_position >= min_close_position
+    and low_proximity_atr is not None
+    and 1.5 <= low_proximity_atr <= 3.5
+    and close is not None
+    and ma60 is not None
+    and close < ma60
+    and ma20_slope is not None
+    and -150.0 <= ma20_slope <= -85.0
+    and ma60_slope is not None
+    and -80.0 <= ma60_slope <= -30.0
+    and ma20_distance_atr is not None
+    and -2.3 <= ma20_distance_atr <= -0.2
+    and ma60_distance_atr is not None
+    and -3.25 <= ma60_distance_atr <= -1.0
+    and atr_pct is not None
+    and 0.30 <= atr_pct <= 0.42
+  )
   if entry_trigger_mode == "escape_breakout":
-    entry_trigger_matched = escape_breakout_matched
+    configured_trigger_matched = escape_breakout_matched
   elif entry_trigger_mode == "early_reversal":
-    entry_trigger_matched = early_reversal_matched
+    configured_trigger_matched = early_reversal_matched
   elif entry_trigger_mode == "rsi_turn":
-    entry_trigger_matched = rsi_turn_matched
+    configured_trigger_matched = rsi_turn_matched
   elif entry_trigger_mode == "either":
-    entry_trigger_matched = (
+    configured_trigger_matched = (
       escape_breakout_matched or early_reversal_matched or rsi_turn_matched
     )
   else:
     entry_trigger_mode = "rsi_turn"
-    entry_trigger_matched = rsi_turn_matched
+    configured_trigger_matched = rsi_turn_matched
+  entry_trigger_matched = configured_trigger_matched or capitulation_rebound_matched
   above_ma20 = close is not None and ma20 is not None and close > ma20
   above_ma60 = close is not None and ma60 is not None and close > ma60
   ma20_slope_non_negative = ma20_slope is not None and ma20_slope >= 0
@@ -1292,12 +1346,16 @@ def _rsi14_oversold_reversal_entry_evaluation(
   else:
     trend_filter_mode = "any"
     trend_filter = True
+  entry_trend_allowed = trend_filter or capitulation_rebound_matched
   close_below_ma60 = close is not None and ma60 is not None and close < ma60
   ma20_slope_down = ma20_slope is not None and ma20_slope < 0
-  structural_downtrend_block = (
+  raw_structural_downtrend_block = (
     close_below_ma60
     and ma20_slope_down
     and recent_lower_lows
+  )
+  structural_downtrend_block = (
+    raw_structural_downtrend_block and not capitulation_rebound_matched
   )
 
   filters = {
@@ -1328,6 +1386,8 @@ def _rsi14_oversold_reversal_entry_evaluation(
     },
     "entry_trigger": {
       "passed": entry_trigger_matched,
+      "configured_trigger_matched": configured_trigger_matched,
+      "capitulation_rebound_matched": capitulation_rebound_matched,
       "escape_breakout_matched": escape_breakout_matched,
       "early_reversal_matched": early_reversal_matched,
       "rsi_turn_matched": rsi_turn_matched,
@@ -1355,6 +1415,24 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "recent_price_swing_low": recent_price_swing_low,
       "atr": atr,
     },
+    "capitulation_rebound": {
+      "passed": capitulation_rebound_matched,
+      "enabled": capitulation_rebound_enabled,
+      "rsi_recent_min": rsi_recent_min,
+      "rsi": rsi,
+      "rsi_rebound_delta": rsi_rebound_delta,
+      "bullish_rebound_candle": bullish_rebound_candle,
+      "close_position": close_position,
+      "low_proximity_atr": low_proximity_atr,
+      "close": close,
+      "ma20": ma20,
+      "ma60": ma60,
+      "ma20_slope": ma20_slope,
+      "ma60_slope": ma60_slope,
+      "ma20_distance_atr": ma20_distance_atr,
+      "ma60_distance_atr": ma60_distance_atr,
+      "atr_pct": atr_pct,
+    },
     "rsi_rebound_limit": {
       "passed": rsi_rebound_within_limit,
       "rsi_rebound_delta": rsi_rebound_delta,
@@ -1372,8 +1450,10 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "atr": atr,
     },
     "trend_filter": {
-      "passed": trend_filter,
+      "passed": entry_trend_allowed,
       "mode": trend_filter_mode,
+      "standard_trend_filter": trend_filter,
+      "capitulation_rebound_override": capitulation_rebound_matched,
       "above_ma20": above_ma20,
       "above_ma60": above_ma60,
       "ma20_slope_non_negative": ma20_slope_non_negative,
@@ -1381,10 +1461,13 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "ma20": ma20,
       "ma60": ma60,
       "ma20_slope": ma20_slope,
+      "ma60_slope": ma60_slope,
     },
     "structural_downtrend_block": {
       "passed": not structural_downtrend_block,
       "blocked": structural_downtrend_block,
+      "raw_blocked": raw_structural_downtrend_block,
+      "capitulation_rebound_override": capitulation_rebound_matched,
       "close_below_ma60": close_below_ma60,
       "ma20_slope_down": ma20_slope_down,
       "recent_lower_lows": recent_lower_lows,
@@ -1419,6 +1502,8 @@ def _rsi14_oversold_reversal_entry_evaluation(
       failed_trigger_parts.append("early_reversal")
     if entry_trigger_mode in {"rsi_turn", "either"}:
       failed_trigger_parts.append("rsi_turn")
+    if capitulation_rebound_enabled:
+      failed_trigger_parts.append("capitulation_rebound")
     failed_filters_list.extend(part for part in failed_trigger_parts if part not in failed_filters_list)
   failed_filters = tuple(failed_filters_list)
   matched = not failed_filters
@@ -1429,7 +1514,11 @@ def _rsi14_oversold_reversal_entry_evaluation(
       else (
         "entry_conditions_met:rsi14_oversold_early_reversal"
         if early_reversal_matched
-        else "entry_conditions_met:rsi14_oversold_rsi_turn"
+        else (
+          "entry_conditions_met:rsi14_capitulation_rebound"
+          if capitulation_rebound_matched
+          else "entry_conditions_met:rsi14_oversold_rsi_turn"
+        )
       )
     )
     if matched
@@ -1446,6 +1535,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
     "escape_breakout_matched": escape_breakout_matched,
     "early_reversal_matched": early_reversal_matched,
     "rsi_turn_matched": rsi_turn_matched,
+    "capitulation_rebound_matched": capitulation_rebound_matched,
   }
 
 

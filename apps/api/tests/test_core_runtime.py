@@ -143,6 +143,7 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["entry_breakout_grace_bars"]["default"] == 20
   assert reversal_strategy["parameter_schema"]["entry_enable_early_reversal"]["default"] is False
   assert reversal_strategy["parameter_schema"]["entry_trigger_mode"]["default"] == "rsi_turn"
+  assert reversal_strategy["parameter_schema"]["entry_enable_capitulation_rebound"]["default"] is True
   assert reversal_strategy["parameter_schema"]["entry_max_rsi_rebound"]["default"] == 10.0
   assert reversal_strategy["parameter_schema"]["entry_min_close_position"]["default"] == 0.75
   assert reversal_strategy["parameter_schema"]["entry_trend_filter_mode"]["default"] == "above60"
@@ -977,6 +978,43 @@ def test_rsi14_oversold_reversal_rejects_overextended_rsi_rebound():
   assert envelope.trace["entry"]["rsi_turn_matched"] is False
   assert envelope.trace["entry"]["filters"]["rsi_rebound_limit"]["passed"] is False
   assert envelope.trace["entry"]["filters"]["rsi_rebound_limit"]["rsi_rebound_delta"] == pytest.approx(14.5)
+
+
+def test_rsi14_oversold_reversal_buys_capitulation_rebound_below_ma60():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (17.0, 34.0, 40.0),
+    closes=(100.0, 99.8, 100.0),
+    ma20=(101.0, 101.5, 100.5),
+    ma60=(151.0, 150.9, 100.9),
+    ma20_slope=-100.0,
+    recent_lower_lows=True,
+    atr=0.35,
+  )
+  frame.loc[frame.index[-1], "open"] = 99.6
+  frame.loc[frame.index[-1], "high"] = 100.2
+  frame.loc[frame.index[-1], "low"] = 99.0
+  frame["recent_price_swing_low"] = frame["low"].rolling(window=5, min_periods=1).min()
+  frame["previous_price_swing_low"] = frame["low"].shift(1).rolling(window=5, min_periods=1).min()
+  frame["ma60_slope"] = -50.0
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={},
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.signal.reason == "entry_conditions_met:rsi14_capitulation_rebound"
+  assert envelope.trace["entry"]["capitulation_rebound_matched"] is True
+  assert envelope.trace["entry"]["filters"]["trend_filter"]["standard_trend_filter"] is False
+  assert envelope.trace["entry"]["filters"]["trend_filter"]["capitulation_rebound_override"] is True
+  assert envelope.trace["entry"]["filters"]["structural_downtrend_block"]["raw_blocked"] is True
+  assert envelope.trace["entry"]["filters"]["structural_downtrend_block"]["passed"] is True
 
 
 def test_rsi14_oversold_reversal_rejects_without_previous_high_breakout():

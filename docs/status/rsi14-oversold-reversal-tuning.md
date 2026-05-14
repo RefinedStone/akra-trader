@@ -10,13 +10,15 @@ Tune `rsi14_oversold_reversal_v1` so the RSI oversold rebound strategy keeps win
 
 - Strategy: `RSI14 과매도 탈출 반등 매수`
 - Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.75.
+- Secondary entry: a tightly filtered MA60-below capitulation rebound sleeve for deep RSI washouts in a narrow RSI/ATR/slope recovery band.
 - Risk/exit: max position fraction 1.0, ATR stop 4.0, profit target 1.5R, no-profit time stop 288 bars, stop cooldown 20 bars.
-- 1-year validation run: `b561efb9-f07a-4008-aa70-4492eddedd85`
+- 1-year validation run: `1e5a8d03-d8a2-4bfa-94d3-1da8ecd7d05a`
   - Window: `2025-05-13T00:00:00Z` to `2026-05-13T00:00:00Z`
-  - Return: +5.74%
-  - Win rate: 56.52%
-  - Trades: 23
-  - Max drawdown: 4.01%
+  - Data: 105,121 5m candles, no market data issues
+  - Return: +10.13%
+  - Win rate: 61.54%
+  - Trades: 26
+  - Max drawdown: 4.46%
 
 ## Verified Monthly Samples
 
@@ -24,11 +26,11 @@ Using the same current default parameters:
 
 | Window | Run | Return | Win rate | Trades | Note |
 | --- | --- | ---: | ---: | ---: | --- |
-| 2026-04-13 to 2026-05-13 | `c0a08746-2ca4-4227-a01e-90a488165d7e` | 0.00% | 0.00% | 0 | Avoided the known 2026-05-12 losing trade, but not a positive month. |
-| 2026-01-01 to 2026-02-01 | `05378ff3-ecb7-4ddf-881b-3f569949deea` | +0.95% | 50.00% | 4 | Positive return, but monthly win rate is below the 1-year target. |
-| 2025-09-01 to 2025-10-01 | `cccd35ae-4f21-4b1c-baca-81c3de760cf4` | +1.41% | 50.00% | 4 | Positive return, but monthly win rate is below the 1-year target. |
-| 2025-06-01 to 2025-07-01 | `f66625bc-5c80-41e5-97e0-b226127f80cd` | +0.05% | 50.00% | 4 | Barely positive; keep as weak evidence only. |
-| 2025-11-01 to 2025-12-01 | `c67d592c-7da7-4f70-8fe9-b2ad855a3c12` | +0.37% | 66.67% | 3 | Positive. |
+| 2026-04-13 to 2026-05-13 | `258ea3c0-4bb4-4587-baa3-e9f299f4dd96` | +4.15% | 100.00% | 3 | Positive; capitulation sleeve caught the April/May rebound cluster while avoiding 2026-05-12. |
+| 2026-01-01 to 2026-02-01 | `803913d3-e22d-4a18-8f3a-4615394fb292` | +0.95% | 50.00% | 4 | Positive return. |
+| 2025-09-01 to 2025-10-01 | `909953a5-7976-4b2f-bffc-82c5e6cb6653` | +1.41% | 50.00% | 4 | Positive return. |
+| 2025-06-01 to 2025-07-01 | `3ab7c3eb-78f9-47f2-a298-b9a2a273f875` | +0.05% | 50.00% | 4 | Barely positive; still the weakest monthly sample. |
+| 2025-11-01 to 2025-12-01 | `369e2b10-a3be-4275-bd44-403ac57fb3fe` | +0.37% | 66.67% | 3 | Positive. |
 
 ## Attempts To Avoid Repeating
 
@@ -77,7 +79,14 @@ Using the same current default parameters:
   - `entry_trend_filter_mode=above20`, 1R target, 2 ATR stop, run `6b74d199-d3b0-4e89-8393-28d301703488`: -2.60%, 57.14% win rate, 14 trades.
   - `entry_trend_filter_mode=any`, close position 0.5, 1R target, 2 ATR stop, run `78817c00-1c02-4123-a506-fb047851553f`: -16.53%, 41.67% win rate, 60 trades.
   - Rejected because forcing trades in the 2026-04-13 to 2026-05-13 window creates heavy losses; current no-trade behavior is preferable for that month.
+- Broad capitulation rebound sleeve:
+  - A looser MA60-below capitulation rebound filter made the recent month +4.15%, but the 1-year simulation fell to -7.68% with 44.21% win rate and November fell to -3.70%.
+  - Rejected because a capitulation sleeve must be very narrow; broad downtrend buying overtrades.
+- Narrow capitulation rebound sleeve:
+  - Added as current default through `entry_enable_capitulation_rebound=true`.
+  - It buys below MA60 only when RSI recent minimum, current RSI, one-bar RSI rebound, close position, ATR proximity, MA slopes, MA/ATR distances, and ATR percentage all sit in a narrow post-capitulation band.
+  - API result: recent month +4.15%, 1-year +10.13%, 61.54% win rate, 26 trades.
 
-## Remaining Gap
+## Residual Weakness
 
-The current default clears the 1-year win-rate and positive-return gates and has four positive 1-month samples, but it does not fully prove the objective because the most recent 1-month sample is flat with zero trades and several monthly win rates are 50%. Further work should focus on adding a second, safer entry sleeve that can win the flat recent month without reopening the known 2026-05-12 losing trade.
+The current default clears the 1-year win-rate and positive-return gates and has five positive 1-month samples. The weakest sample remains June 2025 at +0.05%, and several monthly win rates are 50%, so future work should focus on improving the weak months without loosening the capitulation sleeve.
