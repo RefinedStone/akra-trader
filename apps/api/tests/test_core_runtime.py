@@ -138,12 +138,13 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["ma20_window"]["default"] == 20
   assert reversal_strategy["parameter_schema"]["ma60_window"]["default"] == 60
   assert reversal_strategy["parameter_schema"]["rsi_window"]["default"] == 14
-  assert reversal_strategy["parameter_schema"]["rsi_oversold_level"]["default"] == 25
+  assert reversal_strategy["parameter_schema"]["rsi_oversold_level"]["default"] == 30
   assert reversal_strategy["parameter_schema"]["entry_lookback_bars"]["default"] == 80
   assert reversal_strategy["parameter_schema"]["entry_breakout_grace_bars"]["default"] == 20
   assert reversal_strategy["parameter_schema"]["entry_enable_early_reversal"]["default"] is False
   assert reversal_strategy["parameter_schema"]["entry_trigger_mode"]["default"] == "rsi_turn"
-  assert reversal_strategy["parameter_schema"]["entry_min_close_position"]["default"] == 0.45
+  assert reversal_strategy["parameter_schema"]["entry_max_rsi_rebound"]["default"] == 10.0
+  assert reversal_strategy["parameter_schema"]["entry_min_close_position"]["default"] == 0.75
   assert reversal_strategy["parameter_schema"]["entry_trend_filter_mode"]["default"] == "above60"
   assert reversal_strategy["parameter_schema"]["swing_lookback_bars"]["default"] == 80
   assert reversal_strategy["parameter_schema"]["exit_rsi_profit_level"]["default"] == 50
@@ -945,6 +946,37 @@ def test_rsi14_oversold_reversal_buys_rsi_turn_after_recent_oversold():
   assert envelope.signal.action == SignalAction.BUY
   assert envelope.signal.reason == "entry_conditions_met:rsi14_oversold_rsi_turn"
   assert envelope.trace["entry"]["rsi_turn_matched"] is True
+
+
+def test_rsi14_oversold_reversal_rejects_overextended_rsi_rebound():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (29.0, 39.0, 53.5),
+    closes=(100.0, 100.2, 101.2),
+    ma20=(99.0, 99.1, 99.2),
+    ma60=(98.0, 98.1, 98.2),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={
+      "entry_trigger_mode": "rsi_turn",
+      "entry_max_rsi_rebound": 10.0,
+      "entry_min_close_position": 0.5,
+      "entry_max_low_proximity_atr": 3.0,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.HOLD
+  assert envelope.trace["entry"]["rsi_turn_matched"] is False
+  assert envelope.trace["entry"]["filters"]["rsi_rebound_limit"]["passed"] is False
+  assert envelope.trace["entry"]["filters"]["rsi_rebound_limit"]["rsi_rebound_delta"] == pytest.approx(14.5)
 
 
 def test_rsi14_oversold_reversal_rejects_without_previous_high_breakout():

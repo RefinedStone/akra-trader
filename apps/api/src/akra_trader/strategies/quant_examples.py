@@ -408,11 +408,11 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "rsi_oversold_level": {
           "type": "number",
-          "default": 25,
+          "default": 30,
           "minimum": 0,
           "maximum": 100,
           "semantic_hint": "RSI level defining oversold setup and escape trigger.",
-          "description_ko": "과매도 기준선입니다. 기본값 25는 더 깊은 RSI 과매도 이후 반등만 매수 후보로 봅니다.",
+          "description_ko": "과매도 기준선입니다. 기본값 30은 RSI14 과매도권 반등을 매수 후보로 봅니다.",
         },
         "entry_lookback_bars": {
           "type": "integer",
@@ -453,13 +453,21 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Minimum one-bar RSI increase required for early reversal entries.",
           "description_ko": "초기 반등 매수에 필요한 RSI14 전봉 대비 최소 상승폭입니다.",
         },
+        "entry_max_rsi_rebound": {
+          "type": "number",
+          "default": 10.0,
+          "minimum": 0,
+          "maximum": 100,
+          "semantic_hint": "Maximum one-bar RSI increase allowed for rebound entries.",
+          "description_ko": "반등 매수에서 허용할 RSI14 전봉 대비 최대 상승폭입니다. 과도하게 급등한 늦은 반등 진입을 막습니다.",
+        },
         "entry_min_close_position": {
           "type": "number",
-          "default": 0.45,
+          "default": 0.75,
           "minimum": 0,
           "maximum": 1,
           "semantic_hint": "Minimum candle close position from low to high for rebound entries.",
-          "description_ko": "반등 매수에서 요구하는 캔들 마감 위치입니다. 기본값 0.45는 봉의 중간 이상 부근에서 마감한 반등만 허용합니다.",
+          "description_ko": "반등 매수에서 요구하는 캔들 마감 위치입니다. 기본값 0.75는 봉의 저가~고가 구간 상위 25%에서 마감한 강한 반등만 허용합니다.",
         },
         "entry_max_low_proximity_atr": {
           "type": "number",
@@ -623,7 +631,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         parameter_contract="Typed parameter schema exposes oversold lookback, swing stop, R target, time stop, and cooldown controls.",
         source_descriptor="akra_trader.strategies.quant_examples:Rsi14OversoldReversalStrategy",
         operator_notes=(
-          "BUY defaults to deep RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI25 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
+          "BUY defaults to RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI30 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
           "SELL uses fixed 4 ATR stop, configurable swing-low stop, 288-bar no-profit time exit, 1.5R default target, and optional profit-signal trailing based on RSI/R-target/MA-resistance.",
@@ -695,7 +703,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     oversold_level = _clamped_mapping_number(
       parameters,
       "rsi_oversold_level",
-      25.0,
+      30.0,
       minimum=0.0,
       maximum=100.0,
     )
@@ -1145,10 +1153,17 @@ def _rsi14_oversold_reversal_entry_evaluation(
     minimum=0.0,
     maximum=20.0,
   )
+  max_rsi_rebound = _clamped_parameter(
+    context,
+    "entry_max_rsi_rebound",
+    10.0,
+    minimum=0.0,
+    maximum=100.0,
+  )
   min_close_position = _clamped_parameter(
     context,
     "entry_min_close_position",
-    0.45,
+    0.75,
     minimum=0.0,
     maximum=1.0,
   )
@@ -1205,6 +1220,9 @@ def _rsi14_oversold_reversal_entry_evaluation(
     if rsi is not None and previous_rsi is not None
     else None
   )
+  rsi_rebound_within_limit = (
+    rsi_rebound_delta is not None and rsi_rebound_delta <= max_rsi_rebound
+  )
   early_rsi_rebound = (
     previous_rsi is not None
     and rsi is not None
@@ -1212,6 +1230,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
     and rsi <= oversold_level
     and rsi_rebound_delta is not None
     and rsi_rebound_delta >= min_rsi_rebound
+    and rsi_rebound_within_limit
   )
   bullish_rebound_candle = (
     open_price is not None
@@ -1228,6 +1247,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
   escape_breakout_matched = (
     rsi_crossed_oversold_recent
     and close_above_previous_high
+    and rsi_rebound_within_limit
     and entry_candle_confirmed
   )
   early_reversal_matched = (
@@ -1241,6 +1261,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
     and rsi is not None
     and previous_rsi is not None
     and rsi > previous_rsi
+    and rsi_rebound_within_limit
     and bullish_rebound_candle
     and entry_candle_confirmed
   )
@@ -1319,6 +1340,8 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "early_rsi_rebound": early_rsi_rebound,
       "rsi_rebound_delta": rsi_rebound_delta,
       "entry_min_rsi_rebound": min_rsi_rebound,
+      "entry_max_rsi_rebound": max_rsi_rebound,
+      "rsi_rebound_within_limit": rsi_rebound_within_limit,
       "bullish_rebound_candle": bullish_rebound_candle,
       "open": open_price,
       "close": close,
@@ -1331,6 +1354,11 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "entry_max_low_proximity_atr": max_low_proximity_atr,
       "recent_price_swing_low": recent_price_swing_low,
       "atr": atr,
+    },
+    "rsi_rebound_limit": {
+      "passed": rsi_rebound_within_limit,
+      "rsi_rebound_delta": rsi_rebound_delta,
+      "entry_max_rsi_rebound": max_rsi_rebound,
     },
     "entry_candle_confirmation": {
       "passed": entry_candle_confirmed,

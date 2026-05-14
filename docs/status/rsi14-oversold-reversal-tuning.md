@@ -1,0 +1,77 @@
+# RSI14 Oversold Reversal Tuning Notes
+
+Last updated: 2026-05-15 KST
+
+## Objective
+
+Tune `rsi14_oversold_reversal_v1` so the RSI oversold rebound strategy keeps win rate above 51%, favors longer reward/risk exits, and can be validated across 1-year and multiple 1-month backtests without repeating already-failed parameter searches.
+
+## Current Default
+
+- Strategy: `RSI14 과매도 탈출 반등 매수`
+- Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.75.
+- Risk/exit: max position fraction 1.0, ATR stop 4.0, profit target 1.5R, no-profit time stop 288 bars, stop cooldown 20 bars.
+- 1-year validation run: `b561efb9-f07a-4008-aa70-4492eddedd85`
+  - Window: `2025-05-13T00:00:00Z` to `2026-05-13T00:00:00Z`
+  - Return: +5.74%
+  - Win rate: 56.52%
+  - Trades: 23
+  - Max drawdown: 4.01%
+
+## Verified Monthly Samples
+
+Using the same current default parameters:
+
+| Window | Run | Return | Win rate | Trades | Note |
+| --- | --- | ---: | ---: | ---: | --- |
+| 2026-04-13 to 2026-05-13 | `c0a08746-2ca4-4227-a01e-90a488165d7e` | 0.00% | 0.00% | 0 | Avoided the known 2026-05-12 losing trade, but not a positive month. |
+| 2026-01-01 to 2026-02-01 | `05378ff3-ecb7-4ddf-881b-3f569949deea` | +0.95% | 50.00% | 4 | Positive return, but monthly win rate is below the 1-year target. |
+| 2025-09-01 to 2025-10-01 | `cccd35ae-4f21-4b1c-baca-81c3de760cf4` | +1.41% | 50.00% | 4 | Positive return, but monthly win rate is below the 1-year target. |
+| 2025-06-01 to 2025-07-01 | `f66625bc-5c80-41e5-97e0-b226127f80cd` | +0.05% | 50.00% | 4 | Barely positive; keep as weak evidence only. |
+| 2025-11-01 to 2025-12-01 | `c67d592c-7da7-4f70-8fe9-b2ad855a3c12` | +0.37% | 66.67% | 3 | Positive. |
+
+## Attempts To Avoid Repeating
+
+- Loose RSI30 rebound default:
+  - Parameters: RSI oversold 30, lookback 80, `rsi_turn`, above MA60, ATR stop 2.0, 2.0R target, full-size risk sizing.
+  - 1-year result: +1.55%, 51.16% win rate, 43 trades, 2.35% max drawdown.
+  - Rejected because several 1-month samples were negative: recent -0.49%, June -0.58%, September -0.08%.
+- Stricter RSI25 with half allocation:
+  - Parameters: RSI oversold 25, close position 0.45, above MA60, ATR stop 4.0, 1.5R target, max position fraction 0.5.
+  - 1-year result: +4.47%, 63.64% win rate, 11 trades.
+  - Rejected as default because the same signal quality with max position fraction 1.0 improved 1-year return to +5.87% without increasing drawdown beyond 1.91%.
+- RSI30 trade expansion:
+  - Increased trade count but admitted shallow oversold rebounds that failed in the recent and June monthly windows.
+  - A one-bar RSI rebound cap now blocks the 2026-05-12 overextended rebound, but shallow RSI30 entries still need close-position filtering.
+- Immediate trailing-profit default:
+  - Earlier exploratory runs with trailing held winners longer but materially reduced win rate or total return in this signal family.
+  - Keep trailing optional until a verified parameter set beats the current +5.74% 1-year run and positive monthly samples.
+- RSI30 macro trend filter:
+  - Parameters tested: `rsi_oversold_level=30`, `entry_trend_filter_mode=macro`.
+  - Recent month run `0f9e0836-fa0b-4818-9fc3-b013fb947af8`: 0.00%, 0 trades.
+  - June run `96d0bc29-bef5-4619-8f78-cfbad55eac27`: -1.86%, 0.00% win rate, 2 trades.
+  - Rejected because it still loses in June.
+- RSI30 escape-only macro:
+  - Parameters tested: `rsi_oversold_level=30`, `entry_trend_filter_mode=macro`, `entry_trigger_mode=escape_breakout`.
+  - Recent run `e4eb0166-6f7c-42ed-a8bb-4967e0b740da`: 0.00%, 0 trades.
+  - June run `3b3c52d5-9d9a-4c18-9869-6d46708d678c`: 0.00%, 0 trades.
+  - Rejected because it only avoids trades; it does not create monthly wins.
+- Early-reversal/either trigger:
+  - Strict RSI25 + early/either recent run `e774676e-ec97-4cd8-8652-4414afeca4eb`: 0.00%, 0 trades.
+  - Strict RSI25 + early/either June run `ce9ff721-f588-4744-b476-34e3f5e41ed7`: 0.00%, 0 trades.
+  - RSI30 + early/either recent run `2b2887c3-e31f-43c3-b35f-3b7d2fb6b22f`: -1.30%, 0.00% win rate, 1 trade.
+  - RSI30 + early/either June run `0bd24e1f-1776-4ca2-a6e1-4b064d492203`: +0.51%, 50.00% win rate, 6 trades.
+  - Rejected because the June improvement reopens the known 2026-05-12 losing trade.
+- RSI30 with rebound cap and close-position variants:
+  - Default-like `entry_min_close_position=0.45` run `9d65503a-ce41-48f4-bab5-657527fc30b0`: 1-year +8.30%, 55.88% win rate, 34 trades, but November `3beb226c-1325-4df3-aa0e-340e52c38bc5` was -0.90%.
+  - `entry_min_close_position=0.65` run `7eef6f69-5ce5-424a-a0e2-8e1eb188b524`: 1-year +5.37%, 55.56% win rate, 27 trades; November +0.37%.
+  - `entry_min_close_position=0.70` run `a4c8ad09-2444-4c10-8367-fca0e3d595ce`: 1-year +5.52%, 56.00% win rate, 25 trades; November +0.37%.
+  - `entry_min_close_position=0.75` run `19e1fac0-1abe-48c9-9966-1f11915df539`: 1-year +5.74%, 56.52% win rate, 23 trades; June, September, November, and January sample windows stayed positive.
+  - Current default chooses 0.75 because it gives the best 1-year return among the positive-November close-position variants.
+- Slow local random searches:
+  - Two broad Python search passes were stopped because they were too slow for interactive iteration.
+  - Do not rerun broad per-candidate Python loops over 1-year data without vectorizing entries first or reducing the candidate set.
+
+## Remaining Gap
+
+The current default clears the 1-year win-rate and positive-return gates and has four positive 1-month samples, but it does not fully prove the objective because the most recent 1-month sample is flat with zero trades and several monthly win rates are 50%. Further work should focus on adding a second, safer entry sleeve that can win the flat recent month without reopening the known 2026-05-12 losing trade.
