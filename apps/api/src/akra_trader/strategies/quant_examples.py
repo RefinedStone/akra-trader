@@ -404,39 +404,83 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "minimum": 2,
           "unit": "bars",
           "semantic_hint": "ATR volatility lookback for risk sizing and ATR stop exits.",
-          "description_ko": "ATR14 변동성 계산 기간입니다. 진입가 - 1.5 * ATR 손절과 포지션 크기 산정에 사용합니다.",
+          "description_ko": "ATR14 변동성 계산 기간입니다. 진입가 - ATR 손절 배수 기준 손절과 포지션 크기 산정에 사용합니다.",
         },
         "rsi_oversold_level": {
           "type": "number",
-          "default": 30,
+          "default": 25,
           "minimum": 0,
           "maximum": 100,
           "semantic_hint": "RSI level defining oversold setup and escape trigger.",
-          "description_ko": "과매도 기준선입니다. 최근 N봉 안에 RSI가 이 값 이하로 내려갔다가 다시 상향 돌파해야 합니다.",
+          "description_ko": "과매도 기준선입니다. 기본값 25는 더 깊은 RSI 과매도 이후 반등만 매수 후보로 봅니다.",
         },
         "entry_lookback_bars": {
           "type": "integer",
-          "default": 10,
+          "default": 80,
           "minimum": 1,
-          "maximum": 30,
+          "maximum": 80,
           "unit": "bars",
           "semantic_hint": "Recent bar window in which RSI must have reached oversold.",
-          "description_ko": "과매도 발생을 확인할 최근 봉 수입니다. 기본값은 최근 10봉입니다.",
+          "description_ko": "과매도 발생을 확인할 최근 봉 수입니다. 기본값은 최근 80봉입니다.",
         },
         "entry_breakout_grace_bars": {
           "type": "integer",
-          "default": 2,
+          "default": 20,
           "minimum": 0,
-          "maximum": 5,
+          "maximum": 20,
           "unit": "bars",
           "semantic_hint": "Bars allowed after the RSI oversold-line reclaim for the previous-high breakout confirmation.",
-          "description_ko": "RSI14가 30선을 상향 돌파한 뒤 전봉 고가 돌파를 기다릴 봉 수입니다. 2는 재돌파 후 2봉 이내 돌파를 허용합니다.",
+          "description_ko": "RSI14가 과매도 기준선을 상향 돌파한 뒤 전봉 고가 돌파를 기다릴 봉 수입니다. 기본값 20은 재돌파 후 20봉 이내 돌파를 허용합니다.",
+        },
+        "entry_enable_early_reversal": {
+          "type": "boolean",
+          "default": False,
+          "semantic_hint": "Allows BUY while RSI is still oversold when the first rebound candle confirms.",
+          "description_ko": "RSI14가 아직 과매도권 안에 있어도 RSI가 첫 상승 전환하고 반등 캔들이 확인되면 매수를 허용합니다.",
+        },
+        "entry_trigger_mode": {
+          "type": "string",
+          "default": "rsi_turn",
+          "enum": ["escape_breakout", "early_reversal", "rsi_turn", "either"],
+          "semantic_hint": "Entry trigger pattern after recent RSI oversold.",
+          "description_ko": "최근 RSI 과매도 이후 사용할 매수 트리거입니다. rsi_turn은 RSI 재돌파 전후와 무관하게 RSI 증가 + 양봉 반등을 봅니다.",
+        },
+        "entry_min_rsi_rebound": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0,
+          "maximum": 20,
+          "semantic_hint": "Minimum one-bar RSI increase required for early reversal entries.",
+          "description_ko": "초기 반등 매수에 필요한 RSI14 전봉 대비 최소 상승폭입니다.",
+        },
+        "entry_min_close_position": {
+          "type": "number",
+          "default": 0.45,
+          "minimum": 0,
+          "maximum": 1,
+          "semantic_hint": "Minimum candle close position from low to high for rebound entries.",
+          "description_ko": "반등 매수에서 요구하는 캔들 마감 위치입니다. 기본값 0.45는 봉의 중간 이상 부근에서 마감한 반등만 허용합니다.",
+        },
+        "entry_max_low_proximity_atr": {
+          "type": "number",
+          "default": 2.5,
+          "minimum": 0,
+          "maximum": 10,
+          "semantic_hint": "Maximum distance from recent swing low in ATR units for rebound entries.",
+          "description_ko": "반등 매수에서 최근 저점 대비 허용 거리입니다. 현재가가 최근 저점에서 ATR의 이 배수 이상 멀면 진입하지 않습니다.",
+        },
+        "entry_trend_filter_mode": {
+          "type": "string",
+          "default": "above60",
+          "enum": ["any", "loose", "above20", "above60", "macro"],
+          "semantic_hint": "Trend filter strength used before BUY.",
+          "description_ko": "매수 전 추세 필터 강도입니다. any는 구조적 하락 차단만 적용하고, loose는 MA20/MA60/MA20기울기 중 하나를 요구합니다.",
         },
         "swing_lookback_bars": {
           "type": "integer",
-          "default": 5,
+          "default": 80,
           "minimum": 2,
-          "maximum": 20,
+          "maximum": 80,
           "unit": "bars",
           "semantic_hint": "Lookback used to define recent swing-low stop and lower-low structure.",
           "description_ko": "최근 스윙 저점과 저점 하락 구조를 판단할 봉 수입니다.",
@@ -458,31 +502,79 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "RSI level used to take profit after oversold escape.",
           "description_ko": "익절 RSI 기준선입니다. 보유 중 RSI14가 이 값 이상이고 수익 상태면 전량 SELL합니다.",
         },
+        "exit_enable_rsi_profit": {
+          "type": "boolean",
+          "default": False,
+          "semantic_hint": "Enables RSI-level profit exits before the R target.",
+          "description_ko": "R 목표 도달 전 RSI 기준 익절을 사용할지 여부입니다. 기본은 긴 손익비를 위해 비활성화합니다.",
+        },
+        "exit_enable_ma_resistance": {
+          "type": "boolean",
+          "default": False,
+          "semantic_hint": "Enables moving-average resistance profit exits before the R target.",
+          "description_ko": "R 목표 도달 전 MA20/MA60 저항 익절을 사용할지 여부입니다. 기본은 긴 손익비를 위해 비활성화합니다.",
+        },
+        "exit_enable_swing_low_stop": {
+          "type": "boolean",
+          "default": False,
+          "semantic_hint": "Enables recent swing-low breakdown as an immediate stop.",
+          "description_ko": "최근 스윙 저점 이탈을 즉시 손절로 사용할지 여부입니다. 기본은 ATR 손절을 우선해 반등 흔들림을 더 허용합니다.",
+        },
         "exit_profit_r_multiple": {
           "type": "number",
           "default": 1.5,
           "minimum": 0.1,
           "maximum": 5,
           "semantic_hint": "Profit target measured in initial risk R.",
-          "description_ko": "초기 위험 R 기준 익절 배수입니다. 1.5는 진입 위험의 1.5배 수익에서 청산합니다.",
+          "description_ko": "초기 위험 R 기준 익절 감지 배수입니다. 트레일링 보유가 켜져 있으면 즉시 매도 대신 트레일링을 활성화합니다.",
+        },
+        "exit_hold_profit_with_trailing": {
+          "type": "boolean",
+          "default": False,
+          "semantic_hint": "Keeps profitable trades open after profit signals and exits through a trailing stop.",
+          "description_ko": "수익 신호가 발생해도 즉시 익절하지 않고 트레일링 스톱으로 수익을 최대한 끌고 갑니다.",
+        },
+        "exit_trailing_activation_r": {
+          "type": "number",
+          "default": 5.0,
+          "minimum": 0,
+          "maximum": 5,
+          "semantic_hint": "Profit in R required before the trailing stop can activate.",
+          "description_ko": "트레일링 스톱을 활성화할 최소 수익 R입니다. 5.0은 초기 위험의 5배 수익부터 트레일링합니다.",
+        },
+        "exit_trailing_distance_atr": {
+          "type": "number",
+          "default": 1.2,
+          "minimum": 0.1,
+          "maximum": 10,
+          "semantic_hint": "ATR distance kept below the high-watermark once trailing is active.",
+          "description_ko": "트레일링 스톱 거리입니다. 최고가에서 ATR의 이 배수만큼 되돌리면 전량 SELL합니다.",
+        },
+        "exit_break_even_activation_r": {
+          "type": "number",
+          "default": 5.0,
+          "minimum": 0,
+          "maximum": 5,
+          "semantic_hint": "Profit in R required to lift trailing stop to the entry price.",
+          "description_ko": "트레일링 스톱을 진입가 이상으로 끌어올릴 최소 수익 R입니다.",
         },
         "exit_time_stop_bars": {
           "type": "integer",
-          "default": 7,
+          "default": 288,
           "minimum": 1,
-          "maximum": 50,
+          "maximum": 288,
           "unit": "bars",
           "semantic_hint": "Bars allowed after entry before exiting if the trade has not turned profitable.",
-          "description_ko": "진입 후 수익 전환을 기다릴 봉 수입니다. 기본값은 7봉입니다.",
+          "description_ko": "진입 후 수익 전환을 기다릴 봉 수입니다. 기본값은 288봉입니다.",
         },
         "cooldown_after_stop_bars": {
           "type": "integer",
-          "default": 5,
+          "default": 20,
           "minimum": 0,
           "maximum": 50,
           "unit": "bars",
           "semantic_hint": "Bars to block re-entry after a stop-loss exit.",
-          "description_ko": "손절 후 재진입을 금지할 봉 수입니다. 기본값은 5봉입니다.",
+          "description_ko": "손절 후 재진입을 금지할 봉 수입니다. 기본값은 20봉입니다.",
         },
         "risk_fraction": {
           "type": "number",
@@ -494,31 +586,32 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "max_position_fraction": {
           "type": "number",
-          "default": 0.5,
+          "default": 1.0,
           "minimum": 0,
           "maximum": 1,
           "semantic_hint": "Maximum notional allocation for this strategy.",
-          "description_ko": "전략이 사용할 수 있는 최대 포지션 비중입니다. 0.5는 자산의 50% 한도입니다.",
+          "description_ko": "전략이 사용할 수 있는 최대 포지션 비중입니다. 1.0은 자산의 100% 한도입니다.",
         },
         "atr_stop_multiple": {
           "type": "number",
-          "default": 1.5,
+          "default": 4.0,
           "minimum": 0.1,
           "maximum": 10,
           "semantic_hint": "ATR multiple used for fixed stop distance.",
-          "description_ko": "ATR 손절 배수입니다. 기본값은 진입가 - 1.5 * ATR14 손절입니다.",
+          "description_ko": "ATR 손절 배수입니다. 기본값은 진입가 - 4.0 * ATR14 손절입니다.",
         },
         "atr_take_profit_multiple": {
           "type": "number",
           "default": 3.0,
           "minimum": 0.1,
           "semantic_hint": "Compatibility take-profit distance stored on the position.",
-          "description_ko": "포지션에 저장되는 보조 익절 기준입니다. 실제 청산은 RSI50, R배수, MA저항, 시간청산을 우선합니다.",
+          "description_ko": "포지션에 저장되는 보조 익절 기준입니다. 실제 청산은 ATR손절, R배수, 시간청산, 선택형 RSI/MA/트레일링 조건을 사용합니다.",
         },
       },
       description=(
-        "RSI14 oversold escape rebound setup: RSI recently oversold, RSI crosses back above 30, "
-        "close breaks the previous high, trend filter allows the rebound, and exits are stop/R/time/profit based."
+        "RSI14 oversold escape rebound setup: RSI recently oversold, RSI turns up from the oversold threshold, "
+        "close breaks the previous high or an early rebound candle confirms, trend filter allows the rebound, "
+        "and exits are stop/time/trailing-profit based."
       ),
       lifecycle=StrategyLifecycle(stage="experimental"),
       catalog_semantics=StrategyCatalogSemantics(
@@ -530,10 +623,10 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         parameter_contract="Typed parameter schema exposes oversold lookback, swing stop, R target, time stop, and cooldown controls.",
         source_descriptor="akra_trader.strategies.quant_examples:Rsi14OversoldReversalStrategy",
         operator_notes=(
-          "BUY requires RSI14 to have been oversold within 10 bars, RSI14 to cross back above 30, and close to break the previous high within the breakout grace window.",
-          "Trend filter passes when close is above MA20, close is above MA60, or MA20 slope is non-negative.",
+          "BUY defaults to deep RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI25 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
+          "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
-          "SELL uses swing-low stop, fixed 1.5 ATR stop, RSI50/R-target/MA-resistance profit exits, 7-bar no-profit time exit, and 5-bar stop cooldown.",
+          "SELL uses fixed 4 ATR stop, configurable swing-low stop, 288-bar no-profit time exit, 1.5R default target, and optional profit-signal trailing based on RSI/R-target/MA-resistance.",
         ),
       ),
       version_lineage=("1.0.0",),
@@ -558,9 +651,9 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     sizing=AtrRiskSizing(
       atr_feature="atr",
       risk_fraction=ParameterRef("risk_fraction", 0.01),
-      stop_multiple=ParameterRef("atr_stop_multiple", 1.5),
+      stop_multiple=ParameterRef("atr_stop_multiple", 4.0),
       take_profit_multiple=ParameterRef("atr_take_profit_multiple", 3.0),
-      max_position_fraction=ParameterRef("max_position_fraction", 0.5),
+      max_position_fraction=ParameterRef("max_position_fraction", 1.0),
     ),
   )
 
@@ -572,23 +665,23 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     entry_lookback = _mapping_int_parameter(
       parameters,
       "entry_lookback_bars",
-      10,
+      80,
       minimum=1,
-      maximum=30,
+      maximum=80,
     )
     swing_lookback = _mapping_int_parameter(
       parameters,
       "swing_lookback_bars",
-      5,
+      80,
       minimum=2,
-      maximum=20,
+      maximum=80,
     )
     breakout_grace = _mapping_int_parameter(
       parameters,
       "entry_breakout_grace_bars",
-      2,
+      20,
       minimum=0,
-      maximum=5,
+      maximum=20,
     )
     slope_lookback = _mapping_int_parameter(
       parameters,
@@ -602,7 +695,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     oversold_level = _clamped_mapping_number(
       parameters,
       "rsi_oversold_level",
-      30.0,
+      25.0,
       minimum=0.0,
       maximum=100.0,
     )
@@ -624,6 +717,9 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     )
     frame["previous_price_swing_low"] = (
       frame["low"].shift(1).rolling(window=swing_lookback, min_periods=1).min()
+    )
+    frame["recent_price_swing_low"] = (
+      frame["low"].rolling(window=swing_lookback, min_periods=1).min()
     )
     frame["ma20_slope"] = frame["ma20"] - frame["ma20"].shift(slope_lookback)
     frame["ma60_slope"] = frame["ma60"] - frame["ma60"].shift(slope_lookback)
@@ -700,7 +796,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     cooldown_bars = _mapping_int_parameter(
       context.state.parameters,
       "cooldown_after_stop_bars",
-      5,
+      20,
       minimum=0,
       maximum=50,
     )
@@ -732,7 +828,7 @@ def _rsi_atr_entry_evaluation(
   rsi_oversold_level = _clamped_parameter(
     context,
     "rsi_oversold_level",
-    30.0,
+    25.0,
     minimum=0.0,
     maximum=100.0,
   )
@@ -1011,29 +1107,63 @@ def _rsi14_oversold_reversal_entry_evaluation(
   oversold_level = _clamped_parameter(
     context,
     "rsi_oversold_level",
-    30.0,
+    25.0,
     minimum=0.0,
     maximum=100.0,
   )
   bar_index = _finite_number(context.features.get("bar_index"))
+  open_price = _feature_or_market(context, "open")
+  high = _feature_or_market(context, "high")
+  low = _feature_or_market(context, "low")
   close = _feature_or_market(context, "close")
+  previous_close = _feature_value(context, "previous_close")
   previous_high = _feature_value(context, "previous_high")
   rsi = _feature_value(context, "rsi")
   previous_rsi = _feature_value(context, "previous_rsi")
   rsi_recent_min = _feature_value(context, "rsi_recent_min")
   rsi_crossed_oversold_recent = _feature_flag(context, "rsi_crossed_oversold_recent")
   bars_since_rsi_oversold_cross = _feature_value(context, "bars_since_rsi_oversold_cross")
+  recent_price_swing_low = _feature_value(context, "recent_price_swing_low")
+  atr = _feature_value(context, "atr")
   breakout_grace_bars = _mapping_int_parameter(
     context.state.parameters,
     "entry_breakout_grace_bars",
-    2,
+    20,
     minimum=0,
-    maximum=5,
+    maximum=20,
+  )
+  early_reversal_enabled = bool(
+    context.state.parameters.get("entry_enable_early_reversal", False)
+  )
+  entry_trigger_mode = str(
+    context.state.parameters.get("entry_trigger_mode", "rsi_turn")
+  )
+  min_rsi_rebound = _clamped_parameter(
+    context,
+    "entry_min_rsi_rebound",
+    1.0,
+    minimum=0.0,
+    maximum=20.0,
+  )
+  min_close_position = _clamped_parameter(
+    context,
+    "entry_min_close_position",
+    0.45,
+    minimum=0.0,
+    maximum=1.0,
+  )
+  max_low_proximity_atr = _clamped_parameter(
+    context,
+    "entry_max_low_proximity_atr",
+    2.5,
+    minimum=0.0,
+    maximum=10.0,
   )
   ma20 = _feature_value(context, "ma20")
   ma60 = _feature_value(context, "ma60")
   ma20_slope = _feature_value(context, "ma20_slope")
   recent_lower_lows = bool(context.features.get("recent_lower_lows", False))
+  trend_filter_mode = str(context.state.parameters.get("entry_trend_filter_mode", "above60"))
   cooldown_active = (
     cooldown_until_bar_index is not None
     and bar_index is not None
@@ -1052,10 +1182,95 @@ def _rsi14_oversold_reversal_entry_evaluation(
     and previous_high is not None
     and close > previous_high
   )
+  candle_range = (
+    high - low
+    if high is not None and low is not None and high > low
+    else None
+  )
+  close_position = (
+    (close - low) / candle_range
+    if close is not None and low is not None and candle_range is not None
+    else None
+  )
+  low_proximity_atr = (
+    (close - recent_price_swing_low) / atr
+    if close is not None
+    and recent_price_swing_low is not None
+    and atr is not None
+    and atr > 0
+    else None
+  )
+  rsi_rebound_delta = (
+    rsi - previous_rsi
+    if rsi is not None and previous_rsi is not None
+    else None
+  )
+  early_rsi_rebound = (
+    previous_rsi is not None
+    and rsi is not None
+    and previous_rsi <= oversold_level
+    and rsi <= oversold_level
+    and rsi_rebound_delta is not None
+    and rsi_rebound_delta >= min_rsi_rebound
+  )
+  bullish_rebound_candle = (
+    open_price is not None
+    and close is not None
+    and previous_close is not None
+    and close > open_price
+    and close > previous_close
+  )
+  close_position_confirmed = close_position is not None and close_position >= min_close_position
+  low_proximity_confirmed = (
+    low_proximity_atr is not None and low_proximity_atr <= max_low_proximity_atr
+  )
+  entry_candle_confirmed = close_position_confirmed and low_proximity_confirmed
+  escape_breakout_matched = (
+    rsi_crossed_oversold_recent
+    and close_above_previous_high
+    and entry_candle_confirmed
+  )
+  early_reversal_matched = (
+    early_reversal_enabled
+    and early_rsi_rebound
+    and bullish_rebound_candle
+    and entry_candle_confirmed
+  )
+  rsi_turn_matched = (
+    recent_oversold
+    and rsi is not None
+    and previous_rsi is not None
+    and rsi > previous_rsi
+    and bullish_rebound_candle
+    and entry_candle_confirmed
+  )
+  if entry_trigger_mode == "escape_breakout":
+    entry_trigger_matched = escape_breakout_matched
+  elif entry_trigger_mode == "early_reversal":
+    entry_trigger_matched = early_reversal_matched
+  elif entry_trigger_mode == "rsi_turn":
+    entry_trigger_matched = rsi_turn_matched
+  elif entry_trigger_mode == "either":
+    entry_trigger_matched = (
+      escape_breakout_matched or early_reversal_matched or rsi_turn_matched
+    )
+  else:
+    entry_trigger_mode = "rsi_turn"
+    entry_trigger_matched = rsi_turn_matched
   above_ma20 = close is not None and ma20 is not None and close > ma20
   above_ma60 = close is not None and ma60 is not None and close > ma60
   ma20_slope_non_negative = ma20_slope is not None and ma20_slope >= 0
-  trend_filter = above_ma20 or above_ma60 or ma20_slope_non_negative
+  if trend_filter_mode == "loose":
+    trend_filter = above_ma20 or above_ma60 or ma20_slope_non_negative
+  elif trend_filter_mode == "above20":
+    trend_filter = above_ma20
+  elif trend_filter_mode == "above60":
+    trend_filter = above_ma60
+  elif trend_filter_mode == "macro":
+    trend_filter = above_ma60 and ma20 is not None and ma60 is not None and ma20 >= ma60
+  else:
+    trend_filter_mode = "any"
+    trend_filter = True
   close_below_ma60 = close is not None and ma60 is not None and close < ma60
   ma20_slope_down = ma20_slope is not None and ma20_slope < 0
   structural_downtrend_block = (
@@ -1090,8 +1305,47 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "close": close,
       "previous_high": previous_high,
     },
+    "entry_trigger": {
+      "passed": entry_trigger_matched,
+      "escape_breakout_matched": escape_breakout_matched,
+      "early_reversal_matched": early_reversal_matched,
+      "rsi_turn_matched": rsi_turn_matched,
+      "mode": entry_trigger_mode,
+      "entry_candle_confirmed": entry_candle_confirmed,
+    },
+    "early_reversal": {
+      "passed": early_reversal_matched,
+      "enabled": early_reversal_enabled,
+      "early_rsi_rebound": early_rsi_rebound,
+      "rsi_rebound_delta": rsi_rebound_delta,
+      "entry_min_rsi_rebound": min_rsi_rebound,
+      "bullish_rebound_candle": bullish_rebound_candle,
+      "open": open_price,
+      "close": close,
+      "previous_close": previous_close,
+      "close_position_confirmed": close_position_confirmed,
+      "close_position": close_position,
+      "entry_min_close_position": min_close_position,
+      "low_proximity_confirmed": low_proximity_confirmed,
+      "low_proximity_atr": low_proximity_atr,
+      "entry_max_low_proximity_atr": max_low_proximity_atr,
+      "recent_price_swing_low": recent_price_swing_low,
+      "atr": atr,
+    },
+    "entry_candle_confirmation": {
+      "passed": entry_candle_confirmed,
+      "close_position_confirmed": close_position_confirmed,
+      "close_position": close_position,
+      "entry_min_close_position": min_close_position,
+      "low_proximity_confirmed": low_proximity_confirmed,
+      "low_proximity_atr": low_proximity_atr,
+      "entry_max_low_proximity_atr": max_low_proximity_atr,
+      "recent_price_swing_low": recent_price_swing_low,
+      "atr": atr,
+    },
     "trend_filter": {
       "passed": trend_filter,
+      "mode": trend_filter_mode,
       "above_ma20": above_ma20,
       "above_ma60": above_ma60,
       "ma20_slope_non_negative": ma20_slope_non_negative,
@@ -1117,16 +1371,39 @@ def _rsi14_oversold_reversal_entry_evaluation(
 
   requirements = (
     "recent_oversold",
-    "rsi_crossed_oversold_recent",
-    "close_above_previous_high",
+    "entry_trigger",
     "trend_filter",
     "structural_downtrend_block",
     "cooldown",
   )
-  failed_filters = tuple(name for name in requirements if not bool(filters[name]["passed"]))
+  failed_filters_list: list[str] = [
+    name for name in requirements if not bool(filters[name]["passed"])
+  ]
+  if not entry_trigger_matched:
+    failed_trigger_parts: list[str] = []
+    if not rsi_crossed_oversold_recent:
+      failed_trigger_parts.append("rsi_crossed_oversold_recent")
+    if not close_above_previous_high:
+      failed_trigger_parts.append("close_above_previous_high")
+    if not entry_candle_confirmed:
+      failed_trigger_parts.append("entry_candle_confirmation")
+    if early_reversal_enabled:
+      failed_trigger_parts.append("early_reversal")
+    if entry_trigger_mode in {"rsi_turn", "either"}:
+      failed_trigger_parts.append("rsi_turn")
+    failed_filters_list.extend(part for part in failed_trigger_parts if part not in failed_filters_list)
+  failed_filters = tuple(failed_filters_list)
   matched = not failed_filters
   reason = (
-    "entry_conditions_met:rsi14_oversold_escape_rebound"
+    (
+      "entry_conditions_met:rsi14_oversold_escape_rebound"
+      if escape_breakout_matched
+      else (
+        "entry_conditions_met:rsi14_oversold_early_reversal"
+        if early_reversal_matched
+        else "entry_conditions_met:rsi14_oversold_rsi_turn"
+      )
+    )
     if matched
     else f"entry_filters_failed:{','.join(failed_filters)}"
   )
@@ -1138,6 +1415,9 @@ def _rsi14_oversold_reversal_entry_evaluation(
     "filters": filters,
     "structural_downtrend_block": structural_downtrend_block,
     "cooldown_active": cooldown_active,
+    "escape_breakout_matched": escape_breakout_matched,
+    "early_reversal_matched": early_reversal_matched,
+    "rsi_turn_matched": rsi_turn_matched,
   }
 
 
@@ -1151,12 +1431,21 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
   previous_price_swing_low = _feature_value(context, "previous_price_swing_low")
   entry_price = _finite_number(context.state.position_average_price)
   hard_stop_price = _finite_number(context.state.position_stop_loss_price)
+  state_high_watermark_price = _finite_number(context.state.position_high_watermark_price)
+  previous_trailing_stop_price = _finite_number(context.state.position_trailing_stop_price)
+  swing_low_stop_enabled = bool(
+    context.state.parameters.get("exit_enable_swing_low_stop", False)
+  )
   exit_rsi_profit_level = _clamped_parameter(
     context,
     "exit_rsi_profit_level",
     50.0,
     minimum=0.0,
     maximum=100.0,
+  )
+  rsi_profit_enabled = bool(context.state.parameters.get("exit_enable_rsi_profit", False))
+  ma_resistance_enabled = bool(
+    context.state.parameters.get("exit_enable_ma_resistance", False)
   )
   profit_r_multiple = _clamped_parameter(
     context,
@@ -1168,9 +1457,9 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
   time_stop_bars = _mapping_int_parameter(
     context.state.parameters,
     "exit_time_stop_bars",
-    7,
+    288,
     minimum=1,
-    maximum=50,
+    maximum=288,
   )
   bars_since_entry = _bars_since_position_opened(context)
   profitable = close is not None and entry_price is not None and close > entry_price
@@ -1183,13 +1472,37 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
       atr * _clamped_parameter(
         context,
         "atr_stop_multiple",
-        1.5,
+        4.0,
         minimum=0.1,
         maximum=10.0,
       )
       if atr is not None and atr > 0
       else None
     )
+  )
+  hold_profit_with_trailing = bool(
+    context.state.parameters.get("exit_hold_profit_with_trailing", False)
+  )
+  trailing_activation_r = _clamped_parameter(
+    context,
+    "exit_trailing_activation_r",
+    5.0,
+    minimum=0.0,
+    maximum=5.0,
+  )
+  trailing_distance_atr = _clamped_parameter(
+    context,
+    "exit_trailing_distance_atr",
+    1.2,
+    minimum=0.1,
+    maximum=10.0,
+  )
+  break_even_activation_r = _clamped_parameter(
+    context,
+    "exit_break_even_activation_r",
+    5.0,
+    minimum=0.0,
+    maximum=5.0,
   )
   profit_r = (
     (close - entry_price) / risk_per_unit
@@ -1204,15 +1517,66 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
     if entry_price is not None and risk_per_unit is not None
     else None
   )
+  high_candidates = tuple(
+    value
+    for value in (entry_price, state_high_watermark_price, high, close)
+    if value is not None
+  )
+  high_watermark_price = max(high_candidates) if high_candidates else state_high_watermark_price
+  high_watermark_profit_r = (
+    (high_watermark_price - entry_price) / risk_per_unit
+    if high_watermark_price is not None
+    and entry_price is not None
+    and risk_per_unit is not None
+    and risk_per_unit > 0
+    else None
+  )
+  profit_r_target_touched = (
+    high_watermark_profit_r is not None and high_watermark_profit_r >= profit_r_multiple
+  )
+  trailing_activation_price = (
+    entry_price + (risk_per_unit * trailing_activation_r)
+    if entry_price is not None and risk_per_unit is not None
+    else None
+  )
+  trailing_active = previous_trailing_stop_price is not None or (
+    high_watermark_profit_r is not None and high_watermark_profit_r >= trailing_activation_r
+  )
+  break_even_active = (
+    high_watermark_profit_r is not None and high_watermark_profit_r >= break_even_activation_r
+  )
+  trailing_floor = entry_price if break_even_active else hard_stop_price
+  candidate_trailing_stop_price = (
+    high_watermark_price - (atr * trailing_distance_atr)
+    if high_watermark_price is not None and atr is not None and atr > 0
+    else None
+  )
+  if candidate_trailing_stop_price is not None and trailing_floor is not None:
+    candidate_trailing_stop_price = max(candidate_trailing_stop_price, trailing_floor)
+  trailing_stop_price = previous_trailing_stop_price
+  if trailing_active and candidate_trailing_stop_price is not None:
+    trailing_stop_price = max(
+      value
+      for value in (previous_trailing_stop_price, candidate_trailing_stop_price)
+      if value is not None
+    )
+  trailing_stop_hit = (
+    context.state.has_position
+    and close is not None
+    and trailing_stop_price is not None
+    and close <= trailing_stop_price
+  )
   components = {
     "swing_low_stop": _exit_component(
       (
         context.state.has_position
+        and swing_low_stop_enabled
         and close is not None
         and previous_price_swing_low is not None
         and close <= previous_price_swing_low
       ),
       1.0,
+      enabled=swing_low_stop_enabled,
       close=close,
       swing_low=previous_price_swing_low,
     ),
@@ -1231,11 +1595,13 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
     "rsi_profit": _exit_component(
       (
         context.state.has_position
+        and rsi_profit_enabled
         and profitable
         and rsi is not None
         and rsi >= exit_rsi_profit_level
       ),
       1.0,
+      enabled=rsi_profit_enabled,
       rsi=rsi,
       exit_rsi_profit_level=exit_rsi_profit_level,
       profitable=profitable,
@@ -1243,29 +1609,52 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
     "profit_r_target": _exit_component(
       (
         context.state.has_position
-        and profit_r is not None
-        and profit_r >= profit_r_multiple
+        and profit_r_target_touched
       ),
       1.0,
       profit_r=profit_r,
+      high_watermark_profit_r=high_watermark_profit_r,
       profit_r_multiple=profit_r_multiple,
       target_price=profit_r_target_price,
       risk_per_unit=risk_per_unit,
+      target_touched=profit_r_target_touched,
     ),
     "ma_resistance": _exit_component(
-      _ma_resistance_reached(
-        high=high,
-        entry_price=entry_price,
-        ma20=ma20,
-        ma60=ma60,
-        profitable=profitable,
+      (
+        ma_resistance_enabled
+        and _ma_resistance_reached(
+          high=high,
+          entry_price=entry_price,
+          ma20=ma20,
+          ma60=ma60,
+          profitable=profitable,
+        )
       ),
       1.0,
+      enabled=ma_resistance_enabled,
       high=high,
       entry_price=entry_price,
       ma20=ma20,
       ma60=ma60,
       profitable=profitable,
+    ),
+    "trailing_stop": _exit_component(
+      trailing_stop_hit,
+      1.0,
+      close=close,
+      entry_price=entry_price,
+      high_watermark_price=high_watermark_price,
+      high_watermark_profit_r=high_watermark_profit_r,
+      previous_trailing_stop_price=previous_trailing_stop_price,
+      candidate_trailing_stop_price=candidate_trailing_stop_price,
+      trailing_stop_price=trailing_stop_price,
+      trailing_activation_price=trailing_activation_price,
+      trailing_active=trailing_active,
+      break_even_active=break_even_active,
+      atr=atr,
+      exit_trailing_activation_r=trailing_activation_r,
+      exit_trailing_distance_atr=trailing_distance_atr,
+      exit_break_even_activation_r=break_even_activation_r,
     ),
     "time_no_profit": _exit_component(
       (
@@ -1294,25 +1683,65 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
       "hard_stop_price": hard_stop_price,
       "swing_stop_price": previous_price_swing_low,
       "profit_r": profit_r,
+      "profit_r_target_price": profit_r_target_price,
+      "high_watermark_price": high_watermark_price,
+      "high_watermark_profit_r": high_watermark_profit_r,
+      "trailing_stop_price": trailing_stop_price,
+      "trailing_activation_price": trailing_activation_price,
+      "trailing_active": trailing_active,
+      "hold_profit_with_trailing": hold_profit_with_trailing,
     }
 
-  reason_order = (
+  immediate_reason_order = (
     "swing_low_stop",
     "atr_stop",
+    "trailing_stop",
+    "time_no_profit",
+  )
+  immediate_reason = next(
+    (name for name in immediate_reason_order if bool(components[name]["active"])),
+    None,
+  )
+  profit_reason_order = (
     "profit_r_target",
     "rsi_profit",
     "ma_resistance",
-    "time_no_profit",
   )
-  active_reason = next(
-    (name for name in reason_order if bool(components[name]["active"])),
+  profit_reason = next(
+    (name for name in profit_reason_order if bool(components[name]["active"])),
     None,
   )
+  if profit_reason is not None and hold_profit_with_trailing and candidate_trailing_stop_price is not None:
+    trailing_active = True
+    trailing_stop_price = max(
+      value
+      for value in (previous_trailing_stop_price, candidate_trailing_stop_price)
+      if value is not None
+    )
+    components["trailing_stop"]["trailing_active"] = True
+    components["trailing_stop"]["trailing_stop_price"] = trailing_stop_price
+    components["trailing_stop"]["candidate_trailing_stop_price"] = candidate_trailing_stop_price
+    trailing_stop_hit = close is not None and close <= trailing_stop_price
+    components["trailing_stop"]["active"] = trailing_stop_hit
+    components["trailing_stop"]["score"] = 1.0 if trailing_stop_hit else 0.0
+    if trailing_stop_hit:
+      immediate_reason = "trailing_stop"
+
+  active_reason = immediate_reason
+  if active_reason is None and profit_reason is not None and not hold_profit_with_trailing:
+    active_reason = profit_reason
+
   matched = active_reason is not None
   is_stop_exit = active_reason in {"swing_low_stop", "atr_stop"}
+  if active_reason is None and profit_reason is not None and hold_profit_with_trailing:
+    reason = f"profit_trailing_active_holding_until_stop:{profit_reason}"
+  elif active_reason is None and trailing_active:
+    reason = "trailing_active_holding_until_stop"
+  else:
+    reason = active_reason or "exit_conditions_not_met"
   return {
     "matched": matched,
-    "reason": active_reason or "exit_conditions_not_met",
+    "reason": reason,
     "score": 1.0 if matched else 0.0,
     "threshold": 1.0,
     "components": components,
@@ -1322,6 +1751,12 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
     "swing_stop_price": previous_price_swing_low,
     "profit_r": profit_r,
     "profit_r_target_price": profit_r_target_price,
+    "high_watermark_price": high_watermark_price,
+    "high_watermark_profit_r": high_watermark_profit_r,
+    "trailing_stop_price": trailing_stop_price,
+    "trailing_activation_price": trailing_activation_price,
+    "trailing_active": trailing_active,
+    "hold_profit_with_trailing": hold_profit_with_trailing,
   }
 
 
@@ -1637,13 +2072,21 @@ def _rsi14_oversold_reversal_rationale(
     if bool(component.get("active"))
   ]
   exit_component_summary = ",".join(active_exit_components) if active_exit_components else "none"
+  trailing_stop = _finite_number(exit_evaluation.get("trailing_stop_price"))
+  high_watermark = _finite_number(exit_evaluation.get("high_watermark_price"))
+  trailing_summary = ""
+  if trailing_stop is not None:
+    trailing_summary = f"; trailing_stop={trailing_stop:.2f}"
+    if high_watermark is not None:
+      trailing_summary = f"{trailing_summary}; high_watermark={high_watermark:.2f}"
   return (
     f"RSI14 oversold escape rebound signal={signal.action.value}; "
     f"entry={entry_evaluation['matched']}; entry_reason={entry_evaluation['reason']}; "
     f"structural_downtrend_block={entry_evaluation['structural_downtrend_block']}; "
     f"cooldown_active={entry_evaluation['cooldown_active']}; exit={exit_evaluation['matched']}; "
     f"exit_reason={exit_evaluation['reason']}; exit_components={exit_component_summary}; "
-    f"bars_since_entry={exit_evaluation['bars_since_entry']}; profit_r={exit_evaluation['profit_r']}."
+    f"bars_since_entry={exit_evaluation['bars_since_entry']}; profit_r={exit_evaluation['profit_r']}"
+    f"{trailing_summary}."
   )
 
 

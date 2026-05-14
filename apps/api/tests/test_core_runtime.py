@@ -138,14 +138,26 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["ma20_window"]["default"] == 20
   assert reversal_strategy["parameter_schema"]["ma60_window"]["default"] == 60
   assert reversal_strategy["parameter_schema"]["rsi_window"]["default"] == 14
-  assert reversal_strategy["parameter_schema"]["entry_lookback_bars"]["default"] == 10
-  assert reversal_strategy["parameter_schema"]["entry_breakout_grace_bars"]["default"] == 2
-  assert reversal_strategy["parameter_schema"]["swing_lookback_bars"]["default"] == 5
+  assert reversal_strategy["parameter_schema"]["rsi_oversold_level"]["default"] == 25
+  assert reversal_strategy["parameter_schema"]["entry_lookback_bars"]["default"] == 80
+  assert reversal_strategy["parameter_schema"]["entry_breakout_grace_bars"]["default"] == 20
+  assert reversal_strategy["parameter_schema"]["entry_enable_early_reversal"]["default"] is False
+  assert reversal_strategy["parameter_schema"]["entry_trigger_mode"]["default"] == "rsi_turn"
+  assert reversal_strategy["parameter_schema"]["entry_min_close_position"]["default"] == 0.45
+  assert reversal_strategy["parameter_schema"]["entry_trend_filter_mode"]["default"] == "above60"
+  assert reversal_strategy["parameter_schema"]["swing_lookback_bars"]["default"] == 80
   assert reversal_strategy["parameter_schema"]["exit_rsi_profit_level"]["default"] == 50
+  assert reversal_strategy["parameter_schema"]["exit_enable_rsi_profit"]["default"] is False
+  assert reversal_strategy["parameter_schema"]["exit_enable_ma_resistance"]["default"] is False
+  assert reversal_strategy["parameter_schema"]["exit_enable_swing_low_stop"]["default"] is False
   assert reversal_strategy["parameter_schema"]["exit_profit_r_multiple"]["default"] == 1.5
-  assert reversal_strategy["parameter_schema"]["exit_time_stop_bars"]["default"] == 7
-  assert reversal_strategy["parameter_schema"]["cooldown_after_stop_bars"]["default"] == 5
-  assert reversal_strategy["parameter_schema"]["atr_stop_multiple"]["default"] == 1.5
+  assert reversal_strategy["parameter_schema"]["exit_hold_profit_with_trailing"]["default"] is False
+  assert reversal_strategy["parameter_schema"]["exit_trailing_activation_r"]["default"] == 5.0
+  assert reversal_strategy["parameter_schema"]["exit_trailing_distance_atr"]["default"] == 1.2
+  assert reversal_strategy["parameter_schema"]["exit_time_stop_bars"]["default"] == 288
+  assert reversal_strategy["parameter_schema"]["cooldown_after_stop_bars"]["default"] == 20
+  assert reversal_strategy["parameter_schema"]["max_position_fraction"]["default"] == 1.0
+  assert reversal_strategy["parameter_schema"]["atr_stop_multiple"]["default"] == 4.0
   assert (
     "RSI14 과매도 탈출"
     in reversal_strategy["parameter_schema"]["rsi_window"]["description_ko"]
@@ -828,7 +840,7 @@ def test_rsi14_oversold_reversal_buys_escape_breakout():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={},
+    parameters={"entry_trigger_mode": "escape_breakout", "entry_min_close_position": 0.5},
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -856,7 +868,11 @@ def test_rsi14_oversold_reversal_buys_breakout_after_reclaim_grace():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={},
+    parameters={
+      "entry_trigger_mode": "escape_breakout",
+      "entry_breakout_grace_bars": 2,
+      "entry_min_close_position": 0.5,
+    },
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -866,6 +882,69 @@ def test_rsi14_oversold_reversal_buys_breakout_after_reclaim_grace():
   assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold_recent"]["passed"] is True
   assert envelope.trace["entry"]["filters"]["rsi_crossed_oversold_recent"]["bars_since_cross"] == 1
   assert envelope.trace["entry"]["filters"]["close_above_previous_high"]["passed"] is True
+
+
+def test_rsi14_oversold_reversal_buys_early_oversold_rebound_near_low():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (34.0, 25.0, 27.0),
+    closes=(100.0, 98.0, 98.6),
+    ma20=(98.0, 98.1, 98.2),
+    ma60=(97.0, 97.1, 97.2),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_enable_early_reversal": True,
+      "entry_trigger_mode": "early_reversal",
+      "entry_min_close_position": 0.5,
+      "entry_max_low_proximity_atr": 2.0,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.signal.reason == "entry_conditions_met:rsi14_oversold_early_reversal"
+  assert envelope.trace["entry"]["early_reversal_matched"] is True
+  assert envelope.trace["entry"]["filters"]["early_reversal"]["early_rsi_rebound"] is True
+
+
+def test_rsi14_oversold_reversal_buys_rsi_turn_after_recent_oversold():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (24.0, 32.0, 34.0),
+    closes=(100.0, 100.2, 100.8),
+    ma20=(101.0, 101.0, 101.0),
+    ma60=(102.0, 102.0, 102.0),
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={
+      "entry_trigger_mode": "rsi_turn",
+      "entry_trend_filter_mode": "any",
+      "rsi_oversold_level": 35,
+      "entry_min_close_position": 0.5,
+      "entry_max_low_proximity_atr": 3.0,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.signal.reason == "entry_conditions_met:rsi14_oversold_rsi_turn"
+  assert envelope.trace["entry"]["rsi_turn_matched"] is True
 
 
 def test_rsi14_oversold_reversal_rejects_without_previous_high_breakout():
@@ -883,7 +962,12 @@ def test_rsi14_oversold_reversal_rejects_without_previous_high_breakout():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={},
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_trigger_mode": "escape_breakout",
+      "entry_breakout_grace_bars": 2,
+      "entry_min_close_position": 0.5,
+    },
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -910,7 +994,13 @@ def test_rsi14_oversold_reversal_allows_ma20_slope_trend_filter():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={},
+    parameters={
+      "rsi_oversold_level": 30,
+      "entry_trigger_mode": "escape_breakout",
+      "entry_trend_filter_mode": "loose",
+      "entry_min_close_position": 0.5,
+      "entry_max_low_proximity_atr": 3.0,
+    },
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -967,7 +1057,7 @@ def test_rsi14_oversold_reversal_sells_on_swing_low_stop():
     position_average_price=100.0,
     position_opened_at=frame.iloc[1]["timestamp"].to_pydatetime(),
     position_stop_loss_price=98.5,
-    parameters={},
+    parameters={"exit_enable_swing_low_stop": True, "cooldown_after_stop_bars": 5},
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -996,7 +1086,10 @@ def test_rsi14_oversold_reversal_sells_on_profit_r_target():
     position_average_price=100.0,
     position_opened_at=frame.iloc[1]["timestamp"].to_pydatetime(),
     position_stop_loss_price=98.5,
-    parameters={},
+    parameters={
+      "exit_profit_r_multiple": 1.5,
+      "exit_hold_profit_with_trailing": False,
+    },
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -1004,6 +1097,77 @@ def test_rsi14_oversold_reversal_sells_on_profit_r_target():
   assert envelope.signal.action == SignalAction.SELL
   assert envelope.signal.reason == "profit_r_target"
   assert envelope.trace["exit"]["profit_r"] == pytest.approx(1.5333, abs=0.0001)
+
+
+def test_rsi14_oversold_reversal_holds_profit_target_with_trailing():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (35.0, 40.0, 45.0),
+    closes=(100.5, 101.0, 102.3),
+    ma20=(98.0, 98.0, 98.0),
+    ma60=(97.0, 97.0, 97.0),
+    previous_price_swing_low=95.0,
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=True,
+    cash=5_000.0,
+    position_size=1.0,
+    position_average_price=100.0,
+    position_opened_at=frame.iloc[1]["timestamp"].to_pydatetime(),
+    position_stop_loss_price=98.5,
+    parameters={
+      "exit_profit_r_multiple": 1.5,
+      "exit_hold_profit_with_trailing": True,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.HOLD
+  assert envelope.trace["exit"]["reason"] == (
+    "profit_trailing_active_holding_until_stop:profit_r_target"
+  )
+  assert envelope.trace["exit"]["trailing_active"] is True
+  assert envelope.trace["exit"]["trailing_stop_price"] == pytest.approx(102.1)
+  assert "trailing_stop=102.10" in envelope.rationale
+
+
+def test_rsi14_oversold_reversal_sells_on_trailing_stop_after_profit():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (35.0, 45.0, 43.0),
+    closes=(100.5, 103.0, 101.8),
+    ma20=(98.0, 98.0, 98.0),
+    ma60=(97.0, 97.0, 97.0),
+    previous_price_swing_low=95.0,
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=True,
+    cash=5_000.0,
+    position_size=1.0,
+    position_average_price=100.0,
+    position_opened_at=frame.iloc[1]["timestamp"].to_pydatetime(),
+    position_stop_loss_price=98.5,
+    position_high_watermark_price=104.0,
+    position_trailing_stop_price=102.0,
+    parameters={
+      "entry_trigger_mode": "escape_breakout",
+      "entry_min_close_position": 0.5,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.SELL
+  assert envelope.signal.reason == "trailing_stop"
+  assert envelope.trace["exit"]["trailing_stop_price"] == pytest.approx(102.8)
+  assert envelope.trace["exit"]["components"]["trailing_stop"]["active"] is True
 
 
 def test_rsi14_oversold_reversal_sells_on_time_stop_without_profit():
@@ -1026,7 +1190,7 @@ def test_rsi14_oversold_reversal_sells_on_time_stop_without_profit():
     position_average_price=100.0,
     position_opened_at=opened_at,
     position_stop_loss_price=98.5,
-    parameters={},
+    parameters={"exit_time_stop_bars": 7},
   )
 
   envelope = strategy.evaluate(frame, state.parameters, state)
@@ -1056,7 +1220,7 @@ def test_rsi14_oversold_reversal_blocks_reentry_during_stop_cooldown():
     position_average_price=100.0,
     position_opened_at=stop_frame.iloc[1]["timestamp"].to_pydatetime(),
     position_stop_loss_price=98.5,
-    parameters={},
+    parameters={"exit_enable_swing_low_stop": True, "cooldown_after_stop_bars": 5},
   )
   stop_envelope = strategy.evaluate(stop_frame, stop_state.parameters, stop_state)
   assert stop_envelope.signal.reason == "swing_low_stop"
@@ -1075,7 +1239,10 @@ def test_rsi14_oversold_reversal_blocks_reentry_during_stop_cooldown():
     has_position=False,
     cash=10_000.0,
     position_size=0.0,
-    parameters={},
+    parameters={
+      "entry_trigger_mode": "escape_breakout",
+      "entry_min_close_position": 0.5,
+    },
   )
 
   entry_envelope = strategy.evaluate(entry_frame, entry_state.parameters, entry_state)
@@ -1475,6 +1642,7 @@ def _rsi14_escape_frame(
     )
   else:
     frame["previous_price_swing_low"] = previous_price_swing_low
+  frame["recent_price_swing_low"] = frame["low"].rolling(window=5, min_periods=1).min()
   slope = ma20_slope if ma20_slope is not None else ma20[-1] - ma20[-2]
   frame["ma20_slope"] = slope
   frame["ma60_slope"] = ma60[-1] - ma60[-2]
