@@ -168,6 +168,11 @@ Using the same current default parameters:
   - `atr_stop_multiple=3.6` and `3.7`: rejected because 2025-2026 win rate fell to 50.70%.
   - `atr_stop_multiple=3.8`: passed the annual win-rate gate but gave lower aggregate return: 2023-2024 +5.24%, 2024-2025 +5.61%, 2025-2026 +8.32%.
   - `atr_stop_multiple=4.5` and `5.0`: passed win-rate gates but weakened 2024-2025 or 2025-2026 returns versus 3.45.
+- Micro target retest after ATR 3.45:
+  - `exit_micro_probe_profit_r_multiple=0.4`: 2023-2024 +4.91% / 54.21% / 190 trades; 2024-2025 +7.03% / 53.80% / 342 trades; 2025-2026 +11.45% / 49.60% / 371 trades. Rejected because 2025-2026 failed the annual win-rate gate.
+  - `exit_micro_probe_profit_r_multiple=0.45`: 2023-2024 +4.91% / 56.15% / 187 trades; 2024-2025 +5.48% / 53.89% / 334 trades; 2025-2026 +11.65% / 51.36% / 368 trades. Rejected because the minimum annual win-rate margin was thinner than the 0.5 default.
+  - `exit_micro_probe_profit_r_multiple=0.55`: 2023-2024 +4.91% / 54.40% / 182 trades; 2024-2025 +5.49% / 52.47% / 324 trades; 2025-2026 +11.64% / 51.81% / 359 trades. Rejected because monthly consistency worsened: 2026-01 fell to 50.00% win rate and 2025-11 stayed below 51%.
+  - Keep the default at 0.5 because it preserves the best balance between annual gates and the existing monthly sample set.
 - Shallow oversold expansion attempts:
   - `rsi_oversold_level=35`, 2023-2024 run `c7c43387-f4cf-47e3-bd1b-1ecbad5ef1e9`: +0.59%, 48.15% win rate, 27 trades.
   - `rsi_oversold_level=38`, 2023-2024 run `a26ca864-acf5-4314-bfe0-9f7b45a171c0`: -6.85%, 38.89% win rate, 36 trades.
