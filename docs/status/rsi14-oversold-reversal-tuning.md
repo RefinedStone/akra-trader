@@ -130,6 +130,20 @@ Using the same current default parameters:
   - `entry_trend_filter_mode=loose`, 0.8R target, 4 ATR stop, 2023-2024 run `37e5c78c-e30a-4a3b-957d-32157a76d76d`: -25.83%, 55.70% win rate, 149 trades.
   - `entry_trend_filter_mode=loose`, 0.5R target, 2 ATR stop, 2023-2024 run `01bf10bf-5607-4fc9-9c0d-7cadb5fd7e24`: -40.90%, 43.50% win rate, 177 trades.
   - Rejected because the trade-count target is reachable only by admitting many low-quality rebounds that destroy expectancy, directly conflicting with the higher reward/risk objective.
+- Shallow oversold expansion attempts:
+  - `rsi_oversold_level=35`, 2023-2024 run `c7c43387-f4cf-47e3-bd1b-1ecbad5ef1e9`: +0.59%, 48.15% win rate, 27 trades.
+  - `rsi_oversold_level=38`, 2023-2024 run `a26ca864-acf5-4314-bfe0-9f7b45a171c0`: -6.85%, 38.89% win rate, 36 trades.
+  - Rejected because lifting the oversold threshold increases trade count but fails the 51% win-rate gate before reaching monthly-12 frequency.
+- 1m timeframe expansion attempts:
+  - Current default on 1m, recent month run `8eac19d8-ed01-4530-85ca-e288eb9b242b`: +0.59%, 100.00% win rate, 2 trades, with 2 market-data issues.
+  - `rsi_oversold_level=35` on 1m, recent run `0b67a98c-f9b7-41c1-9f07-609e8d4cb8a1`: +0.02%, 66.67% win rate, 3 trades, with 2 market-data issues.
+  - `entry_trend_filter_mode=loose` on 1m, recent run `40dba29e-eb2d-4dfb-9407-8966b99c470a`: -10.80%, 40.68% win rate, 59 trades, with 2 market-data issues.
+  - `entry_trend_filter_mode=loose`, `rsi_oversold_level=35` on 1m, recent run `db723919-ef5c-44aa-8254-026c1bdd45c2`: -16.40%, 40.70% win rate, 86 trades, with 2 market-data issues.
+  - `entry_trend_filter_mode=loose`, `rsi_oversold_level=35`, 0.8R target on 1m, recent run `5299e188-4e86-4c6e-94d2-2993d0b32be5`: -18.83%, 42.86% win rate, 91 trades, with 2 market-data issues.
+  - Rejected because 1m either remains too sparse under the quality filters or loses badly when loosened.
+- Broad local grid search:
+  - A 2023-2024 local grid over RSI threshold, trend mode, close-position, low-proximity, and target R was stopped after it proved too slow.
+  - Keep future searches narrow or implement a vectorized simulator before doing broad high-frequency exploration.
 
 ## Residual Weakness
 
