@@ -145,7 +145,7 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["entry_trigger_mode"]["default"] == "rsi_turn"
   assert reversal_strategy["parameter_schema"]["entry_enable_capitulation_rebound"]["default"] is True
   assert reversal_strategy["parameter_schema"]["entry_enable_micro_probe"]["default"] is True
-  assert reversal_strategy["parameter_schema"]["entry_micro_probe_max_position_fraction"]["default"] == 0.005
+  assert reversal_strategy["parameter_schema"]["entry_micro_probe_max_position_fraction"]["default"] == 0.001
   assert reversal_strategy["parameter_schema"]["entry_max_rsi_rebound"]["default"] == 10.0
   assert reversal_strategy["parameter_schema"]["entry_min_close_position"]["default"] == 0.60
   assert reversal_strategy["parameter_schema"]["entry_trend_filter_mode"]["default"] == "above60"
@@ -1045,7 +1045,7 @@ def test_rsi14_oversold_reversal_buys_late_rebound_as_micro_probe():
 
   assert envelope.signal.action == SignalAction.BUY
   assert envelope.signal.reason == "entry_conditions_met:rsi14_micro_probe"
-  assert envelope.execution.size_fraction == pytest.approx(0.005)
+  assert envelope.execution.size_fraction == pytest.approx(0.001)
   assert envelope.trace["entry"]["micro_probe_matched"] is True
   assert envelope.trace["entry"]["filters"]["trend_filter"]["micro_probe_override"] is True
 
@@ -1288,13 +1288,13 @@ def test_rsi14_oversold_reversal_sells_micro_probe_on_smaller_profit_target():
     timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
     instrument_id="binance:BTC/USDT",
     has_position=True,
-    cash=9_950.0,
-    position_size=0.5,
+    cash=9_990.0,
+    position_size=0.1,
     position_average_price=100.0,
     position_opened_at=frame.iloc[1]["timestamp"].to_pydatetime(),
     position_stop_loss_price=96.0,
     parameters={
-      "entry_micro_probe_max_position_fraction": 0.005,
+      "entry_micro_probe_max_position_fraction": 0.001,
       "exit_micro_probe_profit_r_multiple": 0.5,
     },
   )

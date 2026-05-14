@@ -11,17 +11,17 @@ Tune `rsi14_oversold_reversal_v1` so the RSI oversold rebound strategy keeps win
 - Strategy: `RSI14 과매도 탈출 반등 매수`
 - Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.60.
 - Standard late rebound guard: when a standard entry is more than 2.2 ATR above the recent low, it must either reclaim MA20 without fresh lower lows or match a deep washout recovery profile.
-- Micro probe overlay: lower-quality RSI rebounds that miss full-size entry quality can be sampled with a 0.5% max position, 0.5R target, and 72-bar time stop.
+- Micro probe overlay: lower-quality RSI rebounds that miss full-size entry quality can be sampled with a 0.1% max position, 0.5R target, and 72-bar time stop.
 - Secondary entry: a tightly filtered MA60-below capitulation rebound sleeve for deep RSI washouts in a narrow RSI/ATR/slope recovery band.
 - Risk/exit: max position fraction 1.0, ATR stop 4.0, profit target 1.5R, no-profit time stop 288 bars, stop cooldown 20 bars.
-- 1-year validation run: `161ad088-28b2-4324-975d-3e0184f360a4`
+- 1-year validation run: `4f2f9236-aef0-4eb9-9439-4cca10b038e4`
   - Window: `2025-05-13T00:00:00Z` to `2026-05-13T00:00:00Z`
   - Data: 105,121 5m candles, no market data issues
-  - Return: +7.48%
+  - Return: +7.99%
   - Win rate: 51.30%
   - Trades: 347
   - Average trades per month: 28.9
-  - Max drawdown: 2.44%
+  - Max drawdown: 2.37%
 
 ## Verified 1-Year Samples
 
@@ -29,9 +29,9 @@ Using the same current default parameters:
 
 | Window | Run | Return | Win rate | Trades | Max drawdown | Note |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
-| 2023-05-13 to 2024-05-13 | `c26f7c17-dfa0-44ba-87da-2258892e3063` | +5.02% | 53.71% | 175 | 0.88% | Clears the monthly-12 average trade-count target. |
-| 2024-05-13 to 2025-05-13 | `250d51d1-098c-4c03-bee8-0a6d70401e1b` | +2.79% | 53.80% | 316 | 3.06% | Clears the win-rate and monthly-12 gates. |
-| 2025-05-13 to 2026-05-13 | `161ad088-28b2-4324-975d-3e0184f360a4` | +7.48% | 51.30% | 347 | 2.44% | Clears the gates, but with a thin win-rate margin. |
+| 2023-05-13 to 2024-05-13 | `feac0d7b-e2a5-4041-be91-688dcb5352f9` | +5.25% | 53.71% | 175 | 0.88% | Clears the monthly-12 average trade-count target. |
+| 2024-05-13 to 2025-05-13 | `67b737cf-9e1e-4e7f-a064-d95616d0fe8b` | +3.22% | 53.80% | 316 | 3.05% | Clears the win-rate and monthly-12 gates. |
+| 2025-05-13 to 2026-05-13 | `4f2f9236-aef0-4eb9-9439-4cca10b038e4` | +7.99% | 51.30% | 347 | 2.37% | Clears the gates, but with a thin win-rate margin. |
 
 ## Verified Monthly Samples
 
@@ -39,12 +39,12 @@ Using the same current default parameters:
 
 | Window | Run | Return | Win rate | Trades | Note |
 | --- | --- | ---: | ---: | ---: | --- |
-| 2026-04-13 to 2026-05-13 | `a4ec2a64-0559-4e51-8ab7-214d4783a020` | +2.33% | 45.83% | 24 | Positive with high entry count, but monthly win rate is below 51%. |
-| 2026-01-01 to 2026-02-01 | `5bbfa482-81a4-43a8-afc3-290891fe76a7` | +2.26% | 40.00% | 20 | Positive despite low monthly win rate. |
-| 2025-09-01 to 2025-10-01 | `5ebe0aad-6b6a-4ea6-8020-a1cb04a33329` | +0.61% | 52.00% | 25 | Clears monthly win-rate and trade-count gates. |
-| 2025-06-01 to 2025-07-01 | `6c7898cd-6631-4921-a367-0d1c98324d7e` | +0.12% | 50.00% | 34 | Barely positive; monthly win rate is just below 51%. |
-| 2025-11-01 to 2025-12-01 | `9bf96b3b-0224-46ea-b172-aee9e2c22c9e` | +1.41% | 47.22% | 36 | Positive with high entry count, but monthly win rate is below 51%. |
-| 2023-06-01 to 2023-07-01 | `bca38348-0a94-49f3-ac38-93e88166ee37` | +1.00% | 63.64% | 11 | One trade short of 12 in this older single-month sample. |
+| 2026-04-13 to 2026-05-13 | `2c2484a2-0a00-42eb-91fc-3291ee5f7763` | +2.37% | 45.83% | 24 | Positive with high entry count, but monthly win rate is below 51%. |
+| 2026-01-01 to 2026-02-01 | `4de5ed78-5f2b-4a93-a714-02a375e313a1` | +2.31% | 40.00% | 20 | Positive despite low monthly win rate. |
+| 2025-09-01 to 2025-10-01 | `66e6eeee-d655-4b32-a870-34aa3652e363` | +0.64% | 52.00% | 25 | Clears monthly win-rate and trade-count gates. |
+| 2025-06-01 to 2025-07-01 | `b5cd3811-d993-48bc-b988-be9bd9ef6f19` | +0.15% | 50.00% | 34 | Barely positive; monthly win rate is just below 51%. |
+| 2025-11-01 to 2025-12-01 | `4b0b50c7-2da0-4d9f-a83e-f06abf576324` | +1.49% | 47.22% | 36 | Positive with high entry count, but monthly win rate is below 51%. |
+| 2023-06-01 to 2023-07-01 | `82a61523-7a8e-40e9-96d8-f6b892dd7441` | +1.00% | 63.64% | 11 | One trade short of 12 in this older single-month sample. |
 
 ## Attempts To Avoid Repeating
 
@@ -134,15 +134,25 @@ Using the same current default parameters:
   - Rejected because the trade-count target is reachable only by admitting many low-quality rebounds that destroy expectancy, directly conflicting with the higher reward/risk objective.
 - Micro probe overlay:
   - Added as current default after high-frequency full-size/scalp variants failed.
-  - Full-size entries keep the 1.5R target and ATR risk sizing; lower-quality RSI rebounds are admitted only as 0.5% max-position probes with a 0.5R target and 72-bar time stop.
+  - Full-size entries keep the 1.5R target and ATR risk sizing; lower-quality RSI rebounds are admitted only as 0.1% max-position probes with a 0.5R target and 72-bar time stop.
   - Local dual-layer simulation before implementation suggested 184 / 328 / 365 trades across the three 1-year windows with positive returns and 53%+ win rates.
-  - API validation after implementation: 2023-2024 +5.02%, 53.71% win rate, 175 trades; 2024-2025 +2.79%, 53.80%, 316 trades; 2025-2026 +7.48%, 51.30%, 347 trades.
+  - API validation after implementation and sizing refinement: 2023-2024 +5.25%, 53.71% win rate, 175 trades; 2024-2025 +3.22%, 53.80%, 316 trades; 2025-2026 +7.99%, 51.30%, 347 trades.
   - This satisfies the 1-year monthly-average trade-count target while preserving positive expectancy through tiny sizing on the noisy probe layer.
 - Micro probe target variations:
   - `exit_micro_probe_profit_r_multiple=0.4`: 2023-2024 +5.03% / 56.91% / 181 trades; 2024-2025 +2.75% / 55.38% / 325 trades; 2025-2026 +9.39% / 51.12% / 356 trades.
   - `exit_micro_probe_profit_r_multiple=0.3`: 2025-2026 fell below the win-rate gate at +9.19% / 48.38% / 370 trades.
   - `exit_micro_probe_profit_r_multiple=0.6`: 2024-2025 fell below the win-rate gate at +3.58% / 50.00% / 306 trades.
   - Keep the default at 0.5 because it gives the best minimum full-year win-rate margin among the tested targets.
+- Micro probe sizing sweep:
+  - `entry_micro_probe_max_position_fraction=0.002`: 2023-2024 +5.19% / 53.71% / 175 trades; 2024-2025 +3.11% / 53.80% / 316 trades; 2025-2026 +7.86% / 51.30% / 347 trades.
+  - `entry_micro_probe_max_position_fraction=0.003`: 2023-2024 +5.14% / 53.71% / 175 trades; 2024-2025 +3.00% / 53.80% / 316 trades; 2025-2026 +7.73% / 51.30% / 347 trades.
+  - `entry_micro_probe_max_position_fraction=0.001`: 2023-2024 +5.25% / 53.71% / 175 trades; 2024-2025 +3.22% / 53.80% / 316 trades; 2025-2026 +7.99% / 51.30% / 347 trades.
+  - `entry_micro_probe_max_position_fraction=0.0005`: 2023-2024 +5.28% / 53.71% / 175 trades; 2024-2025 +3.27% / 53.80% / 316 trades; 2025-2026 +8.06% / 51.30% / 347 trades.
+  - `entry_micro_probe_max_position_fraction=0.0002`: 2023-2024 +5.30% / 53.71% / 175 trades; 2024-2025 +3.30% / 53.80% / 316 trades; 2025-2026 +8.10% / 51.30% / 347 trades.
+  - Chosen default is 0.001, not 0.0005 or 0.0002, because a $10,000 account maps 0.0005/0.0002 to roughly $5/$2 notional probes. Those smaller probes slightly improve backtest returns but are too close to dust/min-notional behavior and can unrealistically block full-size re-entry while barely participating.
+- Calendar 2023 data-integrity check:
+  - `2023-01-01T00:00:00Z` to `2024-01-01T00:00:00Z` run `dbd678bc-29a8-474e-925a-896831f8dc9e` failed before trading because market-data validation found 16 missing 5m candles from `2023-03-24T12:35:00Z` to `2023-03-24T14:00:00Z`.
+  - Full-year and narrow-gap resync attempts still reported `missing_candles:16` and `requested_range_gap`, so this calendar-year result is excluded from strategy evidence until the data source can supply those candles.
 - Shallow oversold expansion attempts:
   - `rsi_oversold_level=35`, 2023-2024 run `c7c43387-f4cf-47e3-bd1b-1ecbad5ef1e9`: +0.59%, 48.15% win rate, 27 trades.
   - `rsi_oversold_level=38`, 2023-2024 run `a26ca864-acf5-4314-bfe0-9f7b45a171c0`: -6.85%, 38.89% win rate, 36 trades.

@@ -460,11 +460,11 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "entry_micro_probe_max_position_fraction": {
           "type": "number",
-          "default": 0.005,
+          "default": 0.001,
           "minimum": 0,
           "maximum": 0.05,
           "semantic_hint": "Maximum notional allocation for micro probe entries.",
-          "description_ko": "프로브 진입의 최대 포지션 비중입니다. 기본값 0.005는 자산의 0.5%만 사용합니다.",
+          "description_ko": "프로브 진입의 최대 포지션 비중입니다. 기본값 0.001은 자산의 0.1%만 사용합니다.",
         },
         "entry_min_rsi_rebound": {
           "type": "number",
@@ -671,7 +671,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         operator_notes=(
           "BUY defaults to RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI30 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
           "Standard late rebounds more than 2.2 ATR above the recent low require either an MA20 reclaim without fresh lower lows or a deep washout recovery profile.",
-          "Lower-quality RSI rebounds can be sampled through tiny 0.5% micro probes with a shorter 0.5R target and 72-bar time stop.",
+          "Lower-quality RSI rebounds can be sampled through tiny 0.1% micro probes with a shorter 0.5R target and 72-bar time stop.",
           "A separate capitulation rebound sleeve can buy below MA60 only when RSI/ATR/slope distances sit in a narrow post-capitulation recovery band.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
@@ -1667,7 +1667,7 @@ def _rsi14_micro_probe_execution_plan(context: StrategyDecisionContext) -> Execu
   max_fraction = _clamped_parameter(
     context,
     "entry_micro_probe_max_position_fraction",
-    0.005,
+    0.001,
     minimum=0.0,
     maximum=0.05,
   )
@@ -1747,7 +1747,7 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
   micro_probe_fraction = _clamped_parameter(
     context,
     "entry_micro_probe_max_position_fraction",
-    0.005,
+    0.001,
     minimum=0.0,
     maximum=0.05,
   )
