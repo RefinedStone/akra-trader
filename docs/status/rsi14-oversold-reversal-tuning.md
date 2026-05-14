@@ -13,15 +13,15 @@ Tune `rsi14_oversold_reversal_v1` so the RSI oversold rebound strategy keeps win
 - Standard late rebound guard: when a standard entry is more than 2.2 ATR above the recent low, it must either reclaim MA20 without fresh lower lows or match a deep washout recovery profile.
 - Micro probe overlay: lower-quality RSI rebounds that miss full-size entry quality can be sampled with a 0.1% max position, 0.5R target, and 72-bar time stop.
 - Secondary entry: a tightly filtered MA60-below capitulation rebound sleeve for deep RSI washouts in a narrow RSI/ATR/slope recovery band.
-- Risk/exit: max position fraction 1.0, ATR stop 4.0, profit target 1.5R, no-profit time stop 288 bars, stop cooldown 20 bars.
-- 1-year validation run: `4f2f9236-aef0-4eb9-9439-4cca10b038e4`
+- Risk/exit: max position fraction 1.0, ATR stop 3.45, profit target 1.5R, no-profit time stop 288 bars, stop cooldown 20 bars.
+- 1-year validation run: `7fa5c24a-b306-4268-9ec2-dcd5855c3eca`
   - Window: `2025-05-13T00:00:00Z` to `2026-05-13T00:00:00Z`
   - Data: 105,121 5m candles, no market data issues
-  - Return: +7.99%
-  - Win rate: 51.30%
-  - Trades: 347
-  - Average trades per month: 28.9
-  - Max drawdown: 2.37%
+  - Return: +11.65%
+  - Win rate: 51.52%
+  - Trades: 363
+  - Average trades per month: 30.3
+  - Max drawdown: 2.18%
 
 ## Verified 1-Year Samples
 
@@ -29,9 +29,9 @@ Using the same current default parameters:
 
 | Window | Run | Return | Win rate | Trades | Max drawdown | Note |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
-| 2023-05-13 to 2024-05-13 | `feac0d7b-e2a5-4041-be91-688dcb5352f9` | +5.25% | 53.71% | 175 | 0.88% | Clears the monthly-12 average trade-count target. |
-| 2024-05-13 to 2025-05-13 | `67b737cf-9e1e-4e7f-a064-d95616d0fe8b` | +3.22% | 53.80% | 316 | 3.05% | Clears the win-rate and monthly-12 gates. |
-| 2025-05-13 to 2026-05-13 | `4f2f9236-aef0-4eb9-9439-4cca10b038e4` | +7.99% | 51.30% | 347 | 2.37% | Clears the gates, but with a thin win-rate margin. |
+| 2023-05-13 to 2024-05-13 | `2ea1fabb-3c9c-47d5-a0a9-5eb0e1762d0b` | +4.91% | 55.43% | 184 | 1.02% | Clears the monthly-12 average trade-count target. |
+| 2024-05-13 to 2025-05-13 | `d047432c-6123-4860-8bd1-e9f3402496e3` | +5.48% | 52.91% | 327 | 2.03% | Fixes the prior weak-return year while clearing the gates. |
+| 2025-05-13 to 2026-05-13 | `7fa5c24a-b306-4268-9ec2-dcd5855c3eca` | +11.65% | 51.52% | 363 | 2.18% | Clears the gates, but with a thin win-rate margin. |
 
 ## Verified Monthly Samples
 
@@ -39,12 +39,12 @@ Using the same current default parameters:
 
 | Window | Run | Return | Win rate | Trades | Note |
 | --- | --- | ---: | ---: | ---: | --- |
-| 2026-04-13 to 2026-05-13 | `2c2484a2-0a00-42eb-91fc-3291ee5f7763` | +2.37% | 45.83% | 24 | Positive with high entry count, but monthly win rate is below 51%. |
-| 2026-01-01 to 2026-02-01 | `4de5ed78-5f2b-4a93-a714-02a375e313a1` | +2.31% | 40.00% | 20 | Positive despite low monthly win rate. |
-| 2025-09-01 to 2025-10-01 | `66e6eeee-d655-4b32-a870-34aa3652e363` | +0.64% | 52.00% | 25 | Clears monthly win-rate and trade-count gates. |
-| 2025-06-01 to 2025-07-01 | `b5cd3811-d993-48bc-b988-be9bd9ef6f19` | +0.15% | 50.00% | 34 | Barely positive; monthly win rate is just below 51%. |
-| 2025-11-01 to 2025-12-01 | `4b0b50c7-2da0-4d9f-a83e-f06abf576324` | +1.49% | 47.22% | 36 | Positive with high entry count, but monthly win rate is below 51%. |
-| 2023-06-01 to 2023-07-01 | `82a61523-7a8e-40e9-96d8-f6b892dd7441` | +1.00% | 63.64% | 11 | One trade short of 12 in this older single-month sample. |
+| 2026-04-13 to 2026-05-13 | `086e4985-bae1-483e-912f-3a30911dac23` | +3.63% | 52.00% | 25 | Clears monthly win-rate and trade-count gates. |
+| 2026-01-01 to 2026-02-01 | `c0946647-16e4-42c4-a27e-7258cb3fc671` | +3.78% | 55.00% | 20 | Clears monthly win-rate and trade-count gates. |
+| 2025-09-01 to 2025-10-01 | `977b36d3-c793-41aa-bb2c-c0d2aaaba941` | +0.89% | 46.15% | 26 | Positive with high entry count, but monthly win rate is below 51%. |
+| 2025-06-01 to 2025-07-01 | `faab20e2-bb11-4466-9475-05ebc17e92c8` | +0.56% | 44.44% | 36 | Positive with high entry count, but monthly win rate is below 51%. |
+| 2025-11-01 to 2025-12-01 | `c785bab4-2b6c-4992-a2d2-753d6a6093ff` | +1.51% | 48.78% | 41 | Positive with high entry count, but monthly win rate is below 51%. |
+| 2023-06-01 to 2023-07-01 | `2eab6485-b84c-448c-bca5-02b3ac96d0ab` | +1.00% | 63.64% | 11 | One trade short of 12 in this older single-month sample. |
 
 ## Attempts To Avoid Repeating
 
@@ -158,12 +158,22 @@ Using the same current default parameters:
   - Intermediate 2024-2025 checks also failed to beat the 1.5R default: 1.6R +1.56%, 1.7R -0.77%, 1.8R -0.03%, 1.9R +0.63%.
   - Trailing-hold variants improved 2025-2026 return but broke the win-rate gate: 1.5R activation / 1.2 ATR trail returned +9.91% with 45.24% win rate; 1.5R / 2.0 ATR returned +11.85% with 38.04% win rate; 2R target plus 2R trailing returned +14.40% with 38.04% win rate.
   - Keep 1.5R fixed profit as the default until an exit model can improve 2024-2025 without sacrificing the 51% annual win-rate gate.
+- ATR stop sizing refinement:
+  - 2024-2025 trade decomposition showed the 0.1% micro layer was almost flat (`303` micro trades, -$7.49), while the full-size layer drove the return (`13` larger trades, +$425.17). The next lever was therefore full-size ATR risk sizing rather than adding more micro trades.
+  - `atr_stop_multiple=2.5`: 2023-2024 +4.36% / 49.48% / 192 trades; 2024-2025 +4.43% / 48.76% / 363 trades; 2025-2026 +12.65% / 44.64% / 392 trades. Rejected because win rate fell below 51% in all three windows.
+  - `atr_stop_multiple=3.0`: 2023-2024 +4.57% / 52.41% / 187 trades; 2024-2025 +3.73% / 52.33% / 344 trades; 2025-2026 +9.35% / 48.55% / 379 trades. Rejected because 2025-2026 failed the win-rate gate.
+  - `atr_stop_multiple=3.4`: 2023-2024 +5.01% / 55.98% / 184 trades; 2024-2025 +5.65% / 52.91% / 327 trades; 2025-2026 +10.88% / 51.10% / 364 trades. Rejected in favor of 3.45 because its 2025-2026 win-rate margin was too thin.
+  - `atr_stop_multiple=3.45`: chosen current default. 2023-2024 +4.91% / 55.43% / 184 trades; 2024-2025 +5.48% / 52.91% / 327 trades; 2025-2026 +11.65% / 51.52% / 363 trades.
+  - `atr_stop_multiple=3.5`: 2023-2024 +4.85% / 55.43% / 184 trades; 2024-2025 +6.22% / 52.91% / 327 trades; 2025-2026 +10.43% / 51.24% / 363 trades. Kept as the nearest robust neighbor but not chosen because 3.45 had a better total return and win-rate margin.
+  - `atr_stop_multiple=3.6` and `3.7`: rejected because 2025-2026 win rate fell to 50.70%.
+  - `atr_stop_multiple=3.8`: passed the annual win-rate gate but gave lower aggregate return: 2023-2024 +5.24%, 2024-2025 +5.61%, 2025-2026 +8.32%.
+  - `atr_stop_multiple=4.5` and `5.0`: passed win-rate gates but weakened 2024-2025 or 2025-2026 returns versus 3.45.
 - Shallow oversold expansion attempts:
   - `rsi_oversold_level=35`, 2023-2024 run `c7c43387-f4cf-47e3-bd1b-1ecbad5ef1e9`: +0.59%, 48.15% win rate, 27 trades.
   - `rsi_oversold_level=38`, 2023-2024 run `a26ca864-acf5-4314-bfe0-9f7b45a171c0`: -6.85%, 38.89% win rate, 36 trades.
   - Rejected because lifting the oversold threshold increases trade count but fails the 51% win-rate gate before reaching monthly-12 frequency.
 - 1m timeframe expansion attempts:
-  - Current default on 1m, recent month run `8eac19d8-ed01-4530-85ca-e288eb9b242b`: +0.59%, 100.00% win rate, 2 trades, with 2 market-data issues.
+  - Then-current default on 1m, recent month run `8eac19d8-ed01-4530-85ca-e288eb9b242b`: +0.59%, 100.00% win rate, 2 trades, with 2 market-data issues.
   - `rsi_oversold_level=35` on 1m, recent run `0b67a98c-f9b7-41c1-9f07-609e8d4cb8a1`: +0.02%, 66.67% win rate, 3 trades, with 2 market-data issues.
   - `entry_trend_filter_mode=loose` on 1m, recent run `40dba29e-eb2d-4dfb-9407-8966b99c470a`: -10.80%, 40.68% win rate, 59 trades, with 2 market-data issues.
   - `entry_trend_filter_mode=loose`, `rsi_oversold_level=35` on 1m, recent run `db723919-ef5c-44aa-8254-026c1bdd45c2`: -16.40%, 40.70% win rate, 86 trades, with 2 market-data issues.
@@ -175,4 +185,4 @@ Using the same current default parameters:
 
 ## Residual Weakness
 
-The current default clears the 1-year win-rate, positive-return, and average monthly trade-count gates across three adjacent 1-year windows and has six positive 1-month samples. The weakest remaining evidence is that the 2025-2026 full-year win rate is only 51.30%, several monthly samples have win rates below 51%, and the 2023-06 single-month sample has 11 trades. Future work should improve monthly consistency without increasing the micro probe size or loosening the capitulation sleeve.
+The current default clears the 1-year win-rate, positive-return, and average monthly trade-count gates across three adjacent 1-year windows and has six positive 1-month samples. The weakest remaining evidence is that the 2025-2026 full-year win rate is still close to the gate at 51.52%, several monthly samples have win rates below 51%, and the 2023-06 single-month sample has 11 trades. Future work should improve monthly consistency without increasing the micro probe size or loosening the capitulation sleeve.

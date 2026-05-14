@@ -163,7 +163,7 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["exit_micro_probe_time_stop_bars"]["default"] == 72
   assert reversal_strategy["parameter_schema"]["cooldown_after_stop_bars"]["default"] == 20
   assert reversal_strategy["parameter_schema"]["max_position_fraction"]["default"] == 1.0
-  assert reversal_strategy["parameter_schema"]["atr_stop_multiple"]["default"] == 4.0
+  assert reversal_strategy["parameter_schema"]["atr_stop_multiple"]["default"] == 3.45
   assert (
     "RSI14 과매도 탈출"
     in reversal_strategy["parameter_schema"]["rsi_window"]["description_ko"]

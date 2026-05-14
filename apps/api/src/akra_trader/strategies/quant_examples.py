@@ -640,11 +640,11 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "atr_stop_multiple": {
           "type": "number",
-          "default": 4.0,
+          "default": 3.45,
           "minimum": 0.1,
           "maximum": 10,
           "semantic_hint": "ATR multiple used for fixed stop distance.",
-          "description_ko": "ATR 손절 배수입니다. 기본값은 진입가 - 4.0 * ATR14 손절입니다.",
+          "description_ko": "ATR 손절 배수입니다. 기본값은 진입가 - 3.45 * ATR14 손절입니다.",
         },
         "atr_take_profit_multiple": {
           "type": "number",
@@ -675,7 +675,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "A separate capitulation rebound sleeve can buy below MA60 only when RSI/ATR/slope distances sit in a narrow post-capitulation recovery band.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
-          "SELL uses fixed 4 ATR stop, configurable swing-low stop, 288-bar no-profit time exit, 1.5R default target, and optional profit-signal trailing based on RSI/R-target/MA-resistance.",
+          "SELL uses fixed 3.45 ATR stop, configurable swing-low stop, 288-bar no-profit time exit, 1.5R default target, and optional profit-signal trailing based on RSI/R-target/MA-resistance.",
         ),
       ),
       version_lineage=("1.0.0",),
@@ -700,7 +700,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     sizing=AtrRiskSizing(
       atr_feature="atr",
       risk_fraction=ParameterRef("risk_fraction", 0.01),
-      stop_multiple=ParameterRef("atr_stop_multiple", 4.0),
+      stop_multiple=ParameterRef("atr_stop_multiple", 3.45),
       take_profit_multiple=ParameterRef("atr_take_profit_multiple", 3.0),
       max_position_fraction=ParameterRef("max_position_fraction", 1.0),
     ),
@@ -1674,7 +1674,7 @@ def _rsi14_micro_probe_execution_plan(context: StrategyDecisionContext) -> Execu
   stop_multiple = _clamped_parameter(
     context,
     "atr_stop_multiple",
-    4.0,
+    3.45,
     minimum=0.1,
     maximum=10.0,
   )
@@ -1792,7 +1792,7 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
       atr * _clamped_parameter(
         context,
         "atr_stop_multiple",
-        4.0,
+        3.45,
         minimum=0.1,
         maximum=10.0,
       )
