@@ -71,6 +71,12 @@ Using the same current default parameters:
 - Slow local random searches:
   - Two broad Python search passes were stopped because they were too slow for interactive iteration.
   - Do not rerun broad per-candidate Python loops over 1-year data without vectorizing entries first or reducing the candidate set.
+- Recent-month trade forcing:
+  - `entry_trend_filter_mode=any`, 1R target, 2 ATR stop, run `5940fc9d-00b2-4343-a7e4-f890ae6f5f62`: -15.86%, 40.00% win rate, 55 trades.
+  - `entry_trend_filter_mode=loose`, 1R target, 2 ATR stop, run `04803c6d-ef30-466b-b8ba-a2edc44e18d1`: -4.56%, 47.37% win rate, 19 trades.
+  - `entry_trend_filter_mode=above20`, 1R target, 2 ATR stop, run `6b74d199-d3b0-4e89-8393-28d301703488`: -2.60%, 57.14% win rate, 14 trades.
+  - `entry_trend_filter_mode=any`, close position 0.5, 1R target, 2 ATR stop, run `78817c00-1c02-4123-a506-fb047851553f`: -16.53%, 41.67% win rate, 60 trades.
+  - Rejected because forcing trades in the 2026-04-13 to 2026-05-13 window creates heavy losses; current no-trade behavior is preferable for that month.
 
 ## Remaining Gap
 
