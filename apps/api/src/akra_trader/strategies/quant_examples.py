@@ -6,6 +6,7 @@ from typing import Any
 import pandas as pd
 
 from akra_trader.domain.models import AssetType
+from akra_trader.domain.models import ExecutionPlan
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyCatalogSemantics
@@ -451,6 +452,20 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Allows a tightly filtered rebound after a deeper capitulation below MA60.",
           "description_ko": "MA60 아래 깊은 급락 뒤 강한 반등 캔들이 나온 경우 제한적으로 매수를 허용합니다.",
         },
+        "entry_enable_micro_probe": {
+          "type": "boolean",
+          "default": True,
+          "semantic_hint": "Allows tiny probe entries on lower-quality RSI rebounds that are too weak for full-size entries.",
+          "description_ko": "전량 진입 품질에는 못 미치지만 RSI 반등은 확인된 구간을 아주 작은 비중의 프로브 진입으로 허용합니다.",
+        },
+        "entry_micro_probe_max_position_fraction": {
+          "type": "number",
+          "default": 0.005,
+          "minimum": 0,
+          "maximum": 0.05,
+          "semantic_hint": "Maximum notional allocation for micro probe entries.",
+          "description_ko": "프로브 진입의 최대 포지션 비중입니다. 기본값 0.005는 자산의 0.5%만 사용합니다.",
+        },
         "entry_min_rsi_rebound": {
           "type": "number",
           "default": 1.0,
@@ -542,6 +557,14 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Profit target measured in initial risk R.",
           "description_ko": "초기 위험 R 기준 익절 감지 배수입니다. 트레일링 보유가 켜져 있으면 즉시 매도 대신 트레일링을 활성화합니다.",
         },
+        "exit_micro_probe_profit_r_multiple": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0.1,
+          "maximum": 2,
+          "semantic_hint": "Profit target in R for tiny micro probe entries.",
+          "description_ko": "프로브 진입의 초기 위험 R 기준 익절 배수입니다.",
+        },
         "exit_hold_profit_with_trailing": {
           "type": "boolean",
           "default": False,
@@ -580,6 +603,15 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "unit": "bars",
           "semantic_hint": "Bars allowed after entry before exiting if the trade has not turned profitable.",
           "description_ko": "진입 후 수익 전환을 기다릴 봉 수입니다. 기본값은 288봉입니다.",
+        },
+        "exit_micro_probe_time_stop_bars": {
+          "type": "integer",
+          "default": 72,
+          "minimum": 1,
+          "maximum": 288,
+          "unit": "bars",
+          "semantic_hint": "Maximum bars to hold tiny micro probe entries.",
+          "description_ko": "프로브 진입을 보유할 최대 봉 수입니다. 기본값은 72봉입니다.",
         },
         "cooldown_after_stop_bars": {
           "type": "integer",
@@ -639,6 +671,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         operator_notes=(
           "BUY defaults to RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI30 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
           "Standard late rebounds more than 2.2 ATR above the recent low require either an MA20 reclaim without fresh lower lows or a deep washout recovery profile.",
+          "Lower-quality RSI rebounds can be sampled through tiny 0.5% micro probes with a shorter 0.5R target and 72-bar time stop.",
           "A separate capitulation rebound sleeve can buy below MA60 only when RSI/ATR/slope distances sit in a narrow post-capitulation recovery band.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
@@ -782,6 +815,8 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
       )
 
     execution = self.spec.sizing.build(context, signal)
+    if signal.action == SignalAction.BUY and bool(entry_evaluation.get("micro_probe_matched")):
+      execution = _rsi14_micro_probe_execution_plan(context)
     return StrategyDecisionEnvelope(
       signal=signal,
       rationale=_rsi14_oversold_reversal_rationale(
@@ -1154,6 +1189,9 @@ def _rsi14_oversold_reversal_entry_evaluation(
   capitulation_rebound_enabled = bool(
     context.state.parameters.get("entry_enable_capitulation_rebound", True)
   )
+  micro_probe_enabled = bool(
+    context.state.parameters.get("entry_enable_micro_probe", True)
+  )
   entry_trigger_mode = str(
     context.state.parameters.get("entry_trigger_mode", "rsi_turn")
   )
@@ -1355,15 +1393,12 @@ def _rsi14_oversold_reversal_entry_evaluation(
   else:
     entry_trigger_mode = "rsi_turn"
     configured_trigger_matched = rsi_turn_matched
-  quality_configured_trigger_matched = (
-    configured_trigger_matched and extended_standard_rebound_quality
-  )
-  entry_trigger_matched = (
-    quality_configured_trigger_matched or capitulation_rebound_matched
-  )
   above_ma20 = close is not None and ma20 is not None and close > ma20
   above_ma60 = close is not None and ma60 is not None and close > ma60
   ma20_slope_non_negative = ma20_slope is not None and ma20_slope >= 0
+  quality_configured_trigger_matched = (
+    configured_trigger_matched and extended_standard_rebound_quality
+  )
   if trend_filter_mode == "loose":
     trend_filter = above_ma20 or above_ma60 or ma20_slope_non_negative
   elif trend_filter_mode == "above20":
@@ -1375,7 +1410,6 @@ def _rsi14_oversold_reversal_entry_evaluation(
   else:
     trend_filter_mode = "any"
     trend_filter = True
-  entry_trend_allowed = trend_filter or capitulation_rebound_matched
   close_below_ma60 = close is not None and ma60 is not None and close < ma60
   ma20_slope_down = ma20_slope is not None and ma20_slope < 0
   raw_structural_downtrend_block = (
@@ -1383,8 +1417,29 @@ def _rsi14_oversold_reversal_entry_evaluation(
     and ma20_slope_down
     and recent_lower_lows
   )
+  standard_full_entry_matched = (
+    quality_configured_trigger_matched
+    and trend_filter
+    and not raw_structural_downtrend_block
+  )
+  micro_probe_trend_filter = above_ma20 or above_ma60 or ma20_slope_non_negative
+  micro_probe_matched = (
+    micro_probe_enabled
+    and configured_trigger_matched
+    and not standard_full_entry_matched
+    and not capitulation_rebound_matched
+    and micro_probe_trend_filter
+  )
+  entry_trigger_matched = (
+    quality_configured_trigger_matched
+    or capitulation_rebound_matched
+    or micro_probe_matched
+  )
+  entry_trend_allowed = trend_filter or capitulation_rebound_matched or micro_probe_matched
   structural_downtrend_block = (
-    raw_structural_downtrend_block and not capitulation_rebound_matched
+    raw_structural_downtrend_block
+    and not capitulation_rebound_matched
+    and not micro_probe_matched
   )
 
   filters = {
@@ -1418,11 +1473,23 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "configured_trigger_matched": configured_trigger_matched,
       "quality_configured_trigger_matched": quality_configured_trigger_matched,
       "capitulation_rebound_matched": capitulation_rebound_matched,
+      "micro_probe_matched": micro_probe_matched,
       "escape_breakout_matched": escape_breakout_matched,
       "early_reversal_matched": early_reversal_matched,
       "rsi_turn_matched": rsi_turn_matched,
       "mode": entry_trigger_mode,
       "entry_candle_confirmed": entry_candle_confirmed,
+    },
+    "micro_probe": {
+      "passed": micro_probe_matched,
+      "enabled": micro_probe_enabled,
+      "configured_trigger_matched": configured_trigger_matched,
+      "quality_configured_trigger_matched": quality_configured_trigger_matched,
+      "standard_full_entry_matched": standard_full_entry_matched,
+      "trend_filter": micro_probe_trend_filter,
+      "above_ma20": above_ma20,
+      "above_ma60": above_ma60,
+      "ma20_slope_non_negative": ma20_slope_non_negative,
     },
     "extended_standard_rebound_quality": {
       "passed": extended_standard_rebound_quality or capitulation_rebound_matched,
@@ -1498,6 +1565,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "mode": trend_filter_mode,
       "standard_trend_filter": trend_filter,
       "capitulation_rebound_override": capitulation_rebound_matched,
+      "micro_probe_override": micro_probe_matched,
       "above_ma20": above_ma20,
       "above_ma60": above_ma60,
       "ma20_slope_non_negative": ma20_slope_non_negative,
@@ -1512,6 +1580,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "blocked": structural_downtrend_block,
       "raw_blocked": raw_structural_downtrend_block,
       "capitulation_rebound_override": capitulation_rebound_matched,
+      "micro_probe_override": micro_probe_matched,
       "close_below_ma60": close_below_ma60,
       "ma20_slope_down": ma20_slope_down,
       "recent_lower_lows": recent_lower_lows,
@@ -1550,20 +1619,26 @@ def _rsi14_oversold_reversal_entry_evaluation(
       failed_trigger_parts.append("extended_standard_rebound_quality")
     if capitulation_rebound_enabled:
       failed_trigger_parts.append("capitulation_rebound")
+    if micro_probe_enabled:
+      failed_trigger_parts.append("micro_probe")
     failed_filters_list.extend(part for part in failed_trigger_parts if part not in failed_filters_list)
   failed_filters = tuple(failed_filters_list)
   matched = not failed_filters
   reason = (
     (
-      "entry_conditions_met:rsi14_oversold_escape_rebound"
-      if escape_breakout_matched
+      "entry_conditions_met:rsi14_micro_probe"
+      if micro_probe_matched
       else (
-        "entry_conditions_met:rsi14_oversold_early_reversal"
-        if early_reversal_matched
+        "entry_conditions_met:rsi14_oversold_escape_rebound"
+        if escape_breakout_matched
         else (
-          "entry_conditions_met:rsi14_capitulation_rebound"
-          if capitulation_rebound_matched
-          else "entry_conditions_met:rsi14_oversold_rsi_turn"
+          "entry_conditions_met:rsi14_oversold_early_reversal"
+          if early_reversal_matched
+          else (
+            "entry_conditions_met:rsi14_capitulation_rebound"
+            if capitulation_rebound_matched
+            else "entry_conditions_met:rsi14_oversold_rsi_turn"
+          )
         )
       )
     )
@@ -1582,7 +1657,51 @@ def _rsi14_oversold_reversal_entry_evaluation(
     "early_reversal_matched": early_reversal_matched,
     "rsi_turn_matched": rsi_turn_matched,
     "capitulation_rebound_matched": capitulation_rebound_matched,
+    "micro_probe_matched": micro_probe_matched,
   }
+
+
+def _rsi14_micro_probe_execution_plan(context: StrategyDecisionContext) -> ExecutionPlan:
+  close = _feature_or_market(context, "close")
+  atr = _feature_value(context, "atr")
+  max_fraction = _clamped_parameter(
+    context,
+    "entry_micro_probe_max_position_fraction",
+    0.005,
+    minimum=0.0,
+    maximum=0.05,
+  )
+  stop_multiple = _clamped_parameter(
+    context,
+    "atr_stop_multiple",
+    4.0,
+    minimum=0.1,
+    maximum=10.0,
+  )
+  profit_r_multiple = _clamped_parameter(
+    context,
+    "exit_micro_probe_profit_r_multiple",
+    0.5,
+    minimum=0.1,
+    maximum=2.0,
+  )
+  stop_loss_pct = (
+    min((atr * stop_multiple) / close, 1.0)
+    if close is not None and close > 0 and atr is not None and atr > 0
+    else None
+  )
+  take_profit_pct = (
+    min((atr * stop_multiple * profit_r_multiple) / close, 1.0)
+    if close is not None and close > 0 and atr is not None and atr > 0
+    else None
+  )
+  return ExecutionPlan(
+    size_fraction=max_fraction,
+    max_position_fraction=max_fraction,
+    stop_loss_pct=stop_loss_pct,
+    take_profit_pct=take_profit_pct,
+    tags=("composable", "micro_probe_sizing"),
+  )
 
 
 def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -> dict[str, Any]:
@@ -1625,6 +1744,43 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
     minimum=1,
     maximum=288,
   )
+  micro_probe_fraction = _clamped_parameter(
+    context,
+    "entry_micro_probe_max_position_fraction",
+    0.005,
+    minimum=0.0,
+    maximum=0.05,
+  )
+  position_notional_fraction = (
+    (context.state.position_size * close)
+    / ((context.state.position_size * close) + context.state.cash)
+    if close is not None
+    and close > 0
+    and context.state.position_size > 0
+    and ((context.state.position_size * close) + context.state.cash) > 0
+    else None
+  )
+  micro_probe_position = (
+    bool(context.state.parameters.get("entry_enable_micro_probe", True))
+    and position_notional_fraction is not None
+    and micro_probe_fraction > 0
+    and position_notional_fraction <= micro_probe_fraction * 2
+  )
+  if micro_probe_position:
+    profit_r_multiple = _clamped_parameter(
+      context,
+      "exit_micro_probe_profit_r_multiple",
+      0.5,
+      minimum=0.1,
+      maximum=2.0,
+    )
+    time_stop_bars = _mapping_int_parameter(
+      context.state.parameters,
+      "exit_micro_probe_time_stop_bars",
+      72,
+      minimum=1,
+      maximum=288,
+    )
   bars_since_entry = _bars_since_position_opened(context)
   profitable = close is not None and entry_price is not None and close > entry_price
   risk_per_unit = (
@@ -1825,7 +1981,7 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
         context.state.has_position
         and bars_since_entry is not None
         and bars_since_entry >= time_stop_bars
-        and not profitable
+        and (micro_probe_position or not profitable)
       ),
       1.0,
       bars_since_entry=bars_since_entry,
@@ -1833,6 +1989,7 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
       close=close,
       entry_price=entry_price,
       profitable=profitable,
+      micro_probe_position=micro_probe_position,
     ),
   }
   if not context.state.has_position:
@@ -1854,6 +2011,8 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
       "trailing_activation_price": trailing_activation_price,
       "trailing_active": trailing_active,
       "hold_profit_with_trailing": hold_profit_with_trailing,
+      "micro_probe_position": micro_probe_position,
+      "position_notional_fraction": position_notional_fraction,
     }
 
   immediate_reason_order = (
@@ -1921,6 +2080,8 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
     "trailing_activation_price": trailing_activation_price,
     "trailing_active": trailing_active,
     "hold_profit_with_trailing": hold_profit_with_trailing,
+    "micro_probe_position": micro_probe_position,
+    "position_notional_fraction": position_notional_fraction,
   }
 
 

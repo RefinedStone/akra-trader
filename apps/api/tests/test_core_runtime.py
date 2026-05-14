@@ -144,6 +144,8 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["entry_enable_early_reversal"]["default"] is False
   assert reversal_strategy["parameter_schema"]["entry_trigger_mode"]["default"] == "rsi_turn"
   assert reversal_strategy["parameter_schema"]["entry_enable_capitulation_rebound"]["default"] is True
+  assert reversal_strategy["parameter_schema"]["entry_enable_micro_probe"]["default"] is True
+  assert reversal_strategy["parameter_schema"]["entry_micro_probe_max_position_fraction"]["default"] == 0.005
   assert reversal_strategy["parameter_schema"]["entry_max_rsi_rebound"]["default"] == 10.0
   assert reversal_strategy["parameter_schema"]["entry_min_close_position"]["default"] == 0.60
   assert reversal_strategy["parameter_schema"]["entry_trend_filter_mode"]["default"] == "above60"
@@ -153,10 +155,12 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["exit_enable_ma_resistance"]["default"] is False
   assert reversal_strategy["parameter_schema"]["exit_enable_swing_low_stop"]["default"] is False
   assert reversal_strategy["parameter_schema"]["exit_profit_r_multiple"]["default"] == 1.5
+  assert reversal_strategy["parameter_schema"]["exit_micro_probe_profit_r_multiple"]["default"] == 0.5
   assert reversal_strategy["parameter_schema"]["exit_hold_profit_with_trailing"]["default"] is False
   assert reversal_strategy["parameter_schema"]["exit_trailing_activation_r"]["default"] == 5.0
   assert reversal_strategy["parameter_schema"]["exit_trailing_distance_atr"]["default"] == 1.2
   assert reversal_strategy["parameter_schema"]["exit_time_stop_bars"]["default"] == 288
+  assert reversal_strategy["parameter_schema"]["exit_micro_probe_time_stop_bars"]["default"] == 72
   assert reversal_strategy["parameter_schema"]["cooldown_after_stop_bars"]["default"] == 20
   assert reversal_strategy["parameter_schema"]["max_position_fraction"]["default"] == 1.0
   assert reversal_strategy["parameter_schema"]["atr_stop_multiple"]["default"] == 4.0
@@ -1000,6 +1004,7 @@ def test_rsi14_oversold_reversal_rejects_late_rebound_without_ma20_reclaim():
       "entry_trigger_mode": "rsi_turn",
       "entry_min_close_position": 0.5,
       "entry_max_low_proximity_atr": 3.0,
+      "entry_enable_micro_probe": False,
     },
   )
 
@@ -1011,6 +1016,38 @@ def test_rsi14_oversold_reversal_rejects_late_rebound_without_ma20_reclaim():
   assert quality["standard_passed"] is False
   assert quality["low_proximity_atr"] == pytest.approx(2.6)
   assert "extended_standard_rebound_quality" in envelope.trace["entry"]["reason"]
+
+
+def test_rsi14_oversold_reversal_buys_late_rebound_as_micro_probe():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (24.0, 32.0, 34.0),
+    closes=(100.0, 100.2, 101.6),
+    ma20=(102.0, 102.0, 102.0),
+    ma60=(99.0, 99.0, 99.0),
+    recent_lower_lows=False,
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=False,
+    cash=10_000.0,
+    position_size=0.0,
+    parameters={
+      "entry_trigger_mode": "rsi_turn",
+      "entry_min_close_position": 0.5,
+      "entry_max_low_proximity_atr": 3.0,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert envelope.signal.reason == "entry_conditions_met:rsi14_micro_probe"
+  assert envelope.execution.size_fraction == pytest.approx(0.005)
+  assert envelope.trace["entry"]["micro_probe_matched"] is True
+  assert envelope.trace["entry"]["filters"]["trend_filter"]["micro_probe_override"] is True
 
 
 def test_rsi14_oversold_reversal_allows_deep_late_washout_rebound():
@@ -1235,6 +1272,40 @@ def test_rsi14_oversold_reversal_sells_on_profit_r_target():
   assert envelope.signal.action == SignalAction.SELL
   assert envelope.signal.reason == "profit_r_target"
   assert envelope.trace["exit"]["profit_r"] == pytest.approx(1.5333, abs=0.0001)
+
+
+def test_rsi14_oversold_reversal_sells_micro_probe_on_smaller_profit_target():
+  strategy = Rsi14OversoldReversalStrategy()
+  frame = _rsi14_escape_frame(
+    (35.0, 40.0, 45.0),
+    closes=(100.5, 101.0, 102.1),
+    ma20=(98.0, 98.0, 98.0),
+    ma60=(97.0, 97.0, 97.0),
+    previous_price_swing_low=95.0,
+    atr=1.0,
+  )
+  state = StrategyExecutionState(
+    timestamp=frame.iloc[-1]["timestamp"].to_pydatetime(),
+    instrument_id="binance:BTC/USDT",
+    has_position=True,
+    cash=9_950.0,
+    position_size=0.5,
+    position_average_price=100.0,
+    position_opened_at=frame.iloc[1]["timestamp"].to_pydatetime(),
+    position_stop_loss_price=96.0,
+    parameters={
+      "entry_micro_probe_max_position_fraction": 0.005,
+      "exit_micro_probe_profit_r_multiple": 0.5,
+    },
+  )
+
+  envelope = strategy.evaluate(frame, state.parameters, state)
+
+  assert envelope.signal.action == SignalAction.SELL
+  assert envelope.signal.reason == "profit_r_target"
+  assert envelope.trace["exit"]["micro_probe_position"] is True
+  assert envelope.trace["exit"]["profit_r"] == pytest.approx(0.525, abs=0.0001)
+  assert envelope.trace["exit"]["components"]["profit_r_target"]["profit_r_multiple"] == 0.5
 
 
 def test_rsi14_oversold_reversal_holds_profit_target_with_trailing():
