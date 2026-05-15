@@ -12,6 +12,7 @@ Tune `rsi14_oversold_reversal_v1` so the RSI oversold rebound strategy keeps win
 - Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.58.
 - Standard late rebound guard: when a standard entry is more than 2.2 ATR above the recent low, it must either reclaim MA20 without fresh lower lows or match a deep washout recovery profile.
 - Micro probe overlay: lower-quality RSI rebounds that miss full-size entry quality can be sampled with a 0.1% max position only after a stricter close-location/volatility gate, with a separate 3.0 ATR stop, 0.5R target, and 48-bar time stop.
+- Micro promotion: enabled only when a profitable micro probe is near 0.5R and the same bar also qualifies as a fresh full-size signal; this avoids promoting weak probe-only rebounds.
 - Scale-in: enabled only when an existing position is already profitable by at least 0.25R and a fresh full-size signal appears; losing positions are not averaged down.
 - Secondary entry: a tightly filtered MA60-below capitulation rebound sleeve for deep RSI washouts in a narrow RSI/ATR/slope recovery band.
 - Risk/exit: max position fraction 1.0, ATR stop 3.0, profit target 2.0R, no-profit time stop 288 bars, stop cooldown 20 bars.
@@ -72,7 +73,7 @@ The latest full-size pass changed the default from 3.45 ATR stop / 1.5R target t
 | 2024-05-13 to 2025-05-13 | +3.77% | 57.95% | 88 | 23 | +584.80 USDT | -0.65 USDT |
 | 2025-05-13 to 2026-05-13 | +8.77% | 60.00% | 65 | 28 | +1,139.88 USDT | -0.22 USDT |
 
-Scale-in support is implemented and defaults on, but these three 1-year default runs had exactly two orders per closed trade, so no profitable scale-in actually fired in this validation set. Keep it as a guarded capability rather than counting it as proven return contribution.
+Scale-in and micro promotion support are implemented and default on, but these three 1-year default runs had exactly two orders per closed trade, so neither profitable scale-in nor micro-to-full promotion actually fired in this validation set. A looser promotion variant that did not require a fresh full-size signal damaged the 2023-2024 sample (`+1.97%`, 39.29% win rate, 28 trades), so promotion must remain gated by full-size entry quality.
 
 ## Historical Monthly Samples
 

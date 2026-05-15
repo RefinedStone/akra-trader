@@ -492,6 +492,37 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Maximum one-bar RSI increase allowed for micro probe entries.",
           "description_ko": "프로브 진입에서 허용할 RSI14 전봉 대비 최대 상승폭입니다. 과도하게 늦은 반등 추격을 줄입니다.",
         },
+        "entry_enable_micro_promotion": {
+          "type": "boolean",
+          "default": True,
+          "semantic_hint": "Promotes a profitable micro probe to a full-size entry after RSI and price follow-through.",
+          "description_ko": "수익 중인 프로브가 RSI/가격 후속 반등을 확인하면 full-size 추가 진입으로 승격합니다.",
+        },
+        "entry_micro_promotion_min_profit_r": {
+          "type": "number",
+          "default": 0.45,
+          "minimum": 0,
+          "maximum": 2,
+          "semantic_hint": "Minimum micro probe open profit in R before promotion.",
+          "description_ko": "프로브 승격 전에 필요한 최소 수익 R입니다. 기본값 0.45는 0.5R 근처에서만 승격을 봅니다.",
+        },
+        "entry_micro_promotion_min_rsi": {
+          "type": "number",
+          "default": 40.0,
+          "minimum": 0,
+          "maximum": 100,
+          "semantic_hint": "Minimum RSI required for micro probe promotion.",
+          "description_ko": "프로브 승격에 필요한 최소 RSI14입니다. 과매도 탈출 뒤 모멘텀 회복을 확인합니다.",
+        },
+        "entry_micro_promotion_min_bars_since_entry": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 288,
+          "unit": "bars",
+          "semantic_hint": "Minimum bars since micro probe entry before promotion.",
+          "description_ko": "프로브 진입 후 승격까지 기다릴 최소 봉 수입니다.",
+        },
         "entry_min_rsi_rebound": {
           "type": "number",
           "default": 1.0,
@@ -769,6 +800,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "BUY defaults to RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI30 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
           "Standard late rebounds more than 2.2 ATR above the recent low require either an MA20 reclaim without fresh lower lows or a deep washout recovery profile.",
           "Lower-quality RSI rebounds can be sampled through tiny 0.1% micro probes only after a stricter close-location/volatility quality gate, with a separate 3.0 ATR stop, 0.5R target, and 48-bar time stop.",
+          "Profitable micro probes can be promoted to full-size when open profit is near 0.5R and RSI plus price follow-through confirms continuation.",
           "Profitable open positions can scale in on a fresh full-size signal, but losing positions are not averaged down.",
           "A separate capitulation rebound sleeve can buy below MA60 only when RSI/ATR/slope distances sit in a narrow post-capitulation recovery band.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
@@ -890,8 +922,20 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
       exit_evaluation=exit_evaluation,
     )
     scale_in_match = bool(scale_in_evaluation["matched"])
+    micro_promotion_evaluation = _rsi14_micro_probe_promotion_evaluation(
+      context,
+      entry_evaluation=entry_evaluation,
+      exit_evaluation=exit_evaluation,
+    )
+    micro_promotion_match = bool(micro_promotion_evaluation["matched"])
+    protective_exit_match = exit_match and str(exit_evaluation["reason"]) in {
+      "swing_low_stop",
+      "atr_stop",
+      "trailing_stop",
+      "time_no_profit",
+    }
 
-    if context.state.has_position and exit_match:
+    if context.state.has_position and protective_exit_match:
       signal = SignalDecision(
         timestamp=context.timestamp,
         action=SignalAction.SELL,
@@ -901,6 +945,22 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
       )
       if bool(exit_evaluation.get("is_stop_exit")):
         self._start_stop_cooldown(context)
+    elif context.state.has_position and micro_promotion_match:
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.BUY,
+        confidence=0.72,
+        tags=("composable", "entry", "micro_promotion", "rsi14_oversold_escape"),
+        reason=str(micro_promotion_evaluation["reason"]),
+      )
+    elif context.state.has_position and exit_match:
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.SELL,
+        confidence=0.76,
+        tags=("composable", "exit", str(exit_evaluation["reason"])),
+        reason=str(exit_evaluation["reason"]),
+      )
     elif context.state.has_position and entry_match and scale_in_match:
       signal = SignalDecision(
         timestamp=context.timestamp,
@@ -930,14 +990,18 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     if (
       signal.action == SignalAction.BUY
       and not scale_in_match
+      and not micro_promotion_match
       and bool(entry_evaluation.get("micro_probe_matched"))
     ):
       execution = _rsi14_micro_probe_execution_plan(context)
-    elif signal.action == SignalAction.BUY and scale_in_match:
+    elif signal.action == SignalAction.BUY and (scale_in_match or micro_promotion_match):
       execution = replace(
         execution,
         allow_scale_in=True,
-        tags=(*execution.tags, "scale_in"),
+        tags=(
+          *execution.tags,
+          "micro_promotion" if micro_promotion_match else "scale_in",
+        ),
       )
     return StrategyDecisionEnvelope(
       signal=signal,
@@ -945,6 +1009,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         signal,
         entry_evaluation=entry_evaluation,
         exit_evaluation=exit_evaluation,
+        micro_promotion_evaluation=micro_promotion_evaluation,
       ),
       context=context,
       execution=execution,
@@ -962,6 +1027,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         "entry": entry_evaluation,
         "exit": exit_evaluation,
         "scale_in": scale_in_evaluation,
+        "micro_promotion": micro_promotion_evaluation,
         "execution_tags": execution.tags,
       },
     )
@@ -1834,6 +1900,180 @@ def _rsi14_oversold_reversal_entry_evaluation(
     "capitulation_rebound_matched": capitulation_rebound_matched,
     "micro_probe_matched": micro_probe_matched,
     "standard_full_entry_matched": standard_full_entry_matched,
+  }
+
+
+def _rsi14_micro_probe_promotion_evaluation(
+  context: StrategyDecisionContext,
+  *,
+  entry_evaluation: dict[str, Any],
+  exit_evaluation: dict[str, Any],
+) -> dict[str, Any]:
+  enabled = bool(context.state.parameters.get("entry_enable_micro_promotion", True))
+  close = _feature_or_market(context, "close")
+  open_price = _feature_or_market(context, "open")
+  previous_close = _feature_value(context, "previous_close")
+  previous_high = _feature_value(context, "previous_high")
+  rsi = _feature_value(context, "rsi")
+  previous_rsi = _feature_value(context, "previous_rsi")
+  ma20 = _feature_value(context, "ma20")
+  ma60 = _feature_value(context, "ma60")
+  ma20_slope = _feature_value(context, "ma20_slope")
+  profit_r = _finite_number(exit_evaluation.get("profit_r"))
+  bars_since_entry = _finite_number(exit_evaluation.get("bars_since_entry"))
+  micro_probe_position = bool(exit_evaluation.get("micro_probe_position"))
+  position_fraction = _finite_number(exit_evaluation.get("position_notional_fraction"))
+  if position_fraction is None:
+    position_fraction = _rsi14_position_notional_fraction(context, close=close)
+  min_profit_r = _clamped_parameter(
+    context,
+    "entry_micro_promotion_min_profit_r",
+    0.45,
+    minimum=0.0,
+    maximum=2.0,
+  )
+  min_rsi = _clamped_parameter(
+    context,
+    "entry_micro_promotion_min_rsi",
+    40.0,
+    minimum=0.0,
+    maximum=100.0,
+  )
+  min_bars_since_entry = _mapping_int_parameter(
+    context.state.parameters,
+    "entry_micro_promotion_min_bars_since_entry",
+    2,
+    minimum=0,
+    maximum=288,
+  )
+  max_position_fraction = _clamped_parameter(
+    context,
+    "entry_scale_in_max_position_fraction",
+    1.0,
+    minimum=0.0,
+    maximum=1.0,
+  )
+  filters = entry_evaluation.get("filters", {})
+  recent_oversold_filter = filters.get("recent_oversold", {})
+  recent_oversold = (
+    bool(recent_oversold_filter.get("passed"))
+    if isinstance(recent_oversold_filter, dict)
+    else False
+  )
+  full_size_signal = (
+    bool(entry_evaluation.get("standard_full_entry_matched"))
+    or bool(entry_evaluation.get("capitulation_rebound_matched"))
+  )
+  structural_downtrend_block = bool(entry_evaluation.get("structural_downtrend_block"))
+  exit_reason = str(exit_evaluation.get("reason"))
+  exit_allows_promotion = (
+    not bool(exit_evaluation.get("matched"))
+    or (micro_probe_position and exit_reason == "profit_r_target")
+  )
+  bars_ok = (
+    bars_since_entry is not None and bars_since_entry >= min_bars_since_entry
+  )
+  profit_ok = profit_r is not None and profit_r >= min_profit_r
+  rsi_recovery = (
+    rsi is not None
+    and previous_rsi is not None
+    and rsi >= min_rsi
+    and rsi > previous_rsi
+  )
+  bullish_rebound = (
+    close is not None
+    and open_price is not None
+    and previous_close is not None
+    and close > open_price
+    and close > previous_close
+  )
+  previous_high_breakout = (
+    close is not None and previous_high is not None and close > previous_high
+  )
+  ma20_reclaim = close is not None and ma20 is not None and close > ma20
+  ma60_hold = close is not None and ma60 is not None and close > ma60
+  ma20_slope_non_negative = ma20_slope is not None and ma20_slope >= 0
+  price_follow_through = (
+    bullish_rebound
+    and (
+      previous_high_breakout
+      or ma20_reclaim
+      or (ma60_hold and ma20_slope_non_negative)
+    )
+  )
+  capacity_ok = (
+    position_fraction is not None and position_fraction < max_position_fraction
+  )
+  matched = (
+    context.state.has_position
+    and enabled
+    and micro_probe_position
+    and recent_oversold
+    and full_size_signal
+    and not structural_downtrend_block
+    and exit_allows_promotion
+    and bars_ok
+    and profit_ok
+    and rsi_recovery
+    and price_follow_through
+    and capacity_ok
+  )
+  failed: list[str] = []
+  if not context.state.has_position:
+    failed.append("no_position")
+  if not enabled:
+    failed.append("disabled")
+  if not micro_probe_position:
+    failed.append("not_micro_probe_position")
+  if not recent_oversold:
+    failed.append("recent_oversold")
+  if not full_size_signal:
+    failed.append("no_fresh_full_size_signal")
+  if structural_downtrend_block:
+    failed.append("structural_downtrend_block")
+  if not exit_allows_promotion:
+    failed.append("exit_signal_blocks_promotion")
+  if not bars_ok:
+    failed.append("min_bars_since_entry")
+  if not profit_ok:
+    failed.append("min_profit_r")
+  if not rsi_recovery:
+    failed.append("rsi_recovery")
+  if not price_follow_through:
+    failed.append("price_follow_through")
+  if not capacity_ok:
+    failed.append("max_position_fraction")
+  return {
+    "matched": matched,
+    "reason": (
+      "entry_conditions_met:rsi14_micro_probe_promotion"
+      if matched
+      else f"micro_promotion_filters_failed:{','.join(failed)}"
+    ),
+    "enabled": enabled,
+    "micro_probe_position": micro_probe_position,
+    "recent_oversold": recent_oversold,
+    "full_size_signal": full_size_signal,
+    "structural_downtrend_block": structural_downtrend_block,
+    "exit_reason": exit_reason,
+    "exit_allows_promotion": exit_allows_promotion,
+    "bars_since_entry": bars_since_entry,
+    "entry_micro_promotion_min_bars_since_entry": min_bars_since_entry,
+    "profit_r": profit_r,
+    "entry_micro_promotion_min_profit_r": min_profit_r,
+    "rsi": rsi,
+    "previous_rsi": previous_rsi,
+    "entry_micro_promotion_min_rsi": min_rsi,
+    "rsi_recovery": rsi_recovery,
+    "bullish_rebound": bullish_rebound,
+    "previous_high_breakout": previous_high_breakout,
+    "ma20_reclaim": ma20_reclaim,
+    "ma60_hold": ma60_hold,
+    "ma20_slope_non_negative": ma20_slope_non_negative,
+    "price_follow_through": price_follow_through,
+    "position_notional_fraction": position_fraction,
+    "entry_scale_in_max_position_fraction": max_position_fraction,
+    "failed_filters": tuple(failed),
   }
 
 
@@ -2710,6 +2950,7 @@ def _rsi14_oversold_reversal_rationale(
   *,
   entry_evaluation: dict[str, Any],
   exit_evaluation: dict[str, Any],
+  micro_promotion_evaluation: dict[str, Any] | None = None,
 ) -> str:
   active_exit_components = [
     name
@@ -2724,6 +2965,12 @@ def _rsi14_oversold_reversal_rationale(
     trailing_summary = f"; trailing_stop={trailing_stop:.2f}"
     if high_watermark is not None:
       trailing_summary = f"{trailing_summary}; high_watermark={high_watermark:.2f}"
+  promotion_summary = ""
+  if micro_promotion_evaluation is not None:
+    promotion_summary = (
+      f"; micro_promotion={micro_promotion_evaluation['matched']}; "
+      f"micro_promotion_reason={micro_promotion_evaluation['reason']}"
+    )
   return (
     f"RSI14 oversold escape rebound signal={signal.action.value}; "
     f"entry={entry_evaluation['matched']}; entry_reason={entry_evaluation['reason']}; "
@@ -2731,7 +2978,7 @@ def _rsi14_oversold_reversal_rationale(
     f"cooldown_active={entry_evaluation['cooldown_active']}; exit={exit_evaluation['matched']}; "
     f"exit_reason={exit_evaluation['reason']}; exit_components={exit_component_summary}; "
     f"bars_since_entry={exit_evaluation['bars_since_entry']}; profit_r={exit_evaluation['profit_r']}"
-    f"{trailing_summary}."
+    f"{trailing_summary}{promotion_summary}."
   )
 
 
