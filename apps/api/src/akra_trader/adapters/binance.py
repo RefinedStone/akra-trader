@@ -63,6 +63,8 @@ from akra_trader.adapters.binance_schema import BackfillSnapshot
 from akra_trader.adapters.binance_schema import CandleCoverage
 from akra_trader.adapters.binance_schema import QualitySnapshot
 from akra_trader.adapters.binance_schema import SyncState
+from akra_trader.adapters.binance_rwa import BinanceRwaMarketDataClient
+from akra_trader.adapters.binance_rwa import is_binance_rwa_symbol
 from akra_trader.adapters.binance_storage import CcxtMarketDataStorageMixin
 
 
@@ -89,6 +91,7 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     historical_candle_limit: int | None = None,
     exchange_batch_limit: int = 500,
     exchange: OhlcvExchange | None = None,
+    rwa_market_data: OhlcvExchange | None = None,
     clock: Callable[[], datetime] | None = None,
   ) -> None:
     self._database_url = database_url
@@ -102,6 +105,9 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     )
     self._exchange_batch_limit = exchange_batch_limit
     self._exchange = exchange or build_ccxt_exchange(venue=venue)
+    self._rwa_market_data = rwa_market_data or (
+      BinanceRwaMarketDataClient() if venue == "binance" else None
+    )
     self._clock = clock or (lambda: datetime.now(UTC))
     self._engine = self._build_engine(database_url)
     metadata.create_all(self._engine)
@@ -563,6 +569,15 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     return tuple(issues)
 
   def _build_instrument(self, symbol: str) -> Instrument:
+    if self._uses_rwa_market_data(symbol):
+      return Instrument(
+        symbol=symbol,
+        venue=self._venue,
+        base_currency=symbol,
+        quote_currency="USD",
+        asset_type=AssetType.STOCK,
+        market_type=MarketType.SPOT,
+      )
     base_currency, quote_currency = symbol.split("/")
     return Instrument(
       symbol=symbol,
@@ -606,11 +621,15 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     started_at = self._clock()
     job_id = self._new_ingestion_job_id()
     try:
-      raw = self._exchange.fetch_ohlcv(
+      fetch_limit = self._resolve_fetch_batch_limit(
+        symbol=symbol,
+        requested_count=self._exchange_batch_limit,
+      )
+      raw = self._fetch_ohlcv(
         symbol=symbol,
         timeframe=timeframe,
         since=self._to_exchange_milliseconds(self._shift_candle_timestamp(coverage.last_timestamp, timeframe, 1)),
-        limit=self._exchange_batch_limit,
+        limit=fetch_limit,
       )
       candles = self._normalize_ohlcv(raw)
       if candles:
@@ -631,7 +650,7 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
         finished_at=self._clock(),
         requested_start_at=self._shift_candle_timestamp(coverage.last_timestamp, timeframe, 1),
         requested_end_at=None,
-        requested_limit=self._exchange_batch_limit,
+        requested_limit=fetch_limit,
         fetched_candle_count=len(candles),
         last_error=None,
       )
@@ -688,8 +707,11 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     fetched_candle_count = 0
     try:
       while cursor <= end_boundary and remaining > 0:
-        batch_limit = min(max(remaining, 1), self._exchange_batch_limit)
-        raw = self._exchange.fetch_ohlcv(
+        batch_limit = self._resolve_fetch_batch_limit(
+          symbol=symbol,
+          requested_count=remaining,
+        )
+        raw = self._fetch_ohlcv(
           symbol=symbol,
           timeframe=timeframe,
           since=self._to_exchange_milliseconds(cursor),
@@ -783,9 +805,12 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
     try:
       while coverage.first_timestamp is not None and coverage.candle_count < target_candle_count:
         remaining = target_candle_count - coverage.candle_count
-        batch_limit = min(max(remaining, 1), self._exchange_batch_limit)
+        batch_limit = self._resolve_fetch_batch_limit(
+          symbol=symbol,
+          requested_count=remaining,
+        )
         start_at = self._shift_candle_timestamp(coverage.first_timestamp, timeframe, -batch_limit)
-        raw = self._exchange.fetch_ohlcv(
+        raw = self._fetch_ohlcv(
           symbol=symbol,
           timeframe=timeframe,
           since=self._to_exchange_milliseconds(start_at),
@@ -881,6 +906,40 @@ class CcxtMarketDataAdapter(CcxtMarketDataStorageMixin, MarketDataPort):
         updated = connection.execute(update(market_candles).where(key_filter).values(**row))
         if updated.rowcount == 0:
           connection.execute(insert(market_candles).values(**row))
+
+  def _fetch_ohlcv(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    since: int | None,
+    limit: int | None,
+  ) -> list[list[float]]:
+    if self._uses_rwa_market_data(symbol):
+      if self._rwa_market_data is None:
+        raise ValueError(f"Binance RWA market data is not configured: {symbol}")
+      return self._rwa_market_data.fetch_ohlcv(
+        symbol=symbol,
+        timeframe=timeframe,
+        since=since,
+        limit=limit,
+      )
+    return self._exchange.fetch_ohlcv(
+      symbol=symbol,
+      timeframe=timeframe,
+      since=since,
+      limit=limit,
+    )
+
+  def _resolve_fetch_batch_limit(self, *, symbol: str, requested_count: int) -> int:
+    batch_limit = min(max(requested_count, 1), self._exchange_batch_limit)
+    if self._uses_rwa_market_data(symbol) and self._rwa_market_data is not None:
+      max_kline_limit = getattr(self._rwa_market_data, "max_kline_limit", batch_limit)
+      batch_limit = min(batch_limit, int(max_kline_limit))
+    return batch_limit
+
+  def _uses_rwa_market_data(self, symbol: str) -> bool:
+    return self._venue == "binance" and is_binance_rwa_symbol(symbol)
 
 
 def _add_months(value: datetime, months: int) -> datetime:

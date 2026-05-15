@@ -745,6 +745,8 @@ class TradingApplication:
         "Market data does not cover the requested end: "
         f"{timestamps[-1].isoformat()} < {requested_end_at.isoformat()}."
       )
+    if _allows_session_calendar_gaps(config):
+      return None
     for previous, current in zip(timestamps, timestamps[1:]):
       expected = _shift_timeframe_timestamp(previous, config.timeframe, 1)
       if current > expected:
@@ -1127,6 +1129,10 @@ def _expected_candle_count(
     return 0
   timeframe_seconds = _timeframe_seconds(timeframe)
   return int((end - start).total_seconds() // timeframe_seconds) + 1
+
+
+def _allows_session_calendar_gaps(config: RunConfig) -> bool:
+  return config.venue == "binance" and any("/" not in symbol for symbol in config.symbols)
 
 
 def _effective_start_at(*, run: RunRecord, data: pd.DataFrame) -> str | None:

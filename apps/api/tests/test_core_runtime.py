@@ -21,6 +21,7 @@ from akra_trader.config import Settings
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import ExecutionPlan
 from akra_trader.domain.models import LlmFunctionLayer
+from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
@@ -89,6 +90,12 @@ class FakeOhlcvExchange:
     if since is not None:
       rows = [row for row in rows if row[0] >= since]
     return rows[: limit or len(rows)]
+
+
+class FakeRwaOhlcvExchange(FakeOhlcvExchange):
+  @property
+  def max_kline_limit(self) -> int:
+    return 300
 
 
 class RecordingVenueExecution:
@@ -455,6 +462,51 @@ def test_binance_sync_endpoint_fetches_and_upserts_ohlcv(tmp_path):
   assert jobs[0].fetched_candle_count == 5
 
 
+def test_binance_sync_fetches_tokenized_stock_rwa_ohlcv(tmp_path):
+  start_at = datetime(2026, 4, 1, tzinfo=UTC)
+  exchange = FakeOhlcvExchange(start_at=start_at, candle_count=12)
+  rwa_exchange = FakeRwaOhlcvExchange(start_at=start_at, candle_count=12)
+  market_data = CcxtMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market.sqlite3'}",
+    tracked_symbols=("QQQon",),
+    default_candle_limit=5,
+    historical_candle_limit=12,
+    exchange_batch_limit=500,
+    exchange=exchange,
+    rwa_market_data=rwa_exchange,
+    clock=lambda: start_at + timedelta(hours=2),
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    runs=InMemoryCoreRepository(),
+  )
+  client = build_application_client(app)
+
+  response = client.post(
+    "/api/market-data/sync",
+    json={
+      "symbol": "QQQon",
+      "timeframe": "5m",
+      "start_at": start_at.isoformat().replace("+00:00", "Z"),
+      "end_at": (start_at + timedelta(minutes=20)).isoformat().replace("+00:00", "Z"),
+      "limit": 500,
+    },
+  )
+
+  assert response.status_code == 200
+  result = response.json()
+  assert result["status"] == "synced"
+  assert result["symbol"] == "QQQon"
+  assert result["candle_count"] == 5
+  assert exchange.calls == []
+  assert rwa_exchange.calls[0]["symbol"] == "QQQon"
+  assert rwa_exchange.calls[0]["limit"] == 300
+  instrument = market_data.list_instruments()[0]
+  assert instrument.asset_type == AssetType.STOCK
+  assert instrument.quote_currency == "USD"
+
+
 def test_market_data_candles_explicit_start_can_return_full_range_without_limit(tmp_path):
   start_at = datetime(2025, 5, 1, tzinfo=UTC)
   candle_count = 6_000
@@ -597,6 +649,44 @@ def test_backtest_backfills_requested_range_before_loading(tmp_path):
   assert run.provenance.market_data.requested_start_at == start_at
   assert run.provenance.market_data.candle_count == 30
   assert len(exchange.calls) == 3
+
+
+def test_backtest_allows_session_calendar_gaps_for_binance_rwa_symbols(tmp_path):
+  start_at = datetime(2026, 5, 1, tzinfo=UTC)
+  exchange = FakeOhlcvExchange(start_at=start_at, candle_count=25)
+  rwa_exchange = FakeRwaOhlcvExchange(start_at=start_at, candle_count=25)
+  for row in rwa_exchange.rows[3:]:
+    row[0] += int(timedelta(minutes=5).total_seconds() * 1000)
+  end_at = datetime.fromtimestamp(rwa_exchange.rows[-1][0] / 1000, tz=UTC)
+  market_data = CcxtMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market.sqlite3'}",
+    tracked_symbols=("QQQon",),
+    exchange_batch_limit=10,
+    exchange=exchange,
+    rwa_market_data=rwa_exchange,
+    clock=lambda: end_at + timedelta(hours=1),
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    runs=InMemoryCoreRepository(),
+  )
+
+  run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="QQQon",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=5,
+    parameters={"short_window": 2, "long_window": 3},
+    start_at=start_at,
+    end_at=end_at,
+  )
+
+  assert run.status.value == "completed"
+  assert run.provenance.market_data is not None
+  assert run.provenance.market_data.candle_count == 25
 
 
 def test_backtest_fails_when_requested_range_remains_partial(tmp_path):
