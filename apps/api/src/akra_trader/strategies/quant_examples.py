@@ -466,6 +466,31 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Maximum notional allocation for micro probe entries.",
           "description_ko": "프로브 진입의 최대 포지션 비중입니다. 기본값 0.001은 자산의 0.1%만 사용합니다.",
         },
+        "entry_micro_probe_min_close_position": {
+          "type": "number",
+          "default": 0.80,
+          "minimum": 0,
+          "maximum": 1,
+          "semantic_hint": "Minimum candle close position required for micro probe entries.",
+          "description_ko": "프로브 진입에 필요한 캔들 마감 위치입니다. 기본값 0.80은 봉의 저가~고가 구간 상위 20% 마감을 요구합니다.",
+        },
+        "entry_micro_probe_min_atr_pct": {
+          "type": "number",
+          "default": 0.25,
+          "minimum": 0,
+          "maximum": 5,
+          "unit": "%",
+          "semantic_hint": "Minimum ATR percentage required for micro probe entries.",
+          "description_ko": "프로브 진입에 필요한 최소 ATR 비율입니다. 너무 조용한 장의 작은 반등은 수수료를 이기기 어렵기 때문에 제외합니다.",
+        },
+        "entry_micro_probe_max_rsi_rebound": {
+          "type": "number",
+          "default": 6.0,
+          "minimum": 0,
+          "maximum": 100,
+          "semantic_hint": "Maximum one-bar RSI increase allowed for micro probe entries.",
+          "description_ko": "프로브 진입에서 허용할 RSI14 전봉 대비 최대 상승폭입니다. 과도하게 늦은 반등 추격을 줄입니다.",
+        },
         "entry_min_rsi_rebound": {
           "type": "number",
           "default": 1.0,
@@ -565,6 +590,14 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Profit target in R for tiny micro probe entries.",
           "description_ko": "프로브 진입의 초기 위험 R 기준 익절 배수입니다.",
         },
+        "exit_micro_probe_stop_atr_multiple": {
+          "type": "number",
+          "default": 3.0,
+          "minimum": 0.1,
+          "maximum": 10,
+          "semantic_hint": "ATR stop multiple used only for micro probe entries.",
+          "description_ko": "프로브 진입에만 적용되는 ATR 손절 배수입니다. full-size ATR 손절 배수와 분리됩니다.",
+        },
         "exit_hold_profit_with_trailing": {
           "type": "boolean",
           "default": False,
@@ -606,12 +639,12 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "exit_micro_probe_time_stop_bars": {
           "type": "integer",
-          "default": 72,
+          "default": 48,
           "minimum": 1,
           "maximum": 288,
           "unit": "bars",
           "semantic_hint": "Maximum bars to hold tiny micro probe entries.",
-          "description_ko": "프로브 진입을 보유할 최대 봉 수입니다. 기본값은 72봉입니다.",
+          "description_ko": "프로브 진입을 보유할 최대 봉 수입니다. 기본값은 48봉입니다.",
         },
         "cooldown_after_stop_bars": {
           "type": "integer",
@@ -703,7 +736,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         operator_notes=(
           "BUY defaults to RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI30 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
           "Standard late rebounds more than 2.2 ATR above the recent low require either an MA20 reclaim without fresh lower lows or a deep washout recovery profile.",
-          "Lower-quality RSI rebounds can be sampled through tiny 0.1% micro probes with a shorter 0.5R target and 72-bar time stop.",
+          "Lower-quality RSI rebounds can be sampled through tiny 0.1% micro probes only after a stricter close-location/volatility quality gate, with a separate 3.0 ATR stop, 0.5R target, and 48-bar time stop.",
           "A separate capitulation rebound sleeve can buy below MA60 only when RSI/ATR/slope distances sit in a narrow post-capitulation recovery band.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
@@ -1224,6 +1257,27 @@ def _rsi14_oversold_reversal_entry_evaluation(
   micro_probe_enabled = bool(
     context.state.parameters.get("entry_enable_micro_probe", True)
   )
+  micro_probe_min_close_position = _clamped_parameter(
+    context,
+    "entry_micro_probe_min_close_position",
+    0.80,
+    minimum=0.0,
+    maximum=1.0,
+  )
+  micro_probe_min_atr_pct = _clamped_parameter(
+    context,
+    "entry_micro_probe_min_atr_pct",
+    0.25,
+    minimum=0.0,
+    maximum=5.0,
+  )
+  micro_probe_max_rsi_rebound = _clamped_parameter(
+    context,
+    "entry_micro_probe_max_rsi_rebound",
+    6.0,
+    minimum=0.0,
+    maximum=100.0,
+  )
   entry_trigger_mode = str(
     context.state.parameters.get("entry_trigger_mode", "rsi_turn")
   )
@@ -1455,12 +1509,30 @@ def _rsi14_oversold_reversal_entry_evaluation(
     and not raw_structural_downtrend_block
   )
   micro_probe_trend_filter = above_ma20 or above_ma60 or ma20_slope_non_negative
+  micro_probe_close_quality = (
+    close_position is not None and close_position >= micro_probe_min_close_position
+  )
+  micro_probe_volatility_quality = (
+    atr_pct is not None and atr_pct >= micro_probe_min_atr_pct
+  )
+  micro_probe_rsi_quality = (
+    rsi_rebound_delta is not None
+    and rsi_rebound_delta >= min_rsi_rebound
+    and rsi_rebound_delta <= micro_probe_max_rsi_rebound
+  )
+  micro_probe_quality = (
+    rsi_crossed_oversold_recent
+    and micro_probe_close_quality
+    and micro_probe_volatility_quality
+    and micro_probe_rsi_quality
+  )
   micro_probe_matched = (
     micro_probe_enabled
     and configured_trigger_matched
     and not standard_full_entry_matched
     and not capitulation_rebound_matched
     and micro_probe_trend_filter
+    and micro_probe_quality
   )
   entry_trigger_matched = (
     quality_configured_trigger_matched
@@ -1519,6 +1591,17 @@ def _rsi14_oversold_reversal_entry_evaluation(
       "quality_configured_trigger_matched": quality_configured_trigger_matched,
       "standard_full_entry_matched": standard_full_entry_matched,
       "trend_filter": micro_probe_trend_filter,
+      "quality_gate": micro_probe_quality,
+      "rsi_crossed_oversold_recent": rsi_crossed_oversold_recent,
+      "close_quality": micro_probe_close_quality,
+      "volatility_quality": micro_probe_volatility_quality,
+      "rsi_quality": micro_probe_rsi_quality,
+      "close_position": close_position,
+      "entry_micro_probe_min_close_position": micro_probe_min_close_position,
+      "atr_pct": atr_pct,
+      "entry_micro_probe_min_atr_pct": micro_probe_min_atr_pct,
+      "rsi_rebound_delta": rsi_rebound_delta,
+      "entry_micro_probe_max_rsi_rebound": micro_probe_max_rsi_rebound,
       "above_ma20": above_ma20,
       "above_ma60": above_ma60,
       "ma20_slope_non_negative": ma20_slope_non_negative,
@@ -1649,6 +1732,8 @@ def _rsi14_oversold_reversal_entry_evaluation(
       failed_trigger_parts.append("rsi_turn")
     if configured_trigger_matched and not extended_standard_rebound_quality:
       failed_trigger_parts.append("extended_standard_rebound_quality")
+    if micro_probe_enabled and configured_trigger_matched and not micro_probe_quality:
+      failed_trigger_parts.append("micro_probe_quality")
     if capitulation_rebound_enabled:
       failed_trigger_parts.append("capitulation_rebound")
     if micro_probe_enabled:
@@ -1705,8 +1790,8 @@ def _rsi14_micro_probe_execution_plan(context: StrategyDecisionContext) -> Execu
   )
   stop_multiple = _clamped_parameter(
     context,
-    "atr_stop_multiple",
-    3.45,
+    "exit_micro_probe_stop_atr_multiple",
+    3.0,
     minimum=0.1,
     maximum=10.0,
   )
@@ -1816,7 +1901,7 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
     time_stop_bars = _mapping_int_parameter(
       context.state.parameters,
       "exit_micro_probe_time_stop_bars",
-      72,
+      48,
       minimum=1,
       maximum=288,
     )

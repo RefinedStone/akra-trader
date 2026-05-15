@@ -11,7 +11,7 @@ Tune `rsi14_oversold_reversal_v1` so the RSI oversold rebound strategy keeps win
 - Strategy: `RSI14 과매도 탈출 반등 매수`
 - Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.60.
 - Standard late rebound guard: when a standard entry is more than 2.2 ATR above the recent low, it must either reclaim MA20 without fresh lower lows or match a deep washout recovery profile.
-- Micro probe overlay: lower-quality RSI rebounds that miss full-size entry quality can be sampled with a 0.1% max position, 0.5R target, and 72-bar time stop.
+- Micro probe overlay: lower-quality RSI rebounds that miss full-size entry quality can be sampled with a 0.1% max position only after a stricter close-location/volatility gate, with a separate 3.0 ATR stop, 0.5R target, and 48-bar time stop.
 - Secondary entry: a tightly filtered MA60-below capitulation rebound sleeve for deep RSI washouts in a narrow RSI/ATR/slope recovery band.
 - Risk/exit: max position fraction 1.0, ATR stop 3.45, profit target 1.5R, no-profit time stop 288 bars, stop cooldown 20 bars.
 - 1-year validation run: `7fa5c24a-b306-4268-9ec2-dcd5855c3eca`
@@ -32,6 +32,34 @@ Using the same current default parameters:
 | 2023-05-13 to 2024-05-13 | `2ea1fabb-3c9c-47d5-a0a9-5eb0e1762d0b` | +4.91% | 55.43% | 184 | 1.02% | Clears the monthly-12 average trade-count target. |
 | 2024-05-13 to 2025-05-13 | `d047432c-6123-4860-8bd1-e9f3402496e3` | +5.48% | 52.91% | 327 | 2.03% | Fixes the prior weak-return year while clearing the gates. |
 | 2025-05-13 to 2026-05-13 | `7fa5c24a-b306-4268-9ec2-dcd5855c3eca` | +11.65% | 51.52% | 363 | 2.18% | Clears the gates, but with a thin win-rate margin. |
+
+## Micro Probe Profitability Review
+
+The original 0.1% micro layer produced many trades but did not generate standalone profit after entry and exit costs:
+
+| Window | Micro trades | Micro net PnL | Micro win rate | Full-size trades | Full-size net PnL |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2023-05-13 to 2024-05-13 | 180 | -5.83 USDT | 40.56% | 4 | +496.48 USDT |
+| 2024-05-13 to 2025-05-13 | 314 | -11.52 USDT | 42.68% | 13 | +559.86 USDT |
+| 2025-05-13 to 2026-05-13 | 345 | -11.94 USDT | 37.68% | 18 | +1,176.78 USDT |
+
+The first micro-only hardening pass added:
+
+- `entry_micro_probe_min_close_position=0.80`
+- `entry_micro_probe_min_atr_pct=0.25`
+- `entry_micro_probe_max_rsi_rebound=6.0`
+- `exit_micro_probe_stop_atr_multiple=3.0`
+- `exit_micro_probe_time_stop_bars=48`
+
+API validation after the hardening pass:
+
+| Window | Run | Return | Win rate | Trades | Micro trades | Micro net PnL | Full-size trades | Full-size net PnL |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2023-05-13 to 2024-05-13 | `a62600aa-07a6-4b62-8c49-2d105e033def` | +3.55% | 70.00% | 30 | 25 | -0.04 USDT | 5 | +355.29 USDT |
+| 2024-05-13 to 2025-05-13 | `4d9f18bd-489e-49bd-a306-9b2898555696` | +2.30% | 59.77% | 87 | 65 | -1.30 USDT | 22 | +231.68 USDT |
+| 2025-05-13 to 2026-05-13 | `2f558440-5bb2-4a80-bbef-2661fb0517a0` | +9.46% | 64.62% | 65 | 37 | -0.58 USDT | 28 | +947.01 USDT |
+
+Interpretation: the hardening pass removes most of the cost drag and raises micro win rate, but it still does not make the micro layer a meaningful standalone profit engine. Increasing micro size is therefore not justified by the current evidence. Treat micro as a tiny signal-sampling layer unless a later out-of-sample test shows positive micro net PnL across all adjacent 1-year windows.
 
 ## Verified Monthly Samples
 
