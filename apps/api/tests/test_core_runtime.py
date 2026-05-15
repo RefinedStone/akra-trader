@@ -27,6 +27,7 @@ from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionContext
 from akra_trader.domain.models import StrategyExecutionState
 from akra_trader.domain.services import apply_signal
+from akra_trader.domain.services import build_equity_point
 from akra_trader.main import create_app
 from akra_trader.runtime import StateCache
 from akra_trader.strategies.composable import RsiFeature
@@ -164,6 +165,11 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["cooldown_after_stop_bars"]["default"] == 20
   assert reversal_strategy["parameter_schema"]["max_position_fraction"]["default"] == 1.0
   assert reversal_strategy["parameter_schema"]["atr_stop_multiple"]["default"] == 3.45
+  assert reversal_strategy["parameter_schema"]["execution_market"]["default"] == "spot"
+  assert reversal_strategy["parameter_schema"]["execution_market"]["enum"] == ["spot", "futures"]
+  assert reversal_strategy["parameter_schema"]["execution_leverage"]["default"] == 1.0
+  assert reversal_strategy["parameter_schema"]["execution_maintenance_margin_rate"]["default"] == 0.005
+  assert reversal_strategy["parameter_schema"]["execution_funding_rate_8h"]["default"] == 0.0
   assert (
     "RSI14 과매도 탈출"
     in reversal_strategy["parameter_schema"]["rsi_window"]["description_ko"]
@@ -829,6 +835,65 @@ def test_buy_execution_stores_fixed_stop_loss_and_take_profit_prices():
   assert snapshot.position_take_profit_price == pytest.approx(125.0)
   assert snapshot.position_high_watermark_price == pytest.approx(108.0)
   assert snapshot.position_trailing_stop_price is None
+
+
+def test_futures_execution_applies_leverage_fees_and_unrealized_pnl():
+  opened_at = datetime(2026, 5, 11, tzinfo=UTC)
+  closed_at = opened_at + timedelta(hours=8)
+
+  cash, position, _, _, _ = apply_signal(
+    run_id="run-1",
+    instrument_id="binance:BTC/USDT",
+    signal=SignalDecision(timestamp=opened_at, action=SignalAction.BUY),
+    execution=ExecutionPlan(size_fraction=0.5),
+    market_price=100.0,
+    position=None,
+    cash=10_000.0,
+    fee_rate=0.0004,
+    slippage_bps=0.0,
+    execution_market="futures",
+    leverage=5.0,
+    maintenance_margin_rate=0.005,
+  )
+
+  assert position is not None
+  assert position.market_type == "futures"
+  assert position.leverage == pytest.approx(5.0)
+  assert position.quantity == pytest.approx(250.0)
+  assert position.liquidation_price == pytest.approx(80.5)
+  assert cash == pytest.approx(9_990.0)
+
+  equity = build_equity_point(
+    timestamp=opened_at,
+    cash=cash,
+    position=position,
+    market_price=110.0,
+  )
+
+  assert equity.exposure == pytest.approx(27_500.0)
+  assert equity.equity == pytest.approx(12_490.0)
+
+  cash, position, _, _, closed_trade = apply_signal(
+    run_id="run-1",
+    instrument_id="binance:BTC/USDT",
+    signal=SignalDecision(timestamp=closed_at, action=SignalAction.SELL),
+    execution=ExecutionPlan(),
+    market_price=110.0,
+    position=position,
+    cash=cash,
+    fee_rate=0.0004,
+    slippage_bps=0.0,
+    execution_market="futures",
+    leverage=5.0,
+    funding_rate_8h=0.0001,
+  )
+
+  assert position is not None
+  assert position.is_open is False
+  assert closed_trade is not None
+  assert closed_trade.fee_paid == pytest.approx(13.5)
+  assert closed_trade.pnl == pytest.approx(2486.5)
+  assert cash == pytest.approx(12_476.5)
 
 
 def test_rsi14_oversold_reversal_buys_escape_breakout():

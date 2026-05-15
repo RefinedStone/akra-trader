@@ -548,6 +548,7 @@ class TradingApplication:
         cache=cache,
         market_price=float(latest["close"]),
         market_high=float(latest["high"]),
+        market_low=float(latest["low"]),
       )
       self._record_llm_judgement_trace(run=run, decision=reviewed)
 
@@ -838,6 +839,7 @@ class TradingApplication:
         cache=cache,
         market_price=float(latest["close"]),
         market_high=float(latest["high"]),
+        market_low=float(latest["low"]),
       )
       self._record_llm_judgement_trace(run=run, decision=reviewed)
       processed += 1

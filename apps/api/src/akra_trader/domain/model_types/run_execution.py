@@ -254,6 +254,8 @@ class StrategyExecutionState:
   position_take_profit_price: float | None = None
   position_high_watermark_price: float | None = None
   position_trailing_stop_price: float | None = None
+  position_market_type: str = "spot"
+  position_leverage: float = 1.0
   parameters: dict[str, Any] = field(default_factory=dict)
 
 
@@ -317,6 +319,11 @@ class Position:
   take_profit_price: float | None = None
   high_watermark_price: float | None = None
   trailing_stop_price: float | None = None
+  market_type: str = "spot"
+  leverage: float = 1.0
+  maintenance_margin_rate: float = 0.0
+  liquidation_price: float | None = None
+  funding_rate_8h: float = 0.0
 
   @property
   def is_open(self) -> bool:

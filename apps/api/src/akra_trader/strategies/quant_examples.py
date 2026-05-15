@@ -653,6 +653,38 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "semantic_hint": "Compatibility take-profit distance stored on the position.",
           "description_ko": "포지션에 저장되는 보조 익절 기준입니다. 실제 청산은 ATR손절, R배수, 시간청산, 선택형 RSI/MA/트레일링 조건을 사용합니다.",
         },
+        "execution_market": {
+          "type": "string",
+          "default": "spot",
+          "enum": ["spot", "futures"],
+          "semantic_hint": "Execution accounting model used by the backtest runtime.",
+          "description_ko": "백테스트 체결 회계 방식입니다. futures는 롱 선물 레버리지, 펀딩비, 유지증거금 기반 청산가를 반영합니다.",
+        },
+        "execution_leverage": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 1,
+          "maximum": 20,
+          "unit": "x",
+          "semantic_hint": "Leverage multiplier for futures accounting.",
+          "description_ko": "선물 백테스트에서 사용할 레버리지 배수입니다. spot에서는 1.0으로 처리합니다.",
+        },
+        "execution_maintenance_margin_rate": {
+          "type": "number",
+          "default": 0.005,
+          "minimum": 0,
+          "maximum": 0.1,
+          "semantic_hint": "Maintenance margin rate used for long liquidation checks.",
+          "description_ko": "롱 선물 청산가 계산에 사용할 유지증거금 비율입니다. 기본값 0.005는 0.5%입니다.",
+        },
+        "execution_funding_rate_8h": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": -0.01,
+          "maximum": 0.01,
+          "semantic_hint": "Flat funding rate charged every 8 hours for futures estimates.",
+          "description_ko": "선물 추정 백테스트에 사용할 8시간당 고정 펀딩비율입니다. 양수는 롱이 지불하고 음수는 롱이 수취합니다.",
+        },
       },
       description=(
         "RSI14 oversold escape rebound setup: RSI recently oversold, RSI turns up from the oversold threshold, "
@@ -1751,13 +1783,20 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
     minimum=0.0,
     maximum=0.05,
   )
-  position_notional_fraction = (
+  position_margin_equivalent_value = (
     (context.state.position_size * close)
-    / ((context.state.position_size * close) + context.state.cash)
+    / max(context.state.position_leverage, 1.0)
+    if context.state.position_market_type == "futures"
+    else context.state.position_size * close
+  ) if close is not None and close > 0 and context.state.position_size > 0 else None
+  position_notional_fraction = (
+    position_margin_equivalent_value
+    / (position_margin_equivalent_value + context.state.cash)
     if close is not None
     and close > 0
     and context.state.position_size > 0
-    and ((context.state.position_size * close) + context.state.cash) > 0
+    and position_margin_equivalent_value is not None
+    and (position_margin_equivalent_value + context.state.cash) > 0
     else None
   )
   micro_probe_position = (

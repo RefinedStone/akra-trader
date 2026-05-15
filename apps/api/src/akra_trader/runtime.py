@@ -234,6 +234,8 @@ class StateCache:
         active_position.high_watermark_price if active_position else None
       ),
       position_trailing_stop_price=active_position.trailing_stop_price if active_position else None,
+      position_market_type=active_position.market_type if active_position else "spot",
+      position_leverage=active_position.leverage if active_position else 1.0,
       parameters=parameters,
     )
 
@@ -305,18 +307,57 @@ class ExecutionEngine:
     cache: StateCache,
     market_price: float,
     market_high: float | None = None,
+    market_low: float | None = None,
   ) -> StrategyDecisionEnvelope:
+    execution_market = _execution_market(config.parameters)
+    leverage = _execution_leverage(config.parameters)
+    maintenance_margin_rate = _execution_maintenance_margin_rate(config.parameters)
+    funding_rate_8h = _execution_funding_rate_8h(config.parameters)
+    execution_price = market_price
+    liquidation_price = _liquidation_price_hit(
+      cache.position,
+      market_low=market_low,
+      execution_market=execution_market,
+      leverage=leverage,
+    )
+    if liquidation_price is not None:
+      decision = StrategyDecisionEnvelope(
+        signal=SignalDecision(
+          timestamp=decision.context.timestamp,
+          action=SignalAction.SELL,
+          confidence=1.0,
+          tags=("futures", "liquidation"),
+          reason="futures_liquidation",
+        ),
+        rationale="Futures liquidation guard closed the long position before strategy exit.",
+        context=decision.context,
+        execution=ExecutionPlan(tags=("futures_liquidation",)),
+        trace={
+          **decision.trace,
+          "futures_liquidation": {
+            "liquidation_price": liquidation_price,
+            "market_low": market_low,
+            "leverage": leverage,
+            "maintenance_margin_rate": maintenance_margin_rate,
+          },
+        },
+      )
+      execution_price = liquidation_price
     reviewed = self.review_decision(decision)
     cash, position, order, fill, closed_trade = apply_signal(
       run_id=config.run_id,
       instrument_id=cache.instrument_id,
       signal=reviewed.signal,
       execution=reviewed.execution,
-      market_price=market_price,
+      market_price=execution_price,
       position=cache.position,
       cash=cache.cash,
       fee_rate=config.fee_rate,
       slippage_bps=config.slippage_bps,
+      execution_market=execution_market,
+      leverage=leverage,
+      maintenance_margin_rate=maintenance_margin_rate,
+      funding_rate_8h=funding_rate_8h,
     )
     cache.apply(cash=cash, position=position)
     cache.mark_price(market_price, market_high=market_high)
@@ -555,3 +596,56 @@ def _finite_float(value: object) -> float | None:
   except (TypeError, ValueError):
     return None
   return number if isfinite(number) else None
+
+
+def _execution_market(parameters: dict) -> str:
+  value = str(parameters.get("execution_market", "spot")).strip().lower()
+  leverage = _execution_leverage(parameters)
+  if value == "futures" or leverage > 1.0:
+    return "futures"
+  return "spot"
+
+
+def _execution_leverage(parameters: dict) -> float:
+  try:
+    value = float(parameters.get("execution_leverage", 1.0))
+  except (TypeError, ValueError):
+    return 1.0
+  return max(value, 1.0)
+
+
+def _execution_maintenance_margin_rate(parameters: dict) -> float:
+  try:
+    value = float(parameters.get("execution_maintenance_margin_rate", 0.005))
+  except (TypeError, ValueError):
+    return 0.005
+  return max(value, 0.0)
+
+
+def _execution_funding_rate_8h(parameters: dict) -> float:
+  try:
+    return float(parameters.get("execution_funding_rate_8h", 0.0))
+  except (TypeError, ValueError):
+    return 0.0
+
+
+def _liquidation_price_hit(
+  position: Position | None,
+  *,
+  market_low: float | None,
+  execution_market: str,
+  leverage: float,
+) -> float | None:
+  if (
+    execution_market != "futures"
+    or leverage <= 1.0
+    or position is None
+    or not position.is_open
+    or position.liquidation_price is None
+    or market_low is None
+  ):
+    return None
+  low = _finite_float(market_low)
+  if low is None:
+    return None
+  return position.liquidation_price if low <= position.liquidation_price else None

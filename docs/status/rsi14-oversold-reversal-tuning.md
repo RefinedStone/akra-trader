@@ -188,6 +188,31 @@ Using the same current default parameters:
   - A 2023-2024 local grid over RSI threshold, trend mode, close-position, low-proximity, and target R was stopped after it proved too slow.
   - Keep future searches narrow or implement a vectorized simulator before doing broad high-frequency exploration.
 
+## Futures Leverage Estimates
+
+The backtest runtime now supports a futures accounting estimate through strategy parameters: `execution_market=futures`, `execution_leverage`, `execution_maintenance_margin_rate`, and `execution_funding_rate_8h`.
+
+Assumptions for the first BTC/USDT futures checks:
+
+- Symbol/timeframe: `BTC/USDT`, `5m`
+- Initial cash: `10,000 USDT`
+- Futures taker fee: `fee_rate=0.0004` per side
+- Slippage: `5 bps` per side
+- Funding: `execution_funding_rate_8h=0.0001`; positive means the long pays 0.01% per 8 hours.
+- Maintenance margin: `execution_maintenance_margin_rate=0.005`
+- Liquidation model: isolated long approximation, `entry * (1 - 1/leverage + maintenance_margin_rate)`.
+
+| Leverage | Window | Run | Profit | Return | Win rate | Trades | Max drawdown | Liquidations |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| x5 | 2023-05-13 to 2024-05-13 | `469f15cb-8654-49ca-974a-e28149707b15` | +2,783.56 USDT | +27.84% | 57.07% | 184 | 4.96% | 0 |
+| x5 | 2024-05-13 to 2025-05-13 | `8d0f2da1-851d-4f4e-a690-29785a940189` | +3,563.48 USDT | +35.63% | 56.57% | 327 | 9.53% | 0 |
+| x5 | 2025-05-13 to 2026-05-13 | `72353caa-7f80-4a6a-8bc4-2531497d1761` | +8,474.99 USDT | +84.75% | 56.20% | 363 | 9.33% | 0 |
+| x10 | 2023-05-13 to 2024-05-13 | `523d7c87-7227-4fc2-94c0-36a088401eef` | +6,106.98 USDT | +61.07% | 57.07% | 184 | 9.62% | 0 |
+| x10 | 2024-05-13 to 2025-05-13 | `4afd4ba9-8f91-47ec-9aef-95a94d280d0e` | +7,503.09 USDT | +75.03% | 56.57% | 327 | 18.48% | 0 |
+| x10 | 2025-05-13 to 2026-05-13 | `feb51d55-771a-4421-9df3-955f00f731c8` | +22,466.47 USDT | +224.66% | 56.20% | 363 | 17.89% | 0 |
+
+These are estimates, not exchange-perfect futures replays. The model uses flat funding and a simplified isolated liquidation threshold; actual funding history, mark price, insurance/liquidation fees, tiered maintenance margin, and order-book depth are not included.
+
 ## Residual Weakness
 
 The current default clears the 1-year win-rate, positive-return, and average monthly trade-count gates across three adjacent 1-year windows and has six positive 1-month samples. The weakest remaining evidence is that the 2025-2026 full-year win rate is still close to the gate at 51.52%, several monthly samples have win rates below 51%, and the 2023-06 single-month sample has 11 trades. Future work should improve monthly consistency without increasing the micro probe size or loosening the capitulation sleeve.
