@@ -9,19 +9,20 @@ Tune `rsi14_oversold_reversal_v1` so the RSI oversold rebound strategy keeps win
 ## Current Default
 
 - Strategy: `RSI14 과매도 탈출 반등 매수`
-- Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.60.
+- Entry: RSI14 recent minimum <= 30, RSI turn rebound trigger, one-bar RSI rebound <= 10, close above MA60 trend filter, close position >= 0.58.
 - Standard late rebound guard: when a standard entry is more than 2.2 ATR above the recent low, it must either reclaim MA20 without fresh lower lows or match a deep washout recovery profile.
 - Micro probe overlay: lower-quality RSI rebounds that miss full-size entry quality can be sampled with a 0.1% max position only after a stricter close-location/volatility gate, with a separate 3.0 ATR stop, 0.5R target, and 48-bar time stop.
+- Scale-in: enabled only when an existing position is already profitable by at least 0.25R and a fresh full-size signal appears; losing positions are not averaged down.
 - Secondary entry: a tightly filtered MA60-below capitulation rebound sleeve for deep RSI washouts in a narrow RSI/ATR/slope recovery band.
-- Risk/exit: max position fraction 1.0, ATR stop 3.45, profit target 1.5R, no-profit time stop 288 bars, stop cooldown 20 bars.
-- 1-year validation run: `7fa5c24a-b306-4268-9ec2-dcd5855c3eca`
+- Risk/exit: max position fraction 1.0, ATR stop 3.0, profit target 2.0R, no-profit time stop 288 bars, stop cooldown 20 bars.
+- 1-year validation run: `07f9a4ae-ccf8-412b-ad17-805aa343f04a`
   - Window: `2025-05-13T00:00:00Z` to `2026-05-13T00:00:00Z`
   - Data: 105,121 5m candles, no market data issues
-  - Return: +11.65%
-  - Win rate: 51.52%
-  - Trades: 363
-  - Average trades per month: 30.3
-  - Max drawdown: 2.18%
+  - Return: +8.77%
+  - Win rate: 60.00%
+  - Trades: 65
+  - Average trades per month: 5.4
+  - Max drawdown: 6.64%
 
 ## Verified 1-Year Samples
 
@@ -29,9 +30,9 @@ Using the same current default parameters:
 
 | Window | Run | Return | Win rate | Trades | Max drawdown | Note |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
-| 2023-05-13 to 2024-05-13 | `2ea1fabb-3c9c-47d5-a0a9-5eb0e1762d0b` | +4.91% | 55.43% | 184 | 1.02% | Clears the monthly-12 average trade-count target. |
-| 2024-05-13 to 2025-05-13 | `d047432c-6123-4860-8bd1-e9f3402496e3` | +5.48% | 52.91% | 327 | 2.03% | Fixes the prior weak-return year while clearing the gates. |
-| 2025-05-13 to 2026-05-13 | `7fa5c24a-b306-4268-9ec2-dcd5855c3eca` | +11.65% | 51.52% | 363 | 2.18% | Clears the gates, but with a thin win-rate margin. |
+| 2023-05-13 to 2024-05-13 | `3b6939ff-7d8a-4dc9-8527-4251a5be8672` | +5.13% | 70.00% | 30 | 2.38% | Full-size 5 trades, micro 25 trades. |
+| 2024-05-13 to 2025-05-13 | `db9d3740-3948-4709-bc9f-5f1b2c080ac9` | +3.77% | 57.95% | 88 | 3.69% | Full-size increased from 22 to 23 trades by lowering close-position from 0.60 to 0.58. |
+| 2025-05-13 to 2026-05-13 | `07f9a4ae-ccf8-412b-ad17-805aa343f04a` | +8.77% | 60.00% | 65 | 6.64% | Full-size 28 trades, micro 37 trades. |
 
 ## Micro Probe Profitability Review
 
@@ -61,9 +62,21 @@ API validation after the hardening pass:
 
 Interpretation: the hardening pass removes most of the cost drag and raises micro win rate, but it still does not make the micro layer a meaningful standalone profit engine. Increasing micro size is therefore not justified by the current evidence. Treat micro as a tiny signal-sampling layer unless a later out-of-sample test shows positive micro net PnL across all adjacent 1-year windows.
 
-## Verified Monthly Samples
+## Full-Size Reward/Risk Retune
 
-Using the same current default parameters:
+The latest full-size pass changed the default from 3.45 ATR stop / 1.5R target to 3.0 ATR stop / 2.0R target, then lowered the standard rebound candle close-position gate from 0.60 to 0.58. This adds one full-size 2024-2025 trade without admitting the lower-quality 2025-2026 trade that appears at 0.57.
+
+| Window | Return | Win rate | Trades | Full-size trades | Full-size net PnL | Micro net PnL |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2023-05-13 to 2024-05-13 | +5.13% | 70.00% | 30 | 5 | +550.20 USDT | +0.21 USDT |
+| 2024-05-13 to 2025-05-13 | +3.77% | 57.95% | 88 | 23 | +584.80 USDT | -0.65 USDT |
+| 2025-05-13 to 2026-05-13 | +8.77% | 60.00% | 65 | 28 | +1,139.88 USDT | -0.22 USDT |
+
+Scale-in support is implemented and defaults on, but these three 1-year default runs had exactly two orders per closed trade, so no profitable scale-in actually fired in this validation set. Keep it as a guarded capability rather than counting it as proven return contribution.
+
+## Historical Monthly Samples
+
+These monthly samples were produced before the latest full-size reward/risk retune. Rerun the month set before using them as current-default evidence.
 
 | Window | Run | Return | Win rate | Trades | Note |
 | --- | --- | ---: | ---: | ---: | --- |
@@ -146,11 +159,11 @@ Using the same current default parameters:
 - Close-position trade expansion:
   - `entry_min_close_position=0.70`: 2023-2024 +3.74% / 75.00% / 4 trades; 2024-2025 +3.23% / 54.17% / 24 trades; 2025-2026 +9.09% / 60.00% / 25 trades.
   - `entry_min_close_position=0.65`: 2023-2024 +3.39% / 80.00% / 5 trades; 2024-2025 +3.45% / 54.17% / 24 trades; 2025-2026 +9.60% / 61.54% / 26 trades.
-  - `entry_min_close_position=0.60`: chosen current default because it increases trades to 6 / 25 / 28 across the three 1-year windows while keeping every 1-year win rate above 51%.
+  - `entry_min_close_position=0.60`: previously chosen because it increased trades to 6 / 25 / 28 across the three 1-year windows while keeping every 1-year win rate above 51%. Later superseded by 0.58 after the full-size reward/risk retune.
   - `entry_min_close_position=0.50`: 2025-2026 had more trades at 32 but return fell to +8.72%; not chosen.
   - `entry_min_close_position=0.45`: rejected because 2024-2025 became -0.59% with 50.00% win rate despite 28 trades.
 - Late-guard expansion attempts:
-  - `entry_enable_early_reversal=true`, `entry_trigger_mode=either` after the late rebound guard produced the same 1-year results as current default: 2023-2024 +2.13% / 66.67% / 6 trades; 2024-2025 +2.90% / 52.00% / 25 trades; 2025-2026 +11.26% / 60.71% / 28 trades.
+  - `entry_enable_early_reversal=true`, `entry_trigger_mode=either` after the late rebound guard produced the same 1-year results as the then-current default: 2023-2024 +2.13% / 66.67% / 6 trades; 2024-2025 +2.90% / 52.00% / 25 trades; 2025-2026 +11.26% / 60.71% / 28 trades.
   - `entry_trend_filter_mode=loose` after the late rebound guard made 2023-2024 -32.68%, 35.00% win rate, 140 trades.
   - `entry_trend_filter_mode=loose`, tighter low-proximity variants in 2023-2024 still failed: close-position 0.75 / low-proximity 1.5 ATR was -3.70% with 6 trades, and low-proximity 1.8 ATR was -6.89% with 20 trades.
   - Rejected because early/either adds no trades and loose trend filtering adds many low-quality downtrend trades.
@@ -185,13 +198,13 @@ Using the same current default parameters:
   - `exit_profit_r_multiple=2.0` improved 2025-2026 to +12.95% / 51.30% / 347 trades, but 2024-2025 dropped to +0.88% with 4.42% max drawdown, so it is not stable enough as a default.
   - Intermediate 2024-2025 checks also failed to beat the 1.5R default: 1.6R +1.56%, 1.7R -0.77%, 1.8R -0.03%, 1.9R +0.63%.
   - Trailing-hold variants improved 2025-2026 return but broke the win-rate gate: 1.5R activation / 1.2 ATR trail returned +9.91% with 45.24% win rate; 1.5R / 2.0 ATR returned +11.85% with 38.04% win rate; 2R target plus 2R trailing returned +14.40% with 38.04% win rate.
-  - Keep 1.5R fixed profit as the default until an exit model can improve 2024-2025 without sacrificing the 51% annual win-rate gate.
+  - At that stage, 1.5R stayed default because 2.0R hurt 2024-2025 too much. This was superseded after micro hardening and full-size retuning made the 3.0 ATR / 2.0R combination acceptable.
 - ATR stop sizing refinement:
   - 2024-2025 trade decomposition showed the 0.1% micro layer was almost flat (`303` micro trades, -$7.49), while the full-size layer drove the return (`13` larger trades, +$425.17). The next lever was therefore full-size ATR risk sizing rather than adding more micro trades.
   - `atr_stop_multiple=2.5`: 2023-2024 +4.36% / 49.48% / 192 trades; 2024-2025 +4.43% / 48.76% / 363 trades; 2025-2026 +12.65% / 44.64% / 392 trades. Rejected because win rate fell below 51% in all three windows.
   - `atr_stop_multiple=3.0`: 2023-2024 +4.57% / 52.41% / 187 trades; 2024-2025 +3.73% / 52.33% / 344 trades; 2025-2026 +9.35% / 48.55% / 379 trades. Rejected because 2025-2026 failed the win-rate gate.
   - `atr_stop_multiple=3.4`: 2023-2024 +5.01% / 55.98% / 184 trades; 2024-2025 +5.65% / 52.91% / 327 trades; 2025-2026 +10.88% / 51.10% / 364 trades. Rejected in favor of 3.45 because its 2025-2026 win-rate margin was too thin.
-  - `atr_stop_multiple=3.45`: chosen current default. 2023-2024 +4.91% / 55.43% / 184 trades; 2024-2025 +5.48% / 52.91% / 327 trades; 2025-2026 +11.65% / 51.52% / 363 trades.
+  - `atr_stop_multiple=3.45`: previously chosen default. 2023-2024 +4.91% / 55.43% / 184 trades; 2024-2025 +5.48% / 52.91% / 327 trades; 2025-2026 +11.65% / 51.52% / 363 trades. Later superseded by 3.0 ATR after the micro layer was hardened and full-size exit target moved to 2.0R.
   - `atr_stop_multiple=3.5`: 2023-2024 +4.85% / 55.43% / 184 trades; 2024-2025 +6.22% / 52.91% / 327 trades; 2025-2026 +10.43% / 51.24% / 363 trades. Kept as the nearest robust neighbor but not chosen because 3.45 had a better total return and win-rate margin.
   - `atr_stop_multiple=3.6` and `3.7`: rejected because 2025-2026 win rate fell to 50.70%.
   - `atr_stop_multiple=3.8`: passed the annual win-rate gate but gave lower aggregate return: 2023-2024 +5.24%, 2024-2025 +5.61%, 2025-2026 +8.32%.
@@ -216,7 +229,9 @@ Using the same current default parameters:
   - A 2023-2024 local grid over RSI threshold, trend mode, close-position, low-proximity, and target R was stopped after it proved too slow.
   - Keep future searches narrow or implement a vectorized simulator before doing broad high-frequency exploration.
 
-## Futures Leverage Estimates
+## Historical Futures Leverage Estimates
+
+These leverage estimates were produced before the latest 3.0 ATR / 2.0R full-size retune and should be rerun before being used as current-default evidence.
 
 The backtest runtime now supports a futures accounting estimate through strategy parameters: `execution_market=futures`, `execution_leverage`, `execution_maintenance_margin_rate`, and `execution_funding_rate_8h`.
 
@@ -243,4 +258,4 @@ These are estimates, not exchange-perfect futures replays. The model uses flat f
 
 ## Residual Weakness
 
-The current default clears the 1-year win-rate, positive-return, and average monthly trade-count gates across three adjacent 1-year windows and has six positive 1-month samples. The weakest remaining evidence is that the 2025-2026 full-year win rate is still close to the gate at 51.52%, several monthly samples have win rates below 51%, and the 2023-06 single-month sample has 11 trades. Future work should improve monthly consistency without increasing the micro probe size or loosening the capitulation sleeve.
+The current default clears the 1-year win-rate and positive-return gates across three adjacent 1-year windows, with annual win rates from 57.95% to 70.00%. It no longer targets the earlier high-frequency monthly-12 trade-count gate; after micro hardening, the strategy is deliberately concentrated in fewer higher-quality full-size trades plus tiny probes. The weakest remaining evidence is the higher 2025-2026 max drawdown at 6.64%, the lack of current-default monthly reruns, and the fact that scale-in support did not actually fire in the three annual validation windows.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from math import isfinite
 from typing import Any
 
@@ -509,11 +510,11 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "entry_min_close_position": {
           "type": "number",
-          "default": 0.60,
+          "default": 0.58,
           "minimum": 0,
           "maximum": 1,
           "semantic_hint": "Minimum candle close position from low to high for rebound entries.",
-          "description_ko": "반등 매수에서 요구하는 캔들 마감 위치입니다. 기본값 0.60은 봉의 저가~고가 구간 상위 40%에서 마감한 반등을 허용합니다.",
+          "description_ko": "반등 매수에서 요구하는 캔들 마감 위치입니다. 기본값 0.58은 봉의 저가~고가 구간 상위 42%에서 마감한 반등을 허용합니다.",
         },
         "entry_max_low_proximity_atr": {
           "type": "number",
@@ -529,6 +530,37 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "enum": ["any", "loose", "above20", "above60", "macro"],
           "semantic_hint": "Trend filter strength used before BUY.",
           "description_ko": "매수 전 추세 필터 강도입니다. any는 구조적 하락 차단만 적용하고, loose는 MA20/MA60/MA20기울기 중 하나를 요구합니다.",
+        },
+        "entry_enable_scale_in": {
+          "type": "boolean",
+          "default": True,
+          "semantic_hint": "Allows additional full-size entries while an existing profitable position is open.",
+          "description_ko": "기존 포지션이 수익 상태이고 새 full-size 신호가 다시 확인되면 추가 진입을 허용합니다.",
+        },
+        "entry_scale_in_max_position_fraction": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0,
+          "maximum": 1,
+          "semantic_hint": "Maximum total position fraction allowed before scale-in is blocked.",
+          "description_ko": "추가 진입을 허용할 최대 총 포지션 비중입니다. 이 비중 이상이면 추가 진입하지 않습니다.",
+        },
+        "entry_scale_in_min_profit_r": {
+          "type": "number",
+          "default": 0.25,
+          "minimum": -5,
+          "maximum": 5,
+          "semantic_hint": "Minimum open-position profit in R required before scale-in.",
+          "description_ko": "추가 진입 전에 요구하는 기존 포지션의 최소 수익 R입니다. 기본값 0.25는 손실 중인 물타기를 막습니다.",
+        },
+        "entry_scale_in_min_bars_since_entry": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 0,
+          "maximum": 288,
+          "unit": "bars",
+          "semantic_hint": "Minimum bars since the initial entry before scale-in can occur.",
+          "description_ko": "초기 진입 후 추가 진입까지 기다릴 최소 봉 수입니다.",
         },
         "swing_lookback_bars": {
           "type": "integer",
@@ -576,7 +608,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "exit_profit_r_multiple": {
           "type": "number",
-          "default": 1.5,
+          "default": 2.0,
           "minimum": 0.1,
           "maximum": 5,
           "semantic_hint": "Profit target measured in initial risk R.",
@@ -673,11 +705,11 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "atr_stop_multiple": {
           "type": "number",
-          "default": 3.45,
+          "default": 3.0,
           "minimum": 0.1,
           "maximum": 10,
           "semantic_hint": "ATR multiple used for fixed stop distance.",
-          "description_ko": "ATR 손절 배수입니다. 기본값은 진입가 - 3.45 * ATR14 손절입니다.",
+          "description_ko": "ATR 손절 배수입니다. 기본값은 진입가 - 3.0 * ATR14 손절입니다.",
         },
         "atr_take_profit_multiple": {
           "type": "number",
@@ -737,10 +769,11 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
           "BUY defaults to RSI14 oversold within 80 bars, then the configured trigger mode confirms either an RSI turn, an RSI30 reclaim plus previous-high breakout, or an enabled early oversold rebound near the swing low.",
           "Standard late rebounds more than 2.2 ATR above the recent low require either an MA20 reclaim without fresh lower lows or a deep washout recovery profile.",
           "Lower-quality RSI rebounds can be sampled through tiny 0.1% micro probes only after a stricter close-location/volatility quality gate, with a separate 3.0 ATR stop, 0.5R target, and 48-bar time stop.",
+          "Profitable open positions can scale in on a fresh full-size signal, but losing positions are not averaged down.",
           "A separate capitulation rebound sleeve can buy below MA60 only when RSI/ATR/slope distances sit in a narrow post-capitulation recovery band.",
           "Default trend filter passes only when close is above MA60; looser MA20/MA60/slope modes remain configurable.",
           "Entries are blocked when close is below MA60, MA20 slope is falling, and recent lows continue to make lower lows.",
-          "SELL uses fixed 3.45 ATR stop, configurable swing-low stop, 288-bar no-profit time exit, 1.5R default target, and optional profit-signal trailing based on RSI/R-target/MA-resistance.",
+          "SELL uses fixed 3.0 ATR stop, configurable swing-low stop, 288-bar no-profit time exit, 2.0R default target, and optional profit-signal trailing based on RSI/R-target/MA-resistance.",
         ),
       ),
       version_lineage=("1.0.0",),
@@ -765,7 +798,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     sizing=AtrRiskSizing(
       atr_feature="atr",
       risk_fraction=ParameterRef("risk_fraction", 0.01),
-      stop_multiple=ParameterRef("atr_stop_multiple", 3.45),
+      stop_multiple=ParameterRef("atr_stop_multiple", 3.0),
       take_profit_multiple=ParameterRef("atr_take_profit_multiple", 3.0),
       max_position_fraction=ParameterRef("max_position_fraction", 1.0),
     ),
@@ -851,6 +884,12 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
     exit_evaluation = _rsi14_oversold_reversal_exit_evaluation(context)
     exit_match = bool(exit_evaluation["matched"])
     entry_match = bool(entry_evaluation["matched"])
+    scale_in_evaluation = _rsi14_oversold_reversal_scale_in_evaluation(
+      context,
+      entry_evaluation=entry_evaluation,
+      exit_evaluation=exit_evaluation,
+    )
+    scale_in_match = bool(scale_in_evaluation["matched"])
 
     if context.state.has_position and exit_match:
       signal = SignalDecision(
@@ -862,6 +901,14 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
       )
       if bool(exit_evaluation.get("is_stop_exit")):
         self._start_stop_cooldown(context)
+    elif context.state.has_position and entry_match and scale_in_match:
+      signal = SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.BUY,
+        confidence=0.70,
+        tags=("composable", "entry", "scale_in", "rsi14_oversold_escape"),
+        reason=str(scale_in_evaluation["reason"]),
+      )
     elif not context.state.has_position and entry_match:
       signal = SignalDecision(
         timestamp=context.timestamp,
@@ -880,8 +927,18 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
       )
 
     execution = self.spec.sizing.build(context, signal)
-    if signal.action == SignalAction.BUY and bool(entry_evaluation.get("micro_probe_matched")):
+    if (
+      signal.action == SignalAction.BUY
+      and not scale_in_match
+      and bool(entry_evaluation.get("micro_probe_matched"))
+    ):
       execution = _rsi14_micro_probe_execution_plan(context)
+    elif signal.action == SignalAction.BUY and scale_in_match:
+      execution = replace(
+        execution,
+        allow_scale_in=True,
+        tags=(*execution.tags, "scale_in"),
+      )
     return StrategyDecisionEnvelope(
       signal=signal,
       rationale=_rsi14_oversold_reversal_rationale(
@@ -904,6 +961,7 @@ class Rsi14OversoldReversalStrategy(ComposableStrategy):
         },
         "entry": entry_evaluation,
         "exit": exit_evaluation,
+        "scale_in": scale_in_evaluation,
         "execution_tags": execution.tags,
       },
     )
@@ -1298,7 +1356,7 @@ def _rsi14_oversold_reversal_entry_evaluation(
   min_close_position = _clamped_parameter(
     context,
     "entry_min_close_position",
-    0.60,
+    0.58,
     minimum=0.0,
     maximum=1.0,
   )
@@ -1775,7 +1833,145 @@ def _rsi14_oversold_reversal_entry_evaluation(
     "rsi_turn_matched": rsi_turn_matched,
     "capitulation_rebound_matched": capitulation_rebound_matched,
     "micro_probe_matched": micro_probe_matched,
+    "standard_full_entry_matched": standard_full_entry_matched,
   }
+
+
+def _rsi14_oversold_reversal_scale_in_evaluation(
+  context: StrategyDecisionContext,
+  *,
+  entry_evaluation: dict[str, Any],
+  exit_evaluation: dict[str, Any],
+) -> dict[str, Any]:
+  enabled = bool(context.state.parameters.get("entry_enable_scale_in", True))
+  close = _feature_or_market(context, "close")
+  entry_price = _finite_number(context.state.position_average_price)
+  hard_stop_price = _finite_number(context.state.position_stop_loss_price)
+  atr = _feature_value(context, "atr")
+  bars_since_entry = _bars_since_position_opened(context)
+  min_bars_since_entry = _mapping_int_parameter(
+    context.state.parameters,
+    "entry_scale_in_min_bars_since_entry",
+    3,
+    minimum=0,
+    maximum=288,
+  )
+  min_profit_r = _clamped_parameter(
+    context,
+    "entry_scale_in_min_profit_r",
+    0.25,
+    minimum=-5.0,
+    maximum=5.0,
+  )
+  max_position_fraction = _clamped_parameter(
+    context,
+    "entry_scale_in_max_position_fraction",
+    1.0,
+    minimum=0.0,
+    maximum=1.0,
+  )
+  position_fraction = _rsi14_position_notional_fraction(context, close=close)
+  risk_per_unit = (
+    entry_price - hard_stop_price
+    if entry_price is not None
+    and hard_stop_price is not None
+    and entry_price > hard_stop_price
+    else (
+      atr * _clamped_parameter(
+        context,
+        "atr_stop_multiple",
+        3.0,
+        minimum=0.1,
+        maximum=10.0,
+      )
+      if atr is not None and atr > 0
+      else None
+    )
+  )
+  open_profit_r = (
+    (close - entry_price) / risk_per_unit
+    if close is not None
+    and entry_price is not None
+    and risk_per_unit is not None
+    and risk_per_unit > 0
+    else None
+  )
+  full_size_signal = (
+    bool(entry_evaluation.get("standard_full_entry_matched"))
+    or bool(entry_evaluation.get("capitulation_rebound_matched"))
+  )
+  bars_ok = (
+    bars_since_entry is not None and bars_since_entry >= min_bars_since_entry
+  )
+  profit_ok = open_profit_r is not None and open_profit_r >= min_profit_r
+  capacity_ok = (
+    position_fraction is not None and position_fraction < max_position_fraction
+  )
+  exit_clear = not bool(exit_evaluation.get("matched"))
+  matched = (
+    context.state.has_position
+    and enabled
+    and full_size_signal
+    and exit_clear
+    and bars_ok
+    and profit_ok
+    and capacity_ok
+  )
+  failed: list[str] = []
+  if not context.state.has_position:
+    failed.append("no_position")
+  if not enabled:
+    failed.append("disabled")
+  if not full_size_signal:
+    failed.append("no_fresh_full_size_signal")
+  if not exit_clear:
+    failed.append("exit_signal_active")
+  if not bars_ok:
+    failed.append("min_bars_since_entry")
+  if not profit_ok:
+    failed.append("min_profit_r")
+  if not capacity_ok:
+    failed.append("max_position_fraction")
+  return {
+    "matched": matched,
+    "reason": (
+      "entry_conditions_met:rsi14_scale_in"
+      if matched
+      else f"scale_in_filters_failed:{','.join(failed)}"
+    ),
+    "enabled": enabled,
+    "full_size_signal": full_size_signal,
+    "exit_clear": exit_clear,
+    "bars_since_entry": bars_since_entry,
+    "entry_scale_in_min_bars_since_entry": min_bars_since_entry,
+    "open_profit_r": open_profit_r,
+    "entry_scale_in_min_profit_r": min_profit_r,
+    "position_notional_fraction": position_fraction,
+    "entry_scale_in_max_position_fraction": max_position_fraction,
+    "failed_filters": tuple(failed),
+  }
+
+
+def _rsi14_position_notional_fraction(
+  context: StrategyDecisionContext,
+  *,
+  close: float | None,
+) -> float | None:
+  position_margin_equivalent_value = (
+    (context.state.position_size * close)
+    / max(context.state.position_leverage, 1.0)
+    if context.state.position_market_type == "futures"
+    else context.state.position_size * close
+  ) if close is not None and close > 0 and context.state.position_size > 0 else None
+  if (
+    position_margin_equivalent_value is None
+    or position_margin_equivalent_value <= 0
+    or (position_margin_equivalent_value + context.state.cash) <= 0
+  ):
+    return None
+  return position_margin_equivalent_value / (
+    position_margin_equivalent_value + context.state.cash
+  )
 
 
 def _rsi14_micro_probe_execution_plan(context: StrategyDecisionContext) -> ExecutionPlan:
@@ -1850,7 +2046,7 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
   profit_r_multiple = _clamped_parameter(
     context,
     "exit_profit_r_multiple",
-    1.5,
+    2.0,
     minimum=0.1,
     maximum=5.0,
   )
@@ -1916,7 +2112,7 @@ def _rsi14_oversold_reversal_exit_evaluation(context: StrategyDecisionContext) -
       atr * _clamped_parameter(
         context,
         "atr_stop_multiple",
-        3.45,
+        3.0,
         minimum=0.1,
         maximum=10.0,
       )
