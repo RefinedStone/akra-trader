@@ -14,8 +14,8 @@ yet a finished live-trading product, a multi-user platform, or an LLM-native str
 - Experiment OS: partially complete.
 - Runtime operations: real but still needs clearer active-session UX.
 - Guarded live: early but meaningful.
-- Intelligence research: provider-neutral judgement contract, mock client, and veto-only wrapper
-  exist; provider-backed trace/replay/evaluation controls are still incomplete.
+- Intelligence research: provider-neutral judgement contract, mock client, OpenAI structured-output
+  adapter, and veto-only wrapper exist; replay/evaluation controls are still incomplete.
 
 ## Implemented
 
@@ -80,9 +80,9 @@ Architecture:
   remain incomplete.
 - Deployment, backup, and credential governance are not product-grade.
 - LLM work includes provider-neutral judgement request/response contracts, `LlmJudgementPort`, a
-  deterministic mock client, and a veto-only wrapper for existing rule-based candidate signals.
-  It still has no concrete provider adapter, prompt registry, durable raw trace store, or replay
-  harness.
+  deterministic mock client, an OpenAI Responses structured-output adapter, and a veto-only wrapper
+  for existing rule-based candidate signals. It still has no prompt registry, durable raw trace
+  store, replay harness, or live-promotion path.
 - Some extracted backend/frontend modules remain large and need continued flow-level decomposition.
 
 ## Immediate Priorities

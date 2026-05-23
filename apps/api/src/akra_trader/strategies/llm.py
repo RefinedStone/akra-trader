@@ -332,6 +332,7 @@ def _response_summary(response: LlmJudgementResponse) -> dict[str, Any]:
     "reasons": response.reasons,
     "invalidation_condition": response.invalidation_condition,
     "used_fallback": response.used_fallback,
+    "trace": _json_safe_mapping(response.trace),
   }
 
 

@@ -34,6 +34,11 @@ class Settings:
   guarded_live_api_secret: str | None = None
   binance_api_key: str | None = None
   binance_api_secret: str | None = None
+  llm_judgement_provider: str = "disabled"
+  llm_judgement_model: str = "gpt-5.5"
+  llm_judgement_timeout_seconds: float = 20.0
+  llm_judgement_mock_scenario: str = "approve"
+  openai_api_key: str | None = None
 
 
 from akra_trader.config_loader import load_settings

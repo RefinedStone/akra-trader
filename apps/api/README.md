@@ -22,7 +22,7 @@ Still incomplete:
 - fully normalized experiment artifact/export storage
 - full venue-native live lifecycle recovery
 - provider-owned incident ownership and policy management
-- concrete LLM provider adapters, prompt registry, trace storage, replay, and fallback controls
+- LLM prompt registry, replay, evaluation, and live-promotion controls
 
 ## Run
 
@@ -36,6 +36,8 @@ Defaults:
 - market-data provider: `binance`
 - run database: repo-local SQLite if not overridden
 - market-data database: repo-local SQLite if not overridden
+- LLM judgement provider: `disabled`; set `AKRA_TRADER_LLM_JUDGEMENT_PROVIDER=openai` and
+  `AKRA_TRADER_OPENAI_API_KEY` or `OPENAI_API_KEY` for backtest/sandbox judgement
 
 For the exact settings surface, read `apps/api/src/akra_trader/config.py`. For delivery targets and
 workflow providers, read `apps/api/src/akra_trader/adapters/operator_delivery_registry.py`.

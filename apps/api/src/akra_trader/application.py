@@ -139,7 +139,9 @@ class TradingApplication:
       "lifecycle": metadata.lifecycle.stage,
       "decision_port": "DecisionEnginePort",
       "judgement_port": "LlmJudgementPort",
-      "provider_adapter": None,
+      "provider_adapter": (
+        type(self._llm_judgement).__name__ if self._llm_judgement is not None else None
+      ),
       "isolation_state": "interface_only",
       "judgement_state": "available" if self._llm_judgement is not None else "not_configured",
       "trace_envelope": {
@@ -460,6 +462,7 @@ class TradingApplication:
     strategy, metadata, strategy_snapshot, resolved_parameters = self._prepare_strategy(
       strategy_id=strategy_id,
       parameters=parameters,
+      mode=mode,
     )
     config = RunConfig(
       run_id=str(uuid4()),
@@ -501,6 +504,8 @@ class TradingApplication:
         market_data_by_symbol=loaded.lineage_by_symbol,
       ),
     )
+    if self._llm_judgement_requested_for_live(mode=mode, parameters=resolved_parameters):
+      self._record_live_llm_judgement_ignored(run)
     data = loaded.frame
     data_issue = self._validate_loaded_market_data(
       data=data,
@@ -564,13 +569,14 @@ class TradingApplication:
     *,
     strategy_id: str,
     parameters: dict[str, Any],
+    mode: RunMode,
   ):
     if strategy_id == self._llm_strategy.describe().strategy_id:
       raise ValueError("LLM strategy execution is interface-only in this runtime.")
     strategy = self._strategies.load(strategy_id)
     metadata = strategy.describe()
     resolved_parameters = _resolve_parameters(metadata, parameters)
-    if self._llm_judgement is not None and resolved_parameters.get("use_llm_judgement") is True:
+    if self._should_apply_llm_judgement(mode=mode, parameters=resolved_parameters):
       strategy = LlmJudgementVetoStrategy(strategy, self._llm_judgement)
     metadata = replace(
       metadata,
@@ -594,6 +600,35 @@ class TradingApplication:
       entrypoint=metadata.entrypoint,
     )
     return strategy, metadata, strategy_snapshot, resolved_parameters
+
+  def _should_apply_llm_judgement(self, *, mode: RunMode, parameters: dict[str, Any]) -> bool:
+    if self._llm_judgement is None:
+      return False
+    if parameters.get("use_llm_judgement") is not True:
+      return False
+    return mode in {RunMode.BACKTEST, RunMode.SANDBOX}
+
+  def _llm_judgement_requested_for_live(
+    self,
+    *,
+    mode: RunMode,
+    parameters: dict[str, Any],
+  ) -> bool:
+    return mode == RunMode.LIVE and parameters.get("use_llm_judgement") is True
+
+  def _record_live_llm_judgement_ignored(self, run: RunRecord) -> None:
+    self._append_run_note(
+      run,
+      layer="llm_judgement",
+      event_type="llm_judgement_live_ignored",
+      message="LLM judgement is limited to backtest and sandbox; live request ignored.",
+      severity="warning",
+      payload={
+        "strategy_id": run.config.strategy_id,
+        "mode": run.config.mode.value,
+        "provider_configured": self._llm_judgement is not None,
+      },
+    )
 
   def _ensure_live_launch_allowed(self) -> None:
     if not self._guarded_live_execution_enabled:
@@ -809,6 +844,8 @@ class TradingApplication:
       return 0
 
     strategy = self._strategies.load(run.config.strategy_id)
+    if self._should_apply_llm_judgement(mode=mode, parameters=run.config.parameters):
+      strategy = LlmJudgementVetoStrategy(strategy, self._llm_judgement)
     required_bars = max(strategy.warmup_spec().required_bars, 2)
     cache = self._restore_state_cache(run)
     processed = 0

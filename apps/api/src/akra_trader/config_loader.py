@@ -49,4 +49,15 @@ def load_settings() -> Settings:
     guarded_live_api_secret=os.getenv("AKRA_TRADER_GUARDED_LIVE_API_SECRET") or None,
     binance_api_key=os.getenv("AKRA_TRADER_BINANCE_API_KEY") or None,
     binance_api_secret=os.getenv("AKRA_TRADER_BINANCE_API_SECRET") or None,
+    llm_judgement_provider=os.getenv("AKRA_TRADER_LLM_JUDGEMENT_PROVIDER", "disabled"),
+    llm_judgement_model=os.getenv("AKRA_TRADER_LLM_JUDGEMENT_MODEL", "gpt-5.5"),
+    llm_judgement_timeout_seconds=float(
+      os.getenv("AKRA_TRADER_LLM_JUDGEMENT_TIMEOUT_SECONDS", "20")
+    ),
+    llm_judgement_mock_scenario=os.getenv(
+      "AKRA_TRADER_LLM_JUDGEMENT_MOCK_SCENARIO", "approve"
+    ),
+    openai_api_key=(
+      os.getenv("AKRA_TRADER_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") or None
+    ),
   )

@@ -26,11 +26,15 @@ Compatibility files may exist, but they should delegate or re-export rather than
   that port.
 - `adapters/mock_llm_judgement.py` is the deterministic no-network client for tests and shadow
   experiments.
+- `adapters/openai_llm_judgement.py` is the provider-backed `LlmJudgementPort` implementation
+  for backtest and sandbox research. It uses OpenAI Responses structured outputs and stores only
+  provider/model/latency/response-id summary trace, not raw provider payloads.
 - `strategies/llm.py` owns the veto-only wrapper that can review an existing rule-based candidate
   signal. It may preserve an existing BUY/SELL candidate, or downgrade it to HOLD. It must not
   create BUY/SELL signals when the rule strategy produced HOLD.
 - Runtime integration is explicit opt-in through `use_llm_judgement` with a configured
-  `LlmJudgementPort`. Default strategy execution remains deterministic and unchanged.
+  `LlmJudgementPort`. Provider-backed judgement is limited to backtest and sandbox; guarded-live
+  requests are logged and ignored. Default strategy execution remains deterministic and unchanged.
 
 ## Frontend Shape
 

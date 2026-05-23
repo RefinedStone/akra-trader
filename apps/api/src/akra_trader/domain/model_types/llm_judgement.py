@@ -91,6 +91,7 @@ class LlmJudgementResponse:
   reasons: tuple[str, ...] = ()
   invalidation_condition: str | None = None
   used_fallback: bool = False
+  trace: dict[str, Any] = field(default_factory=dict)
 
 
 _request_adapter = TypeAdapter(LlmJudgementRequest)

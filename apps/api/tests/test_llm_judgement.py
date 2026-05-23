@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC
 from datetime import datetime
 import json
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -13,9 +14,12 @@ from pydantic import TypeAdapter
 from akra_trader.adapters.core_storage import InMemoryCoreRepository
 from akra_trader.adapters.in_memory_market_data import SeededMarketDataAdapter
 from akra_trader.adapters.mock_llm_judgement import MockLlmJudgementClient
+from akra_trader.adapters.openai_llm_judgement import OpenAiLlmJudgementClient
 from akra_trader.api import include_routes
 from akra_trader.application import TradingApplication
 from akra_trader.bootstrap import Container
+from akra_trader.bootstrap import build_llm_judgement_adapter
+from akra_trader.config import Settings
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import ExecutionPlan
 from akra_trader.domain.models import LlmCandidateSignal
@@ -25,6 +29,7 @@ from akra_trader.domain.models import LlmJudgementRequest
 from akra_trader.domain.models import LlmJudgementResponse
 from akra_trader.domain.models import LlmMarketRegime
 from akra_trader.domain.models import LlmRiskLevel
+from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionContext
@@ -263,6 +268,121 @@ def test_application_can_opt_into_mock_backtest_judgement_without_provider_sdk()
   assert judgements[0]["final_action"] == "hold"
 
 
+def test_openai_llm_judgement_adapter_uses_structured_response_and_records_trace():
+  client = _FakeOpenAiClient(
+    _openai_response(
+      {
+        "decision": "approve_buy",
+        "confidence": 0.88,
+        "market_regime": "trending",
+        "risk_level": "low",
+        "risk_flags": [],
+        "reasons": ["rsi_rebound_confirmed"],
+        "invalidation_condition": "close below recent low",
+      }
+    )
+  )
+  adapter = OpenAiLlmJudgementClient(api_key="test-key", model="gpt-test", client=client)
+
+  response = adapter.judge(_request("buy"))
+
+  assert response.decision == LlmJudgementDecision.APPROVE_BUY
+  assert response.confidence == 0.88
+  assert response.risk_level == LlmRiskLevel.LOW
+  assert response.used_fallback is False
+  assert response.trace["provider"] == "openai"
+  assert response.trace["model"] == "gpt-test"
+  assert response.trace["response_id"] == "resp_test"
+  assert response.trace["raw_output_stored"] is False
+  assert "rsi" in response.trace["request_feature_keys"]
+  assert client.calls[0]["model"] == "gpt-test"
+  assert client.calls[0]["reasoning"] == {"effort": "low"}
+
+
+@pytest.mark.parametrize("scenario", ["malformed", "refusal"])
+def test_openai_llm_judgement_adapter_fails_closed(scenario):
+  response = (
+    _openai_response(
+      {
+        "decision": "not_a_decision",
+        "confidence": "invalid",
+      }
+    )
+    if scenario == "malformed"
+    else SimpleNamespace(
+      id="resp_refusal",
+      output=[
+        SimpleNamespace(
+          type="message",
+          content=[SimpleNamespace(type="refusal", refusal="cannot judge")],
+        )
+      ],
+    )
+  )
+  adapter = OpenAiLlmJudgementClient(
+    api_key="test-key",
+    model="gpt-test",
+    client=_FakeOpenAiClient(response),
+  )
+
+  result = adapter.judge(_request("buy"))
+
+  assert result.decision == LlmJudgementDecision.NO_TRADE
+  assert result.confidence == 0.0
+  assert result.risk_level == LlmRiskLevel.HIGH
+  assert result.used_fallback is True
+  assert result.trace["provider"] == "openai"
+  assert result.trace["status"] == "fallback_after_provider_error"
+
+
+def test_bootstrap_builds_configured_llm_judgement_provider_without_startup_failure():
+  assert build_llm_judgement_adapter(Settings(llm_judgement_provider="disabled")) is None
+  assert build_llm_judgement_adapter(Settings(llm_judgement_provider="openai")) is None
+
+  mock = build_llm_judgement_adapter(
+    Settings(llm_judgement_provider="mock", llm_judgement_mock_scenario="no_trade")
+  )
+  assert isinstance(mock, MockLlmJudgementClient)
+  assert mock.judge(_request("buy")).decision == LlmJudgementDecision.NO_TRADE
+
+  openai = build_llm_judgement_adapter(
+    Settings(
+      llm_judgement_provider="openai",
+      openai_api_key="test-key",
+      llm_judgement_model="gpt-test",
+    )
+  )
+  assert isinstance(openai, OpenAiLlmJudgementClient)
+
+
+def test_live_run_ignores_llm_judgement_even_when_requested():
+  client = MockLlmJudgementClient(scenario="no_trade")
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=_SingleStrategyCatalog(_FixedCandidateStrategy(SignalAction.BUY)),
+    runs=InMemoryCoreRepository(),
+    llm_judgement=client,
+    guarded_live_execution_enabled=True,
+  )
+
+  run = app.start_live_run(
+    strategy_id="fixed_candidate_strategy",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=5,
+    parameters={"use_llm_judgement": True},
+    replay_bars=2,
+  )
+
+  assert run.status == RunStatus.RUNNING
+  assert client.requests == []
+  logs = app.get_run_logs(run.config.run_id)
+  assert any(log.event_type == "llm_judgement_live_ignored" for log in logs)
+  assert not any(log.event_type == "llm_judgement_recorded" for log in logs)
+
+
 class _FixedCandidateStrategy(Strategy):
   def __init__(self, action: SignalAction) -> None:
     self._action = action
@@ -307,6 +427,34 @@ class _SingleStrategyCatalog:
 
   def get_registration(self, strategy_id: str):
     return None
+
+
+class _FakeOpenAiClient:
+  def __init__(self, response) -> None:
+    self._response = response
+    self.responses = self
+    self.calls: list[dict] = []
+
+  def parse(self, **kwargs):
+    self.calls.append(kwargs)
+    return self._response
+
+
+def _openai_response(parsed):
+  return SimpleNamespace(
+    id="resp_test",
+    output=[
+      SimpleNamespace(
+        type="message",
+        content=[
+          SimpleNamespace(
+            type="output_text",
+            parsed=parsed,
+          )
+        ],
+      )
+    ],
+  )
 
 
 def _request(action: str) -> LlmJudgementRequest:

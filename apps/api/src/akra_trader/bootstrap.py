@@ -8,6 +8,8 @@ from akra_trader.adapters.binance import CcxtMarketDataAdapter
 from akra_trader.adapters.core_storage import SqlAlchemyCoreRepository
 from akra_trader.adapters.in_memory_catalogs import LocalStrategyCatalog
 from akra_trader.adapters.in_memory_market_data import SeededMarketDataAdapter
+from akra_trader.adapters.mock_llm_judgement import MockLlmJudgementClient
+from akra_trader.adapters.openai_llm_judgement import OpenAiLlmJudgementClient
 from akra_trader.adapters.venue_execution_binance_adapter import BinanceVenueExecutionAdapter
 from akra_trader.adapters.venue_execution_seeded_adapter import SeededVenueExecutionAdapter
 from akra_trader.application import TradingApplication
@@ -77,6 +79,23 @@ def build_venue_execution_adapter(settings: Settings):
   )
 
 
+def build_llm_judgement_adapter(settings: Settings):
+  provider = settings.llm_judgement_provider.strip().lower()
+  if provider in {"", "disabled", "none"}:
+    return None
+  if provider == "mock":
+    return MockLlmJudgementClient(scenario=settings.llm_judgement_mock_scenario)
+  if provider == "openai":
+    if not settings.openai_api_key:
+      return None
+    return OpenAiLlmJudgementClient(
+      api_key=settings.openai_api_key,
+      model=settings.llm_judgement_model,
+      timeout_seconds=settings.llm_judgement_timeout_seconds,
+    )
+  raise ValueError(f"Unsupported LLM judgement provider: {settings.llm_judgement_provider}")
+
+
 def build_container(settings: Settings | None = None) -> Container:
   app_settings = settings or Settings()
   repo_root = Path(__file__).resolve().parents[4]
@@ -86,11 +105,13 @@ def build_container(settings: Settings | None = None) -> Container:
   )
   strategies = LocalStrategyCatalog()
   venue_execution = build_venue_execution_adapter(app_settings)
+  llm_judgement = build_llm_judgement_adapter(app_settings)
   app = TradingApplication(
     market_data=market_data,
     strategies=strategies,
     runs=runs,
     venue_execution=venue_execution,
+    llm_judgement=llm_judgement,
     guarded_live_venue=resolve_guarded_live_venue(app_settings),
     guarded_live_execution_enabled=app_settings.guarded_live_execution_enabled,
     sandbox_worker_heartbeat_interval_seconds=(
