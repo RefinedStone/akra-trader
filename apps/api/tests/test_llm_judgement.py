@@ -16,6 +16,7 @@ from akra_trader.adapters.core_storage import InMemoryCoreRepository
 from akra_trader.adapters.in_memory_market_data import SeededMarketDataAdapter
 from akra_trader.adapters.mock_llm_judgement import MockLlmJudgementClient
 from akra_trader.adapters.openai_llm_judgement import OpenAiLlmJudgementClient
+from akra_trader.adapters.openai_llm_judgement import OpenAiLlmJudgementPayload
 from akra_trader.api import include_routes
 from akra_trader.application import TradingApplication
 from akra_trader.bootstrap import Container
@@ -307,6 +308,11 @@ def test_openai_llm_judgement_adapter_uses_structured_response_and_records_trace
         "dimension_reviews": {
           "trend": "ma slope does not block the candidate",
           "momentum": "rsi rebound supports the candidate",
+          "structure": "recent structure is acceptable",
+          "volatility_liquidity": "volatility and volume are usable",
+          "risk_reward": "risk reward is acceptable for the audit",
+          "position_context": "no existing exposure blocks the entry",
+          "data_quality": "supplied context is sufficient",
         },
         "invalidation_condition": "close below recent low",
       }
@@ -334,6 +340,15 @@ def test_openai_llm_judgement_adapter_uses_structured_response_and_records_trace
   )
   payload = json.loads(client.calls[0]["input"][1]["content"].split("\n", 1)[1])
   assert payload["recent_feature_history"][0]["rsi"] == 29.0
+
+
+def test_openai_llm_judgement_payload_schema_requires_all_provider_fields():
+  schema = OpenAiLlmJudgementPayload.model_json_schema()
+  properties = set(schema["properties"])
+
+  assert set(schema["required"]) == properties
+  assert "dimension_reviews" in properties
+  assert schema["additionalProperties"] is False
 
 
 @pytest.mark.parametrize("scenario", ["malformed", "refusal"])

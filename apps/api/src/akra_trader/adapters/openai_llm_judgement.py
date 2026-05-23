@@ -7,6 +7,7 @@ from typing import Any
 from typing import Mapping
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import TypeAdapter
 
@@ -24,15 +25,29 @@ DEFAULT_OPENAI_LLM_JUDGEMENT_TIMEOUT_SECONDS = 20.0
 OPENAI_LLM_JUDGEMENT_PROMPT_PROFILE = "elite_market_auditor_v1"
 
 
+class OpenAiDimensionReviews(BaseModel):
+  model_config = ConfigDict(extra="forbid")
+
+  trend: str
+  momentum: str
+  structure: str
+  volatility_liquidity: str
+  risk_reward: str
+  position_context: str
+  data_quality: str
+
+
 class OpenAiLlmJudgementPayload(BaseModel):
+  model_config = ConfigDict(extra="forbid")
+
   decision: LlmJudgementDecision
   confidence: float = Field(ge=0.0, le=1.0)
-  market_regime: LlmMarketRegime = LlmMarketRegime.UNKNOWN
-  risk_level: LlmRiskLevel = LlmRiskLevel.MEDIUM
-  risk_flags: tuple[LlmRiskFlag, ...] = ()
-  reasons: tuple[str, ...] = ()
-  dimension_reviews: dict[str, str] = Field(default_factory=dict)
-  invalidation_condition: str | None = None
+  market_regime: LlmMarketRegime
+  risk_level: LlmRiskLevel
+  risk_flags: tuple[LlmRiskFlag, ...]
+  reasons: tuple[str, ...]
+  dimension_reviews: OpenAiDimensionReviews
+  invalidation_condition: str | None
 
 
 class OpenAiLlmJudgementClient:
@@ -153,7 +168,7 @@ class OpenAiLlmJudgementClient:
       risk_level=payload.risk_level,
       risk_flags=payload.risk_flags,
       reasons=payload.reasons,
-      dimension_reviews=payload.dimension_reviews,
+      dimension_reviews=payload.dimension_reviews.model_dump(mode="python"),
       invalidation_condition=payload.invalidation_condition,
       used_fallback=False,
       trace=self._trace(
