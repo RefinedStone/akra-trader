@@ -117,6 +117,8 @@ class MovingAverageCrossStrategy(PolicyBackedStrategy):
       features=features,
       market=context.market,
       state=context.state,
+      recent_features=context.recent_features,
+      llm=context.llm,
     )
 
   def signal_policy(self, parameters: dict) -> SignalPolicy:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 import json
 from types import SimpleNamespace
 
@@ -63,6 +64,9 @@ def test_llm_judgement_contract_round_trips_as_json_schema():
     ),
     market_snapshot={"close": 100.0, "volume": 1000.0},
     selected_features={"rsi": 29.0, "ema_fast": 101.0},
+    recent_feature_history=(
+      {"timestamp": TIMESTAMP.isoformat(), "close": 100.0, "rsi": 29.0},
+    ),
     current_position=LlmCurrentPositionState(
       has_position=False,
       cash=10_000.0,
@@ -77,6 +81,7 @@ def test_llm_judgement_contract_round_trips_as_json_schema():
     risk_level=LlmRiskLevel.LOW,
     risk_flags=(),
     reasons=("trend_confirmed",),
+    dimension_reviews={"momentum": "rsi rebound is constructive"},
     invalidation_condition="close below prior swing low",
   )
 
@@ -92,7 +97,9 @@ def test_llm_judgement_contract_round_trips_as_json_schema():
   assert "provider" not in response_payload
   assert "model" not in response_payload
   assert "candidate_signal" in llm_judgement_request_json_schema()["properties"]
+  assert "recent_feature_history" in llm_judgement_request_json_schema()["properties"]
   assert "invalidation_condition" in llm_judgement_response_json_schema()["properties"]
+  assert "dimension_reviews" in llm_judgement_response_json_schema()["properties"]
 
 
 @pytest.mark.parametrize(
@@ -146,11 +153,18 @@ def test_llm_judgement_approval_keeps_candidate_buy_and_records_trace():
   assert client.requests[0].candidate_signal.action == "buy"
   assert client.requests[0].instrument_id == "binance:BTC/USDT"
   assert client.requests[0].current_position.has_position is False
+  assert len(client.requests[0].recent_feature_history) == 40
+  assert client.requests[0].recent_feature_history[-1]["close"] == 100.0
+  assert "entry_evaluation" in client.requests[0].trace_context["trace_summary"]
+  assert "raw_prompt" not in client.requests[0].trace_context["trace_summary"]
   assert envelope.trace["rule_layer"] == "matched"
   judgement_trace = envelope.trace["llm_judgement"]
   assert judgement_trace["status"] == "approved"
   assert judgement_trace["mode"] == "veto_only"
+  assert judgement_trace["min_confidence"] == 0.7
   assert judgement_trace["request"]["strategy_id"] == "rule_strategy"
+  assert judgement_trace["request"]["recent_history_rows"] == 40
+  assert "rsi" in judgement_trace["request"]["recent_history_keys"]
   assert judgement_trace["response"]["decision"] == "approve_buy"
   assert judgement_trace["veto_reason"] is None
 
@@ -221,6 +235,18 @@ def test_llm_judgement_strategy_threshold_parameter_can_veto_approval():
   assert envelope.trace["llm_judgement"]["veto_reason"] == "confidence_below_threshold"
 
 
+def test_llm_judgement_recent_history_window_parameter_is_capped():
+  client = MockLlmJudgementClient(scenario="approve")
+  strategy = LlmJudgementVetoStrategy(_FixedCandidateStrategy(SignalAction.BUY), client)
+
+  envelope = strategy.decide(_context(parameters={"llm_judgement_recent_window": 120}))
+
+  assert envelope.signal.action == SignalAction.BUY
+  assert len(client.requests[0].recent_feature_history) == 45
+  assert envelope.trace["llm_judgement"]["request"]["recent_history_rows"] == 45
+  assert envelope.trace["llm_judgement"]["min_confidence"] == 0.6
+
+
 def test_application_can_opt_into_mock_backtest_judgement_without_provider_sdk():
   client = MockLlmJudgementClient(scenario="approve")
   app = TradingApplication(
@@ -278,6 +304,10 @@ def test_openai_llm_judgement_adapter_uses_structured_response_and_records_trace
         "risk_level": "low",
         "risk_flags": [],
         "reasons": ["rsi_rebound_confirmed"],
+        "dimension_reviews": {
+          "trend": "ma slope does not block the candidate",
+          "momentum": "rsi rebound supports the candidate",
+        },
         "invalidation_condition": "close below recent low",
       }
     )
@@ -289,14 +319,21 @@ def test_openai_llm_judgement_adapter_uses_structured_response_and_records_trace
   assert response.decision == LlmJudgementDecision.APPROVE_BUY
   assert response.confidence == 0.88
   assert response.risk_level == LlmRiskLevel.LOW
+  assert response.dimension_reviews["momentum"] == "rsi rebound supports the candidate"
   assert response.used_fallback is False
   assert response.trace["provider"] == "openai"
   assert response.trace["model"] == "gpt-test"
   assert response.trace["response_id"] == "resp_test"
   assert response.trace["raw_output_stored"] is False
   assert "rsi" in response.trace["request_feature_keys"]
+  assert response.trace["recent_history_rows"] == 1
   assert client.calls[0]["model"] == "gpt-test"
   assert client.calls[0]["reasoning"] == {"effort": "low"}
+  assert client.calls[0]["input"][0]["content"].startswith(
+    "You are a veto-only top-tier discretionary trader"
+  )
+  payload = json.loads(client.calls[0]["input"][1]["content"].split("\n", 1)[1])
+  assert payload["recent_feature_history"][0]["rsi"] == 29.0
 
 
 @pytest.mark.parametrize("scenario", ["malformed", "refusal"])
@@ -469,6 +506,9 @@ def _request(action: str) -> LlmJudgementRequest:
     ),
     market_snapshot={"close": 100.0},
     selected_features={"rsi": 29.0},
+    recent_feature_history=(
+      {"timestamp": TIMESTAMP.isoformat(), "close": 100.0, "rsi": 29.0},
+    ),
     current_position=LlmCurrentPositionState(
       has_position=False,
       cash=10_000.0,
@@ -497,7 +537,16 @@ def _candidate(
     rationale=f"rule candidate {action.value}",
     context=context,
     execution=ExecutionPlan(size_fraction=signal.size_fraction),
-    trace={"rule_layer": "matched"},
+    trace={
+      "rule_layer": "matched",
+      "entry_evaluation": {
+        "filters": {
+          "momentum": {"passed": True, "value": 29.0},
+          "structure": {"passed": True, "recent_lower_lows": False},
+        }
+      },
+      "raw_prompt": "must_not_be_forwarded",
+    },
   )
 
 
@@ -521,4 +570,30 @@ def _context(parameters: dict | None = None) -> StrategyDecisionContext:
       position_size=0.0,
       parameters=parameters or {},
     ),
+    recent_features=_recent_features(),
   )
+
+
+def _recent_features() -> tuple[dict[str, object], ...]:
+  rows: list[dict[str, object]] = []
+  for index in range(45):
+    rows.append(
+      {
+        "timestamp": (TIMESTAMP - timedelta(minutes=5 * (44 - index))).isoformat(),
+        "open": 95.0 + index * 0.1,
+        "high": 96.0 + index * 0.1,
+        "low": 94.0 + index * 0.1,
+        "close": 95.6 + index * 0.1,
+        "volume": 1000.0 + index,
+        "rsi": 25.0 + index * 0.1,
+        "atr": 2.1,
+        "ma20": 97.0,
+        "ma60": 99.0,
+        "ma20_slope": 0.02,
+        "ma60_slope": -0.01,
+        "recent_lower_lows": False,
+      }
+    )
+  rows[-1]["close"] = 100.0
+  rows[-1]["rsi"] = 29.0
+  return tuple(rows)

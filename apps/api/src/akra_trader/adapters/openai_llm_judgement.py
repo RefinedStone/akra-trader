@@ -21,7 +21,7 @@ from akra_trader.domain.models import build_safe_llm_judgement_fallback
 
 DEFAULT_OPENAI_LLM_JUDGEMENT_MODEL = "gpt-5.5"
 DEFAULT_OPENAI_LLM_JUDGEMENT_TIMEOUT_SECONDS = 20.0
-OPENAI_LLM_JUDGEMENT_PROMPT_PROFILE = "llm_judgement_veto_v1"
+OPENAI_LLM_JUDGEMENT_PROMPT_PROFILE = "elite_market_auditor_v1"
 
 
 class OpenAiLlmJudgementPayload(BaseModel):
@@ -31,6 +31,7 @@ class OpenAiLlmJudgementPayload(BaseModel):
   risk_level: LlmRiskLevel = LlmRiskLevel.MEDIUM
   risk_flags: tuple[LlmRiskFlag, ...] = ()
   reasons: tuple[str, ...] = ()
+  dimension_reviews: dict[str, str] = Field(default_factory=dict)
   invalidation_condition: str | None = None
 
 
@@ -103,8 +104,9 @@ class OpenAiLlmJudgementClient:
   def _request_content(self, request: LlmJudgementRequest) -> str:
     payload = self._request_adapter.dump_python(request, mode="json")
     return (
-      "Evaluate this provider-neutral rule-strategy candidate. Return only the "
-      "structured judgement object.\n"
+      "Evaluate this provider-neutral deterministic strategy candidate. "
+      "recent_feature_history is chronological from oldest to newest and may omit "
+      "unavailable indicators. Return only the structured judgement object.\n"
       f"{json.dumps(payload, sort_keys=True, separators=(',', ':'))}"
     )
 
@@ -151,6 +153,7 @@ class OpenAiLlmJudgementClient:
       risk_level=payload.risk_level,
       risk_flags=payload.risk_flags,
       reasons=payload.reasons,
+      dimension_reviews=payload.dimension_reviews,
       invalidation_condition=payload.invalidation_condition,
       used_fallback=False,
       trace=self._trace(
@@ -180,6 +183,9 @@ class OpenAiLlmJudgementClient:
       "prompt_profile": self._prompt_profile,
       "reasoning_effort": self._reasoning_effort,
       "request_feature_keys": tuple(sorted(request.selected_features)),
+      "recent_history_rows": len(request.recent_feature_history),
+      "recent_history_keys": _history_keys(request.recent_feature_history),
+      "trace_context_keys": tuple(sorted(request.trace_context)),
       "raw_output_stored": False,
     }
     if error_type is not None:
@@ -193,12 +199,41 @@ def _elapsed_ms(started_at: float) -> int:
   return max(0, round((perf_counter() - started_at) * 1000))
 
 
-_SYSTEM_PROMPT = """You are a veto-only trading judgement layer.
+def _history_keys(history: tuple[dict[str, Any], ...]) -> tuple[str, ...]:
+  keys: set[str] = set()
+  for row in history:
+    keys.update(str(key) for key in row)
+  return tuple(sorted(keys))
 
-You review an existing deterministic rule-strategy candidate.
-You must never create a new BUY or SELL signal.
-If the candidate is unsafe, stale, unsupported by the supplied features, or unclear,
-return no_trade, high risk, and a concise reason.
-Only approve_buy for a buy candidate or approve_sell for a sell candidate when the
-provided market snapshot and selected features support the rule rationale.
+
+_SYSTEM_PROMPT = """You are a veto-only top-tier discretionary trader and market-audit layer.
+
+You review an existing deterministic rule-strategy candidate. Your job is not to find
+new trades. Your job is to decide whether the supplied candidate remains valid under a
+broad market read.
+
+Hard rules:
+- Never create or upgrade a signal. If the candidate is BUY, respond only approve_buy
+  or no_trade. If the candidate is SELL, respond only approve_sell or no_trade.
+- Never turn a HOLD into BUY or SELL.
+- Do not invent indicators, future prices, external news, or missing context.
+- Confidence is confidence in your audit judgement, not probability of profit.
+
+Audit dimensions:
+- trend: moving averages, slopes, regime alignment, directional drift.
+- momentum: RSI and recent momentum behavior, exhaustion, rebound, acceleration.
+- structure: swing lows/highs, lower lows, reclaim/failure, support/resistance context.
+- volatility_liquidity: ATR, candle range, volume, gaps, noisy or illiquid conditions.
+- risk_reward: stop/invalidation distance, overextension, asymmetric setup quality.
+- position_context: existing exposure, scale-in/exit context, sizing implications.
+- data_quality: stale, contradictory, insufficient, or low-context inputs.
+
+Use an opportunity-preserving, aggressive audit posture: approve a BUY/SELL candidate
+when the thesis is still broadly plausible and risk is not clearly disqualifying.
+Medium risk, imperfect alignment, or mild caution can still be approved. Veto only when
+the candidate thesis is clearly invalid, structurally weak, overextended, stale,
+data-poor, or high risk.
+
+Return concise reasons and a dimension_reviews object with short summaries for the
+audit dimensions you actually used.
 """

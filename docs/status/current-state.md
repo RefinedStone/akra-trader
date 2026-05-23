@@ -81,7 +81,9 @@ Architecture:
 - Deployment, backup, and credential governance are not product-grade.
 - LLM work includes provider-neutral judgement request/response contracts, `LlmJudgementPort`, a
   deterministic mock client, an OpenAI Responses structured-output adapter, and a veto-only wrapper
-  for existing rule-based candidate signals. It still has no prompt registry, durable raw trace
+  for existing rule-based candidate signals. The active prompt profile is a general
+  `elite_market_auditor_v1` market-audit prompt with recent feature history, sanitized strategy
+  trace context, and dimension-level reviews. It still has no prompt registry, durable raw trace
   store, replay harness, or live-promotion path.
 - Some extracted backend/frontend modules remain large and need continued flow-level decomposition.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime
 from enum import Enum
+from math import isfinite
 from typing import Any
 from typing import Mapping
 
@@ -28,7 +29,72 @@ from akra_trader.ports import DecisionEnginePort
 from akra_trader.ports import LlmJudgementPort
 from akra_trader.strategies.base import Strategy
 
-DEFAULT_LLM_JUDGEMENT_MIN_CONFIDENCE = 0.7
+DEFAULT_LLM_JUDGEMENT_MIN_CONFIDENCE = 0.6
+DEFAULT_LLM_JUDGEMENT_SELECTED_FEATURE_LIMIT = 48
+DEFAULT_LLM_JUDGEMENT_RECENT_HISTORY_LIMIT = 40
+MAX_LLM_JUDGEMENT_RECENT_HISTORY_LIMIT = 80
+_TRACE_SUMMARY_MAX_DEPTH = 4
+_TRACE_SUMMARY_MAX_ITEMS = 40
+_TRACE_SUMMARY_OMITTED_KEYS = {
+  "llm_judgement",
+  "raw_output",
+  "raw_payload",
+  "raw_prompt",
+  "provider_payload",
+}
+_HISTORY_FEATURE_KEYS = (
+  "timestamp",
+  "bar_index",
+  "open",
+  "high",
+  "low",
+  "close",
+  "volume",
+  "return_1",
+  "volatility_8",
+  "rsi",
+  "rsi_recent_min",
+  "rsi_crossed_oversold",
+  "rsi_crossed_oversold_recent",
+  "bars_since_rsi_oversold_cross",
+  "atr",
+  "ma20",
+  "ma60",
+  "ma20_slope",
+  "ma60_slope",
+  "ema_fast",
+  "ema_slow",
+  "sma_short",
+  "sma_long",
+  "previous_price_swing_low",
+  "recent_price_swing_low",
+  "recent_lower_lows",
+)
+_SELECTED_FEATURE_PRIORITY = (
+  *_HISTORY_FEATURE_KEYS,
+  "previous_open",
+  "previous_high",
+  "previous_low",
+  "previous_close",
+  "previous_volume",
+  "previous_rsi",
+  "previous_atr",
+  "previous_ma20",
+  "previous_ma60",
+  "previous_ma20_slope",
+  "previous_ma60_slope",
+  "previous_rsi_recent_min",
+  "previous_price_swing_low",
+  "previous_recent_price_swing_low",
+  "previous_recent_lower_lows",
+  "previous2_open",
+  "previous2_high",
+  "previous2_low",
+  "previous2_close",
+  "previous2_volume",
+  "previous2_rsi",
+  "previous2_atr",
+)
 
 
 class ExternalDecisionStrategy(Strategy):
@@ -87,12 +153,14 @@ class LlmJudgementVetoStrategy(Strategy):
     judgement: LlmJudgementPort,
     *,
     min_confidence: float = DEFAULT_LLM_JUDGEMENT_MIN_CONFIDENCE,
-    selected_feature_limit: int = 32,
+    selected_feature_limit: int = DEFAULT_LLM_JUDGEMENT_SELECTED_FEATURE_LIMIT,
+    recent_history_limit: int = DEFAULT_LLM_JUDGEMENT_RECENT_HISTORY_LIMIT,
   ) -> None:
     self._delegate = delegate
     self._judgement = judgement
     self._min_confidence = min_confidence
     self._selected_feature_limit = selected_feature_limit
+    self._recent_history_limit = recent_history_limit
 
   def describe(self) -> StrategyMetadata:
     return self._delegate.describe()
@@ -115,12 +183,14 @@ class LlmJudgementVetoStrategy(Strategy):
     candidate = self._delegate.decide(context)
     metadata = self._delegate.describe()
     min_confidence = _resolve_min_confidence(context, self._min_confidence)
+    recent_history_limit = _resolve_recent_history_limit(context, self._recent_history_limit)
     return apply_llm_judgement_veto(
       candidate,
       judgement=self._judgement,
       strategy_id=metadata.strategy_id,
       min_confidence=min_confidence,
       selected_feature_limit=self._selected_feature_limit,
+      recent_history_limit=recent_history_limit,
     )
 
 
@@ -130,7 +200,8 @@ def apply_llm_judgement_veto(
   judgement: LlmJudgementPort,
   strategy_id: str | None = None,
   min_confidence: float = DEFAULT_LLM_JUDGEMENT_MIN_CONFIDENCE,
-  selected_feature_limit: int = 32,
+  selected_feature_limit: int = DEFAULT_LLM_JUDGEMENT_SELECTED_FEATURE_LIMIT,
+  recent_history_limit: int = DEFAULT_LLM_JUDGEMENT_RECENT_HISTORY_LIMIT,
 ) -> StrategyDecisionEnvelope:
   if candidate.signal.action == SignalAction.HOLD:
     return replace(
@@ -151,6 +222,7 @@ def apply_llm_judgement_veto(
     candidate,
     strategy_id=strategy_id,
     selected_feature_limit=selected_feature_limit,
+    recent_history_limit=recent_history_limit,
   )
   try:
     response = judgement.judge(request)
@@ -207,6 +279,7 @@ def _build_judgement_request(
   *,
   strategy_id: str | None,
   selected_feature_limit: int,
+  recent_history_limit: int,
 ) -> LlmJudgementRequest:
   context = candidate.context
   return LlmJudgementRequest(
@@ -222,6 +295,10 @@ def _build_judgement_request(
     ),
     market_snapshot=_json_safe_mapping(context.market),
     selected_features=_select_features(context.features, selected_feature_limit),
+    recent_feature_history=_select_recent_feature_history(
+      context.recent_features,
+      recent_history_limit,
+    ),
     current_position=LlmCurrentPositionState(
       has_position=context.state.has_position,
       cash=context.state.cash,
@@ -231,7 +308,14 @@ def _build_judgement_request(
     trace_context={
       "candidate_tags": candidate.signal.tags,
       "candidate_reason": candidate.signal.reason,
-      "trace_keys": tuple(sorted(candidate.trace)),
+      "trace_keys": tuple(
+        sorted(
+          str(key)
+          for key in candidate.trace
+          if str(key) not in _TRACE_SUMMARY_OMITTED_KEYS
+        )
+      ),
+      "trace_summary": _summarize_trace(candidate.trace),
     },
   )
 
@@ -272,6 +356,18 @@ def _resolve_min_confidence(context: StrategyDecisionContext, default: float) ->
   except (TypeError, ValueError):
     return default
   return min(max(value, 0.0), 1.0)
+
+
+def _resolve_recent_history_limit(context: StrategyDecisionContext, default: int) -> int:
+  raw_value = context.state.parameters.get(
+    "llm_judgement_recent_window",
+    context.state.parameters.get("llm_judgement_history_bars", default),
+  )
+  try:
+    value = int(raw_value)
+  except (TypeError, ValueError):
+    return min(max(default, 0), MAX_LLM_JUDGEMENT_RECENT_HISTORY_LIMIT)
+  return min(max(value, 0), MAX_LLM_JUDGEMENT_RECENT_HISTORY_LIMIT)
 
 
 def _with_llm_judgement_trace(
@@ -318,6 +414,9 @@ def _request_summary(request: LlmJudgementRequest) -> dict[str, Any]:
     "candidate_action": request.candidate_signal.action,
     "market_keys": tuple(sorted(request.market_snapshot)),
     "selected_feature_keys": tuple(sorted(request.selected_features)),
+    "recent_history_rows": len(request.recent_feature_history),
+    "recent_history_keys": _history_keys(request.recent_feature_history),
+    "trace_context_keys": tuple(sorted(request.trace_context)),
     "has_position": request.current_position.has_position,
   }
 
@@ -330,6 +429,7 @@ def _response_summary(response: LlmJudgementResponse) -> dict[str, Any]:
     "risk_level": response.risk_level.value,
     "risk_flags": tuple(flag.value for flag in response.risk_flags),
     "reasons": response.reasons,
+    "dimension_reviews": _json_safe_mapping(response.dimension_reviews),
     "invalidation_condition": response.invalidation_condition,
     "used_fallback": response.used_fallback,
     "trace": _json_safe_mapping(response.trace),
@@ -338,13 +438,76 @@ def _response_summary(response: LlmJudgementResponse) -> dict[str, Any]:
 
 def _select_features(features: Mapping[str, Any], limit: int) -> dict[str, Any]:
   selected: dict[str, Any] = {}
+  for key in _SELECTED_FEATURE_PRIORITY:
+    if len(selected) >= max(limit, 0):
+      break
+    if key in features and key != "timestamp":
+      selected[key] = _json_safe_value(features[key])
   for key in sorted(features):
     if len(selected) >= max(limit, 0):
       break
-    if key == "timestamp":
+    if key == "timestamp" or key in selected:
       continue
     selected[key] = _json_safe_value(features[key])
   return selected
+
+
+def _select_recent_feature_history(
+  history: tuple[dict[str, Any], ...],
+  limit: int,
+) -> tuple[dict[str, Any], ...]:
+  if limit <= 0:
+    return ()
+  rows = history[-min(limit, MAX_LLM_JUDGEMENT_RECENT_HISTORY_LIMIT) :]
+  selected_rows: list[dict[str, Any]] = []
+  for row in rows:
+    selected: dict[str, Any] = {}
+    for key in _HISTORY_FEATURE_KEYS:
+      if key in row:
+        selected[key] = _json_safe_value(row[key])
+    if selected:
+      selected_rows.append(selected)
+  return tuple(selected_rows)
+
+
+def _history_keys(history: tuple[dict[str, Any], ...]) -> tuple[str, ...]:
+  keys: set[str] = set()
+  for row in history:
+    keys.update(str(key) for key in row)
+  return tuple(sorted(keys))
+
+
+def _summarize_trace(trace: Mapping[str, Any]) -> dict[str, Any]:
+  summary: dict[str, Any] = {}
+  for key in sorted(trace, key=str):
+    if str(key) in _TRACE_SUMMARY_OMITTED_KEYS:
+      continue
+    summary[str(key)] = _summarize_trace_value(trace[key], depth=0)
+  return summary
+
+
+def _summarize_trace_value(value: Any, *, depth: int) -> Any:
+  if depth >= _TRACE_SUMMARY_MAX_DEPTH:
+    return "<max_depth>"
+  if isinstance(value, Mapping):
+    summary: dict[str, Any] = {}
+    for index, key in enumerate(sorted(value, key=str)):
+      if index >= _TRACE_SUMMARY_MAX_ITEMS:
+        summary["_truncated"] = True
+        break
+      if str(key) in _TRACE_SUMMARY_OMITTED_KEYS:
+        continue
+      summary[str(key)] = _summarize_trace_value(value[key], depth=depth + 1)
+    return summary
+  if isinstance(value, tuple | list):
+    items = [
+      _summarize_trace_value(item, depth=depth + 1)
+      for item in value[:_TRACE_SUMMARY_MAX_ITEMS]
+    ]
+    if len(value) > _TRACE_SUMMARY_MAX_ITEMS:
+      items.append("<truncated>")
+    return items
+  return _json_safe_value(value)
 
 
 def _json_safe_mapping(values: Mapping[str, Any]) -> dict[str, Any]:
@@ -354,10 +517,16 @@ def _json_safe_mapping(values: Mapping[str, Any]) -> dict[str, Any]:
 def _json_safe_value(value: Any) -> Any:
   if isinstance(value, Enum):
     return value.value
+  if hasattr(value, "to_pydatetime"):
+    return value.to_pydatetime().isoformat()
   if isinstance(value, datetime):
     return value.isoformat()
-  if value is None or isinstance(value, str | int | float | bool):
+  if value is None or isinstance(value, str):
     return value
+  if isinstance(value, bool):
+    return value
+  if isinstance(value, int | float):
+    return value if isfinite(float(value)) else None
   if hasattr(value, "item"):
     return _json_safe_value(value.item())
   if isinstance(value, Mapping):

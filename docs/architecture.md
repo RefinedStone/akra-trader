@@ -28,10 +28,14 @@ Compatibility files may exist, but they should delegate or re-export rather than
   experiments.
 - `adapters/openai_llm_judgement.py` is the provider-backed `LlmJudgementPort` implementation
   for backtest and sandbox research. It uses OpenAI Responses structured outputs and stores only
-  provider/model/latency/response-id summary trace, not raw provider payloads.
+  provider/model/latency/response-id/history/key summary trace, not raw provider payloads.
 - `strategies/llm.py` owns the veto-only wrapper that can review an existing rule-based candidate
   signal. It may preserve an existing BUY/SELL candidate, or downgrade it to HOLD. It must not
   create BUY/SELL signals when the rule strategy produced HOLD.
+- The current prompt profile is `elite_market_auditor_v1`: a general, opportunity-preserving market
+  auditor that evaluates trend, momentum, price structure, volatility/liquidity, risk/reward,
+  position context, and data quality. Requests include prioritized core indicators, up to 40 recent
+  feature rows by default, and a sanitized strategy trace summary.
 - Runtime integration is explicit opt-in through `use_llm_judgement` with a configured
   `LlmJudgementPort`. Provider-backed judgement is limited to backtest and sandbox; guarded-live
   requests are logged and ignored. Default strategy execution remains deterministic and unchanged.

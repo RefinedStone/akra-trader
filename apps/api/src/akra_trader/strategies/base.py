@@ -13,6 +13,8 @@ from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import WarmupSpec
 
+DEFAULT_DECISION_CONTEXT_RECENT_FEATURE_LIMIT = 40
+
 
 class Strategy(ABC):
   @abstractmethod
@@ -46,6 +48,7 @@ class Strategy(ABC):
         "volume": float(latest["volume"]),
       },
       state=state,
+      recent_features=build_recent_feature_history(candles),
     )
 
   @abstractmethod
@@ -100,6 +103,25 @@ class FixedFractionExecutionPolicy(ExecutionPolicy):
       exit_mode=self._exit_mode,
       tags=self._tags,
     )
+
+
+def build_recent_feature_history(
+  candles: pd.DataFrame,
+  *,
+  limit: int = DEFAULT_DECISION_CONTEXT_RECENT_FEATURE_LIMIT,
+) -> tuple[dict[str, object], ...]:
+  if limit <= 0 or candles.empty:
+    return ()
+  return tuple(_row_mapping(row) for _, row in candles.tail(limit).iterrows())
+
+
+def _row_mapping(row: pd.Series) -> dict[str, object]:
+  values: dict[str, object] = {}
+  for key, value in row.to_dict().items():
+    if hasattr(value, "item"):
+      value = value.item()
+    values[str(key)] = value
+  return values
 
 
 class PolicyBackedStrategy(Strategy, ABC):

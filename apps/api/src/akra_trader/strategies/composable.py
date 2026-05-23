@@ -16,6 +16,7 @@ from akra_trader.domain.models import StrategyExecutionState
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import WarmupSpec
 from akra_trader.strategies.base import Strategy
+from akra_trader.strategies.base import build_recent_feature_history
 
 
 @dataclass(frozen=True)
@@ -416,6 +417,7 @@ class ComposableStrategy(Strategy):
         "volume": float(latest["volume"]),
       },
       state=state,
+      recent_features=build_recent_feature_history(candles),
     )
 
   def decide(self, context: StrategyDecisionContext) -> StrategyDecisionEnvelope:

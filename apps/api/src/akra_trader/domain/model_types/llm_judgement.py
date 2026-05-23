@@ -77,6 +77,7 @@ class LlmJudgementRequest:
   selected_features: dict[str, Any]
   current_position: LlmCurrentPositionState
   rule_rationale: str
+  recent_feature_history: tuple[dict[str, Any], ...] = ()
   strategy_id: str | None = None
   trace_context: dict[str, Any] = field(default_factory=dict)
 
@@ -89,6 +90,7 @@ class LlmJudgementResponse:
   risk_level: LlmRiskLevel = LlmRiskLevel.MEDIUM
   risk_flags: tuple[LlmRiskFlag, ...] = ()
   reasons: tuple[str, ...] = ()
+  dimension_reviews: dict[str, str] = field(default_factory=dict)
   invalidation_condition: str | None = None
   used_fallback: bool = False
   trace: dict[str, Any] = field(default_factory=dict)
@@ -107,6 +109,7 @@ def build_safe_llm_judgement_fallback(reason: str) -> LlmJudgementResponse:
     risk_level=LlmRiskLevel.HIGH,
     risk_flags=(LlmRiskFlag.UNKNOWN_CONTEXT,),
     reasons=(normalized_reason,),
+    dimension_reviews={"data_quality": normalized_reason},
     invalidation_condition="llm_judgement_fallback_requires_manual_review",
     used_fallback=True,
   )

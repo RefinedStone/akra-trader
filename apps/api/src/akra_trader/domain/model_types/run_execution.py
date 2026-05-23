@@ -266,6 +266,7 @@ class StrategyDecisionContext:
   features: dict[str, Any]
   market: dict[str, Any]
   state: StrategyExecutionState
+  recent_features: tuple[dict[str, Any], ...] = ()
   llm: LlmFunctionLayer = field(default_factory=LlmFunctionLayer.disabled)
 
 
