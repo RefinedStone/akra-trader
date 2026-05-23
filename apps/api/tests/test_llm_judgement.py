@@ -295,6 +295,30 @@ def test_application_can_opt_into_mock_backtest_judgement_without_provider_sdk()
   assert judgements[0]["final_action"] == "hold"
 
 
+def test_backtest_resolves_llm_judgement_to_disabled_by_default():
+  client = MockLlmJudgementClient(scenario="approve")
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=_SingleStrategyCatalog(_FixedCandidateStrategy(SignalAction.BUY)),
+    runs=InMemoryCoreRepository(),
+    llm_judgement=client,
+  )
+
+  run = app.run_backtest(
+    strategy_id="fixed_candidate_strategy",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=5,
+    parameters={},
+  )
+
+  assert run.config.parameters["use_llm_judgement"] is False
+  assert client.requests == []
+  assert not app.get_run_llm_judgements(run.config.run_id)
+
+
 def test_openai_llm_judgement_adapter_uses_structured_response_and_records_trace():
   client = _FakeOpenAiClient(
     _openai_response(

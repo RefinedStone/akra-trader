@@ -189,6 +189,7 @@ def test_health_and_strategy_surface(tmp_path):
   assert reversal_strategy["parameter_schema"]["execution_leverage"]["default"] == 1.0
   assert reversal_strategy["parameter_schema"]["execution_maintenance_margin_rate"]["default"] == 0.005
   assert reversal_strategy["parameter_schema"]["execution_funding_rate_8h"]["default"] == 0.0
+  assert reversal_strategy["parameter_schema"]["use_llm_judgement"]["default"] is False
   assert (
     "RSI14 과매도 탈출"
     in reversal_strategy["parameter_schema"]["rsi_window"]["description_ko"]

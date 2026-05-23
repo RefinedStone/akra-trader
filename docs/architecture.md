@@ -37,8 +37,10 @@ Compatibility files may exist, but they should delegate or re-export rather than
   position context, and data quality. Requests include prioritized core indicators, up to 40 recent
   feature rows by default, and a sanitized strategy trace summary.
 - Runtime integration is explicit opt-in through `use_llm_judgement` with a configured
-  `LlmJudgementPort`. Provider-backed judgement is limited to backtest and sandbox; guarded-live
-  requests are logged and ignored. Default strategy execution remains deterministic and unchanged.
+  `LlmJudgementPort`. `use_llm_judgement` defaults to `false` in runtime parameter schemas even when
+  an adapter is configured, because provider-backed backtests can be expensive. Provider-backed
+  judgement is limited to backtest and sandbox; guarded-live requests are logged and ignored.
+  Default strategy execution remains deterministic and unchanged.
 
 ## Frontend Shape
 

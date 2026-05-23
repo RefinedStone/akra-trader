@@ -41,6 +41,7 @@ from akra_trader.runtime import StateCache
 from akra_trader.runtime import candles_to_frame
 from akra_trader.strategies.llm import ExternalDecisionStrategy
 from akra_trader.strategies.llm import LlmJudgementVetoStrategy
+from akra_trader.strategies.runtime_controls import with_runtime_parameter_schema
 
 
 class HoldDecisionEngine(DecisionEnginePort):
@@ -575,6 +576,10 @@ class TradingApplication:
       raise ValueError("LLM strategy execution is interface-only in this runtime.")
     strategy = self._strategies.load(strategy_id)
     metadata = strategy.describe()
+    metadata = replace(
+      metadata,
+      parameter_schema=with_runtime_parameter_schema(metadata.parameter_schema),
+    )
     resolved_parameters = _resolve_parameters(metadata, parameters)
     if self._should_apply_llm_judgement(mode=mode, parameters=resolved_parameters):
       strategy = LlmJudgementVetoStrategy(strategy, self._llm_judgement)

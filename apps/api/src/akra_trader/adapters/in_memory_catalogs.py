@@ -14,6 +14,7 @@ from akra_trader.strategies.base import Strategy
 from akra_trader.strategies.examples import MovingAverageCrossStrategy
 from akra_trader.strategies.quant_examples import Rsi14OversoldReversalStrategy
 from akra_trader.strategies.quant_examples import RsiAtrOversoldPeakTurnStrategy
+from akra_trader.strategies.runtime_controls import with_runtime_parameter_schema
 
 
 class LocalStrategyCatalog(StrategyCatalogPort):
@@ -77,6 +78,10 @@ class LocalStrategyCatalog(StrategyCatalogPort):
     return self._apply_registration_metadata(metadata)
 
   def _apply_registration_metadata(self, metadata: StrategyMetadata) -> StrategyMetadata:
+    metadata = replace(
+      metadata,
+      parameter_schema=with_runtime_parameter_schema(metadata.parameter_schema),
+    )
     registration = self._registrations.get(metadata.strategy_id)
     if registration is None or metadata.lifecycle.registered_at is not None:
       return metadata

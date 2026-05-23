@@ -40,10 +40,12 @@ Defaults:
   `AKRA_TRADER_OPENAI_API_KEY` or `OPENAI_API_KEY` for backtest/sandbox judgement
 
 LLM judgement remains a veto-only overlay for an existing rule-strategy BUY/SELL candidate. It
-does not upgrade HOLD candidates. The OpenAI prompt profile is `elite_market_auditor_v1`: it asks a
-general market-audit trader to review trend, momentum, price structure, volatility/liquidity,
-risk/reward, position context, and data quality using the latest snapshot, prioritized core
-features, recent feature history, and sanitized strategy trace. The default judgement threshold is
+does not upgrade HOLD candidates. The run parameter `use_llm_judgement` defaults to `false` even
+when a provider is configured; set it to `true` only for a deliberately paid backtest/sandbox
+review. The OpenAI prompt profile is `elite_market_auditor_v1`: it asks a general market-audit
+trader to review trend, momentum, price structure, volatility/liquidity, risk/reward, position
+context, and data quality using the latest snapshot, prioritized core features, recent feature
+history, and sanitized strategy trace. The default judgement threshold is
 `llm_judgement_min_confidence=0.60`; override it per run only when you want stricter or looser veto
 behavior.
 
